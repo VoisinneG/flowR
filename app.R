@@ -87,6 +87,10 @@ body <- dashboardBody(
                          width = NULL, height = NULL,
                          tabPanel("Select",
                                  selectInput("sample_selected", label = "Sample", choices = NULL, selected = NULL),
+                                 actionButton("previous_frame", "previous"),
+                                 actionButton("next_frame", "next"),
+                                 br(),
+                                 br(),
                                  selectInput("xvar_gate", label = "x variable", choices = NULL, selected = NULL),
                                  selectInput("yvar_gate", label = "y variable", choices = NULL, selected = NULL)
                                  )
@@ -143,7 +147,8 @@ body <- dashboardBody(
                                   selectInput("y_scale_gate", 
                                               label = "y scale", 
                                               choices = c("linear", "log10", "asinh", "logicle"), 
-                                              selected = "linear")
+                                              selected = "linear"),
+                                  checkboxInput("freeze_limits", label = "freeze plot limits", value = TRUE)
                                   
                          ),
                          tabPanel("Options",
@@ -255,7 +260,12 @@ server <- function(session, input, output) {
                          pdata = NULL,
                          gates = list(),
                          gate_focus = "root",
-                         df_gate_focus = NULL
+                         df_gate_focus = NULL,
+                         gates_flowCore = list(),
+                         min_val = NULL,
+                         max_val = NULL,
+                         min_val_pos = NULL,
+                         max_val_pos = NULL
                          )
   
   gate <- reactiveValues(x = NULL, y = NULL)
@@ -305,10 +315,18 @@ server <- function(session, input, output) {
       rval$parameters <- data.frame(name = name, 
                                     desc = desc,
                                     name_long = name_long,
-                                    
                                     row.names = NULL)
       
       rval$parameters$transform <- "logicle"
+      
+      plot_var <- rval$parameters$name_long
+      names(plot_var) <- NULL
+      
+      if(length(plot_var)>1){
+        updateSelectInput(session, "xvar_gate", choices = plot_var, selected = plot_var[1])
+        updateSelectInput(session, "yvar_gate", choices = plot_var, selected = plot_var[2])
+        updateSelectInput(session, "color_var", choices = c("none", plot_var), selected = "none")
+      }
       
       rval$pdata <- data.frame(name = pData(rval$flow_set)$name,
                                events = fsApply(rval$flow_set, function(x){description(x)[["$TOT"]]}))
@@ -317,7 +335,46 @@ server <- function(session, input, output) {
                         choices = phenoData(rval$flow_set)$name,
                         selected = phenoData(rval$flow_set)$name[1])
       
+      # Compute max values for each parameter in flow set
+      min_val_pos <- as.data.frame(fsApply(rval$flow_set, each_col, function(x){min(x[x>0 & !is.na(x)])}))
+      min_val <- as.data.frame(fsApply(rval$flow_set, each_col, min, na.rm = TRUE))
+      rval$min_val_pos <- apply(min_val_pos , 2, min)
+      rval$min_val <- apply(min_val, 2, min)
+      
+      max_val_pos <- as.data.frame(fsApply(rval$flow_set, each_col, function(x){max(x[x>0 & !is.na(x)])}))
+      max_val <- as.data.frame(fsApply(rval$flow_set, each_col, max,  na.rm = TRUE))
+      rval$rvmax_val_pos <- apply(max_val_pos , 2, max)
+      rval$max_val <- apply(max_val, 2, max)
+      
+      names(rval$max_val) <- rval$parameters$name_long[match(names(rval$max_val), rval$parameters$name)]
+      names(rval$min_val) <- rval$parameters$name_long[match(names(rval$min_val), rval$parameters$name)]
+      names(rval$min_val_pos) <- rval$parameters$name_long[match(names(rval$min_val_pos), rval$parameters$name)]
+      
+      # Create gating set
       rval$gating_set <- GatingSet(rval$flow_set)
+      
+      # add existing gates
+      ngates <- length(rval$gates_flowCore)
+      if(ngates>0){
+        gs <- rval$gating_set
+        idx <- 1:ngates
+        while(length(idx)>0){
+          
+          i_added <- NULL
+          for(i in 1:length(idx)){
+            if(rval$gates_flowCore[[idx[i]]]$parent %in% union(basename(getNodes(gs)), "root") ){
+              add(gs, 
+                  rval$gates_flowCore[[idx[i]]]$gate, 
+                  parent = rval$gates_flowCore[[idx[i]]]$parent, 
+                  name = names(rval$gates_flowCore)[idx[i]])
+              i_added <- c(i_added, i)
+            }
+          }
+          idx <- idx[-i_added]
+        }
+        rval$gating_set <- gs
+      }
+      
     }
     
   })
@@ -326,19 +383,31 @@ server <- function(session, input, output) {
   
   observeEvent(input$sample_selected, {
     if(!is.null(rval$flow_set)){
-      
       rval$idx_ff_gate <- which(rval$pdata$name == input$sample_selected)
-      plot_var <- rval$parameters$name_long
-      
-      names(plot_var) <- NULL
-      
-      if(length(plot_var)>1){
-        updateSelectInput(session, "xvar_gate", choices = plot_var, selected = plot_var[1])
-        updateSelectInput(session, "yvar_gate", choices = plot_var, selected = plot_var[2])
-        updateSelectInput(session, "color_var", choices = c("none", plot_var), selected = "none")
-      }
     }
-    
+  })
+  
+  observeEvent(input$next_frame, {
+    if(!is.null(rval$flow_set)){
+      idx <- which(rval$pdata$name == input$sample_selected)
+      idx <- idx +1
+      if(idx > length(rval$pdata$name)){
+        idx <- 1
+      }
+      updateSelectInput(session, "sample_selected", selected = rval$pdata$name[idx])
+      
+    }
+  })
+  
+  observeEvent(input$previous_frame, {
+    if(!is.null(rval$flow_set)){
+      idx <- which(rval$pdata$name == input$sample_selected)
+      idx <- idx - 1
+      if(idx < 1){
+        idx <- length(rval$pdata$name)
+      }
+      updateSelectInput(session, "sample_selected", selected = rval$pdata$name[idx])
+    }
   })
   
   observe({
@@ -428,8 +497,8 @@ server <- function(session, input, output) {
                              rval$parameters$name[match(input$yvar_gate, rval$parameters$name_long)])
       
       poly_gate <- polygonGate(boundaries = boundaries, filterId=input$gate_name)
-      
-      add(rval$gating_set, poly_gate, parent = rval$gate_focus)
+      rval$gates_flowCore[[input$gate_name]] <- list(gate = poly_gate, parent = rval$gate_focus)
+      add(rval$gating_set, poly_gate, parent = rval$gate_focus, name = input$gate_name)
       
       recompute(rval$gating_set)
       
@@ -465,6 +534,7 @@ server <- function(session, input, output) {
         
         updateSelectInput(session, "xvar_gate", selected = rval$gates[[input$gate_selected]]$xvar)
         updateSelectInput(session, "yvar_gate", selected = rval$gates[[input$gate_selected]]$yvar)
+        updateSelectInput(session, "gate_selected", selected = rval$gates[[input$gate_selected]]$parent)
         
         cat(gate$x)
         cat("\n")
@@ -553,6 +623,7 @@ server <- function(session, input, output) {
       rval$parameters$transform[match(input$yvar_gate, rval$parameters$name_long)] <- input$y_scale_gate
     })
     
+
   ##########################################################################################################
   # Output
   output$files_table <- renderDataTable({
@@ -588,20 +659,30 @@ server <- function(session, input, output) {
   })
    
   output$tree <- renderPlot({
-    # df <- lapply(rval$gates, function(x){ 
-    #   if(x$name != "root"){
-    #     data.frame("source" = x$parent, "target" = x$name)}
-    #   else{NULL}}
-    # )
-    # df <- do.call(rbind, df)
-    # 
-    # validate(
-    #   need(dim(df)[1]>0, "Empty gates set")
-    # )
-    # net <- igraph::graph.data.frame(df, directed=TRUE)
-    # net$layout <- layout_as_tree(net)
-    # plot(net)
-    plot(rval$gating_set)
+    df <- lapply(rval$gates, function(x){
+      if(x$name != "root"){
+        data.frame("source" = x$parent, "target" = x$name)}
+      else{NULL}}
+    )
+    df <- do.call(rbind, df)
+
+    validate(
+      need(dim(df)[1]>0, "Empty gates set")
+    )
+    net <- igraph::graph.data.frame(df, directed=TRUE)
+    net$layout <- layout_as_tree(net)
+    
+    plot.igraph(net, 
+                layout = layout_as_tree, 
+                vertex.size = 50, 
+                vertex.color = rgb(0,0,0,0.2), 
+                vertex.frame.color = NA, 
+                vertex.label.color = "black", 
+                vertex.label.family = "Helvetica",
+                edge.arrow.size = 0.3, 
+                vertex.label.cex = 0.7)
+    
+    #plot(rval$gating_set)
   })
   
   output$plot_focus <- renderPlot({
@@ -678,17 +759,57 @@ server <- function(session, input, output) {
     df$x <- df[[input$xvar_gate]]
     df$y <- df[[input$yvar_gate]]
     
+    if(input$freeze_limits){
+      xlim <- c(rval$min_val[[input$xvar_gate]], rval$max_val[[input$xvar_gate]])
+      if(input$x_scale_gate != "linear"){
+        xlim <- c(rval$min_val_pos[[input$xvar_gate]], rval$max_val[[input$xvar_gate]])
+      }
+      ylim <- c(rval$min_val[[input$yvar_gate]], rval$max_val[[input$yvar_gate]])
+      if(input$y_scale_gate != "linear"){
+        ylim <- c(rval$min_val_pos[[input$yvar_gate]], rval$max_val[[input$yvar_gate]])
+      }
+    }else{
+      xlim <- range(df$x, na.rm = TRUE)
+      if(input$x_scale_gate != "linear"){
+        xlim <- range(df$x[df$x>0], na.rm = TRUE)
+      }
+      ylim <- range(df$y, na.rm = TRUE)
+      if(input$y_scale_gate != "linear"){
+        ylim <- range(df$y[df$y>0], na.rm = TRUE)
+      }
+    }  
+    
+    binwidth = c(xlim[2]-xlim[1], ylim[2]-ylim[1]) 
+    binwidth[1] <- switch(input$x_scale_gate,
+                          "linear" = binwidth[1],
+                          "log10" = log10(binwidth[1]),
+                          "asinh" = flowJo_fasinh_trans()$transform(binwidth[1]),
+                          "logicle" = logicle_trans()$transform(binwidth[1])
+                          )
+    binwidth[2] <- switch(input$y_scale_gate,
+                          "linear" = binwidth[2],
+                          "log10" = log10(binwidth[2]),
+                          "asinh" = flowJo_fasinh_trans()$transform(binwidth[2]),
+                          "logicle" = logicle_trans()$transform(binwidth[2])
+    )
+    
+    binwidth <- binwidth / input$bin_number_gate
+    cat(binwidth)
+    cat("\n")
+    
     if(!is.null(df)){
       
         p <- ggplot(df,
                     aes(x = x, y = y))
+
+        
         p <- p + 
           xlab(input$xvar_gate) +
           ylab(input$yvar_gate) +
           ggtitle(paste(input$sample_selected, " / ", input$gate_selected, sep = ""))
         
         if(input$plot_type_gate == "hexagonal"){
-          p <- p + geom_hex(bins = input$bin_number_gate) +
+          p <- p + geom_hex(binwidth = binwidth) +
             scale_fill_viridis()
         }
         
@@ -724,14 +845,36 @@ server <- function(session, input, output) {
         p <- p + switch(input$x_scale_gate,
                         "linear" = scale_x_continuous(),
                         "log10" = scale_x_log10(),
-                        "asinh" = scale_x_continuous(trans = flowJo_fasinh_trans()),
-                        "logicle" = scale_x_continuous(trans = logicle_trans()))
+                        "asinh" = scale_x_continuous(trans = flowJo_fasinh_trans(), 
+                                                     breaks = log10_trans()$breaks(xlim),
+                                                     minor_breaks = log10_trans()$minor_breaks(
+                                                       b=log10_trans()$breaks(xlim), 
+                                                       limits = xlim,
+                                                       n=2)),
+                        "logicle" = scale_x_continuous(trans = logicle_trans(), 
+                                                       breaks = log10_trans()$breaks(xlim),
+                                                       minor_breaks = log10_trans()$minor_breaks(
+                                                         b=log10_trans()$breaks(xlim), 
+                                                         limits = xlim,
+                                                         n=2))
+                                                       )
         
         p <- p + switch(input$y_scale_gate,
                         "linear" = scale_y_continuous(),
                         "log10" = scale_y_log10(),
-                        "asinh" = scale_y_continuous(trans = flowJo_fasinh_trans()),
-                        "logicle" = scale_y_continuous(trans = logicle_trans()))
+                        "asinh" = scale_y_continuous(trans = flowJo_fasinh_trans(), 
+                                                     breaks = log10_trans()$breaks(ylim),
+                                                     minor_breaks = log10_trans()$minor_breaks(
+                                                       b=log10_trans()$breaks(ylim), 
+                                                       limits = ylim,
+                                                       n=2)),
+                        "logicle" = scale_y_continuous(trans = logicle_trans(), 
+                                                       breaks = log10_trans()$breaks(ylim),
+                                                       minor_breaks = log10_trans()$minor_breaks(
+                                                         b=log10_trans()$breaks(ylim), 
+                                                         limits = ylim,
+                                                         n=2))
+                                                       )
 
       
       if(!is.null(gate$x)){
@@ -746,9 +889,14 @@ server <- function(session, input, output) {
           geom_path(polygon, mapping = aes(x=x, y=y), color = "red") +
           geom_polygon(data=polygon,
                        fill="red",
-                       alpha=0.25)
+                       alpha=0.1)
       }
       
+        
+      
+        p <- p + coord_cartesian(xlim = xlim, ylim = ylim, expand = TRUE)
+      
+        
       p
       
     }
