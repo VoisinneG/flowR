@@ -3,6 +3,7 @@
 library(openCyto)
 library(ggcyto)
 library(ggridges)
+library(ncdfFlow)
 
 library(shiny)
 library(shinyBS)
@@ -278,18 +279,17 @@ server <- function(session, input, output) {
   })
   
   
-  # load raw data
+  # Select files
   observe({
     
     validate(
       need(input$files$datapath, "Please select a file to import")
     )
-    
     rval$df_files <- input$files
     
   })
   
-
+  # load data
   observeEvent(input$load, {
     validate(
       need(length(input$files_table_rows_selected)>0, "Please select a file to load")
@@ -477,32 +477,41 @@ server <- function(session, input, output) {
   
   observeEvent(input$create_gate, {
     
-    if(!is.null(gate$x)){
-      polygon <- data.frame(x =gate$x, y = gate$y)
-      hpts <- chull(polygon)
-      hpts <- c(hpts, hpts[1])
-      polygon <- polygon[hpts, ]
-      
-      rval$gates[[input$gate_name]] <- list(
-        "name" = input$gate_name,
-        "parent" = rval$gate_focus,
-        "xvar" = input$xvar_gate, 
-        "yvar" = input$yvar_gate,
-        "type" = "polygonal_gate",
-        "path" = polygon
-      )
-      
-      boundaries = list("x" = polygon$x, "y" = polygon$y )
-      names(boundaries) <- c(rval$parameters$name[match(input$xvar_gate, rval$parameters$name_long)],
-                             rval$parameters$name[match(input$yvar_gate, rval$parameters$name_long)])
-      
-      poly_gate <- polygonGate(boundaries = boundaries, filterId=input$gate_name)
-      rval$gates_flowCore[[input$gate_name]] <- list(gate = poly_gate, parent = rval$gate_focus)
-      add(rval$gating_set, poly_gate, parent = rval$gate_focus, name = input$gate_name)
-      
-      recompute(rval$gating_set)
-      
+    if(input$gate_name %in% basename(getNodes(rval$gating_set))){
+      showModal(modalDialog(
+        title = "Error",
+        "Gate name already exists! Please choose another name.",
+        easyClose = TRUE,
+        footer = NULL
+      ))
+    }else{
+      if(!is.null(gate$x)){
+        polygon <- data.frame(x =gate$x, y = gate$y)
+        hpts <- chull(polygon)
+        hpts <- c(hpts, hpts[1])
+        polygon <- polygon[hpts, ]
+        
+        rval$gates[[input$gate_name]] <- list(
+          "name" = input$gate_name,
+          "parent" = rval$gate_focus,
+          "xvar" = input$xvar_gate, 
+          "yvar" = input$yvar_gate,
+          "type" = "polygonal_gate",
+          "path" = polygon
+        )
+        
+        boundaries = list("x" = polygon$x, "y" = polygon$y )
+        names(boundaries) <- c(rval$parameters$name[match(input$xvar_gate, rval$parameters$name_long)],
+                               rval$parameters$name[match(input$yvar_gate, rval$parameters$name_long)])
+        
+        poly_gate <- polygonGate(boundaries = boundaries, filterId=input$gate_name)
+        rval$gates_flowCore[[input$gate_name]] <- list(gate = poly_gate, parent = rval$gate_focus)
+        add(rval$gating_set, poly_gate, parent = rval$gate_focus, name = input$gate_name)
+        
+        recompute(rval$gating_set)
+      }
     }
+      
   })
     
     observe({
@@ -517,11 +526,21 @@ server <- function(session, input, output) {
     
     observeEvent(input$delete_gate, {
       if(input$gate_to_delete != "root"){
-        cat(input$gate_to_delete)
-        idx_del <- which( names(rval$gates) == input$gate_to_delete )
-        cat(idx_del)
+        
+        idx_gh <- which( basename(getNodes(rval$gating_set)) == input$gate_to_delete )
+        target_gate <- basename(getNodes(rval$gating_set)[idx_gh])
+        child_gates <- basename(getChildren(rval$gating_set, target_gate))
+        Rm(target_gate, rval$gating_set)
+        #if(length(child_gates)>0){
+        #  for(i in 1:length(child_gates))
+        #  Rm(child_gates[i], rval$gating_set)
+        #}
+        recompute(rval$gating_set)
+        
+        idx_del <- which( names(rval$gates) %in% basename(c(target_gate, child_gates)))
         new_gates <- rval$gates[ - idx_del ]
         rval$gates <- new_gates
+        
       }
       
     })
