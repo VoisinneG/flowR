@@ -3,7 +3,7 @@
 library(openCyto)
 library(ggcyto)
 library(ggridges)
-library(ncdfFlow)
+#library(ncdfFlow)
 
 library(shiny)
 library(shinyBS)
@@ -11,11 +11,11 @@ library(shinydashboard)
 library(DT)
 library(tools)
 
-library(shinyTree)
+#library(shinyTree)
 library(sp)
 
 library(viridis)
-library(plotly)
+#library(plotly)
 library(igraph)
 library(scales)
 #library(ggplot2)
@@ -28,9 +28,8 @@ library(scales)
 
 transform_values <- function(x, scale, ...){
   xtrans <- switch(scale,
-                   "linear" = x,
-                   "log10" = x,
-                   #"asinh" = flowJo_fasinh_trans()$transform(x),
+                   "linear" = identity_trans()$inverse(x),
+                   "log10" = log10_trans()$inverse(x),
                    "asinh" = flowJo_fasinh_trans()$inverse(x),
                    "logicle" = logicle_trans()$inverse(x))
                    #"logicle" = as.numeric(logicleTransform(...)(x)))
@@ -40,7 +39,7 @@ transform_values <- function(x, scale, ...){
 ##########################################################################################################
 #User interface ----
 
-options(shiny.maxRequestSize = 100*1024^2)
+options(shiny.maxRequestSize = 300*1024^2)
 
 body <- dashboardBody(
   tabItems(
@@ -59,7 +58,7 @@ body <- dashboardBody(
                          dataTableOutput("files_table"),
                          br(),
                          br(),
-                         numericInput("N_lines", label = "Number of cells to import", value = 1000),
+                         numericInput("N_lines", label = "Number of cells to import", value = 3000),
                          actionButton("load", label = "Load selected files")
                      )
               ),
@@ -70,7 +69,8 @@ body <- dashboardBody(
                                      verbatimTextOutput("message")
                             ),
                             tabPanel(title = "parameters",
-                                     dataTableOutput("parameters_table")
+                                     div(style = 'overflow-x: scroll', DT::dataTableOutput("parameters_table"))
+                                     
                             ),
                             tabPanel(title = "metadata",
                                      div(style = 'overflow-x: scroll', DT::dataTableOutput("pData"))
@@ -134,7 +134,7 @@ body <- dashboardBody(
                      tabBox(title = "Plot",
                          width = NULL, height = NULL,
                          tabPanel("Plot",
-                                  plotOutput("plotGate",
+                                  plotOutput("plotGate2",
                                              brush = "plot_brush",
                                              click = "plot_click",
                                              dblclick = "plot_dblclick")
@@ -162,9 +162,10 @@ body <- dashboardBody(
                                   selectInput("color_trans", "color scale",
                                               choices = c("linear","log10"),
                                               selected = "linear"),
-                                  numericInput("bin_number_gate", label = "number of bins", value = 30),
-                                  numericInput("alpha", label = "alpha", value = 0.5),
-                                  numericInput("size", label = "size", value = 2)
+                                  numericInput("bin_number_gate", label = "number of bins", value = 75),
+                                  numericInput("alpha_gate", label = "alpha", value = 0.5),
+                                  numericInput("size_gate", label = "size", value = 2)
+                                  
                                   )
                      ),
                      # box("Plot gate",
@@ -185,15 +186,13 @@ body <- dashboardBody(
     tabItem(tabName = "Plot_tab",
             fluidRow(
               column(width = 4,
-                     box(title = "Plot options",
-                         width = NULL, height = NULL,
-                         selectInput("plot_type", 
-                                     label = "Select plot type", 
-                                     choices = c("Histogram", "2D plot"), 
-                                     selected = "2D plot"),
-                         selectInput("xvar", label = "x variable", choices = NULL, selected = NULL),
-                         selectInput("yvar", label = "y variable", choices = NULL, selected = NULL),
-                         numericInput("bin_number", label = "number of bins", value = 30)
+                     tabBox(title = "Sample",
+                            width = NULL, height = NULL,
+                            tabPanel("Select",
+                                     selectInput("gate", label = "gate", choices = "root", selected = "root"),
+                                     selectInput("xvar", label = "x variable", choices = NULL, selected = NULL),
+                                     selectInput("yvar", label = "y variable", choices = NULL, selected = NULL)
+                            )
                      ),
                      box(title = "Select samples",
                          width = NULL, height = NULL,
@@ -202,13 +201,40 @@ body <- dashboardBody(
                      )
               ),
               column(width = 8,
-                     box(title = "Plot",
-                         width = NULL, height = NULL,
-                         plotOutput("plot_focus")
+                     tabBox(title = "Plot",
+                            width = NULL, height = NULL,
+                            tabPanel("Plot",
+                                     plotOutput("plot_focus")
+                                     
+                            ),
+                            tabPanel("Scale axis",
+                                     selectInput("x_scale", 
+                                                 label = "x scale", 
+                                                 choices = c("linear", "log10", "asinh", "logicle"), 
+                                                 selected = "linear"),
+                                     selectInput("y_scale", 
+                                                 label = "y scale", 
+                                                 choices = c("linear", "log10", "asinh", "logicle"), 
+                                                 selected = "linear")
+                                     #checkboxInput("freeze_limits", label = "freeze plot limits", value = TRUE)
+                                     
+                            ),
+                            tabPanel("Options",
+                                     selectInput("plot_type", label = "plot type",
+                                                 choices = c("hexagonal", "histogram"),
+                                                 selected = "histogram"),
+                                     checkboxInput("smooth", "smooth", value = FALSE),
+                                     numericInput("bw", label = "smoothing bandwidth", value = 0.01),
+                                     numericInput("bin_number", label = "number of bins", value = 30),
+                                     numericInput("alpha", label = "alpha", value = 0.5),
+                                     numericInput("size", label = "size", value = 2),
+                                     checkboxInput("facet", "faceting", value = TRUE)
+                            )
                      )
               )
               
-            )
+              
+          )
     )
     
     
@@ -265,18 +291,17 @@ server <- function(session, input, output) {
                          gates_flowCore = list(),
                          min_val = NULL,
                          max_val = NULL,
-                         min_val_pos = NULL,
-                         max_val_pos = NULL
+                         transformation = NULL
                          )
   
   gate <- reactiveValues(x = NULL, y = NULL)
 
-  observe({
-    rval$gates[["root"]] <- list(
-      "name" = "root",
-      "parent" = NULL
-    )
-  })
+  # observe({
+  #   rval$gates[["root"]] <- list(
+  #     "name" = "root",
+  #     "parent" = NULL
+  #   )
+  # })
   
   
   # Select files
@@ -311,20 +336,45 @@ server <- function(session, input, output) {
       name <- parameters(ff)$name
       name_long <-  name
       name_long[!is.na(desc)] <- paste(name[!is.na(desc)], " (", desc[!is.na(desc)], ")", sep = "")
-        
+      
+      cat(rownames(parameters(ff)@data))
+      
+      display <- unlist(sapply(rownames(parameters(ff)@data), FUN = function(x){
+        kw <- substr(x, start = 2, stop = nchar(x))
+        kw <- paste(kw, "DISPLAY", sep = "")
+        disp <- ff@description[[kw]]
+        if(is.null(disp)){
+          disp <- "NA"
+        }
+        return(disp)
+        }))
+      names(display) <- NULL
+      print(display)
+      
       rval$parameters <- data.frame(name = name, 
                                     desc = desc,
                                     name_long = name_long,
-                                    row.names = NULL)
+                                    display = display,
+                                    range = parameters(ff)@data$range,
+                                    minRange = parameters(ff)@data$minRange,
+                                    maxRange = parameters(ff)@data$maxRange)
+                                    #row.names = NULL)
       
-      rval$parameters$transform <- "logicle"
-      
+      rval$parameters$transform <- "linear"
+      rval$parameters$transform[rval$parameters$display == "LOG"] <- "logicle"
+     
+      rval$transformation <- transformerList(rval$parameters$name, identity_trans())
+      chnls_log <- rval$parameters$name[rval$parameters$display == "LOG"]
+      rval$transformation[chnls_log] <- transformerList(chnls_log, logicle_trans())
+        
       plot_var <- rval$parameters$name_long
       names(plot_var) <- NULL
       
       if(length(plot_var)>1){
         updateSelectInput(session, "xvar_gate", choices = plot_var, selected = plot_var[1])
         updateSelectInput(session, "yvar_gate", choices = plot_var, selected = plot_var[2])
+        updateSelectInput(session, "xvar", choices = plot_var, selected = plot_var[1])
+        updateSelectInput(session, "yvar", choices = plot_var, selected = plot_var[2])
         updateSelectInput(session, "color_var", choices = c("none", plot_var), selected = "none")
       }
       
@@ -384,6 +434,7 @@ server <- function(session, input, output) {
   observeEvent(input$sample_selected, {
     if(!is.null(rval$flow_set)){
       rval$idx_ff_gate <- which(rval$pdata$name == input$sample_selected)
+      cat(rval$idx_ff_gate)
     }
   })
   
@@ -410,20 +461,20 @@ server <- function(session, input, output) {
     }
   })
   
-  observe({
-    if(!is.null(rval$flow_set)){
-      
-      plot_var <- parameters(rval$flow_set[[1]])$desc
-      plot_var <- plot_var[!is.na(plot_var)]
-      
-      names(plot_var) <- NULL
-
-      if(length(plot_var)>1){
-        updateSelectInput(session, "xvar", choices = plot_var, selected = plot_var[1])
-        updateSelectInput(session, "yvar", choices = plot_var, selected = plot_var[2])
-      }
-    }
-  })
+  # observe({
+  #   if(!is.null(rval$flow_set)){
+  #     
+  #     plot_var <- parameters(rval$flow_set[[1]])$desc
+  #     plot_var <- plot_var[!is.na(plot_var)]
+  #     
+  #     names(plot_var) <- NULL
+  # 
+  #     if(length(plot_var)>1){
+  #       updateSelectInput(session, "xvar", choices = plot_var, selected = plot_var[1])
+  #       updateSelectInput(session, "yvar", choices = plot_var, selected = plot_var[2])
+  #     }
+  #   }
+  # })
   
   ##########################################################################################################
   # Observe functions for gating
@@ -491,14 +542,14 @@ server <- function(session, input, output) {
         hpts <- c(hpts, hpts[1])
         polygon <- polygon[hpts, ]
         
-        rval$gates[[input$gate_name]] <- list(
-          "name" = input$gate_name,
-          "parent" = rval$gate_focus,
-          "xvar" = input$xvar_gate, 
-          "yvar" = input$yvar_gate,
-          "type" = "polygonal_gate",
-          "path" = polygon
-        )
+        # rval$gates[[input$gate_name]] <- list(
+        #   "name" = input$gate_name,
+        #   "parent" = rval$gate_focus,
+        #   "xvar" = input$xvar_gate, 
+        #   "yvar" = input$yvar_gate,
+        #   "type" = "polygonal_gate",
+        #   "path" = polygon
+        # )
         
         boundaries = list("x" = polygon$x, "y" = polygon$y )
         names(boundaries) <- c(rval$parameters$name[match(input$xvar_gate, rval$parameters$name_long)],
@@ -509,15 +560,19 @@ server <- function(session, input, output) {
         add(rval$gating_set, poly_gate, parent = rval$gate_focus, name = input$gate_name)
         
         recompute(rval$gating_set)
+        
+        updateSelectInput(session, "gate_selected", choices = basename(getNodes(rval$gating_set)), selected = input$gate_name)
+        updateSelectInput(session, "gate_to_delete", choices = setdiff(basename(getNodes(rval$gating_set)), "root"))
+        updateSelectInput(session, "gate", choices = basename(getNodes(rval$gating_set)), selected = "root")
+        
+        
+        gate$x <- NULL
+        gate$y <- NULL
+        
       }
     }
       
   })
-    
-    observe({
-      updateSelectInput(session, "gate_selected", choices = names(rval$gates))
-      updateSelectInput(session, "gate_to_delete", choices = setdiff(names(rval$gates), "root"))
-    })
 
     
     observeEvent(input$gate_selected, {
@@ -528,18 +583,24 @@ server <- function(session, input, output) {
       if(input$gate_to_delete != "root"){
         
         idx_gh <- which( basename(getNodes(rval$gating_set)) == input$gate_to_delete )
-        target_gate <- basename(getNodes(rval$gating_set)[idx_gh])
-        child_gates <- basename(getChildren(rval$gating_set, target_gate))
+        target_gate <- getNodes(rval$gating_set)[idx_gh]
+        child_gates <- basename(getChildren(rval$gating_set[[1]], target_gate))
+        rval$gates_flowCore <- rval$gates_flowCore[!names(rval$gates_flowCore) %in% c(target_gate, child_gates)]
         Rm(target_gate, rval$gating_set)
+        
         #if(length(child_gates)>0){
         #  for(i in 1:length(child_gates))
         #  Rm(child_gates[i], rval$gating_set)
         #}
         recompute(rval$gating_set)
         
-        idx_del <- which( names(rval$gates) %in% basename(c(target_gate, child_gates)))
-        new_gates <- rval$gates[ - idx_del ]
-        rval$gates <- new_gates
+        # idx_del <- which( names(rval$gates) %in% basename(c(target_gate, child_gates)))
+        # new_gates <- rval$gates[ - idx_del ]
+        # rval$gates <- new_gates
+        
+        updateSelectInput(session, "gate_selected", choices = basename(getNodes(rval$gating_set)), selected = "root")
+        updateSelectInput(session, "gate_to_delete", choices = setdiff(basename(getNodes(rval$gating_set)), "root"))
+        updateSelectInput(session, "gate", choices = basename(getNodes(rval$gating_set)), selected = "root")
         
       }
       
@@ -547,53 +608,49 @@ server <- function(session, input, output) {
     
     observeEvent(input$show_gate, {
       if(input$gate_selected != "root"){
-        rval$gate_focus <- rval$gates[[input$gate_selected]]$parent
-        gate$x <- rval$gates[[input$gate_selected]]$path$x
-        gate$y <- rval$gates[[input$gate_selected]]$path$y
+        rval$gate_focus <- rval$gates_flowCore[[input$gate_selected]]$parent
+        g <- rval$gates_flowCore[[input$gate_selected]]$gate
+        gate <- as.data.frame(g@boundaries)
         
-        updateSelectInput(session, "xvar_gate", selected = rval$gates[[input$gate_selected]]$xvar)
-        updateSelectInput(session, "yvar_gate", selected = rval$gates[[input$gate_selected]]$yvar)
-        updateSelectInput(session, "gate_selected", selected = rval$gates[[input$gate_selected]]$parent)
+        updateSelectInput(session, "xvar_gate", selected = names(gate)[1])
+        updateSelectInput(session, "yvar_gate", selected = names(gate)[2])
+        updateSelectInput(session, "gate_selected", selected = rval$gate_focus)
         
-        cat(gate$x)
-        cat("\n")
-        cat(gate$y)
-        cat("\n")
+        names(gate) <- c("x", "y")
       }
-      
     })
     
-    observe({
-      
-      if(!is.null(rval$flow_set) & !is.null(rval$idx_ff_gate)){
-        if( rval$gate_focus %in% names(rval$gates) ){
-          
-          ff <- rval$flow_set[[rval$idx_ff_gate]]
-          df <- data.frame(exprs(ff))
-          names(df) <- rval$parameters$name_long
-          
-          gate_name <- rval$gate_focus
-          
-          while(gate_name != "root"){
-            x <- rval$gates[[gate_name]]$xvar
-            y <- rval$gates[[gate_name]]$yvar
-            polygon <- rval$gates[[gate_name]]$path
-            
-            in_poly <- point.in.polygon(df[[x]],
-                                        df[[y]],
-                                        polygon$x,
-                                        polygon$y, 
-                                        mode.checked=FALSE)
-            
-            df <- df[in_poly>0, ]
-            gate_name <- rval$gates[[gate_name]]$parent
-          }
-          rval$df_gate_focus <- df
-          
-        }
-      } 
-  
-    })
+    # observe({
+    #   
+    #   if(!is.null(rval$flow_set) & !is.null(rval$idx_ff_gate)){
+    #     if( rval$gate_focus %in% names(rval$gates_flowCore) ){
+    #       
+    #       ff <- rval$flow_set[[rval$idx_ff_gate]]
+    #       df <- data.frame(exprs(ff))
+    #       names(df) <- rval$parameters$name_long
+    #       
+    #       gate_name <- rval$gate_focus
+    #       
+    #       while(gate_name != "root"){
+    #         x <- rval$gates[[gate_name]]$xvar
+    #         y <- rval$gates[[gate_name]]$yvar
+    #         polygon <- rval$gates[[gate_name]]$path
+    #         
+    #         in_poly <- point.in.polygon(df[[x]],
+    #                                     df[[y]],
+    #                                     polygon$x,
+    #                                     polygon$y, 
+    #                                     mode.checked=FALSE)
+    #         
+    #         df <- df[in_poly>0, ]
+    #         gate_name <- rval$gates[[gate_name]]$parent
+    #       }
+    #       rval$df_gate_focus <- df
+    #       
+    #     }
+    #   } 
+    # 
+    # })
     
     # observeEvent(input$x_scale_gate, {
     #   if(!is.null(rval$gating_set) & input$xvar_gate %in% rval$parameters$name_long){
@@ -634,12 +691,30 @@ server <- function(session, input, output) {
                         selected = rval$parameters$transform[match(input$xvar_gate, rval$parameters$name_long)])
     })
     
+    observeEvent(input$yvar, {
+      updateSelectInput(session, "y_scale", 
+                        selected = rval$parameters$transform[match(input$yvar, rval$parameters$name_long)])
+    })
+    
+    observeEvent(input$xvar, {
+      updateSelectInput(session, "x_scale", 
+                        selected = rval$parameters$transform[match(input$xvar, rval$parameters$name_long)])
+    })
+    
     observeEvent(input$x_scale_gate, {
       rval$parameters$transform[match(input$xvar_gate, rval$parameters$name_long)] <- input$x_scale_gate
     })
     
     observeEvent(input$y_scale_gate, {
       rval$parameters$transform[match(input$yvar_gate, rval$parameters$name_long)] <- input$y_scale_gate
+    })
+    
+    observeEvent(input$x_scale, {
+      rval$parameters$transform[match(input$xvar, rval$parameters$name_long)] <- input$x_scale
+    })
+    
+    observeEvent(input$y_scale, {
+      rval$parameters$transform[match(input$yvar, rval$parameters$name_long)] <- input$y_scale
     })
     
 
@@ -657,7 +732,10 @@ server <- function(session, input, output) {
   })
   
   output$parameters_table <- renderDataTable({
-      rval$parameters
+     df <- rval$parameters
+     df$minRange <- format(df$minRange, digits = 2)
+     df$maxRange <- format(df$maxRange, digits = 2)
+     df
   })
   
   output$pData <- DT::renderDataTable({
@@ -678,16 +756,18 @@ server <- function(session, input, output) {
   })
    
   output$tree <- renderPlot({
-    df <- lapply(rval$gates, function(x){
-      if(x$name != "root"){
-        data.frame("source" = x$parent, "target" = x$name)}
+    
+    validate(
+      need(names(rval$gates_flowCore) != "root", "Empty gates set")
+    )
+    
+    df <- lapply(names(rval$gates_flowCore), function(x){
+      if(x != "root"){
+        data.frame("source" = rval$gates_flowCore[[x]]$parent, "target" = x)}
       else{NULL}}
     )
+    
     df <- do.call(rbind, df)
-
-    validate(
-      need(dim(df)[1]>0, "Empty gates set")
-    )
     net <- igraph::graph.data.frame(df, directed=TRUE)
     net$layout <- layout_as_tree(net)
     
@@ -700,55 +780,58 @@ server <- function(session, input, output) {
                 vertex.label.family = "Helvetica",
                 edge.arrow.size = 0.3, 
                 vertex.label.cex = 0.7)
-    
-    #plot(rval$gating_set)
+
   })
   
   output$plot_focus <- renderPlot({
     
     validate(
+      need(rval$gating_set, "Empty gating set")
+    )
+    
+    validate(
       need(input$files_selection_table_rows_selected, "Please select samples")
     )
     
+    idx_x <- match(input$xvar, rval$parameters$name_long)
+    idx_y <- match(input$yvar, rval$parameters$name_long)
     
-    if(!is.null(rval$flow_set)){
-      
-      if(input$plot_type == "2D plot"){
-        
-        cat( names( data.frame( exprs( rval$flow_set[[input$files_selection_table_rows_selected[1]]] ) ) ) )
-        
-        p <- ggcyto(rval$flow_set[input$files_selection_table_rows_selected], 
-                    aes_string(x = input$xvar, y = input$yvar)) 
-        
-        p <- p + geom_hex(bins = input$bin_number)  +
-          scale_x_log10() +
-          scale_y_log10()
-          #facet_wrap(~name)
-            
-        
-      }
-      
-      if(input$plot_type == "Histogram"){
-        p <- ggcyto(rval$flow_set[input$files_selection_table_rows_selected], 
-                    aes_string(x = input$xvar))
-        p <- p + 
-          geom_density_ridges(mapping= aes_string(y = "name", fill = "name"), alpha = 0.2) +
-          #geom_density(mapping= aes_string(fill = "name"), alpha = 0.2,) +
-          #geom_histogram(bins = input$bin_number)  +
-          scale_x_log10() +
-          facet_null()
-          #guides(fill=guide_legend())
-          #facet_wrap(~name)
-        
-        
-      }
-
-      
-      plot(p)
+    if(input$plot_type== "hexagonal"){
+      p <- ggcyto(rval$gating_set[input$files_selection_table_rows_selected], 
+                  aes_(x = as.name(rval$parameters$name[idx_x]), 
+                       y = as.name(rval$parameters$name[idx_y]) ),
+                  subset = input$gate)+
+        geom_hex(bins = input$bin_number_gate) +
+        scale_fill_viridis() +
+        scale_x_continuous(trans = rval$transformation[[idx_x]]) +
+        scale_y_continuous(trans = rval$transformation[[idx_y]]) 
+        #facet_wrap()
       
     }
+    
+    if(input$plot_type == "histogram"){
+      p <- ggcyto(rval$gating_set[input$files_selection_table_rows_selected], 
+                  aes_(x = as.name(rval$parameters$name[idx_x])),
+                  subset = input$gate) +
+        scale_x_continuous(trans = rval$transformation[[idx_x]])
+        #facet_wrap()
+
+      if(input$smooth){
+        p <- p + geom_density(mapping = aes(fill = name, color = name), alpha = input$alpha, bw = input$bw)
+      }else{
+        p <- p + geom_histogram(mapping = aes(fill = name, color = name), alpha = input$alpha, bins = input$bin_number) 
+      }
+      
+      if(!input$facet){
+        p <- p + facet_null()
+      }
+    }
+
+    as.ggplot(p)
+
   })
-  
+
+
   # output$plotGate_flowCore <- renderPlot({
   #   cat(getNodes(rval$gating_set))
   # 
@@ -763,163 +846,261 @@ server <- function(session, input, output) {
   #   
   # })
   
-  output$plotGate <- renderPlot({
+  # output$plotGate <- renderPlot({
+  #   
+  #   validate(
+  #     need(rval$idx_ff_gate, "Please select a sample")
+  #   )
+  #   
+  #   df <- rval$df_gate_focus
+  #   
+  #   validate(
+  #     need(dim(df)[1]>0, "No cells in selection")
+  #   )
+  #   
+  #   df$x <- df[[input$xvar_gate]]
+  #   df$y <- df[[input$yvar_gate]]
+  #   
+  #   if(input$freeze_limits){
+  #     xlim <- c(rval$min_val[[input$xvar_gate]], rval$max_val[[input$xvar_gate]])
+  #     if(input$x_scale_gate != "linear"){
+  #       xlim <- c(rval$min_val_pos[[input$xvar_gate]], rval$max_val[[input$xvar_gate]])
+  #     }
+  #     ylim <- c(rval$min_val[[input$yvar_gate]], rval$max_val[[input$yvar_gate]])
+  #     if(input$y_scale_gate != "linear"){
+  #       ylim <- c(rval$min_val_pos[[input$yvar_gate]], rval$max_val[[input$yvar_gate]])
+  #     }
+  #   }else{
+  #     xlim <- range(df$x, na.rm = TRUE)
+  #     if(input$x_scale_gate != "linear"){
+  #       xlim <- range(df$x[df$x>0], na.rm = TRUE)
+  #     }
+  #     ylim <- range(df$y, na.rm = TRUE)
+  #     if(input$y_scale_gate != "linear"){
+  #       ylim <- range(df$y[df$y>0], na.rm = TRUE)
+  #     }
+  #   }  
+  #   
+  #   binwidth = c(xlim[2]-xlim[1], ylim[2]-ylim[1]) 
+  #   binwidth[1] <- switch(input$x_scale_gate,
+  #                         "linear" = binwidth[1],
+  #                         "log10" = log10(binwidth[1]),
+  #                         "asinh" = flowJo_fasinh_trans()$transform(binwidth[1]),
+  #                         "logicle" = logicle_trans()$transform(binwidth[1])
+  #                         )
+  #   binwidth[2] <- switch(input$y_scale_gate,
+  #                         "linear" = binwidth[2],
+  #                         "log10" = log10(binwidth[2]),
+  #                         "asinh" = flowJo_fasinh_trans()$transform(binwidth[2]),
+  #                         "logicle" = logicle_trans()$transform(binwidth[2])
+  #   )
+  #   
+  #   binwidth <- binwidth / input$bin_number_gate
+  #   cat(binwidth)
+  #   cat("\n")
+  #   
+  #   if(!is.null(df)){
+  #     
+  #       p <- ggplot(df,
+  #                   aes(x = x, y = y))
+  # 
+  #       
+  #       p <- p + 
+  #         xlab(input$xvar_gate) +
+  #         ylab(input$yvar_gate) +
+  #         ggtitle(paste(input$sample_selected, " / ", input$gate_selected, sep = ""))
+  #       
+  #       if(input$plot_type_gate == "hexagonal"){
+  #         p <- p + geom_hex(binwidth = binwidth) +
+  #           scale_fill_viridis()
+  #       }
+  #       
+  #       if(input$plot_type_gate == "contour"){
+  #         p <- p + 
+  #           geom_point(color  = "black", 
+  #                             alpha = input$alpha_gate, 
+  #                             size = input$size_gate) + 
+  #           stat_density_2d(aes(fill = stat(level)), geom = "polygon") +
+  #           scale_fill_viridis_c()
+  #           
+  #       }
+  #       
+  #       if(input$plot_type_gate == "dots"){
+  #         if(input$color_var != "none"){
+  #           trans = switch(input$color_trans,
+  #                          "linear" = "identity",
+  #                          "log10" = "log10")
+  #           df$colour <- df[[input$color_var]]
+  #           p <- p + geom_point(data = df, mapping = aes(colour = colour), 
+  #                               inherit.aes = TRUE, 
+  #                               alpha = input$alpha_gate, 
+  #                               size = input$size_gate) +
+  #             scale_colour_viridis(trans = trans, name = input$color_var)
+  #         }else{
+  #           p <- p + geom_point(alpha = input$alpha_gate, size = input$size_gate) +
+  #             scale_color_viridis()
+  #         }
+  #         
+  #       }
+  #         
+  #       
+  #       p <- p + switch(input$x_scale_gate,
+  #                       "linear" = scale_x_continuous(),
+  #                       "log10" = scale_x_log10(),
+  #                       "asinh" = scale_x_continuous(trans = flowJo_fasinh_trans(), 
+  #                                                    breaks = log10_trans()$breaks(xlim),
+  #                                                    minor_breaks = log10_trans()$minor_breaks(
+  #                                                      b=log10_trans()$breaks(xlim), 
+  #                                                      limits = xlim,
+  #                                                      n=2)),
+  #                       "logicle" = scale_x_continuous(trans = logicle_trans(), 
+  #                                                      breaks = log10_trans()$breaks(xlim),
+  #                                                      minor_breaks = log10_trans()$minor_breaks(
+  #                                                        b=log10_trans()$breaks(xlim), 
+  #                                                        limits = xlim,
+  #                                                        n=2))
+  #                                                      )
+  #       
+  #       p <- p + switch(input$y_scale_gate,
+  #                       "linear" = scale_y_continuous(),
+  #                       "log10" = scale_y_log10(),
+  #                       "asinh" = scale_y_continuous(trans = flowJo_fasinh_trans(), 
+  #                                                    breaks = log10_trans()$breaks(ylim),
+  #                                                    minor_breaks = log10_trans()$minor_breaks(
+  #                                                      b=log10_trans()$breaks(ylim), 
+  #                                                      limits = ylim,
+  #                                                      n=2)),
+  #                       "logicle" = scale_y_continuous(trans = logicle_trans(), 
+  #                                                      breaks = log10_trans()$breaks(ylim),
+  #                                                      minor_breaks = log10_trans()$minor_breaks(
+  #                                                        b=log10_trans()$breaks(ylim), 
+  #                                                        limits = ylim,
+  #                                                        n=2))
+  #                                                      )
+  # 
+  #     
+  #     if(!is.null(gate$x)){
+  #       
+  #       #polygon <- data.frame(x = c(gates$x, gates$x[1]), y = c(gates$y, gates$y[1]))
+  #       polygon <- data.frame(x = gate$x, y = gate$y)
+  #       hpts <- chull(polygon)
+  #       hpts <- c(hpts, hpts[1])
+  #       polygon <- polygon[hpts, ]
+  #       
+  #       p <- p +
+  #         geom_path(polygon, mapping = aes(x=x, y=y), color = "red") +
+  #         geom_polygon(data=polygon,
+  #                      fill="red",
+  #                      alpha=0.1)
+  #     }
+  #     
+  #       
+  #     
+  #       p <- p + coord_cartesian(xlim = xlim, ylim = ylim, expand = TRUE)
+  #     
+  #       
+  #     p
+  #     
+  #   }
+  # })
+  # 
+  
+  output$plotGate2 <- renderPlot({
+    
+    validate(
+      need(rval$gating_set, "Empty gating set")
+    )
     
     validate(
       need(rval$idx_ff_gate, "Please select a sample")
     )
     
-    df <- rval$df_gate_focus
+    idx_x <-match(input$xvar_gate, rval$parameters$name_long)
+    idx_y <- match(input$yvar_gate, rval$parameters$name_long)
     
-    validate(
-      need(dim(df)[1]>0, "No cells in selection")
-    )
-    
-    df$x <- df[[input$xvar_gate]]
-    df$y <- df[[input$yvar_gate]]
-    
+    xlim <- NULL
+    ylim <- NULL
     if(input$freeze_limits){
       xlim <- c(rval$min_val[[input$xvar_gate]], rval$max_val[[input$xvar_gate]])
-      if(input$x_scale_gate != "linear"){
-        xlim <- c(rval$min_val_pos[[input$xvar_gate]], rval$max_val[[input$xvar_gate]])
-      }
       ylim <- c(rval$min_val[[input$yvar_gate]], rval$max_val[[input$yvar_gate]])
-      if(input$y_scale_gate != "linear"){
-        ylim <- c(rval$min_val_pos[[input$yvar_gate]], rval$max_val[[input$yvar_gate]])
-      }
-    }else{
-      xlim <- range(df$x, na.rm = TRUE)
-      if(input$x_scale_gate != "linear"){
-        xlim <- range(df$x[df$x>0], na.rm = TRUE)
-      }
-      ylim <- range(df$y, na.rm = TRUE)
-      if(input$y_scale_gate != "linear"){
-        ylim <- range(df$y[df$y>0], na.rm = TRUE)
-      }
-    }  
+    }
     
-    binwidth = c(xlim[2]-xlim[1], ylim[2]-ylim[1]) 
-    binwidth[1] <- switch(input$x_scale_gate,
-                          "linear" = binwidth[1],
-                          "log10" = log10(binwidth[1]),
-                          "asinh" = flowJo_fasinh_trans()$transform(binwidth[1]),
-                          "logicle" = logicle_trans()$transform(binwidth[1])
-                          )
-    binwidth[2] <- switch(input$y_scale_gate,
-                          "linear" = binwidth[2],
-                          "log10" = log10(binwidth[2]),
-                          "asinh" = flowJo_fasinh_trans()$transform(binwidth[2]),
-                          "logicle" = logicle_trans()$transform(binwidth[2])
-    )
+    ##################################################################################
+    # plot density hexagonal
     
-    binwidth <- binwidth / input$bin_number_gate
-    cat(binwidth)
-    cat("\n")
+    if(input$plot_type_gate == "hexagonal"){
+      p <- ggcyto(rval$gating_set[[rval$idx_ff_gate]], subset = rval$gate_focus,
+                  aes_(x = as.name( rval$parameters$name[idx_x]), 
+                       y = as.name( rval$parameters$name[idx_y]) ) )+
+        geom_hex(bins = input$bin_number_gate) +
+        scale_fill_viridis()
+        
+    }
     
-    if(!is.null(df)){
+    ##################################################################################
+    # plot dots
+    
+    if(input$plot_type_gate == "dots"){
       
-        p <- ggplot(df,
-                    aes(x = x, y = y))
-
-        
-        p <- p + 
-          xlab(input$xvar_gate) +
-          ylab(input$yvar_gate) +
-          ggtitle(paste(input$sample_selected, " / ", input$gate_selected, sep = ""))
-        
-        if(input$plot_type_gate == "hexagonal"){
-          p <- p + geom_hex(binwidth = binwidth) +
-            scale_fill_viridis()
-        }
-        
-        if(input$plot_type_gate == "contour"){
-          p <- p + 
-            geom_point(color  = "black", 
-                              alpha = input$alpha, 
-                              size = input$size) + 
-            stat_density_2d(aes(fill = stat(level)), geom = "polygon") +
-            scale_fill_viridis_c()
-            
-        }
-        
-        if(input$plot_type_gate == "dots"){
-          if(input$color_var != "none"){
-            trans = switch(input$color_trans,
-                           "linear" = "identity",
-                           "log10" = "log10")
-            df$colour <- df[[input$color_var]]
-            p <- p + geom_point(data = df, mapping = aes(colour = colour), 
-                                inherit.aes = TRUE, 
-                                alpha = input$alpha, 
-                                size = input$size) +
-              scale_colour_viridis(trans = trans, name = input$color_var)
-          }else{
-            p <- p + geom_point(alpha = input$alpha, size = input$size) +
-              scale_color_viridis()
-          }
-          
-        }
-          
-        
-        p <- p + switch(input$x_scale_gate,
-                        "linear" = scale_x_continuous(),
-                        "log10" = scale_x_log10(),
-                        "asinh" = scale_x_continuous(trans = flowJo_fasinh_trans(), 
-                                                     breaks = log10_trans()$breaks(xlim),
-                                                     minor_breaks = log10_trans()$minor_breaks(
-                                                       b=log10_trans()$breaks(xlim), 
-                                                       limits = xlim,
-                                                       n=2)),
-                        "logicle" = scale_x_continuous(trans = logicle_trans(), 
-                                                       breaks = log10_trans()$breaks(xlim),
-                                                       minor_breaks = log10_trans()$minor_breaks(
-                                                         b=log10_trans()$breaks(xlim), 
-                                                         limits = xlim,
-                                                         n=2))
-                                                       )
-        
-        p <- p + switch(input$y_scale_gate,
-                        "linear" = scale_y_continuous(),
-                        "log10" = scale_y_log10(),
-                        "asinh" = scale_y_continuous(trans = flowJo_fasinh_trans(), 
-                                                     breaks = log10_trans()$breaks(ylim),
-                                                     minor_breaks = log10_trans()$minor_breaks(
-                                                       b=log10_trans()$breaks(ylim), 
-                                                       limits = ylim,
-                                                       n=2)),
-                        "logicle" = scale_y_continuous(trans = logicle_trans(), 
-                                                       breaks = log10_trans()$breaks(ylim),
-                                                       minor_breaks = log10_trans()$minor_breaks(
-                                                         b=log10_trans()$breaks(ylim), 
-                                                         limits = ylim,
-                                                         n=2))
-                                                       )
-
+      ff <- getData(rval$gating_set[[rval$idx_ff_gate]], y = rval$gate_focus)
+      df <- as.data.frame(exprs(ff))
+      color_var <- rval$parameters$name[ match(input$color_var, rval$parameters$name_long) ]
+      df$colour <- df[[color_var]]
       
-      if(!is.null(gate$x)){
-        
-        #polygon <- data.frame(x = c(gates$x, gates$x[1]), y = c(gates$y, gates$y[1]))
-        polygon <- data.frame(x = gate$x, y = gate$y)
-        hpts <- chull(polygon)
-        hpts <- c(hpts, hpts[1])
-        polygon <- polygon[hpts, ]
-        
-        p <- p +
-          geom_path(polygon, mapping = aes(x=x, y=y), color = "red") +
-          geom_polygon(data=polygon,
-                       fill="red",
-                       alpha=0.1)
+      p <- ggplot(df, aes_(x = as.name( rval$parameters$name[idx_x]), 
+                           y = as.name( rval$parameters$name[idx_y]) ))
+      
+      if(input$color_var != "none"){
+         p <- p + geom_point(mapping = aes(colour = colour), 
+                             alpha = input$alpha_gate, 
+                             size = input$size_gate) +
+           scale_colour_viridis(trans = logicle_trans(), name = input$color_var)
+ 
+      }else{
+        p <- p + geom_point(alpha = input$alpha_gate, size = input$size_gate) +
+          scale_color_viridis()
       }
+    }
+    
+    ##################################################################################
+    # plot gate
+    
+    if(!is.null(gate$x)){
       
-        
+      #polygon <- data.frame(x = c(gates$x, gates$x[1]), y = c(gates$y, gates$y[1]))
+      polygon <- data.frame(x = gate$x, y = gate$y)
+      hpts <- chull(polygon)
+      hpts <- c(hpts, hpts[1])
+      polygon <- polygon[hpts, ]
+      names(polygon) <- c(rval$parameters$name[idx_x], rval$parameters$name[idx_y])
       
-        p <- p + coord_cartesian(xlim = xlim, ylim = ylim, expand = TRUE)
+      xlim <- range(c(xlim, polygon[[1]]))
+      ylim <- range(c(ylim, polygon[[2]]))
       
-        
-      p
+      p <- p +
+        geom_path(data = polygon, color = "red") +
+        geom_polygon(data=polygon,
+                     fill="red",
+                     alpha=0.1)
       
     }
+    
+    ##################################################################################
+    # general plot parameters
+
+    p <- p + 
+      xlab(input$xvar_gate) +
+      ylab(input$yvar_gate) +
+      ggtitle(paste(input$sample_selected, " / ", input$gate_selected, sep = "")) +
+      scale_x_continuous(trans = rval$transformation[[idx_x]], limits = xlim) +
+      scale_y_continuous(trans = rval$transformation[[idx_y]], limits = ylim)
+    
+    p <- as.ggplot(p)
+    
+    p
+
   })
+      
 }
   
 shinyApp(ui, server)
