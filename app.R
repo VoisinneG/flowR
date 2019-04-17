@@ -494,7 +494,8 @@ server <- function(session, input, output) {
     rval$flow_set <- getData(rval$gating_set)
     
     updateSelectInput(session, "facet_var", 
-                      choices = names(rval$pdata))
+                      choices = names(rval$pdata), 
+                      selected = "name")
     
     updateSelectInput(session, "sample_selected",
                       choices = phenoData(rval$flow_set)$name,
@@ -661,20 +662,13 @@ server <- function(session, input, output) {
       if(input$gate_to_delete != "root"){
         
         idx_gh <- which( basename(getNodes(rval$gating_set)) == input$gate_to_delete )
-        target_gate <- getNodes(rval$gating_set)[idx_gh]
+        target_gate <- basename(getNodes(rval$gating_set)[idx_gh])
         child_gates <- basename(getChildren(rval$gating_set[[1]], target_gate))
-        rval$gates_flowCore <- rval$gates_flowCore[!names(rval$gates_flowCore) %in% c(target_gate, child_gates)]
+        idx_delete <- which( names(rval$gates_flowCore) %in% c(target_gate, child_gates) )
+        rval$gates_flowCore <- rval$gates_flowCore[-idx_delete]
+        
         Rm(target_gate, rval$gating_set)
-        
-        #if(length(child_gates)>0){
-        #  for(i in 1:length(child_gates))
-        #  Rm(child_gates[i], rval$gating_set)
-        #}
         recompute(rval$gating_set)
-        
-        # idx_del <- which( names(rval$gates) %in% basename(c(target_gate, child_gates)))
-        # new_gates <- rval$gates[ - idx_del ]
-        # rval$gates <- new_gates
         
         updateSelectInput(session, "gate_selected", choices = basename(getNodes(rval$gating_set)), selected = "root")
         updateSelectInput(session, "gate_to_delete", choices = setdiff(basename(getNodes(rval$gating_set)), "root"))
@@ -698,52 +692,7 @@ server <- function(session, input, output) {
       }
     })
     
-    # observe({
-    #   
-    #   if(!is.null(rval$flow_set) & !is.null(rval$idx_ff_gate)){
-    #     if( rval$gate_focus %in% names(rval$gates_flowCore) ){
-    #       
-    #       ff <- rval$flow_set[[rval$idx_ff_gate]]
-    #       df <- data.frame(exprs(ff))
-    #       names(df) <- rval$parameters$name_long
-    #       
-    #       gate_name <- rval$gate_focus
-    #       
-    #       while(gate_name != "root"){
-    #         x <- rval$gates[[gate_name]]$xvar
-    #         y <- rval$gates[[gate_name]]$yvar
-    #         polygon <- rval$gates[[gate_name]]$path
-    #         
-    #         in_poly <- point.in.polygon(df[[x]],
-    #                                     df[[y]],
-    #                                     polygon$x,
-    #                                     polygon$y, 
-    #                                     mode.checked=FALSE)
-    #         
-    #         df <- df[in_poly>0, ]
-    #         gate_name <- rval$gates[[gate_name]]$parent
-    #       }
-    #       rval$df_gate_focus <- df
-    #       
-    #     }
-    #   } 
-    # 
-    # })
     
-    # observeEvent(input$x_scale_gate, {
-    #   if(!is.null(rval$gating_set) & input$xvar_gate %in% rval$parameters$name_long){
-    #     chnls <- rval$parameters$name[match(input$xvar_gate, rval$parameters$name_long)]
-    #     cat(chnls)
-    #     myTrans <- transformerList(chnls, switch(input$x_scale_gate,
-    #                                              "linear" = scales::identity_trans(),
-    #                                              "log10" = scales::log_trans(base = 10),
-    #                                              "asinh" = flowJo_fasinh_trans(),
-    #                                              "logicle" = logicle_trans()))
-    #     
-    #     rval$gating_set <- transform(rval$gating_set, myTrans)
-    #   }
-    # })
-    # 
     
     observeEvent(input$y_scale_gate, {
       if(!is.null(rval$parameters)){
@@ -829,6 +778,7 @@ server <- function(session, input, output) {
 
   ##########################################################################################################
   # Output
+    
   output$files_table <- renderDataTable({
     validate(
       need(rval$df_files, "Please select a file to import")
@@ -861,39 +811,34 @@ server <- function(session, input, output) {
   
   output$message_gate <- renderPrint({
     #print(rval$gates[[input$gate_selected]])
-    print(rval$transformation)
+    print(rval$gates_flowCore)
   })
    
   output$tree <- renderPlot({
     
     validate(
-      need(names(rval$gates_flowCore) != "root", "Empty gates set")
+      need(length(rval$gates_flowCore)>0, "Empty gates set")
     )
     
-    if(!is.null(rval$gate_selected)){
-      
-      df <- lapply(names(rval$gates_flowCore), function(x){
-        if(x != "root"){
-          data.frame("source" = rval$gates_flowCore[[x]]$parent, "target" = x)}
-        else{NULL}}
-      )
-      
-      df <- do.call(rbind, df)
-      net <- igraph::graph.data.frame(df, directed=TRUE)
-      net$layout <- layout_as_tree(net)
-      
-      plot.igraph(net, 
-                  layout = layout_as_tree, 
-                  vertex.size = 50, 
-                  vertex.color = rgb(0,0,0,0.2), 
-                  vertex.frame.color = NA, 
-                  vertex.label.color = "black", 
-                  vertex.label.family = "Helvetica",
-                  edge.arrow.size = 0.3, 
-                  vertex.label.cex = 0.7)
-    }
-      
+    df <- lapply(names(rval$gates_flowCore), function(x){
+      if(x != "root"){
+        data.frame("source" = rval$gates_flowCore[[x]]$parent, "target" = x)}
+      else{NULL}}
+    )
     
+    df <- do.call(rbind, df)
+    net <- igraph::graph.data.frame(df, directed=TRUE)
+    net$layout <- layout_as_tree(net)
+    
+    plot.igraph(net, 
+                layout = layout_as_tree, 
+                vertex.size = 50, 
+                vertex.color = rgb(0,0,0,0.2), 
+                vertex.frame.color = NA, 
+                vertex.label.color = "black", 
+                vertex.label.family = "Helvetica",
+                edge.arrow.size = 0.3, 
+                vertex.label.cex = 0.7)
 
   })
   
@@ -1172,6 +1117,8 @@ server <- function(session, input, output) {
                        y = as.name( rval$parameters$name[idx_y]) ) )+
         geom_hex(bins = input$bin_number_gate) +
         scale_fill_viridis()
+      
+      p <- as.ggplot(p)
         
     }
     
@@ -1232,8 +1179,6 @@ server <- function(session, input, output) {
       ggtitle(paste(input$sample_selected, " / ", input$gate_selected, sep = "")) +
       scale_x_continuous(trans = rval$transformation[[idx_x]], limits = xlim) +
       scale_y_continuous(trans = rval$transformation[[idx_y]], limits = ylim)
-    
-    p <- as.ggplot(p)
     
     p
 
