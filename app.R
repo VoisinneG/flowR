@@ -173,7 +173,7 @@ body <- dashboardBody(
                                               selected = "linear"),
                                   numericInput("bin_number_gate", label = "number of bins", value = 150),
                                   numericInput("alpha_gate", label = "alpha", value = 0.5),
-                                  numericInput("size_gate", label = "size", value = 2)
+                                  numericInput("size_gate", label = "size", value = 1)
                                   
                                   )
                      ),
@@ -482,6 +482,15 @@ server <- function(session, input, output) {
     }
     
     #########################################################################################################
+    # update gates
+    
+    updateSelectInput(session, "gate_selected", choices = c("root", names(rval$gates_flowCore)), selected = "root")
+    updateSelectInput(session, "gate_to_delete", choices = names(rval$gates_flowCore))
+    updateSelectInput(session, "gate", choices = c("root", names(rval$gates_flowCore)), selected = "root")
+    
+    
+    
+    #########################################################################################################
     # Metadata
     rval$pdata <- data.frame(name = pData(rval$flow_set)$name,
                              tube = fsApply(rval$flow_set, function(x){description(x)[["TUBE NAME"]]}),
@@ -629,12 +638,12 @@ server <- function(session, input, output) {
           names(boundaries) <- c(rval$parameters$name[match(input$xvar_gate, rval$parameters$name_long)],
                                  rval$parameters$name[match(input$yvar_gate, rval$parameters$name_long)])
           
-          poly_gate <- polygonGate(boundaries = boundaries, filterId=input$gate_name)
+          poly_gate <- polygonGate(.gate = boundaries, filterId=input$gate_name)
           rval$gates_flowCore[[input$gate_name]] <- list(gate = poly_gate, parent = rval$gate_focus)
           add(rval$gating_set, poly_gate, parent = rval$gate_focus, name = input$gate_name)
           
           recompute(rval$gating_set)
-          
+
           updateSelectInput(session, "gate_selected", choices = basename(getNodes(rval$gating_set)), selected = input$gate_name)
           updateSelectInput(session, "gate_to_delete", choices = setdiff(basename(getNodes(rval$gating_set)), "root"))
           updateSelectInput(session, "gate", choices = basename(getNodes(rval$gating_set)), selected = "root")
@@ -648,11 +657,6 @@ server <- function(session, input, output) {
         
     })
 
-    observe({
-      updateSelectInput(session, "gate_selected", choices = c("root", names(rval$gates_flowCore)))
-      updateSelectInput(session, "gate_to_delete", choices = names(rval$gates_flowCore))
-      updateSelectInput(session, "gate", choices = c("root", names(rval$gates_flowCore)))
-    })
     
     observeEvent(input$gate_selected, {
       rval$gate_focus <- input$gate_selected
@@ -680,16 +684,19 @@ server <- function(session, input, output) {
     
     observeEvent(input$show_gate, {
       if(input$gate_selected != "root"){
-        rval$gate_focus <- rval$gates_flowCore[[input$gate_selected]]$parent
-        g <- rval$gates_flowCore[[input$gate_selected]]$gate
-        gate <- as.data.frame(g@boundaries)
+        g <- rval$gates_flowCore[[input$gate_selected]]$gate@boundaries
+        g <- as.data.frame(g)
+        names(g) <- rval$parameters$name_long[match(names(g), rval$parameters$name)]
         
-        updateSelectInput(session, "xvar_gate", selected = names(gate)[1])
-        updateSelectInput(session, "yvar_gate", selected = names(gate)[2])
-        updateSelectInput(session, "gate_selected", selected = rval$gate_focus)
+        updateSelectInput(session, "xvar_gate", selected = names(g)[1])
+        updateSelectInput(session, "yvar_gate", selected = names(g)[2])
         
-        names(gate) <- c("x", "y")
+        gate$x <- g[[1]]
+        gate$y <- g[[2]]
       }
+      updateSelectInput(session, "gate_selected",  
+                        selected = rval$gates_flowCore[[input$gate_selected]]$parent)
+
     })
     
     
@@ -775,7 +782,17 @@ server <- function(session, input, output) {
       rval$parameters$transform[match(input$yvar, rval$parameters$name_long)] <- input$y_scale
     })
     
-
+    observe({
+      if(input$plot_type_gate == "dots"){
+        ff <- getData(rval$gating_set[[rval$idx_ff_gate]], y = rval$gate_focus)
+        df <- as.data.frame(exprs(ff))
+        df$identifier <- input$sample_selected
+        rval$df_gate_focus <- df
+      }
+      
+    })
+    
+    
   ##########################################################################################################
   # Output
     
@@ -811,7 +828,11 @@ server <- function(session, input, output) {
   
   output$message_gate <- renderPrint({
     #print(rval$gates[[input$gate_selected]])
-    print(rval$gates_flowCore)
+    
+      
+        print(rval$gates_flowCore)
+    
+    
   })
    
   output$tree <- renderPlot({
@@ -1127,24 +1148,35 @@ server <- function(session, input, output) {
     
     if(input$plot_type_gate == "dots"){
       
-      ff <- getData(rval$gating_set[[rval$idx_ff_gate]], y = rval$gate_focus)
-      df <- as.data.frame(exprs(ff))
-      color_var <- rval$parameters$name[ match(input$color_var, rval$parameters$name_long) ]
-      df$colour <- df[[color_var]]
       
-      p <- ggplot(df, aes_(x = as.name( rval$parameters$name[idx_x]), 
-                           y = as.name( rval$parameters$name[idx_y]) ))
+      df <- rval$df_gate_focus
+    
+      
+      p <- ggplot(df,
+      #p <- ggplot(rval$gating_set[[rval$idx_ff_gate]], subset = rval$gate_focus,
+                  aes_(x = as.name( rval$parameters$name[idx_x]), 
+                       y = as.name( rval$parameters$name[idx_y])))
+      
+      #p <- as.ggplot(p)
+      
+      #p <- ggplot(df, aes_(x = as.name( rval$parameters$name[idx_x]), 
+      #                     y = as.name( rval$parameters$name[idx_y]) ))
       
       if(input$color_var != "none"){
-         p <- p + geom_point(mapping = aes(colour = colour), 
-                             alpha = input$alpha_gate, 
-                             size = input$size_gate) +
-           scale_colour_viridis(trans = logicle_trans(), name = input$color_var)
+        
+        idx_col <- match(input$color_var, rval$parameters$name_long)
+        #color_var <- rval$parameters$name[ idx_col ]
+        #df$colour <- df[[color_var]]
+        
+         p <- p + geom_point(mapping = aes_(colour = as.name(rval$parameters$name[ idx_col ])), 
+                             alpha = input$alpha_gate, size = input$size_gate) +
+           scale_colour_viridis(trans = rval$transformation[[idx_col]], name = input$color_var)
  
       }else{
-        p <- p + geom_point(alpha = input$alpha_gate, size = input$size_gate) +
-          scale_color_viridis()
+        p <- p + geom_point(alpha = input$alpha_gate, size = input$size_gate)
       }
+      
+      p <- p + theme(plot.title = element_text(face = "bold") ) + facet_wrap(facets = "identifier")
     }
     
     ##################################################################################
@@ -1180,7 +1212,7 @@ server <- function(session, input, output) {
       scale_x_continuous(trans = rval$transformation[[idx_x]], limits = xlim) +
       scale_y_continuous(trans = rval$transformation[[idx_y]], limits = ylim)
     
-    p
+    p 
 
   })
       
