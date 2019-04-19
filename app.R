@@ -1,7 +1,7 @@
 #BiocManager::install("flowCore")
 #BiocManager::install("flowViz")
 library(openCyto)
-library(flowWorkspace)
+#library(flowWorkspace)
 library(ggcyto)
 library(ggridges)
 
@@ -196,9 +196,14 @@ body <- dashboardBody(
                      #                click = "plot_click_1",
                      #                dblclick = "plot_dblclick_1")
                      # ),
-                     box(title = "Gates hierarchy",
+                     tabBox(title = "Gating hierarchy",
                          width = NULL, height = NULL,
-                         plotOutput("tree")
+                         tabPanel("Tree",
+                                  plotOutput("tree")
+                                  ),
+                         tabPanel("Plot gates",
+                                  plotOutput("plot_gh"))
+                         
                      )
               )
               
@@ -252,7 +257,7 @@ body <- dashboardBody(
                                                     multiple =TRUE,
                                                     label = "facet variables", 
                                                     choices = "name", 
-                                                    selected = "name"),     
+                                                    selected = NULL),     
                                      numericInput("bw", label = "smoothing bandwidth", value = 0.01),
                                      numericInput("bin_number", label = "number of bins", value = 150),
                                      numericInput("alpha", label = "alpha", value = 0.5),
@@ -314,14 +319,16 @@ server <- function(session, input, output) {
                          parameters = NULL,
                          pdata = NULL,
                          gates = list(),
-                         gate_focus = "root",
+                         gate_focus = NULL,
                          df_gate_focus = NULL,
                          gates_flowCore = list(),
                          min_val = NULL,
                          max_val = NULL,
                          transformation = list(),
                          keywords = NULL,
-                         plot_var = NULL
+                         plot_var = NULL,
+                         gate = NULL,
+                         data_range = NULL
                          )
   
   gate <- reactiveValues(x = NULL, y = NULL)
@@ -440,7 +447,11 @@ server <- function(session, input, output) {
       rval$min_val <- apply(min_val, 2, min)
       max_val <- as.data.frame(fsApply(rval$flow_set, each_col, max,  na.rm = TRUE))
       rval$max_val <- apply(max_val, 2, max)
-
+      
+      rval$data_range <- lapply(rval$parameters$name, function(x){
+        c(rval$min_val[[x]] , rval$max_val[[x]])
+      })
+      names(rval$data_range) <- rval$parameters$name
       
       #########################################################################################################
       # Create gating set
@@ -505,13 +516,11 @@ server <- function(session, input, output) {
     
       #########################################################################################################
       # update gates
+      
       gate_names <- c("root", names(rval$gates_flowCore))
-      if(! rval$gate_focus %in% gate_names){
-        updateSelectInput(session, "gate_selected", choices = gate_names, selected = "root")
-      }
-      if(! rval$gate_focus %in% gate_names){
-        updateSelectInput(session, "gate", choices = gate_names, selected = "root")
-      }
+      
+      updateSelectInput(session, "gate_selected", choices = gate_names)
+      updateSelectInput(session, "gate", choices = gate_names)
       updateSelectInput(session, "gate_to_delete", choices = names(rval$gates_flowCore))
       
       
@@ -644,6 +653,7 @@ server <- function(session, input, output) {
     observeEvent(input$reset_gate, {
       gate$x <- NULL
       gate$y <- NULL
+      rval$gate <- NULL
       session$resetBrush("plot_brush")
     })
   
@@ -668,11 +678,12 @@ server <- function(session, input, output) {
                                  rval$parameters$name[match(input$yvar_gate, rval$parameters$name_long)])
           
           poly_gate <- polygonGate(.gate = boundaries, filterId=input$gate_name)
+          rval$gate <- poly_gate
           rval$gates_flowCore[[input$gate_name]] <- list(gate = poly_gate, parent = rval$gate_focus)
           add(rval$gating_set, poly_gate, parent = rval$gate_focus, name = input$gate_name)
           
           recompute(rval$gating_set)
-
+          cat("update3\n")
           updateSelectInput(session, "gate_selected", choices = basename(getNodes(rval$gating_set)), selected = input$gate_name)
           updateSelectInput(session, "gate_to_delete", choices = setdiff(basename(getNodes(rval$gating_set)), "root"))
           updateSelectInput(session, "gate", choices = basename(getNodes(rval$gating_set)), selected = "root")
@@ -702,7 +713,7 @@ server <- function(session, input, output) {
         
         Rm(target_gate, rval$gating_set)
         recompute(rval$gating_set)
-        
+        cat("update4\n")
         updateSelectInput(session, "gate_selected", choices = basename(getNodes(rval$gating_set)), selected = "root")
         updateSelectInput(session, "gate_to_delete", choices = setdiff(basename(getNodes(rval$gating_set)), "root"))
         updateSelectInput(session, "gate", choices = basename(getNodes(rval$gating_set)), selected = "root")
@@ -713,6 +724,8 @@ server <- function(session, input, output) {
     
     observeEvent(input$show_gate, {
       if(input$gate_selected != "root"){
+        
+        rval$gate <- rval$gates_flowCore[[input$gate_selected]]$gate
         g <- rval$gates_flowCore[[input$gate_selected]]$gate@boundaries
         g <- as.data.frame(g)
         names(g) <- rval$parameters$name_long[match(names(g), rval$parameters$name)]
@@ -723,6 +736,7 @@ server <- function(session, input, output) {
         gate$x <- g[[1]]
         gate$y <- g[[2]]
       }
+      cat("update5\n")
       updateSelectInput(session, "gate_selected",  
                         selected = rval$gates_flowCore[[input$gate_selected]]$parent)
 
@@ -749,7 +763,7 @@ server <- function(session, input, output) {
       
     })
     
-    observeEvent(rval$transformation, {
+    observe({
       updateSelectInput(session, "y_scale_gate", 
                         selected = rval$parameters$transform[match(input$yvar_gate, rval$parameters$name_long)])
       updateSelectInput(session, "x_scale_gate", 
@@ -860,6 +874,38 @@ server <- function(session, input, output) {
 
   })
   
+  output$plot_gh <- renderPlot({
+    
+    validate(
+      need(rval$gating_set, "Empty gating set")
+    )
+    
+    validate(
+      need(rval$idx_ff_gate, "Please select a sample")
+    )
+    
+    axis_labels <- rval$parameters$name_long
+    names(axis_labels) <- rval$parameters$name
+    
+    p <- plot_gh(rval$gating_set, 
+                 idx = rval$idx_ff_gate,
+                 transformation = rval$transformation,
+                 bins = input$bin_number_gate,
+                 facet_vars = NULL,
+                 axis_labels = axis_labels,
+                 data_range = rval$data_range)
+    
+    n <- length(getNodes(rval$gating_set))
+    if(n>2){
+      g <- marrangeGrob(p, nrow = 2, ncol = n%/%2 + n%%2  , top = input$sample_selected)
+    }else{
+      g <- marrangeGrob(p, nrow = 1, ncol = n  , top = input$sample_selected)
+    }
+    
+    g
+    
+  })
+  
   output$plot_focus <- renderPlot({
     
     validate(
@@ -920,25 +966,26 @@ server <- function(session, input, output) {
     xvar <- rval$parameters$name[idx_x]
     yvar <- rval$parameters$name[idx_y]
     
-    xlim <- NULL
-    ylim <- NULL
-    
+
+    data_range <- NULL
     if(input$freeze_limits){
-      xlim <- c(rval$min_val[[idx_x]], rval$max_val[[idx_x]])
-      ylim <- c(rval$min_val[[idx_y]], rval$max_val[[idx_y]])
+      data_range <- rval$data_range
     }
     
+    print(rval$data_range)
+    
     color_var <- rval$parameters$name[match(input$color_var, rval$parameters$name_long)]
-
+    polygon_gate <- data.frame(x = gate$x, y=gate$y)
+    
     p <- plot_gs(gs = rval$gating_set, 
             idx = rval$idx_ff_gate,
             subset = rval$gate_focus, 
             xvar = xvar, 
             yvar = yvar, 
             color_var = color_var, 
-            xlim = xlim, 
-            ylim = ylim, 
-            gate = gate, 
+            data_range = data_range, 
+            gate = rval$gate,
+            polygon_gate = polygon_gate,
             type = input$plot_type_gate, 
             bins = input$bin_number_gate,
             alpha = input$alpha_gate,
