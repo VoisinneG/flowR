@@ -1,18 +1,25 @@
+library(scales)
+library(viridis)
+library(ggcyto)
 
 plot_gs <- function(gs, 
                     idx, 
                     subset,
                     xvar = NULL, 
-                    yvar = NULL, 
+                    yvar = NULL,
+                    xlab = NULL,
+                    ylab = NULL,
                     color_var = NA, 
                     xlim = NULL, 
                     ylim=NULL, 
                     gate=NULL, 
+                    polygon_gate = NULL,
                     type = "hexagonal", 
                     bins = 30,
                     alpha = 0.5,
                     size = 1,
                     transformation = NULL,
+                    default_trans = identity_trans(),
                     facet_vars = "name",
                     norm_density = TRUE,
                     smooth = FALSE,
@@ -21,11 +28,31 @@ plot_gs <- function(gs,
   
   
   if(is.null(transformation)){
-    transformation <- lapply(gs@data@colnames, function(x){identity_trans()} )
+    transformation <- lapply(gs@data@colnames, function(x){default_trans})
     names(transformation) <- gs@data@colnames
   }
   
+  if(!is.null(gate)){
+    if(class(gate) == "character"){
+      
+      gate_int <- lapply(gate, function(x){
+        if(x!="root"){
+          getGate(gs[[idx[1]]], x)
+        }else{
+          NULL
+        }})
+      names(gate_int) <- gate
+      gate <- gate_int
+      
+    }else if(grep("Gate", class(gate)) >0){
+      gate <- list(gate)
+    }
+  }
+  
+  
+  
   if(is.null(xvar)){
+    
     if(subset != "root"){
       g <- getGate(gs[[idx[1]]], y= subset)
       if(.hasSlot(g, "boundaries")){
@@ -40,9 +67,22 @@ plot_gs <- function(gs,
       yvar <- gs@data@colnames[2]
     }
     
-    
+    if(!is.null(gate)){
+      for(i in 1:length(gate)){
+        if(.hasSlot(gate[[i]], "boundaries")){
+          xvar <- colnames(gate[[i]]@boundaries)[1]
+          yvar <- try(colnames(gate[[i]]@boundaries)[2], silent = TRUE)
+          break
+        }
+      }
+    }
     
   }
+
+  #print(gate)
+  #print(c(xvar, yvar))
+  #print(c(xlim,ylim))
+  
   ##################################################################################
   # plot density hexagonal
   
@@ -130,20 +170,7 @@ plot_gs <- function(gs,
   ##################################################################################
   # plot gate
   
-  if(type != "histogram"){
-    
-    if(class(gate) == "character"){
-      
-      gate <- lapply(gate, function(x){
-        if(x!="root"){
-          getGate(gs[[idx[1]]], x)
-        }else{
-          NULL
-        }})
-      
-    }else if(grep("Gate", class(gate)) >0){
-      gate <- list(gate)
-    }
+  if(type != "histogram" & !is.null(gate)){
     
     print(gate)
     
@@ -156,23 +183,62 @@ plot_gs <- function(gs,
         polygon <- as.data.frame(gate_int@boundaries)
         idx_match <- match(c(xvar, yvar), names(polygon))
         
+        print(idx_match)
+        
         if(sum(is.na(idx_match))==0){
-          xlim <- range(c(xlim, polygon[[idx_match[1]]]))
-          ylim <- range(c(ylim, polygon[[idx_match[2]]]))
+          
+          df_trans <- polygon
+          
+          print(transformation[[xvar]]$transform(df_trans[,idx_match[1]]))
+          print(transformation[[yvar]]$transform(df_trans[,idx_match[2]]))
+          
+          df_trans[,idx_match[1]] <- transformation[[xvar]]$transform(df_trans[,idx_match[1]])
+          df_trans[,idx_match[2]] <- transformation[[yvar]]$transform(df_trans[,idx_match[2]])
+          center <- apply(df_trans , MARGIN = 2, FUN = mean)
+          
+          polygon <- rbind(polygon, polygon[1,])
+        
+        
+          #xlim <- range(c(xlim, polygon[[idx_match[1]]]))
+          #ylim <- range(c(ylim, polygon[[idx_match[2]]]))
           
           p <- p +
             geom_path(data = polygon, color = "red") +
             geom_polygon(data=polygon,
                          fill="red",
-                         alpha=0.1)
+                         alpha=0.1) +
+            annotate("text", 
+                     x=transformation[[xvar]]$inverse(center[idx_match[1]]), 
+                     y=transformation[[yvar]]$inverse(center[idx_match[2]]), 
+                     #x=center[idx_match[1]], 
+                     #y=center[idx_match[2]], 
+                     label = gate_int@filterId,
+                     color = "red")
         }else{
-          warning(paste("gate is not defined with parameters ",xvar, "and", yvar, sep = "" ))
+          warning(paste("gate is not defined with parameters ", xvar, "and", yvar, sep = "" ))
         }
       }
     }
     
   }
+  
+  ##################################################################################
+  # plot polygon gate
+  if(type != "histogram" & setequal(names(polygon_gate), c("x", "y"))){
+    if(!is.null(polygon_gate$x)){
+      polygon <- data.frame(x = polygon_gate$x, y = polygon_gate$y)
+      polygon <- rbind(polygon, polygon[1,])
+      names(polygon) <- c(xvar, yvar)
+      
+      p <- p +
+        geom_path(data = polygon, color = "red") +
+        geom_polygon(data=polygon,
+                     fill="red",
+                     alpha=0.1) 
+    }
     
+    
+  }
   
   
   ##################################################################################
@@ -195,6 +261,38 @@ plot_gs <- function(gs,
     p <- p + facet_null()
   }
   
+  if(!is.null(xlab)) p <- p + xlab(xlab)
+  if(!is.null(ylab)) p <- p + xlab(ylab)
+  
   p
   
+}
+
+
+plot_gh <- function(gs, idx, ...){
+  if(length(idx) != 1){
+    stop("length of idx must be equal to 1")
+  }
+  child_nodes <- getChildren(gs[[idx]], "root")
+  plist <- list()
+  count <- 0
+  while(length(child_nodes)>0){
+    child_nodes_int <- NULL
+    nodes_to_plot <- child_nodes
+    while(length(nodes_to_plot) > 0){
+      par_nodes <- lapply(nodes_to_plot, function(x){
+        try(colnames(getGate(gs[[idx]], nodes_to_plot)@boundaries), silent = TRUE)})
+      same_par <- sapply(par_nodes, function(x){setequal(x, par_nodes[[1]])})
+      
+      count <- count + 1
+      plist[[count]] <- plot_gs(gs, idx, subset = parent, gate = nodes_to_plot[same_par], ...)
+      child_nodes_int <- c(child_nodes_int, 
+                           unlist( nodes_to_plot[same_par], function(x){getChildren(gs[[1]], x)}) )
+      nodes_to_plot <- nodes_to_plot[-same_par]
+    }
+    
+    child_nodes <- child_nodes_int
+
+  }
+  return(plist)
 }
