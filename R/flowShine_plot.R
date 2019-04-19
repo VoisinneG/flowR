@@ -7,11 +7,9 @@ plot_gs <- function(gs,
                     subset,
                     xvar = NULL, 
                     yvar = NULL,
-                    xlab = NULL,
-                    ylab = NULL,
+                    axis_labels = NULL,
                     color_var = NA, 
-                    xlim = NULL, 
-                    ylim=NULL, 
+                    data_range = NULL, 
                     gate=NULL, 
                     polygon_gate = NULL,
                     type = "hexagonal", 
@@ -61,7 +59,6 @@ plot_gs <- function(gs,
           yvar <- colnames(g@boundaries)[2]
         }
       }
-      print(c(xvar,yvar))
     }else{
       xvar <- gs@data@colnames[1]
       yvar <- gs@data@colnames[2]
@@ -79,9 +76,12 @@ plot_gs <- function(gs,
     
   }
 
-  #print(gate)
-  #print(c(xvar, yvar))
-  #print(c(xlim,ylim))
+  xlim <- NULL
+  ylim <- NULL
+  if(!is.null(data_range)){
+    xlim <- data_range[[xvar]]
+    ylim <- data_range[[yvar]]
+  }
   
   ##################################################################################
   # plot density hexagonal
@@ -183,24 +183,18 @@ plot_gs <- function(gs,
         polygon <- as.data.frame(gate_int@boundaries)
         idx_match <- match(c(xvar, yvar), names(polygon))
         
-        print(idx_match)
-        
         if(sum(is.na(idx_match))==0){
           
           df_trans <- polygon
-          
-          print(transformation[[xvar]]$transform(df_trans[,idx_match[1]]))
-          print(transformation[[yvar]]$transform(df_trans[,idx_match[2]]))
           
           df_trans[,idx_match[1]] <- transformation[[xvar]]$transform(df_trans[,idx_match[1]])
           df_trans[,idx_match[2]] <- transformation[[yvar]]$transform(df_trans[,idx_match[2]])
           center <- apply(df_trans , MARGIN = 2, FUN = mean)
           
           polygon <- rbind(polygon, polygon[1,])
-        
-        
-          #xlim <- range(c(xlim, polygon[[idx_match[1]]]))
-          #ylim <- range(c(ylim, polygon[[idx_match[2]]]))
+          
+          
+          
           
           p <- p +
             geom_path(data = polygon, color = "red") +
@@ -209,9 +203,7 @@ plot_gs <- function(gs,
                          alpha=0.1) +
             annotate("text", 
                      x=transformation[[xvar]]$inverse(center[idx_match[1]]), 
-                     y=transformation[[yvar]]$inverse(center[idx_match[2]]), 
-                     #x=center[idx_match[1]], 
-                     #y=center[idx_match[2]], 
+                     y=transformation[[yvar]]$inverse(center[idx_match[2]]),
                      label = gate_int@filterId,
                      color = "red")
         }else{
@@ -230,6 +222,11 @@ plot_gs <- function(gs,
       polygon <- rbind(polygon, polygon[1,])
       names(polygon) <- c(xvar, yvar)
       
+      if(!is.null(data_range)){
+        xlim <- range(c(data_range[[xvar]], polygon[,1]))
+        ylim <- range(c(data_range[[yvar]], polygon[,2]))
+      }
+      
       p <- p +
         geom_path(data = polygon, color = "red") +
         geom_polygon(data=polygon,
@@ -243,26 +240,23 @@ plot_gs <- function(gs,
   
   ##################################################################################
   # general plot parameters
-  
-  p <- p + 
-    xlab(xvar) +
-    ggtitle(subset) +
-    scale_x_continuous(trans = transformation[[xvar]], limits = xlim) 
-  
-  if(type != "histogram"){
-    p <- p + scale_y_continuous(trans = transformation[[yvar]], limits = ylim) +
-      ylab(yvar)
-  }
-    
-  
+ 
   if(!is.null(facet_vars)){
     p <- p + facet_wrap(facets = sapply(facet_vars, as.name), labeller = label_both)
   }else{
     p <- p + facet_null()
   }
   
-  if(!is.null(xlab)) p <- p + xlab(xlab)
-  if(!is.null(ylab)) p <- p + xlab(ylab)
+  labx <- ifelse(is.null(axis_labels), xvar, axis_labels[[xvar]])
+  laby <- ifelse(is.null(axis_labels), yvar, axis_labels[[yvar]])
+  
+  p <- p + 
+    ggtitle(subset) +
+    scale_x_continuous(name = labx, trans = transformation[[xvar]], limits = xlim) 
+  
+  if(type != "histogram"){
+    p <- p + scale_y_continuous(name = laby, trans = transformation[[yvar]], limits = ylim) 
+  }
   
   p
   
@@ -276,19 +270,30 @@ plot_gh <- function(gs, idx, ...){
   child_nodes <- getChildren(gs[[idx]], "root")
   plist <- list()
   count <- 0
+  
+  #plot gates descending the gh until there are no more children gates
   while(length(child_nodes)>0){
+    
     child_nodes_int <- NULL
     nodes_to_plot <- child_nodes
+    
+    #plot together gates that share the same set of parameters
     while(length(nodes_to_plot) > 0){
+      
       par_nodes <- lapply(nodes_to_plot, function(x){
-        try(colnames(getGate(gs[[idx]], nodes_to_plot)@boundaries), silent = TRUE)})
+        try(colnames(getGate(gs[[idx]], x)@boundaries), silent = TRUE)})
+      
       same_par <- sapply(par_nodes, function(x){setequal(x, par_nodes[[1]])})
       
+      parent <- getParent(gs[[idx]], nodes_to_plot[1])
       count <- count + 1
       plist[[count]] <- plot_gs(gs, idx, subset = parent, gate = nodes_to_plot[same_par], ...)
-      child_nodes_int <- c(child_nodes_int, 
-                           unlist( nodes_to_plot[same_par], function(x){getChildren(gs[[1]], x)}) )
-      nodes_to_plot <- nodes_to_plot[-same_par]
+      
+      all_children <- unlist(sapply(nodes_to_plot[same_par], function(x){getChildren(gs[[1]], x)}))
+      names(all_children) <- NULL
+      
+      child_nodes_int <- c(child_nodes_int, all_children)
+      nodes_to_plot <- setdiff(nodes_to_plot, nodes_to_plot[same_par])
     }
     
     child_nodes <- child_nodes_int
