@@ -843,7 +843,7 @@ server <- function(session, input, output) {
   })
   
   output$message_gate <- renderPrint({
-        print(rval$gates_flowCore)
+        print(gate$x)
   })
    
   output$tree <- renderPlot({
