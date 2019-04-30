@@ -1,6 +1,57 @@
 library(scales)
 library(viridis)
 library(ggcyto)
+library(data.table)
+library(ggsignif)
+#library(sf) # need libudunits2-dev
+
+get_data_gs <- function(gs, 
+                        idx, 
+                        subset
+                        ){
+  df <- NULL
+  for(k in 1:length(subset)){
+    
+    for(i in 1:length(idx)){
+      ff <- getData(gs[[idx[i]]], subset[k])
+      #ff <- fs[[i]]
+      df_int <- as.data.frame(exprs(ff))
+      df_int[["name"]] <- pData(gs)$name[idx[i]]
+      df_int[["subset"]] <- subset[k]
+      df <- rbind(df, df_int)
+    }
+  }
+  
+  df[["subset"]] <- factor(df[["subset"]], levels = subset)
+  df[["name"]] <- factor(df[["name"]], levels = pData(gs)$name[idx])
+  
+  return(df)
+  
+}
+
+add_columns_from_metadata <- function(df, 
+                                      metadata,
+                                      color_var = NA, 
+                                      facet_vars = "name",
+                                      group_var = "name",
+                                      yridges_var = NULL){
+  
+  if(!is.null(facet_vars)){
+    facet_vars <- facet_vars[facet_vars %in% names(metadata)]
+  }
+  
+  new_vars <- unique(setdiff( c(yridges_var, group_var, facet_vars), 
+                              c("name","subset")))
+  if(length(new_vars)>0){
+    for(variable in new_vars){
+      df[[variable]] <- metadata[[variable]][match(df[["name"]], metadata$name)]
+    }
+  }
+  
+  print(names(df))
+  
+  return(df)
+}
 
 plot_gs <- function(gs, 
                     idx, 
@@ -19,10 +70,14 @@ plot_gs <- function(gs,
                     transformation = NULL,
                     default_trans = identity_trans(),
                     facet_vars = "name",
+                    group_var = "name",
+                    yridges_var = "name",
                     norm_density = TRUE,
                     smooth = FALSE,
                     ridges = FALSE,
-                    bw = 0.01){
+                    bw = 0.1,
+                    show.legend = TRUE
+                    ){
   
   
   if(is.null(transformation)){
@@ -83,27 +138,41 @@ plot_gs <- function(gs,
     ylim <- data_range[[yvar]]
   }
   
+  
+  
+  df <- get_data_gs(gs = gs,
+                    idx = idx, 
+                    subset = subset)
+  
+  df <- add_columns_from_metadata(df,
+                                  metadata = pData(gs),
+                                  color_var = color_var, 
+                                  facet_vars = facet_vars,
+                                  group_var = group_var,
+                                  yridges_var = yridges_var)
+  print(names(df))
+    
   ##################################################################################
   # plot density hexagonal
-  
   if(type == "hexagonal"){
-    p <- ggcyto(gs[idx], subset = subset,
+    
+    
+    p <- ggplot(df,
                 aes_(x = as.name( xvar ), 
                      y = as.name( yvar ) ) )+
-      geom_hex(bins = bins) +
+      geom_hex(bins = bins, show.legend = show.legend) +
       scale_fill_viridis()
     
-    p <- as.ggplot(p)
+    #p <- as.ggplot(p)
   }
   
   ##################################################################################
   # plot histogram
   
   if(type == "histogram"){
-    p <- ggcyto(gs[idx], subset = subset,
-                aes_(x = as.name( xvar )))
     
-    p <- as.ggplot(p)
+    p <- ggplot(df,
+                aes_(x = as.name( xvar )))
     
     if(norm_density){
       stat_var <- "stat(ndensity)"
@@ -113,58 +182,67 @@ plot_gs <- function(gs,
     
     if(smooth){
       if(ridges){
-        p <- p + geom_density_ridges(mapping = aes_string(fill = "name", color = "name", y = "name", height = stat_var), 
-                                     alpha = alpha, bw = bw,
-                                     stat = "density",show.legend = FALSE)
+        p <- p + geom_density_ridges(mapping = aes_string(fill = group_var, 
+                                                          color = group_var, 
+                                                          y = yridges_var, 
+                                                          height = stat_var), 
+                                     alpha = alpha, 
+                                     bw = bw,
+                                     stat = "density",
+                                     show.legend = show.legend)
       }else{
-        p <- p + geom_density(mapping = aes_string(fill = "name", color = "name", y = stat_var), 
-                              alpha = alpha, bw = bw)
+        p <- p + geom_density(mapping = aes_string(fill = group_var, color = group_var, y = stat_var), 
+                              alpha = alpha, 
+                              bw = bw, 
+                              show.legend = show.legend)
       }
     }else{
-      p <- p + geom_histogram(mapping = aes_string(fill = "name", color = "name", y = stat_var), 
-                              alpha = alpha,  bins = bins, position = "identity", boundary = 0) 
+      p <- p + geom_histogram(mapping = aes_string(fill = group_var, color = group_var, y = stat_var), 
+                              alpha = alpha,  
+                              bins = bins, 
+                              position = "identity", 
+                              boundary = 0, 
+                              show.legend = show.legend) 
     }
-
+    
   }
   
   ##################################################################################
   # plot dots
   
-  if(type == "dots"){
-    
-    
-    fs <- getData(gs, subset = subset)
-    df <- NULL
-    for(i in 1:length(idx)){
-      ff <- fs[[idx[i]]]
-      df_int <- as.data.frame(exprs(ff))
-      df_int[["name"]] <- pData(gs)$name[idx[i]]
-      df <- rbind(df, df_int)
-    }
-    for(facet in setdiff(facet_vars[facet_vars %in% names(pData(gs))], "name")){
-      df_int[[facet]] <- pData(gs)[[facet_var]][match(df_int[["name"]], pData(gs)$name)]
-    }
-    
+  if(type %in% c("dots", "contour")){
     
     p <- ggplot(df,
                 aes_(x = as.name( xvar ), 
                      y = as.name( yvar )))
     
-    if(color_var %in% gs@data@colnames){
-      idx_col <- match(color_var, names(df))
-      p <- p + geom_point(mapping = aes_(colour = as.name(color_var)),
-                         alpha = alpha, size = size)
-      if(!is.null(transformation)){
-        p <- p + scale_colour_viridis(trans = transformation[[color_var]], name = color_var)
-      }else{
-        p <- p + scale_colour_viridis()
-      }
+    if(type == "dots"){
+      if(color_var %in% gs@data@colnames){
+        #idx_col <- match(color_var, names(df))
+        p <- p + geom_point(mapping = aes_(colour = as.name(color_var)),
+                           alpha = alpha, 
+                           size = size, 
+                           show.legend = show.legend)
         
-    }else{
-      p <- p + geom_point(alpha = alpha, size = size)
+        p <- p + scale_colour_viridis(trans = transformation[[color_var]], name = color_var)
+        
+      }else{
+        p <- p + geom_point(mapping = aes_string(colour = group_var), 
+                            alpha = alpha, 
+                            size = size, 
+                            show.legend = show.legend)
+      }
+    }
+
+    
+    if(type == "contour"){
+      p <- p + geom_density_2d(mapping = aes_string(color = group_var), 
+                              alpha = alpha, 
+                              size =size, 
+                              n = bins, 
+                              show.legend = show.legend) 
     }
     
-    p <- p + theme(plot.title = element_text(face = "bold") ) + facet_wrap(facets = "identifier")
   }
   
   ##################################################################################
@@ -189,23 +267,34 @@ plot_gs <- function(gs,
           
           df_trans[,idx_match[1]] <- transformation[[xvar]]$transform(df_trans[,idx_match[1]])
           df_trans[,idx_match[2]] <- transformation[[yvar]]$transform(df_trans[,idx_match[2]])
-          center <- apply(df_trans , MARGIN = 2, FUN = mean)
+          
+          
+          center <- c(mean(df_trans[,idx_match[1]]), mean(df_trans[,idx_match[2]]))
           
           polygon <- rbind(polygon, polygon[1,])
+
+          xlim <- range(c(xlim, polygon[,idx_match[1]]))
+          ylim <- range(c(ylim, polygon[,idx_match[2]]))
+          
+          #trueCentroids = gCentroid(sids,byid=TRUE)
           
           
-          
+          df_label <- data.frame(x = transformation[[xvar]]$inverse(center[idx_match[1]]), 
+                                 y = transformation[[yvar]]$inverse(center[idx_match[2]]),
+                                 label = gate_int@filterId)
           
           p <- p +
             geom_path(data = polygon, color = "red") +
             geom_polygon(data=polygon,
                          fill="red",
                          alpha=0.1) +
-            annotate("text", 
-                     x=transformation[[xvar]]$inverse(center[idx_match[1]]), 
-                     y=transformation[[yvar]]$inverse(center[idx_match[2]]),
-                     label = gate_int@filterId,
-                     color = "red")
+            geom_label(data = df_label, aes(x=x, y=y, label = label),
+                       fill = "white", color = "red", hjust = "middle", vjust = "center")
+            # annotate("text", 
+            #          x=transformation[[xvar]]$inverse(center[idx_match[1]]), 
+            #          y=transformation[[yvar]]$inverse(center[idx_match[2]]),
+            #          label = gate_int@filterId,
+            #          color = "red", fill = "white")
         }else{
           warning(paste("gate is not defined with parameters ", xvar, "and", yvar, sep = "" ))
         }
@@ -222,10 +311,13 @@ plot_gs <- function(gs,
       polygon <- rbind(polygon, polygon[1,])
       names(polygon) <- c(xvar, yvar)
       
-      if(!is.null(data_range)){
-        xlim <- range(c(data_range[[xvar]], polygon[,1]))
-        ylim <- range(c(data_range[[yvar]], polygon[,2]))
-      }
+      # if(!is.null(data_range)){
+      #   xlim <- range(c(data_range[[xvar]], polygon[,1]))
+      #   ylim <- range(c(data_range[[yvar]], polygon[,2]))
+      # }
+      
+      xlim <- range(c(xlim, polygon[,1]))
+      ylim <- range(c(ylim, polygon[,2]))
       
       p <- p +
         geom_path(data = polygon, color = "red") +
@@ -248,13 +340,15 @@ plot_gs <- function(gs,
   }
   
   labx <- ifelse(is.null(axis_labels), xvar, axis_labels[[xvar]])
-  laby <- ifelse(is.null(axis_labels), yvar, axis_labels[[yvar]])
+  p <- p + scale_x_continuous(name = labx, trans = transformation[[xvar]], limits = xlim) 
+  p <- p + theme(plot.title = element_text(face = "bold") )
   
-  p <- p + 
-    ggtitle(subset) +
-    scale_x_continuous(name = labx, trans = transformation[[xvar]], limits = xlim) 
+  if(length(subset)==1){
+    p <- p + ggtitle(subset)
+  }
   
   if(type != "histogram"){
+    laby <- ifelse(is.null(axis_labels), yvar, axis_labels[[yvar]])
     p <- p + scale_y_continuous(name = laby, trans = transformation[[yvar]], limits = ylim) 
   }
   
@@ -300,4 +394,137 @@ plot_gh <- function(gs, idx, ...){
 
   }
   return(plist)
+}
+
+
+plot_stat <- function(gs,
+                    idx, 
+                    subset,
+                    yvar = NULL,
+                    type = "bar",
+                    color_var = NA, 
+                    log10_trans = TRUE,
+                    facet_vars = "name",
+                    group_var = "subset",
+                    show.legend = TRUE
+){
+  
+  if(log10_trans){
+    trans <- log10_trans()
+  }else{
+    trans <- identity_trans()
+  }
+  # if(is.null(transformation)){
+  #  transformation <- lapply(gs@data@colnames, function(x){trans})
+  #  names(transformation) <- gs@data@colnames
+  # }
+  
+  
+  if(is.null(yvar)){
+    yvar <- gs@data@colnames[1]
+  }
+  
+  #ylim <- NULL
+  #if(!is.null(data_range)){
+  #  ylim <- data_range[[yvar]]
+  #}
+  
+  df <- get_data_gs(gs = gs,
+                    idx = idx,
+                    subset = subset)
+  
+  for(i in 1:length(yvar)){
+    #df[[yvar[i]]] <- transformation[[yvar[i]]]$transform(df[[yvar[i]]])
+    df[[yvar[i]]] <- trans$transform(df[[yvar[i]]])
+  }
+  
+  df_melt <- melt(df, id.vars = c("name", "subset"), measure.vars = yvar)
+  #df_melt$value[!is.finite(df_melt$value)] <- NA
+  
+  df_cast <- dcast(df_melt, name + subset ~ variable, mean, na.rm = TRUE)
+  
+  for(i in 1:length(yvar)){
+    #df_cast[[yvar[i]]] <- transformation[[yvar[i]]]$inverse(df_cast[[yvar[i]]])
+    df_cast[[yvar[i]]] <- trans$inverse(df_cast[[yvar[i]]])
+  }
+  
+  df_scale <- df_cast
+  df_melt2 <- melt(df_scale, id.vars = c("name", "subset") )
+  
+  df_melt2 <- add_columns_from_metadata(df_melt2,
+                                  metadata = pData(gs),
+                                  color_var = color_var,
+                                  facet_vars = facet_vars,
+                                  group_var = group_var)
+  
+  df_melt2 <- df_melt2[df_melt2$variable %in% yvar, ]
+
+  ylim <- c( min(df_melt2$value, na.rm = TRUE)*(1-50/100), max(df_melt2$value, na.rm = TRUE)*(1+50/100))
+  
+  if(type == "tile"){
+    
+    p <- ggplot(df_melt2, aes_string( x = group_var ))
+    p <- p + geom_tile(mapping = aes_string(y = "variable", fill = "value"),
+                       show.legend = show.legend)
+    
+    
+    p <- p + scale_fill_distiller( palette = "Spectral", limits = ylim) +
+      scale_y_discrete(labels = NULL, name = "")
+    
+    # if(!is.null(facet_vars)){
+    #   formula_facet <- as.formula(paste(". ~", paste(facet_vars, collapse = " + ")))
+    # }else{
+    #   formula_facet <- NULL
+    # }
+  }
+  
+  if(type == "bar"){
+    
+    p <- ggplot(df_melt2, aes_string( x = group_var, y = "value"))
+    
+    p <- p + 
+      geom_bar(alpha = 0.5, stat = "summary", fun.y = "mean") + 
+      geom_point( mapping = aes_string(color = color_var), 
+                  inherit.aes = TRUE, 
+                  position = position_jitter(width = 0.25),
+                  alpha = 0.5,
+                  size = 3,
+                  show.legend = show.legend) +
+      geom_signif(comparisons = list(c(1,2)),
+                  test="t.test",
+                  test.args = list("paired"=FALSE))
+    
+    p <- p + scale_y_continuous(trans = trans)
+    p <- p + coord_cartesian(ylim = ylim)
+    
+      #geom_boxplot(mapping = aes_string( y = "value", fill = "variable")) +
+      #geom_point(mapping = aes_string(y = "value"))
+    
+  }
+  
+  if(!is.null(facet_vars)){
+    formula_facet <- as.formula(paste("variable ~", paste(facet_vars, collapse = " + ")))
+  }else{
+    formula_facet <- as.formula("variable ~ .")
+  }
+  
+  #if(!is.null(formula_facet)){
+    p <- p + facet_grid(formula_facet,
+                        labeller = label_both, 
+                        scales = "free")
+  #}
+  
+  
+  ##################################################################################
+  # general plot parameters
+  
+  
+  p <- p + theme( axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5), 
+                  strip.text.y = element_text(angle = 0)
+                  )
+      
+
+  
+  p
+  
 }
