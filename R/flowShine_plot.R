@@ -200,13 +200,17 @@ plot_gs <- function(df = NULL,
                                                           y = yridges_var, 
                                                           height = stat_var), 
                                      alpha = alpha, 
-                                     bw = bw,
+                                     #bw = dist(transformation[[xvar]]$transform( range(df[[xvar]]) / bins ))[1], 
+                                     #bw = dist(range(df[[xvar]])/bins)[1], 
+                                     bw = 1/bins, 
                                      stat = "density",
                                      show.legend = show.legend)
       }else{
         p <- p + geom_density(mapping = aes_string(fill = group_var, color = group_var, y = stat_var), 
                               alpha = alpha, 
-                              bw = bw, 
+                              #bw = dist(transformation[[xvar]]$transform( range(df[[xvar]]) / bins ))[1], 
+                              #bw = dist(range(df[[xvar]])/bins)[1], 
+                              bw = 1/bins, 
                               show.legend = show.legend)
       }
     }else{
@@ -419,6 +423,9 @@ plot_stat <- function(df = NULL,
                       color_var = NULL, 
                       transformation = NULL,
                       default_trans = identity_trans(),
+                      scale_values = FALSE,
+                      free_y_scale = TRUE,
+                      max_scale = 0,
                       facet_vars = "name",
                       group_var = "subset",
                       show.legend = TRUE
@@ -472,7 +479,14 @@ plot_stat <- function(df = NULL,
   #}
   
   df_scale <- df_cast
+  if(scale_values){
+    df_scale[-c(1:2)] <- scale(df_cast[-c(1:2)])
+    
+  }
+  
   df_melt2 <- melt(df_scale, id.vars = c("name", "subset") )
+  
+  
   
   df_melt2 <- add_columns_from_metadata(df_melt2,
                                   metadata = pData(gs),
@@ -484,7 +498,28 @@ plot_stat <- function(df = NULL,
   
   df_melt2 <- df_melt2[df_melt2$variable %in% yvar, ]
 
-  ylim <- c( min(df_melt2$value, na.rm = TRUE)*(1-50/100), max(df_melt2$value, na.rm = TRUE)*(1+50/100))
+  ylim <- NULL
+  #scale_y <- "fixed"
+  
+  
+  
+  if(!free_y_scale){
+    ylim <- c( min(df_melt2$value, na.rm = TRUE)*(1-50/100), max(df_melt2$value, na.rm = TRUE)*(1+50/100))
+    #scale_y <- "free"
+  }
+  
+  if(scale_values & max_scale > 0){
+    df_melt2$value[df_melt2$value > max_scale] <- max_scale
+    df_melt2$value[df_melt2$value < -max_scale] <- -max_scale
+    ylim <- c(-max_scale, max_scale)
+    #scale_y <- "free_y"
+    #main_title <- "Scaled values (Z-score)"
+  }
+  
+  # if(free_y_scale){
+  #   scale_y <- "free_y"
+  # }
+  
   
   if(type == "tile"){
     
@@ -493,7 +528,7 @@ plot_stat <- function(df = NULL,
                        show.legend = show.legend)
     
     
-    p <- p + scale_fill_distiller( palette = "Spectral", limits = ylim) +
+    p <- p + scale_fill_distiller(palette = "Spectral", limits = ylim) +
       scale_y_discrete(labels = NULL, name = "")
     
     # if(!is.null(facet_vars)){
@@ -536,6 +571,7 @@ plot_stat <- function(df = NULL,
   #if(!is.null(formula_facet)){
     p <- p + facet_grid(formula_facet,
                         labeller = label_both, 
+                        #scales = scale_y,
                         scales = "free")
   #}
   
