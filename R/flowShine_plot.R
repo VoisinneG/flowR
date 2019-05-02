@@ -31,7 +31,7 @@ get_data_gs <- function(gs,
 
 add_columns_from_metadata <- function(df, 
                                       metadata,
-                                      color_var = NA, 
+                                      color_var = NULL, 
                                       facet_vars = "name",
                                       group_var = "name",
                                       yridges_var = NULL){
@@ -40,7 +40,11 @@ add_columns_from_metadata <- function(df,
     facet_vars <- facet_vars[facet_vars %in% names(metadata)]
   }
   
-  new_vars <- unique(setdiff( c(yridges_var, group_var, facet_vars), 
+  if(!is.null(color_var)){
+    color_var <- color_var[color_var %in% names(metadata)]
+  }
+  
+  new_vars <- unique(setdiff( c(yridges_var, group_var, facet_vars, color_var), 
                               c("name","subset")))
   if(length(new_vars)>0){
     for(variable in new_vars){
@@ -53,13 +57,14 @@ add_columns_from_metadata <- function(df,
   return(df)
 }
 
-plot_gs <- function(gs, 
+plot_gs <- function(df = NULL,
+                    gs, 
                     idx, 
                     subset,
                     xvar = NULL, 
                     yvar = NULL,
                     axis_labels = NULL,
-                    color_var = NA, 
+                    color_var = NULL, 
                     data_range = NULL, 
                     gate=NULL, 
                     polygon_gate = NULL,
@@ -139,10 +144,15 @@ plot_gs <- function(gs,
   }
   
   
-  
-  df <- get_data_gs(gs = gs,
-                    idx = idx, 
-                    subset = subset)
+  if(is.null(df)){
+    
+    df <- get_data_gs(gs = gs,
+                      idx = idx, 
+                      subset = subset)
+  }else{
+    df <- df[df$name %in% pData(gs)[["name"]][idx] & 
+               df$subset %in% subset, ]
+  } 
   
   df <- add_columns_from_metadata(df,
                                   metadata = pData(gs),
@@ -150,6 +160,9 @@ plot_gs <- function(gs,
                                   facet_vars = facet_vars,
                                   group_var = group_var,
                                   yridges_var = yridges_var)
+    
+  
+ 
   print(names(df))
     
   ##################################################################################
@@ -357,7 +370,7 @@ plot_gs <- function(gs,
 }
 
 
-plot_gh <- function(gs, idx, ...){
+plot_gh <- function(df, gs, idx, ...){
   if(length(idx) != 1){
     stop("length of idx must be equal to 1")
   }
@@ -381,7 +394,7 @@ plot_gh <- function(gs, idx, ...){
       
       parent <- getParent(gs[[idx]], nodes_to_plot[1])
       count <- count + 1
-      plist[[count]] <- plot_gs(gs, idx, subset = parent, gate = nodes_to_plot[same_par], ...)
+      plist[[count]] <- plot_gs(df, gs, idx, subset = parent, gate = nodes_to_plot[same_par], ...)
       
       all_children <- unlist(sapply(nodes_to_plot[same_par], function(x){getChildren(gs[[1]], x)}))
       names(all_children) <- NULL
@@ -397,27 +410,31 @@ plot_gh <- function(gs, idx, ...){
 }
 
 
-plot_stat <- function(gs,
-                    idx, 
-                    subset,
-                    yvar = NULL,
-                    type = "bar",
-                    color_var = NA, 
-                    log10_trans = TRUE,
-                    facet_vars = "name",
-                    group_var = "subset",
-                    show.legend = TRUE
+plot_stat <- function(df = NULL,
+                      gs,
+                      idx, 
+                      subset,
+                      yvar = NULL,
+                      type = "bar",
+                      color_var = NULL, 
+                      transformation = NULL,
+                      default_trans = identity_trans(),
+                      facet_vars = "name",
+                      group_var = "subset",
+                      show.legend = TRUE
+                    
 ){
   
-  if(log10_trans){
-    trans <- log10_trans()
-  }else{
+  #if(log10_trans){
+  #  trans <- log10_trans()
+  #}else{
     trans <- identity_trans()
+  #}
+  
+  if(is.null(transformation)){
+   transformation <- lapply(gs@data@colnames, function(x){trans})
+   names(transformation) <- gs@data@colnames
   }
-  # if(is.null(transformation)){
-  #  transformation <- lapply(gs@data@colnames, function(x){trans})
-  #  names(transformation) <- gs@data@colnames
-  # }
   
   
   if(is.null(yvar)){
@@ -428,14 +445,19 @@ plot_stat <- function(gs,
   #if(!is.null(data_range)){
   #  ylim <- data_range[[yvar]]
   #}
+  if(is.null(df)){
+    df <- get_data_gs(gs = gs,
+                      idx = idx,
+                      subset = subset)
+  }else{
+    df <- df[df$name %in% pData(gs)[["name"]][idx] & 
+               df$subset %in% subset, ]
+  } 
   
-  df <- get_data_gs(gs = gs,
-                    idx = idx,
-                    subset = subset)
   
   for(i in 1:length(yvar)){
-    #df[[yvar[i]]] <- transformation[[yvar[i]]]$transform(df[[yvar[i]]])
-    df[[yvar[i]]] <- trans$transform(df[[yvar[i]]])
+    df[[yvar[i]]] <- transformation[[yvar[i]]]$transform(df[[yvar[i]]])
+    #df[[yvar[i]]] <- trans$transform(df[[yvar[i]]])
   }
   
   df_melt <- melt(df, id.vars = c("name", "subset"), measure.vars = yvar)
@@ -443,10 +465,11 @@ plot_stat <- function(gs,
   
   df_cast <- dcast(df_melt, name + subset ~ variable, mean, na.rm = TRUE)
   
-  for(i in 1:length(yvar)){
-    #df_cast[[yvar[i]]] <- transformation[[yvar[i]]]$inverse(df_cast[[yvar[i]]])
-    df_cast[[yvar[i]]] <- trans$inverse(df_cast[[yvar[i]]])
-  }
+  
+  #for(i in 1:length(yvar)){
+  #  df_cast[[yvar[i]]] <- transformation[[yvar[i]]]$inverse(df_cast[[yvar[i]]])
+  #  #df_cast[[yvar[i]]] <- trans$inverse(df_cast[[yvar[i]]])
+  #}
   
   df_scale <- df_cast
   df_melt2 <- melt(df_scale, id.vars = c("name", "subset") )
@@ -456,6 +479,8 @@ plot_stat <- function(gs,
                                   color_var = color_var,
                                   facet_vars = facet_vars,
                                   group_var = group_var)
+  
+  print(names(df_melt2))
   
   df_melt2 <- df_melt2[df_melt2$variable %in% yvar, ]
 
@@ -480,13 +505,13 @@ plot_stat <- function(gs,
   
   if(type == "bar"){
     
-    p <- ggplot(df_melt2, aes_string( x = group_var, y = "value"))
+    p <- ggplot(df_melt2, aes_string(x = group_var, y = "value"))
     
     p <- p + 
       geom_bar(alpha = 0.5, stat = "summary", fun.y = "mean") + 
-      geom_point( mapping = aes_string(color = color_var), 
+      geom_point( mapping = aes_(colour = as.name(color_var)), 
                   inherit.aes = TRUE, 
-                  position = position_jitter(width = 0.25),
+                  position = position_jitter(width = 0.25, height = 0),
                   alpha = 0.5,
                   size = 3,
                   show.legend = show.legend) +
@@ -494,7 +519,7 @@ plot_stat <- function(gs,
                   test="t.test",
                   test.args = list("paired"=FALSE))
     
-    p <- p + scale_y_continuous(trans = trans)
+    #p <- p + scale_y_continuous(trans = trans)
     p <- p + coord_cartesian(ylim = ylim)
     
       #geom_boxplot(mapping = aes_string( y = "value", fill = "variable")) +
