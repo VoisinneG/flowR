@@ -26,6 +26,8 @@ library(scales)
 #library(viridis)
 
 
+options(repos = BiocInstaller::biocinstallRepos(), shiny.maxRequestSize = 300*1024^2)
+getOption("repos")
 
 source("./R/flowShine_plot.R")
 
@@ -51,8 +53,6 @@ transform_values <- function(x, scale, ...){
 ##########################################################################################################
 #User interface ----
 
-options(shiny.maxRequestSize = 300*1024^2)
-
 body <- dashboardBody(
   tabItems(
     tabItem(tabName = "Import_tab",
@@ -72,22 +72,30 @@ body <- dashboardBody(
                          br(),
                          numericInput("N_lines", label = "Number of cells to import", value = 3000),
                          actionButton("load", label = "Load selected files")
+                     ),
+                     box(title = "summary",
+                         width = NULL, height = NULL,
+                         verbatimTextOutput("message")
                      )
               ),
               column(width = 6,
-                     tabBox(title = "Info",
+                     tabBox(title = "Parameters",
                             width = NULL, height = NULL,
-                            tabPanel(title = "summary",
-                                     verbatimTextOutput("message")
-                            ),
-                            tabPanel(title = "parameters",
-                                     selectInput("default_trans", "default transformation", 
-                                                    choices = c("identity", "logicle", "asinh", "log10"), 
-                                                    selected = "identity"),
+                            tabPanel(title = "Chanels",
                                      div(style = 'overflow-x: scroll', DT::dataTableOutput("parameters_table"))
                                      
                             ),
-                            tabPanel(title = "metadata",
+                            tabPanel(title = "transformation",
+                                     selectInput("default_trans", "default transformation", 
+                                                 choices = c("identity", "logicle", "asinh", "log10"), 
+                                                 selected = "identity")
+                            )
+                     )
+              ),
+              column(width = 6,
+                     tabBox(title = "Metadata",
+                            width = NULL, height = NULL,
+                            tabPanel(title = "Keywords",
                                      selectizeInput("keyword", "select keywords", 
                                                     choices = NULL, 
                                                     selected = NULL,
@@ -154,6 +162,12 @@ body <- dashboardBody(
                                   )
                          
                          
+                     ),
+                     box(title = "Get data",
+                         width = NULL, height = NULL,
+                         helpText( "Get data for all files and subsets"),
+                         actionButton("compute_data", "Get data"),
+                         actionButton("reset_data", "reset")
                      ),
                      box(title = "Message_gate",
                          width = NULL, height = NULL,
@@ -222,24 +236,43 @@ body <- dashboardBody(
     tabItem(tabName = "Plot_tab",
             fluidRow(
               column(width = 4,
-                     tabBox(title = "Sample",
+                     tabBox(title = "Select",
                             width = NULL, height = NULL,
-                            tabPanel("Select",
+                            tabPanel("Samples",
+                                     div(style = 'overflow-x: scroll', DT::dataTableOutput("files_selection_table"))
+                            ),
+                            tabPanel("Subset",
                                      selectizeInput("gate", 
                                                     label = "subset", 
                                                     choices = "root", 
                                                     selected = "root",
-                                                    multiple = TRUE),
+                                                    multiple = TRUE)
+                            ),
+                            tabPanel("Variables",
                                      selectInput("xvar", label = "x variable", choices = NULL, selected = NULL),
                                      selectInput("yvar", label = "y variable", choices = NULL, selected = NULL)
                             )
-                     ),
-                     box(title = "Select samples",
-                         width = NULL, height = NULL,
-                         div(style = 'overflow-x: scroll', DT::dataTableOutput("files_selection_table"))
-                         
-                     )
+                     ) 
               ),
+              # column(width = 4,
+              #        tabBox(title = "Sample",
+              #               width = NULL, height = NULL,
+              #               tabPanel("Select",
+              #                        selectizeInput("gate", 
+              #                                       label = "subset", 
+              #                                       choices = "root", 
+              #                                       selected = "root",
+              #                                       multiple = TRUE),
+              #                        selectInput("xvar", label = "x variable", choices = NULL, selected = NULL),
+              #                        selectInput("yvar", label = "y variable", choices = NULL, selected = NULL)
+              #               )
+              #        ),
+              #        box(title = "Select samples",
+              #            width = NULL, height = NULL,
+              #            div(style = 'overflow-x: scroll', DT::dataTableOutput("files_selection_table"))
+              #            
+              #        )
+              # ),
               column(width = 8,
                      tabBox(title = "Plot",
                             width = NULL, height = NULL,
@@ -334,7 +367,7 @@ body <- dashboardBody(
                                                  choices = c("bar", "tile"),
                                                  selected = "bar"),
                                      checkboxInput("legend_stat", "show legend", value = TRUE),
-                                     checkboxInput("log10_trans_stat", "use log10 scale", value = TRUE),
+                                     checkboxInput("apply_trans", "apply tansformation", value = TRUE),
                                      selectizeInput("facet_var_stat", 
                                                     multiple =TRUE,
                                                     label = "facet variables", 
@@ -421,7 +454,8 @@ server <- function(session, input, output) {
                          plot_var = NULL,
                          gate = NULL,
                          data_range = NULL,
-                         df_meta = NULL
+                         df_meta = NULL,
+                         df_tot = NULL
                          )
   
   gate <- reactiveValues(x = NULL, y = NULL)
@@ -441,6 +475,7 @@ server <- function(session, input, output) {
   
   # load data
   observeEvent(input$load, {
+    
     validate(
       need(length(input$files_table_rows_selected)>0, "Please select a file to load")
     )
@@ -450,12 +485,15 @@ server <- function(session, input, output) {
       
       if(file_ext(rval$df_files$datapath[input$files_table_rows_selected[1]]) == "xml"){
         ws <- openWorkspace(rval$df_files$datapath[input$files_table_rows_selected[1]])
-        show(ws)
-        rval$gating_set <- try(parseWorkspace(ws,
-                                              name = "All Samples",
+        #print(getSamples(ws))
+        #show(ws)
+        #cat(dirname(rval$df_files$datapath)[1])
+        rval$gating_set <- parseWorkspace(ws,
+                                              name = "samples",
                                               execute = TRUE, 
                                               isNcdf = TRUE,
-                                              path = "./data/"))
+                                              sampNloc = "sampleNode",
+                                              path = dirname(rval$df_files$datapath)[1])
         
         nodes <- getNodes(rval$gating_set)
         
@@ -466,6 +504,13 @@ server <- function(session, input, output) {
         }   
           
         rval$flow_set <- getData(rval$gating_set)
+        
+        
+        names_imported <- fsApply(rval$flow_set, function(x){description(x)[["FILENAME"]]})
+        names_imported <- basename(names_imported)
+        idx_match <- sapply(names_imported, function(x){as.numeric(strsplit(x, split= ".", fixed = TRUE)[[1]][1])})
+        pData(rval$flow_set)$name <- rval$df_files$name[idx_match+1]
+        pData(rval$gating_set) <- pData(rval$flow_set)
 
       }else{
         rval$flow_set <- read.ncdfFlowSet( rval$df_files$datapath[input$files_table_rows_selected], 
@@ -480,7 +525,7 @@ server <- function(session, input, output) {
       name_long <-  name
       name_long[!is.na(desc)] <- paste(name[!is.na(desc)], " (", desc[!is.na(desc)], ")", sep = "")
       
-      cat(rownames(parameters(ff)@data))
+      #cat(rownames(parameters(ff)@data))
       
       display <- unlist(sapply(rownames(parameters(ff)@data), FUN = function(x){
         kw <- substr(x, start = 2, stop = nchar(x))
@@ -492,7 +537,7 @@ server <- function(session, input, output) {
         return(disp)
         }))
       names(display) <- NULL
-      print(display)
+      #print(display)
       
       rval$parameters <- data.frame(name = name, 
                                     desc = desc,
@@ -534,7 +579,7 @@ server <- function(session, input, output) {
           updateSelectInput(session, "yvar", choices = rval$plot_var, selected = rval$plot_var[2])
           updateSelectInput(session, "color_var_gate", choices = c("none", rval$plot_var), selected = "none")
           updateSelectInput(session, "color_var", choices = c("none", rval$plot_var), selected = "none")
-          updateSelectInput(session, "color_var_stat", choices = c("none", rval$plot_var), selected = "none")
+          
           
         }
       }
@@ -658,13 +703,13 @@ server <- function(session, input, output) {
                           choices = c("subset", names(rval$pdata), rval$gating_set@data@colnames), 
                           selected = "subset")
         updateSelectInput(session, "color_var_stat", 
-                          choices = c("subset", names(rval$pdata), rval$gating_set@data@colnames), 
+                          choices = c("subset", names(rval$pdata)), 
                           selected = "subset")
         
         updateSelectInput(session, "sample_selected",
                           choices = pData(rval$flow_set)$name,
                           selected = pData(rval$flow_set)$name[1])
-        cat("update\n")
+        #cat("update\n")
       }
       
       
@@ -759,10 +804,10 @@ server <- function(session, input, output) {
                         choices = c("subset", names(rval$pdata), rval$gating_set@data@colnames), 
                         selected = "subset")
       updateSelectInput(session, "color_var_stat", 
-                        choices = c("subset", names(rval$pdata), rval$gating_set@data@colnames), 
+                        choices = c("subset", names(rval$pdata)), 
                         selected = "subset")
       
-      cat("update\n")
+      #cat("update\n")
     }
   })
 
@@ -773,7 +818,7 @@ server <- function(session, input, output) {
   observeEvent(input$sample_selected, {
     if(!is.null(rval$flow_set)){
       rval$idx_ff_gate <- which(rval$pdata$name == input$sample_selected)
-      cat(rval$idx_ff_gate)
+      
     }
   })
   
@@ -806,12 +851,12 @@ server <- function(session, input, output) {
     observeEvent(input$plot_click, {
       gate$x <- c(gate$x, transform_values(input$plot_click$x, input$x_scale_gate))
       gate$y <- c(gate$y, transform_values(input$plot_click$y, input$y_scale_gate))
-      cat("click")
+      #cat("click")
     })
     
     observeEvent(input$plot_brush, {
       brush <- input$plot_brush
-      cat("brush")
+      #cat("brush")
       if (!is.null(brush)) {
         gate$x <- sapply(c(brush$xmin, brush$xmax, brush$xmax, brush$xmin), 
                          transform_values, 
@@ -827,7 +872,7 @@ server <- function(session, input, output) {
     observeEvent(input$plot_dblclick, {
       gate$x <- NULL
       gate$y <- NULL
-      cat("dblclick")
+      #cat("dblclick")
       session$resetBrush("plot_brush")
     })
     
@@ -864,7 +909,7 @@ server <- function(session, input, output) {
           add(rval$gating_set, poly_gate, parent = rval$gate_focus, name = input$gate_name)
           
           recompute(rval$gating_set)
-          cat("update3\n")
+          #cat("update3\n")
           updateSelectInput(session, "gate_selected", choices = basename(getNodes(rval$gating_set)), selected = input$gate_name)
           updateSelectInput(session, "gate_to_delete", choices = setdiff(basename(getNodes(rval$gating_set)), "root"))
           updateSelectInput(session, "gate", choices = basename(getNodes(rval$gating_set)), selected = "root")
@@ -895,7 +940,7 @@ server <- function(session, input, output) {
         
         Rm(target_gate, rval$gating_set)
         recompute(rval$gating_set)
-        cat("update4\n")
+        #cat("update4\n")
         updateSelectInput(session, "gate_selected", choices = basename(getNodes(rval$gating_set)), selected = "root")
         updateSelectInput(session, "gate_to_delete", choices = setdiff(basename(getNodes(rval$gating_set)), "root"))
         updateSelectInput(session, "gate", choices = basename(getNodes(rval$gating_set)), selected = "root")
@@ -919,7 +964,7 @@ server <- function(session, input, output) {
         gate$x <- g[[1]]
         gate$y <- g[[2]]
       }
-      cat("update5\n")
+      #cat("update5\n")
       updateSelectInput(session, "gate_selected",  
                         selected = rval$gates_flowCore[[input$gate_selected]]$parent)
 
@@ -932,7 +977,7 @@ server <- function(session, input, output) {
     
     observeEvent(rval$parameters, {
       if(!is.null(rval$parameters)){
-        cat("OK\n")
+        #cat("OK\n")
         rval$transformation <- lapply(rval$parameters$transform, function(x){
           switch(x,
                  "identity" = identity_trans(),
@@ -941,7 +986,7 @@ server <- function(session, input, output) {
                  "logicle" = logicle_trans())})
         
         names(rval$transformation) <- rval$parameters$name
-        cat("OK2\n")
+        #cat("OK2\n")
       }
       
     })
@@ -976,7 +1021,7 @@ server <- function(session, input, output) {
     })
     
     observeEvent(input$default_trans, {
-      cat(rval$parameters$display == "NA")
+      #cat(rval$parameters$display == "NA")
       rval$parameters$transform[rval$parameters$display == "NA"] <- input$default_trans
     })
     
@@ -991,6 +1036,15 @@ server <- function(session, input, output) {
       
     })
     
+    observeEvent(input$compute_data, {
+      rval$df_tot <- get_data_gs(gs = rval$gating_set,
+                        idx = 1:length(rval$gating_set), 
+                        subset = basename(getNodes(rval$gating_set)) )
+    })
+    
+    observeEvent(input$reset_data, {
+      rval$df_tot <- NULL
+    })
     
   ##########################################################################################################
   # Output
@@ -1023,10 +1077,16 @@ server <- function(session, input, output) {
   })
   
   output$parameters_table <- renderDataTable({
+    
+    validate(
+      need(rval$flow_set, "No data imported")
+    )
+    
      df <- rval$parameters
      df$minRange <- format(df$minRange, digits = 2)
      df$maxRange <- format(df$maxRange, digits = 2)
      df
+    
   })
   
   output$pData <- DT::renderDataTable({
@@ -1089,10 +1149,14 @@ server <- function(session, input, output) {
       need(rval$idx_ff_gate, "Please select a sample")
     )
     
+    cat("sample_selected : \n")
+    print(rval$idx_ff_gate)
+    
     axis_labels <- rval$parameters$name_long
     names(axis_labels) <- rval$parameters$name
     
-    p <- plot_gh(rval$gating_set, 
+    p <- plot_gh(df = rval$df_tot,
+                 gs = rval$gating_set, 
                  idx = rval$idx_ff_gate,
                  transformation = rval$transformation,
                  bins = input$bin_number_gate,
@@ -1136,7 +1200,8 @@ server <- function(session, input, output) {
     axis_labels <- rval$parameters$name_long
     names(axis_labels) <- rval$parameters$name
     
-    p <- plot_gs(gs = rval$gating_set, 
+    p <- plot_gs(df = rval$df_tot,
+                 gs = rval$gating_set, 
                  idx = input$files_selection_table_rows_selected,
                  subset = input$gate, 
                  xvar = xvar, 
@@ -1189,7 +1254,7 @@ server <- function(session, input, output) {
       data_range <- rval$data_range
     }
     
-    print(rval$data_range)
+    #print(rval$data_range)
     
     #color_var <- rval$parameters$name[match(input$color_var, rval$parameters$name_long)]
     color_var <- input$color_var_gate
@@ -1198,25 +1263,27 @@ server <- function(session, input, output) {
     
     polygon_gate <- data.frame(x = gate$x, y=gate$y)
     
-    p <- plot_gs(gs = rval$gating_set, 
-            idx = rval$idx_ff_gate,
-            subset = rval$gate_focus, 
-            xvar = xvar, 
-            yvar = yvar, 
-            color_var = color_var, 
-            data_range = data_range,
-            axis_labels = axis_labels,
-            gate = rval$gate,
-            polygon_gate = polygon_gate,
-            type = input$plot_type_gate, 
-            bins = input$bin_number_gate,
-            alpha = input$alpha_gate,
-            size = input$size_gate,
-            norm_density = input$norm_gate,
-            smooth = input$smooth_gate,
-            bw = input$bw_gate,
-            transformation = rval$transformation,
-            show.legend = input$legend_gate)
+    p <- plot_gs(df = rval$df_tot,
+                 gs = rval$gating_set, 
+                 idx = rval$idx_ff_gate,
+                 subset = rval$gate_focus, 
+                 xvar = xvar, 
+                 yvar = yvar, 
+                 color_var = color_var, 
+                 data_range = data_range,
+                 axis_labels = axis_labels,
+                 gate = rval$gate,
+                 polygon_gate = polygon_gate,
+                 type = input$plot_type_gate, 
+                 bins = input$bin_number_gate,
+                 alpha = input$alpha_gate,
+                 size = input$size_gate,
+                 norm_density = input$norm_gate,
+                 smooth = input$smooth_gate,
+                 bw = input$bw_gate,
+                 transformation = rval$transformation,
+                 show.legend = input$legend_gate)
+            
     
     p <- p + xlab(input$xvar_gate) + ylab(input$yvar_gate)
     
@@ -1235,13 +1302,23 @@ server <- function(session, input, output) {
       need(input$samples_stat_rows_selected, "Please select a sample")
     )
     
-    p <- plot_stat(gs = rval$gating_set,
+    idx_y <- match(input$yvar_stat, rval$parameters$name_long)
+    yvar <- rval$parameters$name[idx_y]
+    
+    transformation <- NULL
+    if(input$apply_trans){
+      transformation <- rval$transformation
+    }
+    
+    p <- plot_stat(df = rval$df_tot,
+                   gs = rval$gating_set,
                    idx =  input$samples_stat_rows_selected,
                    subset = input$gate_stat,
-                   yvar = input$yvar_stat,
+                   yvar = yvar,
                    type = input$plot_type_stat,
+                   transformation = transformation,
+                   default_trans = identity_trans(),
                    color_var = input$color_var_stat, 
-                   log10_trans = input$log10_trans_stat,
                    facet_vars = input$facet_var_stat,
                    group_var = input$group_var_stat,
                    show.legend = input$legend_stat)
