@@ -234,14 +234,17 @@ plot_gs <- function(df = NULL,
                      y = as.name( yvar )))
     
     if(type == "dots"){
-      if(color_var %in% gs@data@colnames){
-        #idx_col <- match(color_var, names(df))
-        p <- p + geom_point(mapping = aes_(colour = as.name(color_var)),
-                           alpha = alpha, 
-                           size = size, 
-                           show.legend = show.legend)
+      if(!is.null(color_var)){
         
-        p <- p + scale_colour_viridis(trans = transformation[[color_var]], name = color_var)
+          #idx_col <- match(color_var, names(df))
+          p <- p + geom_point(mapping = aes_(colour = as.name(color_var)),
+                              alpha = alpha, 
+                              size = size, 
+                              show.legend = show.legend)
+          
+          if(color_var %in% gs@data@colnames){
+            p <- p + scale_colour_viridis(trans = transformation[[color_var]], name = color_var)
+          }
         
       }else{
         p <- p + geom_point(mapping = aes_string(colour = group_var), 
@@ -421,6 +424,7 @@ plot_stat <- function(df = NULL,
                       yvar = NULL,
                       type = "bar",
                       color_var = NULL, 
+                      axis_labels = NULL,
                       transformation = NULL,
                       default_trans = identity_trans(),
                       scale_values = FALSE,
@@ -519,6 +523,16 @@ plot_stat <- function(df = NULL,
   # if(free_y_scale){
   #   scale_y <- "free_y"
   # }
+  
+  df_melt2$variable <- as.character(df_melt2$variable)
+  
+  if(!is.null(axis_labels)){
+    print(axis_labels)
+    for(i in 1:length(yvar)){
+      df_melt2$variable[df_melt2$variable == yvar[i]] <- axis_labels[[yvar[i]]]
+    }
+  }
+  
   
   
   if(type == "tile"){

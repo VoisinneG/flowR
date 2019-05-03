@@ -38,12 +38,28 @@ flowJo_biexp_inverse_trans <- function (..., n = 6, equal.space = FALSE){
              n = n, equal.space = equal.space)
 }
 
+asinh_transform <- function(b=5, inverse = FALSE){ 
+  if(inverse){
+    function(x){b*sinh(x)} 
+  }else{
+    function(x){asinh(x/b)} 
+  }
+}
+
+asinh_trans <- function (..., n = 6, equal.space = FALSE){
+  trans <- asinh_transform(...)
+  inv <- asinh_transform(..., inverse = TRUE)
+  flow_trans(name = "asinh", trans.fun = trans, inverse.fun = inv, 
+             n = n, equal.space = equal.space)
+}
+
 
 transform_values <- function(x, scale, ...){
   xtrans <- switch(scale,
                    "identity" = identity_trans()$inverse(x),
                    "log10" = log10_trans()$inverse(x),
-                   "asinh" = flowJo_fasinh_trans()$inverse(x),
+                   "flowJo_asinh" = flowJo_fasinh_trans()$inverse(x),
+                   "asinh" = asinh_trans()$inverse(x),
                    "logicle" = logicle_trans()$inverse(x))
 
 }
@@ -70,6 +86,10 @@ body <- dashboardBody(
                          div(style = 'overflow-x: scroll', DT::dataTableOutput("files_table")),
                          br(),
                          br(),
+                         selectizeInput("groups", "select groups", 
+                                        choices = NULL, 
+                                        selected = NULL,
+                                        multiple = TRUE),
                          numericInput("N_lines", label = "Number of cells to import", value = 3000),
                          actionButton("load", label = "Load selected files")
                      ),
@@ -125,9 +145,30 @@ body <- dashboardBody(
                             ),
                             tabPanel(title = "transformation",
                                      selectInput("trans", "transformation", 
-                                                 choices = c("identity", "logicle", "asinh", "log10"), 
+                                                 choices = c("identity", "logicle", "asinh", "flowJo_asinh", "log"), 
                                                  selected = "identity"),
-                                     numericInput("m", label = "parameters: m", value = 4),
+                                     conditionalPanel(condition = "input.trans == 'asinh'",
+                                                      h5("Parameters"),
+                                                      numericInput("base_asinh", label = "base", value = 1)
+                                     ),
+                                     conditionalPanel(condition = "input.trans == 'flowJo_asinh'",
+                                                      h5("Parameters"),
+                                                      numericInput("m", label = "m", value = 5),
+                                                      numericInput("t", label = "t", value = 12000),
+                                                      numericInput("a", label = "a", value = 0.7),
+                                                      numericInput("length", label = "length", value = 256)
+                                     ),
+                                     conditionalPanel(condition = "input.trans == 'logicle'",
+                                                      h5("Parameters"),
+                                                      numericInput("w_logicle", label = "w", value = 0.5),
+                                                      numericInput("t_logicle", label = "t", value = 262144),
+                                                      numericInput("m_logicle", label = "m", value = 4.5),
+                                                      numericInput("a_logicle", label = "a", value = 0)
+                                     ),
+                                     conditionalPanel(condition = "input.trans == 'log'",
+                                                      h5("Parameters"),
+                                                      numericInput("base_log", label = "base", value = 10)
+                                     ),
                                      br(),
                                      actionButton("apply_transformation", label = "apply transformation to selected variables"),
                                      br()
@@ -222,6 +263,7 @@ body <- dashboardBody(
                                   selectInput("plot_type_gate", label = "plot type",
                                               choices = c("hexagonal", "histogram", "dots","contour"),
                                               selected = "hexagonal"),
+                                  checkboxInput("apply_trans_gate", "apply tansformation", value = TRUE),
                                   checkboxInput("legend_gate", "show legend", value = TRUE),
                                   checkboxInput("norm_gate", "normalize (set max to 1)", value = TRUE),
                                   checkboxInput("smooth_gate", "smooth", value = FALSE),
@@ -316,6 +358,7 @@ body <- dashboardBody(
                                      selectInput("plot_type", label = "plot type",
                                                  choices = c("hexagonal", "histogram", "dots", "contour"),
                                                  selected = "histogram"),
+                                     checkboxInput("apply_trans_plot", "apply tansformation", value = TRUE),
                                      checkboxInput("legend", "show legend", value = TRUE),
                                      checkboxInput("norm", "normalize (set max to 1)", value = TRUE),
                                      checkboxInput("smooth", "smooth", value = FALSE),
@@ -502,7 +545,19 @@ server <- function(session, input, output) {
   })
   
   
-  
+  observe({
+    
+    validate(
+      need(length(input$files_table_rows_selected)>0, "Please select a file to load")
+    )
+    
+    if(file_ext(rval$df_files$datapath[input$files_table_rows_selected[1]]) == "xml"){
+      ws <- openWorkspace(rval$df_files$datapath[input$files_table_rows_selected[1]])
+      groups <- unique(getSampleGroups(ws)$groupName)
+      updateSelectInput(session, "groups", choices = groups, selected = groups[1])
+    }
+    
+  })
   
   # load data
   observeEvent(input$load, {
@@ -520,7 +575,7 @@ server <- function(session, input, output) {
         #show(ws)
         #cat(dirname(rval$df_files$datapath)[1])
         rval$gating_set <- parseWorkspace(ws,
-                                              name = "samples",
+                                              name = input$groups,
                                               execute = TRUE, 
                                               isNcdf = TRUE,
                                               sampNloc = "sampleNode",
@@ -589,8 +644,9 @@ server <- function(session, input, output) {
       rval$transformation <- lapply(rval$parameters$transform, function(x){
         switch(x,
                "identity" = identity_trans(),
-               "log10" = log10_trans(),
-               "asinh" = flowJo_fasinh_trans(),
+               "log" = log_trans(),
+               "flowJo_asinh" = flowJo_fasinh_trans(),
+               "asinh" = asinh_trans(),
                "logicle" = logicle_trans())})
       
       names(rval$transformation) <- rval$parameters$name
@@ -739,12 +795,13 @@ server <- function(session, input, output) {
                           selected = "subset")
         
         updateSelectInput(session, "color_var_gate", 
-                          choices = c("subset", names(rval$pdata), rval$gating_set@data@colnames), 
+                          choices = c("subset", names(rval$pdata), rval$plot_var), 
                           selected = "subset")
         
         updateSelectInput(session, "color_var", 
-                          choices = c("subset", names(rval$pdata), rval$gating_set@data@colnames), 
+                          choices = c("subset", names(rval$pdata), rval$plot_var), 
                           selected = "subset")
+        
         updateSelectInput(session, "color_var_stat", 
                           choices = c("subset", names(rval$pdata)), 
                           selected = "subset")
@@ -864,11 +921,11 @@ server <- function(session, input, output) {
                         selected = "subset")
       
       updateSelectInput(session, "color_var_gate", 
-                        choices = c("subset", names(rval$pdata), rval$gating_set@data@colnames), 
+                        choices = c("subset", names(rval$pdata), rval$plot_var), 
                         selected = "subset")
       
       updateSelectInput(session, "color_var", 
-                        choices = c("subset", names(rval$pdata), rval$gating_set@data@colnames), 
+                        choices = c("subset", names(rval$pdata), rval$plot_var), 
                         selected = "subset")
       updateSelectInput(session, "color_var_stat", 
                         choices = c("subset", names(rval$pdata)), 
@@ -1065,18 +1122,32 @@ server <- function(session, input, output) {
         
         trans_params <- switch(input$trans,
                                "identity" = list(),
-                               "log10" = list(),
-                               "asinh" = list(m=input$m),
-                               "logicle" = list(m=input$m))
+                               "asinh" = list(base = input$base_asinh),
+                               "log" = list(base = input$base_log),
+                               "flowJo_asinh" = list(m=input$m, 
+                                              t = input$t, 
+                                              a = input$a, 
+                                              length = input$length),
+                               "logicle" = list(w=input$w_logicle, 
+                                                m=input$m_logicle, 
+                                                t = input$t_logicle, 
+                                                a = input$a_logicle))
         
         trans <- switch(input$trans,
                         "identity" = identity_trans(),
-                        "log10" = log10_trans(),
-                        "asinh" = flowJo_fasinh_trans(m = input$m),
-                        "logicle" = logicle_trans(m=input$m))
+                        "log" = log10_trans(b = input$base_log),
+                        "asinh" = asinh_trans(b = input$base_asinh),
+                        "flowJo_asinh" = flowJo_fasinh_trans(m=input$m, 
+                                                      t = input$t, 
+                                                      a = input$a, 
+                                                      length = input$length),
+                        "logicle" = logicle_trans(w=input$w_logicle, 
+                                                  m=input$m_logicle, 
+                                                  t = input$t_logicle, 
+                                                  a = input$a_logicle))
         
         rval$parameters$transform[input$parameters_table_rows_selected] <- input$trans
-        rval$parameters$transform_parameters[input$parameters_table_rows_selected] <- paste(as.character(trans_params), collapse="; ")
+        rval$parameters$transform_parameters[input$parameters_table_rows_selected] <- paste( paste(names(trans_params), as.character(trans_params), sep = ": "), collapse="; ")
         
         for(i in 1:length(var_name)){
           rval$transformation[[var_name[i]]] <- trans
@@ -1295,11 +1366,23 @@ server <- function(session, input, output) {
     axis_labels <- rval$parameters$name_long
     names(axis_labels) <- rval$parameters$name
     
+    transformation <- NULL
+    if(input$apply_trans_gate){
+      transformation <- rval$transformation
+    }
+    
+    if(input$color_var_gate %in% rval$parameters$name_long){
+      color_var <- rval$parameters$name[match(input$color_var_gate, rval$parameters$name_long)]
+    }else{
+      color_var <- input$color_var_gate
+    }
+    
     p <- plot_gh(df = rval$df_tot,
                  gs = rval$gating_set, 
                  idx = rval$idx_ff_gate,
-                 transformation = rval$transformation,
+                 transformation = transformation,
                  bins = input$bin_number_gate,
+                 color_var = color_var,
                  facet_vars = NULL,
                  axis_labels = axis_labels,
                  data_range = rval$data_range,
@@ -1335,10 +1418,23 @@ server <- function(session, input, output) {
     xvar <- rval$parameters$name[idx_x]
     yvar <- rval$parameters$name[idx_y]
     
-    #color_var <- rval$parameters$name[match(input$color_var, rval$parameters$name_long)]
-    color_var <- input$color_var
+    
+    if(input$color_var %in% rval$parameters$name_long){
+      color_var <- rval$parameters$name[match(input$color_var, rval$parameters$name_long)]
+    }else{
+      color_var <- input$color_var
+    }
+    
+    #color_var <- rval$parameters$name[match(input$color_var_gate, rval$parameters$name_long)]
+    #color_var <- input$color_var
+    
     axis_labels <- rval$parameters$name_long
     names(axis_labels) <- rval$parameters$name
+    
+    transformation <- NULL
+    if(input$apply_trans_plot){
+      transformation <- rval$transformation
+    }
     
     p <- plot_gs(df = rval$df_tot,
                  gs = rval$gating_set, 
@@ -1355,7 +1451,7 @@ server <- function(session, input, output) {
                  norm_density = input$norm,
                  smooth = input$smooth,
                  ridges = input$ridges,
-                 transformation = rval$transformation,
+                 transformation =  transformation,
                  facet_vars = input$facet_var,
                  group_var = input$group_var,
                  yridges_var = input$yridges_var,
@@ -1394,13 +1490,23 @@ server <- function(session, input, output) {
     }
     
     #print(rval$data_range)
+    if(input$color_var_gate %in% rval$parameters$name_long){
+      color_var <- rval$parameters$name[match(input$color_var_gate, rval$parameters$name_long)]
+    }else{
+      color_var <- input$color_var_gate
+    }
     
-    #color_var <- rval$parameters$name[match(input$color_var, rval$parameters$name_long)]
-    color_var <- input$color_var_gate
+    #color_var <- input$color_var_gate
+    
     axis_labels <- rval$parameters$name_long
     names(axis_labels) <- rval$parameters$name
     
     polygon_gate <- data.frame(x = gate$x, y=gate$y)
+    
+    transformation <- NULL
+    if(input$apply_trans_gate){
+      transformation <- rval$transformation
+    }
     
     p <- plot_gs(df = rval$df_tot,
                  gs = rval$gating_set, 
@@ -1419,7 +1525,7 @@ server <- function(session, input, output) {
                  size = input$size_gate,
                  norm_density = input$norm_gate,
                  smooth = input$smooth_gate,
-                 transformation = rval$transformation,
+                 transformation = transformation,
                  show.legend = input$legend_gate)
             
     
@@ -1448,6 +1554,9 @@ server <- function(session, input, output) {
       transformation <- rval$transformation
     }
     
+    axis_labels <- rval$parameters$name_long
+    names(axis_labels) <- rval$parameters$name
+    
     p <- plot_stat(df = rval$df_tot,
                    gs = rval$gating_set,
                    idx =  input$samples_stat_rows_selected,
@@ -1455,6 +1564,7 @@ server <- function(session, input, output) {
                    yvar = yvar,
                    type = input$plot_type_stat,
                    transformation = transformation,
+                   axis_labels = axis_labels,
                    default_trans = identity_trans(),
                    scale_values = input$scale_values,
                    max_scale = input$max_scale,
