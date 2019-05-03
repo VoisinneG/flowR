@@ -559,7 +559,9 @@ server <- function(session, input, output) {
     
   })
   
-  # load data
+  ##########################################################################################################
+  # load data and initialize values
+  
   observeEvent(input$load, {
     
     validate(
@@ -633,24 +635,47 @@ server <- function(session, input, output) {
                                     minRange = parameters(ff)@data$minRange,
                                     maxRange = parameters(ff)@data$maxRange,
                                     stringsAsFactors = FALSE)
-
+      
+      #########################################################################################################
       #initialization of transformation
       
       rval$parameters$transform <- "identity"
       rval$parameters$transform[rval$parameters$display == "LIN"] <- "identity"
       rval$parameters$transform[rval$parameters$display == "LOG"] <- "logicle"
-      rval$parameters$transform_parameters <- ""
      
+      rval$parameters$transform_parameters <- sapply(rval$parameters$transform, function(x){
+        l <- switch(x,
+                    "identity" = list(),
+                    "asinh" = list(base = input$base_asinh),
+                    "log" = list(base = input$base_log),
+                    "flowJo_asinh" = list(m=input$m, 
+                                          t = input$t, 
+                                          a = input$a, 
+                                          length = input$length),
+                    "logicle" = list(w=input$w_logicle, 
+                                     m=input$m_logicle, 
+                                     t = input$t_logicle, 
+                                     a = input$a_logicle))
+        return(paste( paste(names(l), as.character(l), sep = ": "), collapse="; "))
+      })
+      
       rval$transformation <- lapply(rval$parameters$transform, function(x){
         switch(x,
                "identity" = identity_trans(),
-               "log" = log_trans(),
-               "flowJo_asinh" = flowJo_fasinh_trans(),
-               "asinh" = asinh_trans(),
-               "logicle" = logicle_trans())})
+               "log" = log10_trans(b = input$base_log),
+               "asinh" = asinh_trans(b = input$base_asinh),
+               "flowJo_asinh" = flowJo_fasinh_trans(m=input$m, 
+                                                    t = input$t, 
+                                                    a = input$a, 
+                                                    length = input$length),
+               "logicle" = logicle_trans(w=input$w_logicle, 
+                                         m=input$m_logicle, 
+                                         t = input$t_logicle, 
+                                         a = input$a_logicle))})
       
       names(rval$transformation) <- rval$parameters$name
       
+      #########################################################################################################
       
       if(file_ext(rval$df_files$datapath[input$files_table_rows_selected[1]]) == "xml"){
         myTrans <- lapply(rval$parameters$display, function(x){
@@ -682,9 +707,7 @@ server <- function(session, input, output) {
         }
       }
       
-      
-      
-      
+      #########################################################################################################
       # Compute max values for each parameter in flow set
       min_val <- as.data.frame(fsApply(rval$flow_set, each_col, min, na.rm = TRUE))
       rval$min_val <- apply(min_val, 2, min)
