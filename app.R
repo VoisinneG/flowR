@@ -7,7 +7,7 @@ library(ggridges)
 library(gridExtra)
 
 library(shiny)
-library(shinyBS)
+#library(shinyBS)
 library(shinydashboard)
 library(DT)
 library(tools)
@@ -20,13 +20,14 @@ library(scales)
 #library(ggplot2)
 #library(ggrepel)
 #library(data.table)
-#library(plotly)
-#library(heatmaply)
+library(plotly)
+library(heatmaply)
+library(ggsignif)
 #library(RColorBrewer)
 #library(viridis)
 
 
-options(repos = BiocInstaller::biocinstallRepos(), shiny.maxRequestSize = 300*1024^2)
+options(repos = BiocManager::repositories(), shiny.maxRequestSize = 300*1024^2)
 getOption("repos")
 
 source("./R/flowShine_plot.R")
@@ -85,7 +86,6 @@ body <- dashboardBody(
                          width = NULL, height = NULL,
                          div(style = 'overflow-x: scroll', DT::dataTableOutput("files_table")),
                          br(),
-                         br(),
                          selectizeInput("groups", "select groups", 
                                         choices = NULL, 
                                         selected = NULL,
@@ -99,7 +99,7 @@ body <- dashboardBody(
                      )
               ),
               column(width = 6,
-                     tabBox(title = "Metadata",
+                     tabBox(title = "Meta",
                             width = NULL, height = NULL,
                             tabPanel(title = "Table",
                                      div(style = 'overflow-x: scroll', DT::dataTableOutput("pData"))
@@ -117,7 +117,7 @@ body <- dashboardBody(
                                      
                                      
                             ),
-                            tabPanel(title = "Load metadata",
+                            tabPanel(title = "Import",
                                      fileInput("file_meta", "load metadata file", multiple = FALSE),
                                      selectInput("sep_meta", "column separator", choices = c("comma", "semi-column", "tab"), selected = "tab"),
                                      #checkboxInput("sep_meta", "Choose `;` as column separator", value = FALSE),
@@ -136,14 +136,14 @@ body <- dashboardBody(
     tabItem(tabName = "Trans_tab",
             fluidRow(
               
-              column(width = 6,
-                     tabBox(title = "Parameters",
+              column(width = 5,
+                     tabBox(title = "Chanels",
                             width = NULL, height = NULL,
-                            tabPanel(title = "Chanels",
+                            tabPanel(title = "Table",
                                      div(style = 'overflow-x: scroll', DT::dataTableOutput("parameters_table"))
                                      
                             ),
-                            tabPanel(title = "transformation",
+                            tabPanel(title = "transform",
                                      selectInput("trans", "transformation", 
                                                  choices = c("identity", "logicle", "asinh", "flowJo_asinh", "log"), 
                                                  selected = "identity"),
@@ -170,43 +170,209 @@ body <- dashboardBody(
                                                       numericInput("base_log", label = "base", value = 10)
                                      ),
                                      br(),
-                                     actionButton("apply_transformation", label = "apply transformation to selected variables"),
+                                     actionButton("apply_transformation", label = "apply to selected variables"),
                                      br()
+                            )#,
+                            # tabPanel(title = "show",
+                            #          selectInput("xvar_show", label = "variable", choices = NULL, selected = NULL),
+                            #          verbatimTextOutput("message_transform")
+                            # )
+                     )
+              ),
+              column(width = 7,
+                     tabBox(title = "Plot",
+                            width = NULL, height = NULL,
+                            tabPanel("Plot",
+                                     plotOutput("plot_trans")
+                                     
                             ),
-                            tabPanel(title = "show",
-                                     selectInput("xvar_show", label = "variable", choices = NULL, selected = NULL),
-                                     verbatimTextOutput("message_transform")
+                            tabPanel("Select",
+                                     selectInput("sample_selected_trans", label = "Sample", choices = NULL, selected = NULL),
+                                     actionButton("previous_frame_trans", "previous"),
+                                     actionButton("next_frame_trans", "next"),
+                                     br(),
+                                     br(),
+                                     selectizeInput("gate_trans", 
+                                                    label = "subset", 
+                                                    choices = "root", 
+                                                    selected = "root",
+                                                    multiple = FALSE),
+                                     selectInput("xvar_trans", label = "x variable", choices = NULL, selected = NULL),
+                                     selectInput("yvar_trans", label = "y variable", choices = NULL, selected = NULL)
+                            ),
+                            # tabPanel("Scale axis",
+                            #          selectInput("x_scale", 
+                            #                      label = "x scale", 
+                            #                      choices = c("identity", "log10", "asinh", "logicle"), 
+                            #                      selected = "identity"),
+                            #          selectInput("y_scale", 
+                            #                      label = "y scale", 
+                            #                      choices = c("identity", "log10", "asinh", "logicle"), 
+                            #                      selected = "identity")
+                            #          #checkboxInput("freeze_limits", label = "freeze plot limits", value = TRUE)
+                            #          
+                            # ),
+                            tabPanel("Options",
+                                     selectInput("plot_type_trans", label = "plot type",
+                                                 choices = c("hexagonal", "histogram", "dots", "contour"),
+                                                 selected = "histogram"),
+                                     #checkboxInput("apply_trans_trans", "apply tansformation", value = TRUE),
+                                     checkboxInput("legend_trans", "show legend", value = FALSE),
+                                     checkboxInput("norm_trans", "normalize (set max to 1)", value = TRUE),
+                                     checkboxInput("smooth_trans", "smooth", value = FALSE),
+                                     #checkboxInput("ridges", "ridges", value = FALSE),
+                                     #checkboxInput("facet", "faceting", value = TRUE),
+                                     # selectizeInput("facet_var", 
+                                     #                multiple =TRUE,
+                                     #                label = "facet variables", 
+                                     #                choices = "name", 
+                                     #                selected = NULL),
+                                     # selectizeInput("group_var", 
+                                     #                multiple =FALSE,
+                                     #                label = "group variable", 
+                                     #                choices = c("name","subset"), 
+                                     #                selected = "subset"),
+                                     # selectizeInput("yridges_var", 
+                                     #                multiple =FALSE,
+                                     #                label = "y ridges variable", 
+                                     #                choices = c("name","subset"), 
+                                     #                selected = "subset"),
+                                     selectInput("color_var_trans", "color variable",
+                                                 choices = "none",
+                                                 selected = "none"),
+                                     numericInput("bin_number_trans", label = "number of bins", value = 50),
+                                     numericInput("alpha_trans", label = "alpha", value = 0.5),
+                                     numericInput("size_trans", label = "size", value = 1)
+                                     
                             )
                      )
               )
             )
             
     ),
+    tabItem(tabName = "Comp_tab",
+            fluidRow(
+              
+              column(width = 6,
+                     tabBox(title = "Comp",
+                            width = NULL, height = NULL,
+                            tabPanel(title = "Table",
+                                     div(style = 'overflow-x: scroll', DT::dataTableOutput("spill_table")),
+                                     br(),
+                                     actionButton("reset_comp", "reset")
+                                     
+                            ),
+                            tabPanel(title = "Heatmap",
+                                     plotlyOutput("heatmap_spill")
+                                     
+                            ),
+                            tabPanel("Set",
+                                     selectInput("xvar_comp", label = "column (chanel)", choices = NULL, selected = NULL),
+                                     selectInput("yvar_comp", label = "row (fluorophore)", choices = NULL, selected = NULL),
+                                     numericInput("spill_value", 
+                                                  label = "spillover value", 
+                                                  value = 0, 
+                                                  min = 0, 
+                                                  max = 2, 
+                                                  step = 0.01),
+                                     numericInput("step_size", label = "step size", value = 0.01),
+                                     # sliderInput("spill_value", "spillover value (log10):",
+                                     #             min = -5, max = 1,
+                                     #             value = 0.5, step = 0.01),
+                                     actionButton("set_spill_value", "set value")
+                                     
+                            )
+                     )
+              ),
+              column(width = 6,
+                     tabBox(title = "Plot",
+                            width = NULL, height = NULL,
+                            tabPanel("Plot",
+                                     plotOutput("plot_comp")
+                                     
+                            ),
+                            tabPanel("Select",
+                                     selectInput("sample_selected_comp", label = "Sample", choices = NULL, selected = NULL),
+                                     actionButton("previous_frame_comp", "previous"),
+                                     actionButton("next_frame_comp", "next"),
+                                     br(),
+                                     br(),
+                                     selectizeInput("gate_comp", 
+                                                    label = "subset", 
+                                                    choices = "root", 
+                                                    selected = "root",
+                                                    multiple = FALSE)
+                                     
+                            ),
+                            tabPanel("Options",
+                                     selectInput("plot_type_comp", label = "plot type",
+                                                 choices = c("hexagonal", "histogram", "dots", "contour"),
+                                                 selected = "hexagonal"),
+                                     #checkboxInput("apply_trans_comp", "apply tansformation", value = TRUE),
+                                     checkboxInput("legend_comp", "show legend", value = FALSE),
+                                     checkboxInput("norm_comp", "normalize (set max to 1)", value = TRUE),
+                                     checkboxInput("smooth_comp", "smooth", value = FALSE),
+                                     #checkboxInput("ridges", "ridges", value = FALSE),
+                                     #checkboxInput("facet", "faceting", value = TRUE),
+                                     # selectizeInput("facet_var", 
+                                     #                multiple =TRUE,
+                                     #                label = "facet variables", 
+                                     #                choices = "name", 
+                                     #                selected = NULL),
+                                     # selectizeInput("group_var", 
+                                     #                multiple =FALSE,
+                                     #                label = "group variable", 
+                                     #                choices = c("name","subset"), 
+                                     #                selected = "subset"),
+                                     # selectizeInput("yridges_var", 
+                                     #                multiple =FALSE,
+                                     #                label = "y ridges variable", 
+                                     #                choices = c("name","subset"), 
+                                     #                selected = "subset"),
+                                     selectInput("color_var_comp", "color variable",
+                                                 choices = "none",
+                                                 selected = "none"),
+                                     numericInput("bin_number_comp", label = "number of bins", value = 50),
+                                     numericInput("alpha_comp", label = "alpha", value = 0.5),
+                                     numericInput("size_comp", label = "size", value = 1)
+                                     
+                            )
+                     )
+              )
+              
+            )
+            
+    ),
     tabItem(tabName = "Gates_tab",
             fluidRow(
               column(width = 4,
-                     tabBox(title = "Sample",
+                     box(title = "Select",
                          width = NULL, height = NULL,
-                         tabPanel("Select",
-                                 selectInput("sample_selected", label = "Sample", choices = NULL, selected = NULL),
-                                 actionButton("previous_frame", "previous"),
-                                 actionButton("next_frame", "next"),
-                                 br(),
-                                 br(),
-                                 selectInput("xvar_gate", label = "x variable", choices = NULL, selected = NULL),
-                                 selectInput("yvar_gate", label = "y variable", choices = NULL, selected = NULL)
-                                 )
+                         selectInput("sample_selected", label = "Sample", choices = NULL, selected = NULL),
+                         actionButton("previous_frame", "previous"),
+                         actionButton("next_frame", "next"),
+                         br(),
+                         br(),
+                         selectInput("xvar_gate", label = "x variable", choices = NULL, selected = NULL),
+                         selectInput("yvar_gate", label = "y variable", choices = NULL, selected = NULL),
+                         selectInput("gate_selected", 
+                                     label = "Subset (gate)", 
+                                     choices = "root", 
+                                     selected = "root"),
+                         actionButton("show_gate", "show gate")
+                                 
+                                 
                      ),
                      tabBox(title = "Gates",
                          width = NULL, height = NULL,
-                         tabPanel("Select",
-                                  selectInput("gate_selected", 
-                                              label = "gate", 
-                                              choices = "root", 
-                                              selected = "root"),
-                                  actionButton("show_gate", "show gate")
-                                  ),
-                         tabPanel("Create",
+                         # tabPanel("Select",
+                         #          selectInput("gate_selected", 
+                         #                      label = "gate", 
+                         #                      choices = "root", 
+                         #                      selected = "root"),
+                         #          actionButton("show_gate", "show gate")
+                         #          ),
+                         tabPanel("Add",
                                   #selectInput("gate_type",
                                   #            label = "Type of gate",
                                   #            choices = c("rectangular", "polygonal"),
@@ -247,26 +413,27 @@ body <- dashboardBody(
                                              dblclick = "plot_dblclick")
                          
                          ),
-                         tabPanel("Scale axis",
-                                  selectInput("x_scale_gate", 
-                                              label = "x scale", 
-                                              choices = c("identity", "log10", "asinh", "logicle"), 
-                                              selected = "identity"),
-                                  selectInput("y_scale_gate", 
-                                              label = "y scale", 
-                                              choices = c("identity", "log10", "asinh", "logicle"), 
-                                              selected = "identity"),
-                                  checkboxInput("freeze_limits", label = "freeze plot limits", value = TRUE)
-                                  
-                         ),
+                         # tabPanel("Scale axis",
+                         #          selectInput("x_scale_gate", 
+                         #                      label = "x scale", 
+                         #                      choices = c("identity", "log10", "asinh", "logicle"), 
+                         #                      selected = "identity"),
+                         #          selectInput("y_scale_gate", 
+                         #                      label = "y scale", 
+                         #                      choices = c("identity", "log10", "asinh", "logicle"), 
+                         #                      selected = "identity"),
+                         #          checkboxInput("freeze_limits", label = "freeze plot limits", value = TRUE)
+                         #          
+                         # ),
                          tabPanel("Options",
                                   selectInput("plot_type_gate", label = "plot type",
                                               choices = c("hexagonal", "histogram", "dots","contour"),
                                               selected = "hexagonal"),
-                                  checkboxInput("apply_trans_gate", "apply tansformation", value = TRUE),
+                                  #checkboxInput("apply_trans_gate", "apply tansformation", value = TRUE),
                                   checkboxInput("legend_gate", "show legend", value = TRUE),
                                   checkboxInput("norm_gate", "normalize (set max to 1)", value = TRUE),
                                   checkboxInput("smooth_gate", "smooth", value = FALSE),
+                                  checkboxInput("freeze_limits", label = "freeze plot limits", value = TRUE),
                                   selectInput("color_var_gate", "color variable",
                                               choices = "none",
                                               selected = "none"),
@@ -342,23 +509,23 @@ body <- dashboardBody(
                                      plotOutput("plot_focus")
                                      
                             ),
-                            tabPanel("Scale axis",
-                                     selectInput("x_scale", 
-                                                 label = "x scale", 
-                                                 choices = c("identity", "log10", "asinh", "logicle"), 
-                                                 selected = "identity"),
-                                     selectInput("y_scale", 
-                                                 label = "y scale", 
-                                                 choices = c("identity", "log10", "asinh", "logicle"), 
-                                                 selected = "identity")
-                                     #checkboxInput("freeze_limits", label = "freeze plot limits", value = TRUE)
-                                     
-                            ),
+                            # tabPanel("Scale axis",
+                            #          selectInput("x_scale", 
+                            #                      label = "x scale", 
+                            #                      choices = c("identity", "log10", "asinh", "logicle"), 
+                            #                      selected = "identity"),
+                            #          selectInput("y_scale", 
+                            #                      label = "y scale", 
+                            #                      choices = c("identity", "log10", "asinh", "logicle"), 
+                            #                      selected = "identity")
+                            #          #checkboxInput("freeze_limits", label = "freeze plot limits", value = TRUE)
+                            #          
+                            # ),
                             tabPanel("Options",
                                      selectInput("plot_type", label = "plot type",
                                                  choices = c("hexagonal", "histogram", "dots", "contour"),
                                                  selected = "histogram"),
-                                     checkboxInput("apply_trans_plot", "apply tansformation", value = TRUE),
+                                     #checkboxInput("apply_trans_plot", "apply tansformation", value = TRUE),
                                      checkboxInput("legend", "show legend", value = TRUE),
                                      checkboxInput("norm", "normalize (set max to 1)", value = TRUE),
                                      checkboxInput("smooth", "smooth", value = FALSE),
@@ -429,7 +596,7 @@ body <- dashboardBody(
                                                  choices = c("bar", "tile"),
                                                  selected = "bar"),
                                      checkboxInput("legend_stat", "show legend", value = TRUE),
-                                     checkboxInput("apply_trans", "apply tansformation", value = TRUE),
+                                     #checkboxInput("apply_trans", "apply tansformation", value = TRUE),
                                      checkboxInput("free_y_scale", "free y scale", value = FALSE),
                                      checkboxInput("scale_values", "scale values by row", value = FALSE),
                                      numericInput("max_scale", label = "scale limit", value = 2),
@@ -463,17 +630,21 @@ body <- dashboardBody(
 
 sidebar <- dashboardSidebar(
   sidebarMenu(id = "menu",
+              
               menuItem("Import",
                        tabName = "Import_tab", 
                        startExpanded = FALSE,
                        icon = icon("check-circle")
-                       
               ),
-              menuItem("Transformation",
+              menuItem("Transform",
                        tabName = "Trans_tab", 
                        startExpanded = FALSE,
+                       icon = icon("check-circle")   
+              ),
+              menuItem("Compensate",
+                       tabName = "Comp_tab", 
+                       startExpanded = FALSE,
                        icon = icon("check-circle")
-                       
               ),
               menuItem("Gates",
                        tabName = "Gates_tab", 
@@ -485,13 +656,19 @@ sidebar <- dashboardSidebar(
                        tabName = "Plot_tab", 
                        startExpanded = FALSE,
                        icon = icon("check-circle")
-                       
               ),
               menuItem("Stats",
                        tabName = "Stat_tab", 
                        startExpanded = FALSE,
                        icon = icon("check-circle")
-                       
+              ),
+              menuItem("Controls",
+                       tabName = "Control_tab", 
+                       startExpanded = FALSE,
+                       icon = icon("check-circle"),
+                       checkboxInput("apply_comp", "apply compensation", TRUE),
+                       checkboxInput("apply_trans", "apply transformation", TRUE),
+                       br()
               )
   )
   
@@ -529,7 +706,10 @@ server <- function(session, input, output) {
                          pdata_original = NULL,
                          df_meta = NULL,
                          df_meta_mapped = NULL,
-                         df_keywords = NULL
+                         df_keywords = NULL,
+                         spill = NULL,
+                         df_spill_original = NULL,
+                         df_spill = NULL
                          )
   
   gate <- reactiveValues(x = NULL, y = NULL)
@@ -541,7 +721,7 @@ server <- function(session, input, output) {
       need(input$files$datapath, "Please select a file to import")
     )
     rval$df_files <- input$files
-    
+    print(names(input$files))
   })
   
   
@@ -576,38 +756,92 @@ server <- function(session, input, output) {
         #print(getSamples(ws))
         #show(ws)
         #cat(dirname(rval$df_files$datapath)[1])
-        rval$gating_set <- parseWorkspace(ws,
+        gs <- parseWorkspace(ws,
                                               name = input$groups,
                                               execute = TRUE, 
                                               isNcdf = TRUE,
                                               sampNloc = "sampleNode",
                                               path = dirname(rval$df_files$datapath)[1])
         
-        nodes <- getNodes(rval$gating_set)
+        
+        #samples <- pData(rval$gating_set)$name
+        #samples <- paste(unlist(strsplit(s$name, split = "_[0-9]{3}\\.fcs$")), ".fcs", sep = "")
+        #print(samples)
+        # idx_match <- sapply(samples, function(x){as.numeric(strsplit(x, split= ".", fixed = TRUE)[[1]][1])})
+        # samples <- rval$df_files$name[idx_match+1]
+        # print(samples)
+          
+        nodes <- getNodes(gs)
         
         for(node in setdiff(nodes, "root")){
-          g <- getGate(rval$gating_set[[1]], node)
-          parent <- getParent(rval$gating_set[[1]], node)
+          g <- getGate(gs[[1]], node)
+          parent <- getParent(gs[[1]], node)
           rval$gates_flowCore[[basename(node)]] <- list(gate = g, parent = basename(parent))
+          if(basename(node) == "CD4+ Tcells"){
+            print(g@boundaries)
+          }
         }   
-          
-        rval$flow_set <- getData(rval$gating_set)
         
         
-        names_imported <- fsApply(rval$flow_set, function(x){description(x)[["FILENAME"]]})
+        # idx_to_import <- which(rval$df_files$name %in% samples)
+        # 
+        # print(rval$df_files$name %in% samples)
+        # 
+        # 
+        # rval$flow_set <- read.ncdfFlowSet(rval$df_files$datapath[ file_ext(rval$df_files$datapath) == ".fcs" ], 
+        #                                   which.lines = input$N_lines,
+        #                                   which.lines = 10)
+        # 
+        # names_imported <- fsApply(rval$flow_set, function(x){description(x)[["FILENAME"]]})
+        # print(names_imported)
+        # 
+        # phenoData(rval$flow_set)$name <- rval$df_files$name[idx_to_import]
+        
+        fs <- getData(gs)
+        
+        
+        # ff <- rval$flow_set[[1]]
+        # 
+        # rval$df_spill <- as.data.frame(description(ff)[["SPILL"]])
+        # colnames(rval$df_spill) <- paste("<",colnames(rval$df_spill),">", sep = "")
+        # row.names(rval$df_spill) <- colnames(rval$df_spill)
+        # rval$df_spill_original <- rval$df_spill
+        # 
+        # sp <- as.matrix(rval$df_spill)
+        # sp_inverse <- solve(sp)
+        # colnames(sp_inverse) <- colnames(sp)
+        # rval$flow_set <- compensate(rval$flow_set, sp_inverse)
+
+
+        names_imported <- fsApply(fs, function(x){description(x)[["FILENAME"]]})
         names_imported <- basename(names_imported)
         idx_match <- sapply(names_imported, function(x){as.numeric(strsplit(x, split= ".", fixed = TRUE)[[1]][1])})
-        pData(rval$flow_set)$name <- rval$df_files$name[idx_match+1]
-        pData(rval$gating_set) <- pData(rval$flow_set)
+        
+        
+        
+        #pData(rval$flow_set)$name <- rval$df_files$name[idx_match+1]
+        #pData(rval$gating_set) <- pData(rval$flow_set)
+        
+        rval$flow_set <- read.ncdfFlowSet( rval$df_files$datapath[idx_match+1],
+                                           which.lines = input$N_lines)
+        
+        phenoData(rval$flow_set)$name <- rval$df_files$name[idx_match+1]
+        
 
       }else{
         rval$flow_set <- read.ncdfFlowSet( rval$df_files$datapath[input$files_table_rows_selected], 
                                        which.lines = input$N_lines)
         
         phenoData(rval$flow_set)$name <- rval$df_files$name[input$files_table_rows_selected]
+        
       }
       
       ff <- rval$flow_set[[1]]
+      
+      rval$df_spill <- as.data.frame(description(ff)[["SPILL"]])
+      row.names(rval$df_spill) <- colnames(rval$df_spill)
+      rval$df_spill_original <- rval$df_spill
+      
       desc <- parameters(ff)$desc
       name <- parameters(ff)$name
       name_long <-  name
@@ -627,7 +861,7 @@ server <- function(session, input, output) {
       names(display) <- NULL
       #print(display)
       
-      rval$parameters <- data.frame(name = name, 
+      rval$parameters <- data.frame(name = name,
                                     desc = desc,
                                     name_long = name_long,
                                     display = display,
@@ -636,6 +870,7 @@ server <- function(session, input, output) {
                                     maxRange = parameters(ff)@data$maxRange,
                                     stringsAsFactors = FALSE)
       
+      print(rval$parameters)
       #########################################################################################################
       #initialization of transformation
       
@@ -677,24 +912,33 @@ server <- function(session, input, output) {
       
       #########################################################################################################
       
-      if(file_ext(rval$df_files$datapath[input$files_table_rows_selected[1]]) == "xml"){
-        myTrans <- lapply(rval$parameters$display, function(x){
-          switch(x,
-                 "LOG" = flowJo_biexp_inverse_trans(),
-                 identity_trans())
-        })
-        myTrans <- transformerList(rval$parameters$name, myTrans)
-        rval$gating_set <- transform(rval$gating_set, myTrans)
-        recompute(rval$gating_set)
-        rval$flow_set <- getData(rval$gating_set)
-      }
+      # if(file_ext(rval$df_files$datapath[input$files_table_rows_selected[1]]) == "xml"){
+      #   myTrans <- lapply(rval$parameters$display, function(x){
+      #     switch(x,
+      #            "LOG" = flowJo_biexp_inverse_trans(),
+      #            identity_trans())
+      #   })
+      #   myTrans <- transformerList(rval$parameters$name, myTrans)
+      #   rval$gating_set <- transform(rval$gating_set, myTrans)
+      #   recompute(rval$gating_set)
+      #   rval$flow_set <- getData(rval$gating_set)
+      # }
       
       if(! setequal(rval$plot_var, rval$parameters$name_long)){
         rval$plot_var <- rval$parameters$name_long
         names(rval$plot_var) <- NULL
         
         if(length(rval$plot_var)>1){
+          
           updateSelectInput(session, "xvar_show", choices = rval$plot_var, selected = rval$plot_var[1])
+          updateSelectInput(session, "xvar_trans", choices = rval$plot_var, selected = rval$plot_var[1])
+          updateSelectInput(session, "yvar_trans", choices = rval$plot_var, selected = rval$plot_var[2])
+          
+          comp_params <- rval$parameters$name_long[match(colnames(rval$df_spill), rval$parameters$name)]
+          names(comp_params) <- NULL
+          updateSelectInput(session, "xvar_comp", choices = comp_params, selected = comp_params[1])
+          updateSelectInput(session, "yvar_comp", choices = comp_params, selected = comp_params[2])
+          
           updateSelectInput(session, "xvar_gate", choices = rval$plot_var, selected = rval$plot_var[1])
           updateSelectInput(session, "yvar_gate", choices = rval$plot_var, selected = rval$plot_var[2])
           updateSelectInput(session, "yvar_stat", choices = rval$plot_var, selected = rval$plot_var[1])
@@ -702,6 +946,8 @@ server <- function(session, input, output) {
           updateSelectInput(session, "yvar", choices = rval$plot_var, selected = rval$plot_var[2])
           updateSelectInput(session, "color_var_gate", choices = c("none", rval$plot_var), selected = "none")
           updateSelectInput(session, "color_var", choices = c("none", rval$plot_var), selected = "none")
+          updateSelectInput(session, "color_var_trans", choices = c("none", rval$plot_var), selected = "none")
+          updateSelectInput(session, "color_var_comp", choices = c("none", rval$plot_var), selected = "none")
           
           
         }
@@ -721,63 +967,104 @@ server <- function(session, input, output) {
       
       #########################################################################################################
       # Create gating set
-      if(file_ext(rval$df_files$datapath[input$files_table_rows_selected[1]]) != "xml"){
+      #if(file_ext(rval$df_files$datapath[input$files_table_rows_selected[1]]) != "xml"){
         
+      myTrans <- lapply(rval$parameters$display, function(x){
+            switch(x,
+                   "LOG" = flowJo_biexp_inverse_trans(),
+                   identity_trans())
+      })
+        
+      names(myTrans) <- rval$parameters$name
+      
+      # polygon <- g@boundaries
+      # colnames(polygon) <- gsub("<", "", colnames(polygon))
+      # colnames(polygon) <- gsub(">", "", colnames(polygon))
+      # poly_gate <- polygonGate(.gate = polygon, filterId=basename(node))
+      
+      
         rval$gating_set <- GatingSet(rval$flow_set)
         
         # add existing gates
         ngates <- length(rval$gates_flowCore)
+        
         if(ngates>0){
-          gs <- rval$gating_set
+          
+          #gs <- rval$gating_set
           idx <- 1:ngates
           while(length(idx)>0){
             
             i_added <- NULL
             for(i in 1:length(idx)){
-              if(rval$gates_flowCore[[idx[i]]]$parent %in% union(basename(getNodes(gs)), "root") ){
-                add(gs, 
-                    rval$gates_flowCore[[idx[i]]]$gate, 
-                    parent = rval$gates_flowCore[[idx[i]]]$parent, 
+              
+              g <- rval$gates_flowCore[[idx[i]]]
+              
+              if(g$parent %in% union(basename(getNodes(gs)), "root") ){
+                
+                polygon <- g$gate@boundaries
+                colnames(polygon) <- gsub("<", "", colnames(polygon))
+                colnames(polygon) <- gsub(">", "", colnames(polygon))
+                
+                for(j in 1:length(colnames(polygon))){
+                  polygon[,j] <- myTrans[[colnames(polygon)[j]]]$transform(polygon[,j])
+                }
+                
+                poly_gate <- polygonGate(.gate = polygon, filterId=names(rval$gates_flowCore)[idx[i]])
+                
+                add(rval$gating_set, 
+                    poly_gate, 
+                    parent = g$parent, 
                     name = names(rval$gates_flowCore)[idx[i]])
+                
+                rval$gates_flowCore[[idx[i]]] <- list(gate = poly_gate, parent = basename(g$parent))
+                
+                if(basename(names(rval$gates_flowCore)[idx[i]]) == "CD4+ Tcells"){
+                  print(poly_gate@boundaries)
+                }
+                
                 i_added <- c(i_added, i)
               }
             }
             idx <- idx[-i_added]
           }
-          rval$gating_set <- gs
-        }
-        recompute(rval$gating_set)
-      }else{
-        
-        #remove gates
-        for(i in 1:length(rval$gates_flowCore)){
-          gate_name <- names(rval$gates_flowCore)[i]
-          if(gate_name %in% basename(getNodes(rval$gating_set))){
-            Rm(gate_name, rval$gating_set)
-          }
-        }
-        #recompute(rval$gating_set)
-        getNodes(rval$gating_set)
-        
-        #add gates with rescaled gate coordinates
-        for(i in 1:length(rval$gates_flowCore)){
-          g <- rval$gates_flowCore[[i]]$gate
-          if(.hasSlot(g, "boundaries")){
-            bdr <- g@boundaries
-            for(j in 1:dim(bdr)[2]){
-              if(colnames(bdr)[j] %in% rval$parameters$name[rval$parameters$display == "LOG"]){
-                g@boundaries[,j] <- flowJo_biexp_inverse_trans()$transform(bdr[,j])
-              }
-            }
-          }
-          rval$gates_flowCore[[i]]$gate <- g
-          add(rval$gating_set, g, 
-              parent = rval$gates_flowCore[[i]]$parent, 
-              name = names(rval$gates_flowCore)[i])
+          #rval$gating_set <- gs
+          
+          recompute(rval$gating_set)
         }
         
-        recompute(rval$gating_set)
-      }
+        
+      #}
+      # else{
+      #   
+      #   #remove gates
+      #   for(i in 1:length(rval$gates_flowCore)){
+      #     gate_name <- names(rval$gates_flowCore)[i]
+      #     if(gate_name %in% basename(getNodes(rval$gating_set))){
+      #       Rm(gate_name, rval$gating_set)
+      #     }
+      #   }
+      #   #recompute(rval$gating_set)
+      #   getNodes(rval$gating_set)
+      #   
+      #   #add gates with rescaled gate coordinates
+      #   for(i in 1:length(rval$gates_flowCore)){
+      #     g <- rval$gates_flowCore[[i]]$gate
+      #     if(.hasSlot(g, "boundaries")){
+      #       bdr <- g@boundaries
+      #       for(j in 1:dim(bdr)[2]){
+      #         if(colnames(bdr)[j] %in% rval$parameters$name[rval$parameters$display == "LOG"]){
+      #           g@boundaries[,j] <- flowJo_biexp_inverse_trans()$transform(bdr[,j])
+      #         }
+      #       }
+      #     }
+      #     rval$gates_flowCore[[i]]$gate <- g
+      #     add(rval$gating_set, g, 
+      #         parent = rval$gates_flowCore[[i]]$parent, 
+      #         name = names(rval$gates_flowCore)[i])
+      #   }
+      #   
+      #   recompute(rval$gating_set)
+      # }
       
     
       #########################################################################################################
@@ -788,6 +1075,8 @@ server <- function(session, input, output) {
       updateSelectInput(session, "gate_selected", choices = gate_names)
       updateSelectInput(session, "gate", choices = gate_names, selected = "root")
       updateSelectInput(session, "gate_stat", choices = gate_names, selected = "root")
+      updateSelectInput(session, "gate_trans", choices = gate_names, selected = "root")
+      updateSelectInput(session, "gate_comp", choices = gate_names, selected = "root")
       updateSelectInput(session, "gate_to_delete", choices = names(rval$gates_flowCore))
       
       
@@ -829,7 +1118,22 @@ server <- function(session, input, output) {
                           choices = c("subset", names(rval$pdata)), 
                           selected = "subset")
         
+        updateSelectInput(session, "color_var_trans", 
+                          choices = c("subset", names(rval$pdata)), 
+                          selected = "subset")
+        updateSelectInput(session, "color_var_comp", 
+                          choices = c("subset", names(rval$pdata)), 
+                          selected = "subset")
+        
         updateSelectInput(session, "sample_selected",
+                          choices = pData(rval$flow_set)$name,
+                          selected = pData(rval$flow_set)$name[1])
+        
+        updateSelectInput(session, "sample_selected_trans",
+                          choices = pData(rval$flow_set)$name,
+                          selected = pData(rval$flow_set)$name[1])
+        
+        updateSelectInput(session, "sample_selected_comp",
                           choices = pData(rval$flow_set)$name,
                           selected = pData(rval$flow_set)$name[1])
         #cat("update\n")
@@ -848,7 +1152,87 @@ server <- function(session, input, output) {
     
   })
   
+  ##########################################################################################################
+  # Observe functions for compensation
   
+  observe({
+    
+    validate(
+      need(length(input$file_comp)>0, "Please select a file to load")
+    )
+    
+    sep <- switch(input$sep_comp,
+                  "comma" = ",",
+                  "semi-column" = ";",
+                  "tab" = "\t")
+    
+    rval$df_comp <- read.csv(input$file_comp$datapath, sep = sep, header = TRUE, quote = "\"", fill = TRUE)
+    names(rval$df_comp)[1] <- "name"
+  })
+  
+  observeEvent(input$import_comp, {
+    idx_match_row <- match(rval$pdata$name, rval$df_comp[,1])
+    idx_match_col <- match(rval$pdata$name, names(rval$df_comp))
+    rval$df_spill <- rval$df_comp[idx_match_row, idx_match_col]
+  })
+  
+  observeEvent(input$reset_comp, {
+    rval$df_spill <- rval$df_spill_original
+  })
+  
+  observeEvent(input$set_spill_value, {
+    
+    xvar <- rval$parameters$name[match(input$xvar_comp, rval$parameters$name_long)]
+    yvar <- rval$parameters$name[match(input$yvar_comp, rval$parameters$name_long)]
+    idx_x <- match(xvar, names(rval$df_spill))
+    idx_y <- match(yvar, names(rval$df_spill))
+    rval$df_spill[idx_y, idx_x] <- input$spill_value
+
+  })
+  
+  observe({
+    if(input$apply_comp){
+      rval$spill <- rval$df_spill
+    }else{
+      rval$spill <- NULL
+    }
+    
+  })
+  
+  observe({
+    df <- rval$df_spill
+    event.data <- event_data("plotly_click", source = "select_heatmap")
+    idx_y <- dim(df)[1] - event.data$pointNumber[[1]][1]
+    idx_x <- event.data$pointNumber[[1]][2] + 1
+    
+    if(length(idx_x)>0){
+      updateSelectInput(session, "xvar_comp", 
+                        selected = rval$parameters$name_long[match(colnames(df)[idx_x], rval$parameters$name)])
+    }
+    if(length(idx_y)>0){
+      updateSelectInput(session, "yvar_comp", 
+                        selected = rval$parameters$name_long[match(row.names(df)[idx_y], rval$parameters$name)])
+      
+    }
+    
+  })
+  
+  observe({
+    df <- rval$df_spill
+    xvar <- rval$parameters$name[match(input$xvar_comp, rval$parameters$name_long)]
+    yvar <- rval$parameters$name[match(input$yvar_comp, rval$parameters$name_long)]
+    idx_x <- match(xvar, colnames(df))
+    idx_y <- match(yvar, row.names(df))
+    #if(length(idx_x)>0 & length(idx_y)>0){
+      updateNumericInput(session, "spill_value", value = df[idx_y, idx_x])
+      
+    #}
+    
+  })
+  
+  observe({
+    updateNumericInput(session, "spill_value", step = input$step_size)
+  })
   
   ##########################################################################################################
   # Observe functions for metadata
@@ -869,8 +1253,8 @@ server <- function(session, input, output) {
   })
   
   observeEvent(input$append_meta, {
-    idx_match <- match(rval$df_meta[,1], rval$pdata$name)
-    rval$df_meta_mapped <- rval$df_meta[!is.na(idx_match), -1]
+    idx_match <- match(rval$pdata$name, rval$df_meta[,1])
+    rval$df_meta_mapped <- rval$df_meta[idx_match, -1]
   })
   
   observeEvent(input$reset_meta, {
@@ -897,9 +1281,10 @@ server <- function(session, input, output) {
         keys <- gsub(pattern = "$", replacement = "", keys, fixed = TRUE)
         colnames(df) <- keys
         row.names(df) <- NULL
-        rval$df_keywords <- df
+        
         
       }
+      rval$df_keywords <- df
     }
   })
 
@@ -946,11 +1331,16 @@ server <- function(session, input, output) {
       updateSelectInput(session, "color_var_gate", 
                         choices = c("subset", names(rval$pdata), rval$plot_var), 
                         selected = "subset")
-      
       updateSelectInput(session, "color_var", 
                         choices = c("subset", names(rval$pdata), rval$plot_var), 
                         selected = "subset")
       updateSelectInput(session, "color_var_stat", 
+                        choices = c("subset", names(rval$pdata)), 
+                        selected = "subset")
+      updateSelectInput(session, "color_var_trans", 
+                        choices = c("subset", names(rval$pdata)), 
+                        selected = "subset")
+      updateSelectInput(session, "color_var_trans", 
                         choices = c("subset", names(rval$pdata)), 
                         selected = "subset")
       
@@ -989,6 +1379,52 @@ server <- function(session, input, output) {
         idx <- length(rval$pdata$name)
       }
       updateSelectInput(session, "sample_selected", selected = rval$pdata$name[idx])
+    }
+  })
+  
+  observeEvent(input$next_frame_trans, {
+    if(!is.null(rval$flow_set)){
+      idx <- which(rval$pdata$name == input$sample_selected_trans)
+      idx <- idx +1
+      if(idx > length(rval$pdata$name)){
+        idx <- 1
+      }
+      updateSelectInput(session, "sample_selected_trans", selected = rval$pdata$name[idx])
+      
+    }
+  })
+  
+  observeEvent(input$previous_frame_trans, {
+    if(!is.null(rval$flow_set)){
+      idx <- which(rval$pdata$name == input$sample_selected_trans)
+      idx <- idx - 1
+      if(idx < 1){
+        idx <- length(rval$pdata$name)
+      }
+      updateSelectInput(session, "sample_selected_trans", selected = rval$pdata$name[idx])
+    }
+  })
+  
+  observeEvent(input$next_frame_comp, {
+    if(!is.null(rval$flow_set)){
+      idx <- which(rval$pdata$name == input$sample_selected_comp)
+      idx <- idx +1
+      if(idx > length(rval$pdata$name)){
+        idx <- 1
+      }
+      updateSelectInput(session, "sample_selected_comp", selected = rval$pdata$name[idx])
+      
+    }
+  })
+  
+  observeEvent(input$previous_frame_comp, {
+    if(!is.null(rval$flow_set)){
+      idx <- which(rval$pdata$name == input$sample_selected_comp)
+      idx <- idx - 1
+      if(idx < 1){
+        idx <- length(rval$pdata$name)
+      }
+      updateSelectInput(session, "sample_selected_comp", selected = rval$pdata$name[idx])
     }
   })
   
@@ -1076,6 +1512,8 @@ server <- function(session, input, output) {
           updateSelectInput(session, "gate_to_delete", choices = setdiff(basename(getNodes(rval$gating_set)), "root"))
           updateSelectInput(session, "gate", choices = basename(getNodes(rval$gating_set)), selected = "root")
           updateSelectInput(session, "gate_stat", choices = basename(getNodes(rval$gating_set)), selected = "root")
+          updateSelectInput(session, "gate_trans", choices = basename(getNodes(rval$gating_set)), selected = "root")
+          updateSelectInput(session, "gate_comp", choices = basename(getNodes(rval$gating_set)), selected = "root")
           
           
           gate$x <- NULL
@@ -1107,6 +1545,8 @@ server <- function(session, input, output) {
         updateSelectInput(session, "gate_to_delete", choices = setdiff(basename(getNodes(rval$gating_set)), "root"))
         updateSelectInput(session, "gate", choices = basename(getNodes(rval$gating_set)), selected = "root")
         updateSelectInput(session, "gate_stat", choices = basename(getNodes(rval$gating_set)), selected = "root")
+        updateSelectInput(session, "gate_trans", choices = basename(getNodes(rval$gating_set)), selected = "root")
+        updateSelectInput(session, "gate_comp", choices = basename(getNodes(rval$gating_set)), selected = "root")
         
       }
       
@@ -1252,20 +1692,22 @@ server <- function(session, input, output) {
     ##########################################################################################################
     # Observe functions to store data
     
-    observe({
-      if(input$plot_type_gate == "dots"){
-        ff <- getData(rval$gating_set[[rval$idx_ff_gate]], y = rval$gate_focus)
-        df <- as.data.frame(exprs(ff))
-        df$identifier <- input$sample_selected
-        rval$df_gate_focus <- df
-      }
-      
-    })
+    # observe({
+    #   if(input$plot_type_gate == "dots"){
+    #     ff <- getData(rval$gating_set[[rval$idx_ff_gate]], y = rval$gate_focus)
+    #     df <- as.data.frame(exprs(ff))
+    #     df$identifier <- input$sample_selected
+    #     rval$df_gate_focus <- df
+    #   }
+    #   
+    # })
     
     observeEvent(input$compute_data, {
+      
       rval$df_tot <- get_data_gs(gs = rval$gating_set,
                         idx = 1:length(rval$gating_set), 
-                        subset = basename(getNodes(rval$gating_set)) )
+                        subset = basename(getNodes(rval$gating_set)),
+                        spill = rval$spill)
     })
     
     observeEvent(input$reset_data, {
@@ -1380,6 +1822,10 @@ server <- function(session, input, output) {
     )
     
     validate(
+      need(length(getNodes(rval$gating_set))>1, "No gates to display")
+    )
+    
+    validate(
       need(rval$idx_ff_gate, "Please select a sample")
     )
     
@@ -1390,7 +1836,7 @@ server <- function(session, input, output) {
     names(axis_labels) <- rval$parameters$name
     
     transformation <- NULL
-    if(input$apply_trans_gate){
+    if(input$apply_trans){
       transformation <- rval$transformation
     }
     
@@ -1403,6 +1849,7 @@ server <- function(session, input, output) {
     p <- plot_gh(df = rval$df_tot,
                  gs = rval$gating_set, 
                  idx = rval$idx_ff_gate,
+                 spill = rval$spill,
                  transformation = transformation,
                  bins = input$bin_number_gate,
                  color_var = color_var,
@@ -1425,6 +1872,66 @@ server <- function(session, input, output) {
     g
     
   })
+  
+  output$plot_trans <- renderPlot({
+    
+    validate(
+      need(rval$gating_set, "Empty gating set")
+    )
+    
+    validate(
+      need(input$sample_selected_trans, "Please select a sample")
+    )
+  
+    
+    idx_x <- match(input$xvar_trans, rval$parameters$name_long)
+    idx_y <- match(input$yvar_trans, rval$parameters$name_long)
+    xvar <- rval$parameters$name[idx_x]
+    yvar <- rval$parameters$name[idx_y]
+    
+    
+    if(input$color_var_trans %in% rval$parameters$name_long){
+      color_var <- rval$parameters$name[match(input$color_var_trans, rval$parameters$name_long)]
+    }else{
+      color_var <- input$color_var
+    }
+    
+    #color_var <- rval$parameters$name[match(input$color_var_gate, rval$parameters$name_long)]
+    #color_var <- input$color_var
+    
+    axis_labels <- rval$parameters$name_long
+    names(axis_labels) <- rval$parameters$name
+    
+    transformation <- NULL
+    if(input$apply_trans){
+      transformation <- rval$transformation
+    }
+    
+    p <- plot_gs(df = rval$df_tot,
+                 gs = rval$gating_set, 
+                 idx = match(input$sample_selected_trans, rval$pdata$name),
+                 subset = input$gate_trans, 
+                 spill = rval$spill,
+                 xvar = xvar, 
+                 yvar = yvar, 
+                 color_var = color_var, 
+                 gate = NULL, 
+                 type = input$plot_type_trans, 
+                 bins = input$bin_number_trans,
+                 alpha = input$alpha_trans,
+                 size = input$size_trans,
+                 norm_density = input$norm_trans,
+                 smooth = input$smooth_trans,
+                 transformation =  transformation,
+                 show.legend = input$legend_trans,
+                 axis_labels = axis_labels)
+    
+    p <- p + xlab(input$xvar_trans) + ylab(input$yvar_trans)
+    
+    p
+    
+  })
+  
   
   output$plot_focus <- renderPlot({
     
@@ -1455,7 +1962,7 @@ server <- function(session, input, output) {
     names(axis_labels) <- rval$parameters$name
     
     transformation <- NULL
-    if(input$apply_trans_plot){
+    if(input$apply_trans){
       transformation <- rval$transformation
     }
     
@@ -1463,6 +1970,7 @@ server <- function(session, input, output) {
                  gs = rval$gating_set, 
                  idx = input$files_selection_table_rows_selected,
                  subset = input$gate, 
+                 spill = rval$spill,
                  xvar = xvar, 
                  yvar = yvar, 
                  color_var = color_var, 
@@ -1527,7 +2035,7 @@ server <- function(session, input, output) {
     polygon_gate <- data.frame(x = gate$x, y=gate$y)
     
     transformation <- NULL
-    if(input$apply_trans_gate){
+    if(input$apply_trans){
       transformation <- rval$transformation
     }
     
@@ -1535,6 +2043,7 @@ server <- function(session, input, output) {
                  gs = rval$gating_set, 
                  idx = rval$idx_ff_gate,
                  subset = rval$gate_focus, 
+                 spill = rval$spill,
                  xvar = xvar, 
                  yvar = yvar, 
                  color_var = color_var, 
@@ -1584,6 +2093,7 @@ server <- function(session, input, output) {
                    gs = rval$gating_set,
                    idx =  input$samples_stat_rows_selected,
                    subset = input$gate_stat,
+                   spill = rval$spill,
                    yvar = yvar,
                    type = input$plot_type_stat,
                    transformation = transformation,
@@ -1599,6 +2109,100 @@ server <- function(session, input, output) {
     
     p                          
       
+  })
+  
+  output$plot_comp <- renderPlot({
+    
+    validate(
+      need(rval$gating_set, "Empty gating set")
+    )
+    
+    validate(
+      need(input$sample_selected_comp, "Please select a sample")
+    )
+    
+    
+    idx_x <- match(input$xvar_comp, rval$parameters$name_long)
+    idx_y <- match(input$yvar_comp, rval$parameters$name_long)
+    yvar <- rval$parameters$name[idx_x]
+    xvar <- rval$parameters$name[idx_y]
+    
+    
+    if(input$color_var_comp %in% rval$parameters$name_long){
+      color_var <- rval$parameters$name[match(input$color_var_comp, rval$parameters$name_long)]
+    }else{
+      color_var <- input$color_var
+    }
+    
+    #color_var <- rval$parameters$name[match(input$color_var_gate, rval$parameters$name_long)]
+    #color_var <- input$color_var
+    
+    axis_labels <- rval$parameters$name_long
+    names(axis_labels) <- rval$parameters$name
+    axis_labels[[xvar]] <- paste(axis_labels[[xvar]], "(fluo)")
+    axis_labels[[yvar]] <- paste(axis_labels[[yvar]], "(chanel)")
+    
+    transformation <- NULL
+    if(input$apply_trans){
+      transformation <- rval$transformation
+    }
+    
+    p <- plot_gs(df = rval$df_tot,
+                 gs = rval$gating_set, 
+                 idx = match(input$sample_selected_comp, rval$pdata$name),
+                 subset = input$gate_comp, 
+                 spill = rval$spill,
+                 xvar = xvar, 
+                 yvar = yvar, 
+                 color_var = color_var, 
+                 gate = NULL, 
+                 type = input$plot_type_comp, 
+                 bins = input$bin_number_comp,
+                 alpha = input$alpha_comp,
+                 size = input$size_comp,
+                 norm_density = input$norm_comp,
+                 smooth = input$smooth_comp,
+                 transformation =  transformation,
+                 show.legend = input$legend_comp,
+                 axis_labels = axis_labels)
+    
+    #p <- p + xlab(paste(input$yvar_comp, "(fluo)")) + ylab(paste(input$xvar_comp, "(chanel)"))
+    
+    p
+    
+  })
+  
+  output$spill_table <- renderDataTable({
+    
+    validate(
+      need(rval$df_spill, "No spillover matrix")
+    )
+    
+    df <- rval$df_spill
+    format(df, digits =3)
+  })
+  
+  output$heatmap_spill <- renderPlotly({
+    
+    validate(
+      need(rval$df_spill, "No spillover matrix")
+    )
+    
+    df <- rval$df_spill
+    df[df == 0] <- NA
+    df_log <- log10(df)
+    p <- heatmaply(df,
+                   #colors = c(rgb(1,1,1), rgb(1,0,0)),
+                   #colors= viridis,
+                   plot_method="ggplot",
+                   scale_fill_gradient_fun = scale_fill_viridis(trans = log10_trans(), name = "spillover"),
+                   Rowv = NULL,
+                   Colv = NULL,
+                   xlab = "detection chanel",
+                   ylab = "emitting fluorophore"
+                   )
+    p$x$source <- "select_heatmap"
+    p
   })
  
 }

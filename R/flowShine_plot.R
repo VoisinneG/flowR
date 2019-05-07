@@ -7,13 +7,20 @@ library(ggsignif)
 
 get_data_gs <- function(gs, 
                         idx, 
-                        subset
+                        subset,
+                        spill = NULL
                         ){
   df <- NULL
   for(k in 1:length(subset)){
     
     for(i in 1:length(idx)){
+      
       ff <- getData(gs[[idx[i]]], subset[k])
+      
+      if(!is.null(spill)){
+        ff <- compensate(ff, spill)
+      }
+      
       #ff <- fs[[i]]
       df_int <- as.data.frame(exprs(ff))
       df_int[["name"]] <- pData(gs)$name[idx[i]]
@@ -74,6 +81,7 @@ plot_gs <- function(df = NULL,
                     size = 1,
                     transformation = NULL,
                     default_trans = identity_trans(),
+                    spill = NULL,
                     facet_vars = "name",
                     group_var = "name",
                     yridges_var = "name",
@@ -148,7 +156,8 @@ plot_gs <- function(df = NULL,
     
     df <- get_data_gs(gs = gs,
                       idx = idx, 
-                      subset = subset)
+                      subset = subset,
+                      spill = spill)
   }else{
     df <- df[df$name %in% pData(gs)[["name"]][idx] & 
                df$subset %in% subset, ]
@@ -426,6 +435,7 @@ plot_stat <- function(df = NULL,
                       color_var = NULL, 
                       axis_labels = NULL,
                       transformation = NULL,
+                      spill = NULL,
                       default_trans = identity_trans(),
                       scale_values = FALSE,
                       free_y_scale = TRUE,
@@ -459,7 +469,8 @@ plot_stat <- function(df = NULL,
   if(is.null(df)){
     df <- get_data_gs(gs = gs,
                       idx = idx,
-                      subset = subset)
+                      subset = subset,
+                      spill = spill)
   }else{
     df <- df[df$name %in% pData(gs)[["name"]][idx] & 
                df$subset %in% subset, ]
