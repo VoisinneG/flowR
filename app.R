@@ -90,7 +90,7 @@ body <- dashboardBody(
                                         choices = NULL, 
                                         selected = NULL,
                                         multiple = TRUE),
-                         numericInput("N_lines", label = "Number of cells to import", value = 3000),
+                         #numericInput("N_lines", label = "Number of cells to import", value = 3000),
                          actionButton("load", label = "Load selected files")
                      ),
                      box(title = "summary",
@@ -822,15 +822,15 @@ server <- function(session, input, output) {
         #pData(rval$flow_set)$name <- rval$df_files$name[idx_match+1]
         #pData(rval$gating_set) <- pData(rval$flow_set)
         
-        rval$flow_set <- read.ncdfFlowSet( rval$df_files$datapath[idx_match+1],
-                                           which.lines = input$N_lines)
+        rval$flow_set <- read.ncdfFlowSet( rval$df_files$datapath[idx_match+1])
+                                           #which.lines = input$N_lines)
         
         phenoData(rval$flow_set)$name <- rval$df_files$name[idx_match+1]
         
 
       }else{
-        rval$flow_set <- read.ncdfFlowSet( rval$df_files$datapath[input$files_table_rows_selected], 
-                                       which.lines = input$N_lines)
+        rval$flow_set <- read.ncdfFlowSet( rval$df_files$datapath[input$files_table_rows_selected] )
+                                       #which.lines = input$N_lines)
         
         phenoData(rval$flow_set)$name <- rval$df_files$name[input$files_table_rows_selected]
         
@@ -1840,6 +1840,11 @@ server <- function(session, input, output) {
       transformation <- rval$transformation
     }
     
+    data_range <- NULL
+    if(input$freeze_limits){
+      data_range <- rval$data_range
+    }
+    
     if(input$color_var_gate %in% rval$parameters$name_long){
       color_var <- rval$parameters$name[match(input$color_var_gate, rval$parameters$name_long)]
     }else{
@@ -1855,7 +1860,7 @@ server <- function(session, input, output) {
                  color_var = color_var,
                  facet_vars = NULL,
                  axis_labels = axis_labels,
-                 data_range = rval$data_range,
+                 data_range = data_range,
                  type = input$plot_type_gate,
                  alpha = input$alpha_gate,
                  size = input$size_gate,
