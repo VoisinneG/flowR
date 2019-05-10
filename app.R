@@ -1,6 +1,7 @@
 #BiocManager::install("flowCore")
 #BiocManager::install("flowViz")
 library(openCyto)
+library(CytoML)
 #library(flowWorkspace)
 library(ggcyto)
 library(ggridges)
@@ -32,27 +33,7 @@ getOption("repos")
 
 source("./R/flowShine_plot.R")
 
-flowJo_biexp_inverse_trans <- function (..., n = 6, equal.space = FALSE){
-  trans <- flowJoTrans(..., inverse = TRUE)
-  inv <- flowJoTrans(...)
-  flow_trans(name = "flowJo_biexp_inverse", trans.fun = trans, inverse.fun = inv, 
-             n = n, equal.space = equal.space)
-}
 
-asinh_transform <- function(b=5, inverse = FALSE){ 
-  if(inverse){
-    function(x){b*sinh(x)} 
-  }else{
-    function(x){asinh(x/b)} 
-  }
-}
-
-asinh_trans <- function (..., n = 6, equal.space = FALSE){
-  trans <- asinh_transform(...)
-  inv <- asinh_transform(..., inverse = TRUE)
-  flow_trans(name = "asinh", trans.fun = trans, inverse.fun = inv, 
-             n = n, equal.space = equal.space)
-}
 
 
 transform_values <- function(x, scale, ...){
@@ -92,13 +73,21 @@ body <- dashboardBody(
                                         multiple = TRUE),
                          #numericInput("N_lines", label = "Number of cells to import", value = 3000),
                          actionButton("load", label = "Load selected files")
-                     ),
-                     box(title = "summary",
-                         width = NULL, height = NULL,
-                         verbatimTextOutput("message")
                      )
+                     # ,
+                     # box(title = "summary",
+                     #     width = NULL, height = NULL,
+                     #     verbatimTextOutput("message")
+                     # )
               ),
               column(width = 6,
+                     fluidRow(
+                       valueBoxOutput("progressBox", width = 6),
+                       valueBoxOutput("progressBox2", width = 6)
+                     ),
+                     fluidRow(
+                       valueBoxOutput("progressBox3", width = 12)
+                     ),
                      tabBox(title = "Meta",
                             width = NULL, height = NULL,
                             tabPanel(title = "Table",
@@ -129,6 +118,10 @@ body <- dashboardBody(
                                      
                             )
                      )
+                     
+                     
+                     
+                     
               )
             )
       
@@ -140,10 +133,13 @@ body <- dashboardBody(
                      tabBox(title = "Chanels",
                             width = NULL, height = NULL,
                             tabPanel(title = "Table",
+                                     "Select chanels",
+                                     br(),
+                                     br(),
                                      div(style = 'overflow-x: scroll', DT::dataTableOutput("parameters_table"))
                                      
                             ),
-                            tabPanel(title = "transform",
+                            tabPanel(title = "Transform",
                                      selectInput("trans", "transformation", 
                                                  choices = c("identity", "logicle", "asinh", "flowJo_asinh", "log"), 
                                                  selected = "identity"),
@@ -170,7 +166,7 @@ body <- dashboardBody(
                                                       numericInput("base_log", label = "base", value = 10)
                                      ),
                                      br(),
-                                     actionButton("apply_transformation", label = "apply to selected variables"),
+                                     actionButton("apply_transformation", label = "apply to selected chanels"),
                                      br()
                             )#,
                             # tabPanel(title = "show",
@@ -392,12 +388,6 @@ body <- dashboardBody(
                          
                          
                      ),
-                     box(title = "Get data",
-                         width = NULL, height = NULL,
-                         helpText( "Get data for all files and subsets"),
-                         actionButton("compute_data", "Get data"),
-                         actionButton("reset_data", "reset")
-                     ),
                      box(title = "Message_gate",
                          width = NULL, height = NULL,
                          verbatimTextOutput("message_gate")
@@ -600,6 +590,15 @@ body <- dashboardBody(
                                      checkboxInput("free_y_scale", "free y scale", value = FALSE),
                                      checkboxInput("scale_values", "scale values by row", value = FALSE),
                                      numericInput("max_scale", label = "scale limit", value = 2),
+                                     numericInput("expand_factor", label = "expand factor", value = 0.1),
+                                     selectInput("stat_function", 
+                                                 label = "statistics", 
+                                                 choices = c("mean", "median", "sd"), 
+                                                 selected = "mean"),
+                                     selectInput("y_trans", 
+                                                 label = "Transform variables:", 
+                                                 choices = c("log10", "asinh", "identity", "default"), 
+                                                 selected = "default"),
                                      selectizeInput("facet_var_stat", 
                                                     multiple =TRUE,
                                                     label = "facet variables", 
@@ -613,6 +612,7 @@ body <- dashboardBody(
                                      selectInput("color_var_stat", "color variable",
                                                  choices = "none",
                                                  selected = "none")
+                                     
                                      
                             )
                      )
@@ -662,13 +662,24 @@ sidebar <- dashboardSidebar(
                        startExpanded = FALSE,
                        icon = icon("check-circle")
               ),
-              menuItem("Controls",
-                       tabName = "Control_tab", 
+              menuItem("Sub-sample",
+                       tabName = "Sub_tab",
                        startExpanded = FALSE,
                        icon = icon("check-circle"),
-                       checkboxInput("apply_comp", "apply compensation", TRUE),
-                       checkboxInput("apply_trans", "apply transformation", TRUE),
+                       br(),
+                       "Sample cells per subset:",
+                       numericInput("ncells_per_sample", "Number of cells / subset", 10000),
+                       actionButton("compute_data", "sample"),
+                       actionButton("reset_data", "reset"),
                        br()
+              ),
+              menuItem("General controls",
+                      tabName = "General_tab",
+                      startExpanded = TRUE,
+                      icon = icon("check-circle"),
+                      checkboxInput("apply_comp", "apply compensation", TRUE),
+                      checkboxInput("apply_trans", "apply transformation", TRUE),
+                      br()
               )
   )
   
@@ -709,7 +720,8 @@ server <- function(session, input, output) {
                          df_keywords = NULL,
                          spill = NULL,
                          df_spill_original = NULL,
-                         df_spill = NULL
+                         df_spill = NULL,
+                         Ncells_tot = 0
                          )
   
   gate <- reactiveValues(x = NULL, y = NULL)
@@ -748,6 +760,10 @@ server <- function(session, input, output) {
       need(length(input$files_table_rows_selected)>0, "Please select a file to load")
     )
     
+    # Create a Progress object
+    progress <- shiny::Progress$new(min = 0, max = 1)
+    on.exit(progress$close())
+    progress$set(message = "Loading data", value = 0.5)
     
     if(length(rval$df_files$datapath)>0){
       
@@ -761,6 +777,7 @@ server <- function(session, input, output) {
                                               execute = TRUE, 
                                               isNcdf = TRUE,
                                               sampNloc = "sampleNode",
+                                              #sampNloc = "keyword",
                                               path = dirname(rval$df_files$datapath)[1])
         
         
@@ -771,16 +788,18 @@ server <- function(session, input, output) {
         # samples <- rval$df_files$name[idx_match+1]
         # print(samples)
           
-        nodes <- getNodes(gs)
-        
-        for(node in setdiff(nodes, "root")){
-          g <- getGate(gs[[1]], node)
-          parent <- getParent(gs[[1]], node)
-          rval$gates_flowCore[[basename(node)]] <- list(gate = g, parent = basename(parent))
-          if(basename(node) == "CD4+ Tcells"){
-            print(g@boundaries)
-          }
-        }   
+        rval$gates_flowCore <- get_gates_from_gs(gs)
+        print(rval$gates_flowCore)
+        # nodes <- getNodes(gs)
+        # 
+        # for(node in setdiff(nodes, "root")){
+        #   g <- getGate(gs[[1]], node)
+        #   parent <- getParent(gs[[1]], node)
+        #   rval$gates_flowCore[[basename(node)]] <- list(gate = g, parent = basename(parent))
+        #   if(basename(node) == "CD4+ Tcells"){
+        #     print(g@boundaries)
+        #   }
+        # }   
         
         
         # idx_to_import <- which(rval$df_files$name %in% samples)
@@ -836,6 +855,9 @@ server <- function(session, input, output) {
         
       }
       
+      rval$Ncells_tot <- sum(fsApply(rval$flow_set, function(x){as.numeric(description(x)[["$TOT"]])}))
+      print(rval$Ncells_tot)
+      
       ff <- rval$flow_set[[1]]
       
       rval$df_spill <- as.data.frame(description(ff)[["SPILL"]])
@@ -878,7 +900,7 @@ server <- function(session, input, output) {
       rval$parameters$transform[rval$parameters$display == "LIN"] <- "identity"
       rval$parameters$transform[rval$parameters$display == "LOG"] <- "logicle"
      
-      rval$parameters$transform_parameters <- sapply(rval$parameters$transform, function(x){
+      rval$parameters[["transform parameters"]] <- sapply(rval$parameters$transform, function(x){
         l <- switch(x,
                     "identity" = list(),
                     "asinh" = list(base = input$base_asinh),
@@ -897,7 +919,7 @@ server <- function(session, input, output) {
       rval$transformation <- lapply(rval$parameters$transform, function(x){
         switch(x,
                "identity" = identity_trans(),
-               "log" = log10_trans(b = input$base_log),
+               "log" = log_trans(base = input$base_log),
                "asinh" = asinh_trans(b = input$base_asinh),
                "flowJo_asinh" = flowJo_fasinh_trans(m=input$m, 
                                                     t = input$t, 
@@ -977,60 +999,75 @@ server <- function(session, input, output) {
         
       names(myTrans) <- rval$parameters$name
       
-      # polygon <- g@boundaries
-      # colnames(polygon) <- gsub("<", "", colnames(polygon))
-      # colnames(polygon) <- gsub(">", "", colnames(polygon))
-      # poly_gate <- polygonGate(.gate = polygon, filterId=basename(node))
+      # transform gate coordinates
       
+      ngates <- length(rval$gates_flowCore)
+      
+      if(ngates>0){
+        
+        for(i in 1:ngates){
+          g <- rval$gates_flowCore[[i]]
+          
+          
+          if(class(g$gate) %in% c("rectangleGate", "polygonGate")){
+            polygon <- g$gate@boundaries
+            colnames(polygon) <- gsub("<", "", colnames(polygon))
+            colnames(polygon) <- gsub(">", "", colnames(polygon))
+            
+            for(j in 1:length(colnames(polygon))){
+              polygon[,j] <- myTrans[[colnames(polygon)[j]]]$transform(polygon[,j])
+              if(colnames(polygon)[j] == "Time"){
+                polygon[,j] <- polygon[,j]/as.numeric(description(ff)[["$TIMESTEP"]])
+              }
+            }
+            
+            trans_gate <- polygonGate(.gate = polygon, filterId=names(rval$gates_flowCore)[i])
+          }
+          
+          if(class(g$gate) %in% c("ellipsoidGate")){
+            
+            cov <- g$gate@cov
+            mean <- g$gate@mean
+            print(cov)
+            print(mean)
+            polygon <- ellipse_path(cov = cov, mean = mean)
+
+            colnames(polygon) <- gsub("<", "", colnames(polygon))
+            colnames(polygon) <- gsub(">", "", colnames(polygon))
+            
+            for(j in 1:length(colnames(polygon))){
+              polygon[,j] <- myTrans[[colnames(polygon)[j]]]$transform(polygon[,j])
+              if(colnames(polygon)[j] == "Time"){
+                polygon[,j] <- polygon[,j]/as.numeric(description(ff)[["$TIMESTEP"]])
+              }
+            }
+            
+            # mean_gate <- g$gate@mean
+            # names(mean_gate) <- gsub("<", "", names(mean_gate))
+            # names(mean_gate) <- gsub(">", "", names(mean_gate))
+            # 
+            # for(j in 1:length(names(mean_gate))){
+            #   mean_gate[j] <- myTrans[[names(mean_gate)[j]]]$transform(mean_gate[j])
+            # }
+            
+            #print(cov)
+            #print(mean_gate)
+            trans_gate <- polygonGate(.gate = polygon, filterId=names(rval$gates_flowCore)[i])
+          }
+          
+          rval$gates_flowCore[[i]] <- list(gate = trans_gate, parent = basename(g$parent))
+        }
+      }
+      
+    
+      # add gates
       
         rval$gating_set <- GatingSet(rval$flow_set)
         
-        # add existing gates
-        ngates <- length(rval$gates_flowCore)
+        rval$gating_set <- add_gates_flowCore(rval$gating_set, rval$gates_flowCore)
         
-        if(ngates>0){
-          
-          #gs <- rval$gating_set
-          idx <- 1:ngates
-          while(length(idx)>0){
-            
-            i_added <- NULL
-            for(i in 1:length(idx)){
-              
-              g <- rval$gates_flowCore[[idx[i]]]
-              
-              if(g$parent %in% union(basename(getNodes(gs)), "root") ){
-                
-                polygon <- g$gate@boundaries
-                colnames(polygon) <- gsub("<", "", colnames(polygon))
-                colnames(polygon) <- gsub(">", "", colnames(polygon))
-                
-                for(j in 1:length(colnames(polygon))){
-                  polygon[,j] <- myTrans[[colnames(polygon)[j]]]$transform(polygon[,j])
-                }
-                
-                poly_gate <- polygonGate(.gate = polygon, filterId=names(rval$gates_flowCore)[idx[i]])
-                
-                add(rval$gating_set, 
-                    poly_gate, 
-                    parent = g$parent, 
-                    name = names(rval$gates_flowCore)[idx[i]])
-                
-                rval$gates_flowCore[[idx[i]]] <- list(gate = poly_gate, parent = basename(g$parent))
-                
-                if(basename(names(rval$gates_flowCore)[idx[i]]) == "CD4+ Tcells"){
-                  print(poly_gate@boundaries)
-                }
-                
-                i_added <- c(i_added, i)
-              }
-            }
-            idx <- idx[-i_added]
-          }
-          #rval$gating_set <- gs
-          
-          recompute(rval$gating_set)
-        }
+        
+        
         
         
       #}
@@ -1598,7 +1635,7 @@ server <- function(session, input, output) {
         
         trans <- switch(input$trans,
                         "identity" = identity_trans(),
-                        "log" = log10_trans(b = input$base_log),
+                        "log" = log_trans(base = input$base_log),
                         "asinh" = asinh_trans(b = input$base_asinh),
                         "flowJo_asinh" = flowJo_fasinh_trans(m=input$m, 
                                                       t = input$t, 
@@ -1610,7 +1647,7 @@ server <- function(session, input, output) {
                                                   a = input$a_logicle))
         
         rval$parameters$transform[input$parameters_table_rows_selected] <- input$trans
-        rval$parameters$transform_parameters[input$parameters_table_rows_selected] <- paste( paste(names(trans_params), as.character(trans_params), sep = ": "), collapse="; ")
+        rval$parameters[["transform parameters"]][input$parameters_table_rows_selected] <- paste( paste(names(trans_params), as.character(trans_params), sep = ": "), collapse="; ")
         
         for(i in 1:length(var_name)){
           rval$transformation[[var_name[i]]] <- trans
@@ -1620,6 +1657,16 @@ server <- function(session, input, output) {
       
     })
       
+    
+    observe({
+      updateSelectInput(session, "xvar_trans", 
+                        selected = rval$parameters$name_long[input$parameters_table_rows_selected[1]])
+      if(length(input$parameters_table_row_selected)>1){
+        updateSelectInput(session, "yvar_trans", 
+                          selected = rval$parameters$name_long[input$parameters_table_rows_selected[2]])
+      }
+    })
+    
     #   df <- rval$parameters$name[input$parameters_table_rows_selected]
     #   
     #   if(!is.null(rval$parameters)){
@@ -1704,10 +1751,20 @@ server <- function(session, input, output) {
     
     observeEvent(input$compute_data, {
       
+      # Create a Progress object
+      progress <- shiny::Progress$new(min = 0, max = 100)
+      on.exit(progress$close())
+      progress$set(message = "Computing...", value = 0)
+      updateProgress <- function(value = NULL, detail = NULL) {
+        progress$set(value = value, detail = detail)
+      }
+      
       rval$df_tot <- get_data_gs(gs = rval$gating_set,
                         idx = 1:length(rval$gating_set), 
                         subset = basename(getNodes(rval$gating_set)),
-                        spill = rval$spill)
+                        spill = rval$spill,
+                        Ncells = input$ncells_per_sample,
+                        updateProgress = updateProgress)
     })
     
     observeEvent(input$reset_data, {
@@ -1740,8 +1797,29 @@ server <- function(session, input, output) {
     rval$df_files[ ,c("name", "size")]
   })
   
-  output$message <- renderText({
-    paste("You have loaded", length(rval$flow_set), "items")
+  # output$message <- renderText({
+  #   paste("You have loaded", length(rval$flow_set), "items")
+  # })
+  
+  output$progressBox <- renderValueBox({
+    valueBox(
+      length(rval$flow_set), "samples",icon = icon("list"),
+      color = "purple"
+    )
+  })
+  
+  output$progressBox2 <- renderValueBox({
+    valueBox(
+      length(rval$gates_flowCore), "gates", icon = icon("list"),
+      color = "yellow"
+    )
+  })
+  
+  output$progressBox3 <- renderValueBox({
+    valueBox(
+      format(rval$Ncells_tot, digits = 2), "cells", icon = icon("list"),
+      color = "green"
+    )
   })
   
   output$parameters_table <- renderDataTable({
@@ -1753,8 +1831,12 @@ server <- function(session, input, output) {
      df <- rval$parameters
      df$minRange <- format(df$minRange, digits = 2)
      df$maxRange <- format(df$maxRange, digits = 2)
-     df
-    
+     df[["chanel_name"]] <- df$name_long
+     DT::datatable(
+       df[, c("chanel_name", "transform", "transform parameters", "display", "range", "minRange", "maxRange")], 
+       rownames = FALSE)
+     #df <- df[, c("transform", "transform_parameters", "display", "range", "minRange", "maxRange")]
+     #DT::datatable(df, rownames = rval$parameters$name_long)
   })
   
   output$pData <- DT::renderDataTable({
@@ -1793,25 +1875,31 @@ server <- function(session, input, output) {
       need(length(rval$gates_flowCore)>0, "Empty gates set")
     )
     
-    df <- lapply(names(rval$gates_flowCore), function(x){
-      if(x != "root"){
-        data.frame("source" = rval$gates_flowCore[[x]]$parent, "target" = x)}
-      else{NULL}}
-    )
+    p <- plot(rval$gating_set)
     
-    df <- do.call(rbind, df)
-    net <- igraph::graph.data.frame(df, directed=TRUE)
-    net$layout <- layout_as_tree(net)
+    renderGraph(p)
     
-    plot.igraph(net, 
-                layout = layout_as_tree, 
-                vertex.size = 50, 
-                vertex.color = rgb(0,0,0,0.2), 
-                vertex.frame.color = NA, 
-                vertex.label.color = "black", 
-                vertex.label.family = "Helvetica",
-                edge.arrow.size = 0.3, 
-                vertex.label.cex = 0.7)
+    # df <- lapply(names(rval$gates_flowCore), function(x){
+    #   if(x != "root"){
+    #     data.frame("source" = rval$gates_flowCore[[x]]$parent, "target" = x)}
+    #   else{NULL}}
+    # )
+    # 
+    # df <- do.call(rbind, df)
+    # net <- igraph::graph.data.frame(df, directed=TRUE)
+    # #layout <- layout_as_tree(net, circular = TRUE)
+    # layout <- layout.reingold.tilford(net)
+    # layout <- -layout[,2:1] 
+    # 
+    # plot.igraph(net, 
+    #             layout = layout, 
+    #             vertex.size = 50, 
+    #             vertex.color = rgb(0,0,0,0.2), 
+    #             vertex.frame.color = NA, 
+    #             vertex.label.color = "black", 
+    #             vertex.label.family = "Helvetica",
+    #             edge.arrow.size = 0.3, 
+    #             vertex.label.cex = 0.7)
 
   })
   
@@ -2094,6 +2182,12 @@ server <- function(session, input, output) {
     axis_labels <- rval$parameters$name_long
     names(axis_labels) <- rval$parameters$name
     
+    y_trans <- switch(input$y_trans,
+                      "log10" = log10_trans(),
+                      "asinh" = asinh_trans(),
+                      "identity" = identity_trans(),
+                      NULL)
+    
     p <- plot_stat(df = rval$df_tot,
                    gs = rval$gating_set,
                    idx =  input$samples_stat_rows_selected,
@@ -2110,7 +2204,10 @@ server <- function(session, input, output) {
                    color_var = input$color_var_stat, 
                    facet_vars = input$facet_var_stat,
                    group_var = input$group_var_stat,
-                   show.legend = input$legend_stat)
+                   expand_factor = input$expand_factor,
+                   stat_function = input$stat_function,
+                   show.legend = input$legend_stat,
+                   y_trans = y_trans)
     
     p                          
       
@@ -2203,8 +2300,15 @@ server <- function(session, input, output) {
                    scale_fill_gradient_fun = scale_fill_viridis(trans = log10_trans(), name = "spillover"),
                    Rowv = NULL,
                    Colv = NULL,
+                   column_text_angle = 90,
                    xlab = "detection chanel",
-                   ylab = "emitting fluorophore"
+                   ylab = "emitting fluorophore",
+                   fontsize_row = 6,
+                   fontsize_col = 6,
+                   cellnote_size = 6,
+                   hide_colorbar = TRUE,
+                   main = "spillover matrix",
+                   margins = c(50, 50, 50, 0)
                    )
     p$x$source <- "select_heatmap"
     p

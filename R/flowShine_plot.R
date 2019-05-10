@@ -4,35 +4,212 @@ library(ggcyto)
 library(data.table)
 library(ggsignif)
 #library(sf) # need libudunits2-dev
+#devtools::install_github("JinmiaoChenLab/ClusterX")
+library(ClusterX)
+#devtools::install_github("JinmiaoChenLab/Rphenograph")
+library(Rphenograph)
+library(Rtsne)
 
-get_data_gs <- function(gs, 
+flowJo_biexp_inverse_trans <- function (..., n = 6, equal.space = FALSE){
+  trans <- flowJoTrans(..., inverse = TRUE)
+  inv <- flowJoTrans(...)
+  flow_trans(name = "flowJo_biexp_inverse", trans.fun = trans, inverse.fun = inv, 
+             n = n, equal.space = equal.space)
+}
+
+asinh_transform <- function(b=5, inverse = FALSE){ 
+  if(inverse){
+    function(x){b*sinh(x)} 
+  }else{
+    function(x){asinh(x/b)} 
+  }
+}
+
+asinh_trans <- function (..., n = 6, equal.space = FALSE){
+  trans <- asinh_transform(...)
+  inv <- asinh_transform(..., inverse = TRUE)
+  flow_trans(name = "asinh", trans.fun = trans, inverse.fun = inv, 
+             n = n, equal.space = equal.space)
+}
+
+
+ellipse_path <- function(cov, mean, n = 20000){
+  
+  eg <- eigen(g@cov)
+  a <- sqrt(eg$values[1])
+  b <- sqrt(eg$values[2])
+  
+  alpha <- acos(eg$vectors[1,1])
+  
+  
+  x <- rep(NA, n+1)
+  y <- rep(NA, n+1)
+  
+  for(i in 1:(n+1)){
+    theta <- (i-1)*pi*2/n
+    r <- a*b / sqrt( (b*cos(theta))^2 + (a*sin(theta))^2 )
+    xr <- r*cos(theta)
+    yr <- r*sin(theta)
+    x[i] <- cos(alpha)*xr - sin(alpha)*yr + mean[1]
+    y[i] <- sin(alpha)*xr + cos(alpha)*yr + mean[2]
+  }
+  
+  df <- data.frame(x = x, y= y)
+  names(df) <- colnames(cov)
+  
+  return(df)
+}
+
+get_gates_from_gs <- function(gs){
+  
+  nodes <- getNodes(gs)
+  gates <- list()
+  
+  for(node in setdiff(nodes, "root")){
+    g <- getGate(gs[[1]], node)
+    parent <- getParent(gs[[1]], node)
+    gates[[basename(node)]] <- list(gate = g, parent = basename(parent))
+  } 
+  
+  return(gates)
+  
+}
+
+add_gates_flowCore <- function(gs, gates){
+  
+  ngates <- length(gates)
+  
+  if(ngates>0){
+    
+    idx <- 1:ngates
+    while(length(idx)>0){
+      
+      i_added <- NULL
+      for(i in 1:length(idx)){
+        
+        g <- gates[[idx[i]]]
+        
+        if(g$parent %in% union(basename(getNodes(gs)), "root") ){
+          
+          add(gs, 
+              g$gate, 
+              parent = g$parent, 
+              name = names(gates)[idx[i]])
+          
+          i_added <- c(i_added, i)
+        }
+      }
+      idx <- idx[-i_added]
+    }
+    
+    recompute(gs)
+  }
+  
+  return(gs)
+}
+
+get_data_gs_2 <- function(gs, 
                         idx, 
                         subset,
-                        spill = NULL
-                        ){
-  df <- NULL
-  for(k in 1:length(subset)){
-    
-    for(i in 1:length(idx)){
+                        Ncells = NULL,
+                        spill = NULL,
+                        updateProgress = NULL
+){
+  
+  df <- list()
+  count <- 0
+  
+  
+  
+  
+  for(i in 1:length(idx)){
       
-      ff <- getData(gs[[idx[i]]], subset[k])
       
-      if(!is.null(spill)){
-        ff <- compensate(ff, spill)
+      
+      for(k in 1:length(subset)){
+        #ff <- fs[[i]]
+        df_int[[subset[k]]] <- getIndices(gs[[idx[i]]], subset[k])
+        #df <- rbind(df, df_int)
       }
       
-      #ff <- fs[[i]]
+      if(!is.null(Ncells)){
+        if(Ncells < dim(df_int)[1]){
+          df_int <- df_int[sample(1:dim(df_int)[1], Ncells, replace = FALSE), ] 
+        }
+      }
+      
+      count <- count + 1
+      df[[count]] <- df_int
+      
+      if(is.function(updateProgress)){
+        value <- count / (length(subset)*length(idx))*100
+        updateProgress(value = value, detail = format(value, digits=0))
+      }
+    
+  }
+  
+  df_tot <- do.call(rbind, df)
+  #df_tot[["subset"]] <- factor(df_tot[["subset"]], levels = subset)
+  df_tot[["name"]] <- factor(df_tot[["name"]], levels = pData(gs)$name[idx])
+  
+  return(df_tot)
+  
+}
+
+get_data_gs <- function(gs,
+                        idx,
+                        subset,
+                        Ncells = NULL,
+                        spill = NULL,
+                        updateProgress = NULL
+){
+  
+  if(!is.null(spill)){
+    gates <- get_gates_from_gs(gs)
+    fs <- getData(gs[idx])
+    spill_list <- lapply(1:length(idx), function(x){return(spill)})
+    names(spill_list) <- sampleNames(fs)
+    fs <- compensate(fs, spill_list)
+    gs <- GatingSet(fs)
+    gs <- add_gates_flowCore(gs, gates)
+    idx <- 1:length(gs)
+  }
+  
+  df <- list()
+  count <- 0
+  for(i in 1:length(idx)){
+    
+    
+    
+    for(k in 1:length(subset)){
+    
+      ff <- getData(gs[[idx[i]]], subset[k])
       df_int <- as.data.frame(exprs(ff))
       df_int[["name"]] <- pData(gs)$name[idx[i]]
       df_int[["subset"]] <- subset[k]
-      df <- rbind(df, df_int)
+      #df <- rbind(df, df_int)
+      
+      if(!is.null(Ncells)){
+        if(Ncells < dim(df_int)[1]){
+          df_int <- df_int[sample(1:dim(df_int)[1], Ncells, replace = FALSE), ] 
+        }
+      }
+      
+      count <- count + 1
+      df[[count]] <- df_int
+      
+      if(is.function(updateProgress)){
+        value <- count / (length(subset)*length(idx))*100
+        updateProgress(value = value, detail = paste(format(value, digits=0), "%", sep = ""))
+      }
     }
   }
   
-  df[["subset"]] <- factor(df[["subset"]], levels = subset)
-  df[["name"]] <- factor(df[["name"]], levels = pData(gs)$name[idx])
+  df_tot <- do.call(rbind, df)
+  df_tot[["subset"]] <- factor(df_tot[["subset"]], levels = subset)
+  df_tot[["name"]] <- factor(df_tot[["name"]], levels = pData(gs)$name[idx])
   
-  return(df)
+  return(df_tot)
   
 }
 
@@ -52,7 +229,7 @@ add_columns_from_metadata <- function(df,
   }
   
   new_vars <- unique(setdiff( c(yridges_var, group_var, facet_vars, color_var), 
-                              c("name","subset")))
+                              names(df)))
   if(length(new_vars)>0){
     for(variable in new_vars){
       df[[variable]] <- metadata[[variable]][match(df[["name"]], metadata$name)]
@@ -72,7 +249,8 @@ plot_gs <- function(df = NULL,
                     yvar = NULL,
                     axis_labels = NULL,
                     color_var = NULL, 
-                    data_range = NULL, 
+                    data_range = NULL,
+                    min_value = NULL,
                     gate=NULL, 
                     polygon_gate = NULL,
                     type = "hexagonal", 
@@ -93,10 +271,7 @@ plot_gs <- function(df = NULL,
                     ){
   
   
-  if(is.null(transformation)){
-    transformation <- lapply(gs@data@colnames, function(x){default_trans})
-    names(transformation) <- gs@data@colnames
-  }
+  
   
   if(!is.null(gate)){
     if(class(gate) == "character"){
@@ -134,9 +309,14 @@ plot_gs <- function(df = NULL,
     
     if(!is.null(gate)){
       for(i in 1:length(gate)){
-        if(.hasSlot(gate[[i]], "boundaries")){
+        if(class(gate[[i]]) %in% c("rectangleGate", "polygonGate")){
           xvar <- colnames(gate[[i]]@boundaries)[1]
           yvar <- try(colnames(gate[[i]]@boundaries)[2], silent = TRUE)
+          break
+        }
+        if(class(gate[[i]])=="ellipsoidGate"){
+          xvar <- colnames(gate[[i]]@cov)[1]
+          yvar <- try(colnames(gate[[i]]@cov)[2], silent = TRUE)
           break
         }
       }
@@ -144,36 +324,46 @@ plot_gs <- function(df = NULL,
     
   }
 
-  xlim <- NULL
-  ylim <- NULL
-  if(!is.null(data_range)){
-    xlim <- data_range[[xvar]]
-    ylim <- data_range[[yvar]]
+  print(xvar)
+  print(yvar)
+  
+  if(is.null(transformation)){
+    trans_var <- unique(c(xvar, yvar, color_var))
+    transformation <- lapply(trans_var, function(x){default_trans})
+    names(transformation) <- trans_var
   }
+  
+  
   
   
   if(is.null(df)){
     
     df <- get_data_gs(gs = gs,
-                      idx = idx, 
+                      idx = idx,
                       subset = subset,
                       spill = spill)
   }else{
-    df <- df[df$name %in% pData(gs)[["name"]][idx] & 
-               df$subset %in% subset, ]
-  } 
+    #df <- df[df$name %in% pData(gs)[["name"]][idx],  names(df) %in% c("name", subset, xvar, yvar)]
+    df <- df[df$name %in% pData(gs)[["name"]][idx] & df$subset %in% subset, ]
+  }
   
   df <- add_columns_from_metadata(df,
                                   metadata = pData(gs),
-                                  color_var = color_var, 
+                                  color_var = color_var,
                                   facet_vars = facet_vars,
                                   group_var = group_var,
                                   yridges_var = yridges_var)
-    
-  
  
   print(names(df))
     
+  
+  xlim <- range(df[[xvar]])
+  ylim <- range(df[[yvar]])
+  if(!is.null(data_range)){
+    xlim <- data_range[[xvar]]
+    ylim <- data_range[[yvar]]
+  }
+  
   ##################################################################################
   # plot density hexagonal
   if(type == "hexagonal"){
@@ -285,9 +475,20 @@ plot_gs <- function(df = NULL,
       
       gate_int <- gate[[j]]
       
-      if(.hasSlot(gate_int, "boundaries") ){
-        
+      if(class(gate_int) %in% c("rectangleGate", "polygonGate") ){
         polygon <- as.data.frame(gate_int@boundaries)
+      }else if(class(gate_int) %in% c("ellipsoidGate")){
+        cov <- gate_int@cov
+        mean <- gate_int@mean
+        polygon <- ellipse_path(cov = cov, mean = mean)
+        print(cov)
+        print(mean)
+        print(polygon)
+      }else{
+        warning("gate format not supported")
+        break
+      }
+      
         idx_match <- match(c(xvar, yvar), names(polygon))
         
         if(sum(is.na(idx_match))==0){
@@ -324,9 +525,7 @@ plot_gs <- function(df = NULL,
             #          y=transformation[[yvar]]$inverse(center[idx_match[2]]),
             #          label = gate_int@filterId,
             #          color = "red", fill = "white")
-        }else{
-          warning(paste("gate is not defined with parameters ", xvar, "and", yvar, sep = "" ))
-        }
+        
       }
     }
     
@@ -362,6 +561,11 @@ plot_gs <- function(df = NULL,
   ##################################################################################
   # general plot parameters
  
+  if(!is.null(min_value)){
+    xlim[1] <- min_value
+    ylim[1] <- min_value
+  }
+  
   if(!is.null(facet_vars)){
     p <- p + facet_wrap(facets = sapply(facet_vars, as.name), labeller = label_both)
   }else{
@@ -408,9 +612,11 @@ plot_gh <- function(df, gs, idx, ...){
       
       same_par <- sapply(par_nodes, function(x){setequal(x, par_nodes[[1]])})
       
-      parent <- getParent(gs[[idx]], nodes_to_plot[1])
+      parent <- basename(getParent(gs[[idx]], nodes_to_plot[1]))
       count <- count + 1
-      plist[[count]] <- plot_gs(df, gs, idx, subset = parent, gate = nodes_to_plot[same_par], ...)
+      #print(parent)
+      #print(unique(df$subset))
+      plist[[count]] <- plot_gs(df = df, gs=gs, idx=idx, subset = parent, gate = nodes_to_plot[same_par], ...)
       
       all_children <- unlist(sapply(nodes_to_plot[same_par], function(x){getChildren(gs[[1]], x)}))
       names(all_children) <- NULL
@@ -430,7 +636,7 @@ plot_stat <- function(df = NULL,
                       gs,
                       idx, 
                       subset,
-                      yvar = NULL,
+                      yvar,
                       type = "bar",
                       color_var = NULL, 
                       axis_labels = NULL,
@@ -442,25 +648,26 @@ plot_stat <- function(df = NULL,
                       max_scale = 0,
                       facet_vars = "name",
                       group_var = "subset",
-                      show.legend = TRUE
+                      expand_factor = 0.1,
+                      stat_function = "mean",
+                      show.legend = TRUE,
+                      y_trans = NULL
                     
 ){
   
   #if(log10_trans){
   #  trans <- log10_trans()
   #}else{
-    trans <- identity_trans()
+  #  trans <- identity_trans()
   #}
   
-  if(is.null(transformation)){
-   transformation <- lapply(gs@data@colnames, function(x){trans})
-   names(transformation) <- gs@data@colnames
+  if(!is.null(y_trans)){
+   transformation <- lapply(yvar, function(x){y_trans})
+   names(transformation) <- yvar
   }
   
+  trans_name <-  unique(unlist(sapply(transformation[yvar], function(tf){tf$name})))
   
-  if(is.null(yvar)){
-    yvar <- gs@data@colnames[1]
-  }
   
   #ylim <- NULL
   #if(!is.null(data_range)){
@@ -483,20 +690,20 @@ plot_stat <- function(df = NULL,
   }
   
   df_melt <- melt(df, id.vars = c("name", "subset"), measure.vars = yvar)
-  #df_melt$value[!is.finite(df_melt$value)] <- NA
+  df_melt <- df_melt[is.finite(df_melt$value), ]
   
-  df_cast <- dcast(df_melt, name + subset ~ variable, mean, na.rm = TRUE)
+  stat.fun <- function(...){do.call(stat_function, args = list(...))}
+  df_cast <- dcast(df_melt, name + subset ~ variable, stat.fun, na.rm = TRUE)
   
   
-  #for(i in 1:length(yvar)){
-  #  df_cast[[yvar[i]]] <- transformation[[yvar[i]]]$inverse(df_cast[[yvar[i]]])
+  for(i in 1:length(yvar)){
+    df_cast[[yvar[i]]] <- transformation[[yvar[i]]]$inverse(df_cast[[yvar[i]]])
   #  #df_cast[[yvar[i]]] <- trans$inverse(df_cast[[yvar[i]]])
-  #}
+  }
   
   df_scale <- df_cast
   if(scale_values){
     df_scale[-c(1:2)] <- scale(df_cast[-c(1:2)])
-    
   }
   
   df_melt2 <- melt(df_scale, id.vars = c("name", "subset") )
@@ -519,14 +726,18 @@ plot_stat <- function(df = NULL,
   
   
   if(!free_y_scale){
-    ylim <- c( min(df_melt2$value, na.rm = TRUE)*(1-50/100), max(df_melt2$value, na.rm = TRUE)*(1+50/100))
+    delta = range(df_melt2$value)
+    delta <- abs(delta[2]-delta[1])
+    ylim <- c( min(df_melt2$value, na.rm = TRUE) - expand_factor*delta, 
+               max(df_melt2$value, na.rm = TRUE) + expand_factor*delta)
     #scale_y <- "free"
   }
   
   if(scale_values & max_scale > 0){
     df_melt2$value[df_melt2$value > max_scale] <- max_scale
     df_melt2$value[df_melt2$value < -max_scale] <- -max_scale
-    ylim <- c(-max_scale, max_scale)
+    ylim <- c(-max_scale - expand_factor*2*max_scale, 
+              max_scale + expand_factor*2*max_scale)
     #scale_y <- "free_y"
     #main_title <- "Scaled values (Z-score)"
   }
@@ -579,8 +790,15 @@ plot_stat <- function(df = NULL,
                   test="t.test",
                   test.args = list("paired"=FALSE))
     
-    #p <- p + scale_y_continuous(trans = trans)
-    p <- p + coord_cartesian(ylim = ylim)
+    if(!is.null(y_trans)){
+      p <- p + scale_y_continuous(trans = y_trans)
+    }
+    
+    if(length(grep("log", trans_name))>0){
+      ylim[1] <- max(c(1, ylim[1])) 
+    }
+    
+    p <- p + coord_cartesian(ylim = ylim, expand = FALSE)
     
       #geom_boxplot(mapping = aes_string( y = "value", fill = "variable")) +
       #geom_point(mapping = aes_string(y = "value"))
@@ -608,9 +826,75 @@ plot_stat <- function(df = NULL,
   p <- p + theme( axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5), 
                   strip.text.y = element_text(angle = 0)
                   )
-      
-
+    
+  trans_name_plot <- trans_name
+  if(length(trans_name)>1){
+    trans_name_plot <- "defined by variable"
+  }
   
+  p <- p + ggtitle(paste("statistic : ",stat_function, " / transform : ", trans_name_plot, sep = "")) 
+
   p
+  
+}
+
+dim_reduction <- function(df=NULL,
+                          gs,
+                          idx,
+                          subset,
+                          Ncells = NULL,
+                          spill = NULL,
+                          yvar,
+                          transformation = NULL,
+                          y_trans = NULL,
+                          perplexity = 50,
+                          method = "tSNE"){
+  
+  yvar <- yvar[yvar %in% gs@data@colnames]
+  
+  if(!is.null(y_trans)){
+    transformation <- lapply(yvar, function(x){y_trans})
+    names(transformation) <- yvar
+  }
+  
+  trans_name <-  unique(unlist(sapply(transformation[yvar], function(tf){tf$name})))
+  
+  if(is.null(df)){
+    df <- get_data_gs(gs = gs,
+                      idx = idx,
+                      subset = subset,
+                      spill = spill)
+  }else{
+    df <- df[df$name %in% pData(gs)[["name"]][idx] & 
+               df$subset %in% subset, ]
+  } 
+  
+  
+  df_trans <- df
+  for(i in 1:length(yvar)){
+    df_trans[[yvar[i]]] <- transformation[[yvar[i]]]$transform(df[[yvar[i]]])
+  }
+  
+  #idx_filter <- which(rowSums(is.na(df_trans[, yvar])) > 0 | rowSums(!is.finite(df_trans[, yvar])) > 0)
+  
+  idx_filter <- which(rowSums(is.na(df_trans[, yvar])) > 0)
+  
+  if(length(idx_filter)>0){
+    message(paste("Filter out ", length(idx_filter), " cells with NA values", sep =""))
+  }
+  df_trans <- df_trans[-idx_filter, ]
+  
+  Ncells_tSNE <- dim(df_trans)[1]
+  message(paste("Running tSNE with ", Ncells_tSNE, " cells and ",  length(yvar), " parameters", sep = ""))
+  
+  if(Ncells > 3000){
+    message("This may take a while... Try with less cells.")
+  }
+  
+  tSNE <- Rtsne(df_trans[ , yvar], perplexity = perplexity)
+  df_tSNE <- tSNE$Y
+  colnames(df_tSNE) <- c("tSNE1","tSNE2")
+  
+  return(cbind(df[-idx_filter, ], df_tSNE))
   
 }
