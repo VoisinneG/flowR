@@ -33,29 +33,26 @@ asinh_trans <- function (..., n = 6, equal.space = FALSE){
 }
 
 
-ellipse_path <- function(cov, mean, n = 20000){
+ellipse_path <- function(cov, mean, n = 100){
   
-  eg <- eigen(g@cov)
+  eg <- eigen(cov)
   a <- sqrt(eg$values[1])
   b <- sqrt(eg$values[2])
-  
   alpha <- acos(eg$vectors[1,1])
   
-  
-  x <- rep(NA, n+1)
-  y <- rep(NA, n+1)
-  
+  x <- NULL
+  y <- NULL
+
   for(i in 1:(n+1)){
     theta <- (i-1)*pi*2/n
-    r <- a*b / sqrt( (b*cos(theta))^2 + (a*sin(theta))^2 )
-    xr <- r*cos(theta)
-    yr <- r*sin(theta)
-    x[i] <- cos(alpha)*xr - sin(alpha)*yr + mean[1]
-    y[i] <- sin(alpha)*xr + cos(alpha)*yr + mean[2]
+    xr <- a*cos(theta)
+    yr <- b*sin(theta)
+    x <- c(x, cos(alpha)*xr - sin(alpha)*yr + mean[1])
+    y <- c(y, sin(alpha)*xr + cos(alpha)*yr + mean[2])
   }
   
   df <- data.frame(x = x, y= y)
-  names(df) <- colnames(cov)
+  names(df)[1:2] <- colnames(cov)
   
   return(df)
 }
@@ -68,9 +65,10 @@ get_gates_from_gs <- function(gs){
   for(node in setdiff(nodes, "root")){
     g <- getGate(gs[[1]], node)
     parent <- getParent(gs[[1]], node)
-    gates[[basename(node)]] <- list(gate = g, parent = basename(parent))
+    gates[[node]] <- list(gate = g, parent = parent)
   } 
   
+  print(gates)
   return(gates)
   
 }
@@ -78,23 +76,31 @@ get_gates_from_gs <- function(gs){
 add_gates_flowCore <- function(gs, gates){
   
   ngates <- length(gates)
+  print(gates)
   
   if(ngates>0){
     
     idx <- 1:ngates
+    
     while(length(idx)>0){
       
       i_added <- NULL
+      
       for(i in 1:length(idx)){
         
         g <- gates[[idx[i]]]
         
-        if(g$parent %in% union(basename(getNodes(gs)), "root") ){
+        print(g$parent)
+        print(union(getNodes(gs), "root"))
+        
+        if(g$parent %in% union(getNodes(gs), "root") ){
           
-          add(gs, 
-              g$gate, 
-              parent = g$parent, 
-              name = names(gates)[idx[i]])
+          print(names(gates)[idx[i]])
+          
+          add(gs,
+              g$gate,
+              parent = g$parent,
+              name = g$gate@filterId)
           
           i_added <- c(i_added, i)
         }
@@ -106,54 +112,6 @@ add_gates_flowCore <- function(gs, gates){
   }
   
   return(gs)
-}
-
-get_data_gs_2 <- function(gs, 
-                        idx, 
-                        subset,
-                        Ncells = NULL,
-                        spill = NULL,
-                        updateProgress = NULL
-){
-  
-  df <- list()
-  count <- 0
-  
-  
-  
-  
-  for(i in 1:length(idx)){
-      
-      
-      
-      for(k in 1:length(subset)){
-        #ff <- fs[[i]]
-        df_int[[subset[k]]] <- getIndices(gs[[idx[i]]], subset[k])
-        #df <- rbind(df, df_int)
-      }
-      
-      if(!is.null(Ncells)){
-        if(Ncells < dim(df_int)[1]){
-          df_int <- df_int[sample(1:dim(df_int)[1], Ncells, replace = FALSE), ] 
-        }
-      }
-      
-      count <- count + 1
-      df[[count]] <- df_int
-      
-      if(is.function(updateProgress)){
-        value <- count / (length(subset)*length(idx))*100
-        updateProgress(value = value, detail = format(value, digits=0))
-      }
-    
-  }
-  
-  df_tot <- do.call(rbind, df)
-  #df_tot[["subset"]] <- factor(df_tot[["subset"]], levels = subset)
-  df_tot[["name"]] <- factor(df_tot[["name"]], levels = pData(gs)$name[idx])
-  
-  return(df_tot)
-  
 }
 
 get_data_gs <- function(gs,
@@ -177,31 +135,38 @@ get_data_gs <- function(gs,
   
   df <- list()
   count <- 0
+  
   for(i in 1:length(idx)){
-    
-    
     
     for(k in 1:length(subset)){
     
       ff <- getData(gs[[idx[i]]], subset[k])
       df_int <- as.data.frame(exprs(ff))
-      df_int[["name"]] <- pData(gs)$name[idx[i]]
-      df_int[["subset"]] <- subset[k]
-      #df <- rbind(df, df_int)
       
-      if(!is.null(Ncells)){
-        if(Ncells < dim(df_int)[1]){
-          df_int <- df_int[sample(1:dim(df_int)[1], Ncells, replace = FALSE), ] 
+      if(dim(df_int)[1]>0){
+        
+        df_int[["name"]] <- pData(gs)$name[idx[i]]
+        df_int[["subset"]] <- subset[k]
+        #df <- rbind(df, df_int)
+        
+        if(!is.null(Ncells)){
+          if(Ncells < dim(df_int)[1]){
+            df_int <- df_int[sample(1:dim(df_int)[1], Ncells, replace = FALSE), ] 
+          }
         }
+        count <- count + 1
+        df[[count]] <- df_int
       }
       
-      count <- count + 1
-      df[[count]] <- df_int
       
       if(is.function(updateProgress)){
         value <- count / (length(subset)*length(idx))*100
         updateProgress(value = value, detail = paste(format(value, digits=0), "%", sep = ""))
       }
+        
+        
+      
+      
     }
   }
   
@@ -236,7 +201,7 @@ add_columns_from_metadata <- function(df,
     }
   }
   
-  print(names(df))
+  #print(names(df))
   
   return(df)
 }
@@ -324,8 +289,6 @@ plot_gs <- function(df = NULL,
     
   }
 
-  print(xvar)
-  print(yvar)
   
   if(is.null(transformation)){
     trans_var <- unique(c(xvar, yvar, color_var))
@@ -354,7 +317,7 @@ plot_gs <- function(df = NULL,
                                   group_var = group_var,
                                   yridges_var = yridges_var)
  
-  print(names(df))
+  #print(names(df))
     
   
   xlim <- range(df[[xvar]])
@@ -469,7 +432,7 @@ plot_gs <- function(df = NULL,
   
   if(type != "histogram" & !is.null(gate)){
     
-    print(gate)
+    #print(gate)
     
     for(j in 1:length(gate)){
       
@@ -481,9 +444,6 @@ plot_gs <- function(df = NULL,
         cov <- gate_int@cov
         mean <- gate_int@mean
         polygon <- ellipse_path(cov = cov, mean = mean)
-        print(cov)
-        print(mean)
-        print(polygon)
       }else{
         warning("gate format not supported")
         break
@@ -590,10 +550,21 @@ plot_gs <- function(df = NULL,
 }
 
 
-plot_gh <- function(df, gs, idx, ...){
+plot_gh <- function(df = NULL, gs, idx, spill = NULL, ...){
+  
   if(length(idx) != 1){
     stop("length of idx must be equal to 1")
   }
+  
+  if(is.null(df)){
+    
+    df <- get_data_gs(gs = gs,
+                      idx = idx,
+                      subset = getNodes(gs),
+                      spill = spill)
+    
+  }
+  
   child_nodes <- getChildren(gs[[idx]], "root")
   plist <- list()
   count <- 0
@@ -603,26 +574,49 @@ plot_gh <- function(df, gs, idx, ...){
     
     child_nodes_int <- NULL
     nodes_to_plot <- child_nodes
+    all_parents <- sapply(nodes_to_plot, function(x){getParent(gs[[idx]], x)})
+    names(all_parents) <- NULL
+    #print(all_parents)
     
+    for(parent in unique(all_parents)){
+      
+      idx_parent <- which(all_parents == parent)
+      
+      nodes_to_plot_parent <- nodes_to_plot[idx_parent]
+      
     #plot together gates that share the same set of parameters
-    while(length(nodes_to_plot) > 0){
       
-      par_nodes <- lapply(nodes_to_plot, function(x){
-        try(colnames(getGate(gs[[idx]], x)@boundaries), silent = TRUE)})
+      while(length(nodes_to_plot_parent) > 0){
+        
+          
+          par_nodes <- lapply(nodes_to_plot_parent, function(x){
+            
+            #print(x)
+            g <- getGate(gs[[idx]], x)
+            
+            if(class(g) %in% c("rectangleGate", "polygonGate")){
+              try(colnames(g@boundaries), silent = TRUE)
+            }else if(class(g) %in% c("ellipsoidGate")){
+              try(colnames(g@cov), silent = TRUE)
+            }
+          })
+          
+          same_par <- sapply(par_nodes, function(x){setequal(x, par_nodes[[1]])})
+          
+          #parent <- getParent(gs[[idx]], nodes_to_plot[1])
+          count <- count + 1
+          #print(parent)
+          #print(unique(df$subset))
+          plist[[count]] <- plot_gs(df = df, gs=gs, idx=idx, subset = parent, gate = nodes_to_plot_parent[same_par], ...)
+          
+          all_children <- unlist(sapply(nodes_to_plot_parent[same_par], function(x){getChildren(gs[[1]], x)}))
+          names(all_children) <- NULL
+          
+          child_nodes_int <- c(child_nodes_int, all_children)
+          nodes_to_plot_parent <- setdiff(nodes_to_plot_parent, nodes_to_plot_parent[same_par])
+          
+      }
       
-      same_par <- sapply(par_nodes, function(x){setequal(x, par_nodes[[1]])})
-      
-      parent <- basename(getParent(gs[[idx]], nodes_to_plot[1]))
-      count <- count + 1
-      #print(parent)
-      #print(unique(df$subset))
-      plist[[count]] <- plot_gs(df = df, gs=gs, idx=idx, subset = parent, gate = nodes_to_plot[same_par], ...)
-      
-      all_children <- unlist(sapply(nodes_to_plot[same_par], function(x){getChildren(gs[[1]], x)}))
-      names(all_children) <- NULL
-      
-      child_nodes_int <- c(child_nodes_int, all_children)
-      nodes_to_plot <- setdiff(nodes_to_plot, nodes_to_plot[same_par])
     }
     
     child_nodes <- child_nodes_int
@@ -716,7 +710,7 @@ plot_stat <- function(df = NULL,
                                   facet_vars = facet_vars,
                                   group_var = group_var)
   
-  print(names(df_melt2))
+  #print(names(df_melt2))
   
   df_melt2 <- df_melt2[df_melt2$variable %in% yvar, ]
 
@@ -749,7 +743,7 @@ plot_stat <- function(df = NULL,
   df_melt2$variable <- as.character(df_melt2$variable)
   
   if(!is.null(axis_labels)){
-    print(axis_labels)
+    #print(axis_labels)
     for(i in 1:length(yvar)){
       df_melt2$variable[df_melt2$variable == yvar[i]] <- axis_labels[[yvar[i]]]
     }
