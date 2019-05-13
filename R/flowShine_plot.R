@@ -305,6 +305,7 @@ plot_gs <- function(df = NULL,
                       idx = idx,
                       subset = subset,
                       spill = spill)
+    
   }else{
     #df <- df[df$name %in% pData(gs)[["name"]][idx],  names(df) %in% c("name", subset, xvar, yvar)]
     df <- df[df$name %in% pData(gs)[["name"]][idx] & df$subset %in% subset, ]
@@ -472,14 +473,14 @@ plot_gs <- function(df = NULL,
           df_label <- data.frame(x = transformation[[xvar]]$inverse(center[idx_match[1]]), 
                                  y = transformation[[yvar]]$inverse(center[idx_match[2]]),
                                  label = gate_int@filterId)
-          
+
           p <- p +
             geom_path(data = polygon, color = "red") +
             geom_polygon(data=polygon,
                          fill="red",
-                         alpha=0.1) +
+                         alpha=0.05) +
             geom_label(data = df_label, aes(x=x, y=y, label = label),
-                       fill = "white", color = "red", hjust = "middle", vjust = "center")
+                       fill = rgb(1,1,1,0.5), color = "red", hjust = "middle", vjust = "center")
             # annotate("text", 
             #          x=transformation[[xvar]]$inverse(center[idx_match[1]]), 
             #          y=transformation[[yvar]]$inverse(center[idx_match[2]]),
@@ -511,7 +512,7 @@ plot_gs <- function(df = NULL,
         geom_path(data = polygon, color = "red") +
         geom_polygon(data=polygon,
                      fill="red",
-                     alpha=0.1) 
+                     alpha=0.05) 
     }
     
     
@@ -642,7 +643,7 @@ plot_stat <- function(df = NULL,
                       max_scale = 0,
                       facet_vars = "name",
                       group_var = "subset",
-                      expand_factor = 0.1,
+                      expand_factor = 0.2,
                       stat_function = "mean",
                       show.legend = TRUE,
                       y_trans = NULL
@@ -720,10 +721,23 @@ plot_stat <- function(df = NULL,
   
   
   if(!free_y_scale){
-    delta = range(df_melt2$value)
-    delta <- abs(delta[2]-delta[1])
-    ylim <- c( min(df_melt2$value, na.rm = TRUE) - expand_factor*delta, 
-               max(df_melt2$value, na.rm = TRUE) + expand_factor*delta)
+    if(!is.null(y_trans)){
+      rg = y_trans$transform(range(df_melt2$value))
+    }else{
+      rg = range(df_melt2$value)
+    }
+    delta <- abs(rg[2]-rg[1])
+    
+    if(!is.null(y_trans)){
+      ylim <- y_trans$inverse(c( min(rg) - expand_factor*delta, 
+                 max(rg) + expand_factor*delta))
+    }else{
+      ylim <- c( min(rg) - expand_factor*delta, 
+                 max(rg) + expand_factor*delta)
+    }
+    
+    # ylim <- c( min(df_melt2$value, na.rm = TRUE) - expand_factor*delta, 
+    #            max(df_melt2$value, na.rm = TRUE) + expand_factor*delta)
     #scale_y <- "free"
   }
   
