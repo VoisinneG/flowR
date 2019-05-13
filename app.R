@@ -24,6 +24,7 @@ library(scales)
 library(plotly)
 library(heatmaply)
 library(ggsignif)
+library("Rgraphviz")
 #library(RColorBrewer)
 #library(viridis)
 
@@ -1006,10 +1007,12 @@ server <- function(session, input, output) {
       if(ngates>0){
         
         for(i in 1:ngates){
+          
           g <- rval$gates_flowCore[[i]]
           
           
           if(class(g$gate) %in% c("rectangleGate", "polygonGate")){
+            
             polygon <- g$gate@boundaries
             colnames(polygon) <- gsub("<", "", colnames(polygon))
             colnames(polygon) <- gsub(">", "", colnames(polygon))
@@ -1021,42 +1024,31 @@ server <- function(session, input, output) {
               }
             }
             
-            trans_gate <- polygonGate(.gate = polygon, filterId=names(rval$gates_flowCore)[i])
+            trans_gate <- polygonGate(.gate = polygon, filterId=g$gate@filterId)
           }
           
           if(class(g$gate) %in% c("ellipsoidGate")){
             
             cov <- g$gate@cov
             mean <- g$gate@mean
-            print(cov)
-            print(mean)
             polygon <- ellipse_path(cov = cov, mean = mean)
-
+            
             colnames(polygon) <- gsub("<", "", colnames(polygon))
             colnames(polygon) <- gsub(">", "", colnames(polygon))
             
             for(j in 1:length(colnames(polygon))){
               polygon[,j] <- myTrans[[colnames(polygon)[j]]]$transform(polygon[,j])
+              
               if(colnames(polygon)[j] == "Time"){
                 polygon[,j] <- polygon[,j]/as.numeric(description(ff)[["$TIMESTEP"]])
               }
             }
-            
-            # mean_gate <- g$gate@mean
-            # names(mean_gate) <- gsub("<", "", names(mean_gate))
-            # names(mean_gate) <- gsub(">", "", names(mean_gate))
-            # 
-            # for(j in 1:length(names(mean_gate))){
-            #   mean_gate[j] <- myTrans[[names(mean_gate)[j]]]$transform(mean_gate[j])
-            # }
-            
-            #print(cov)
-            #print(mean_gate)
-            trans_gate <- polygonGate(.gate = polygon, filterId=names(rval$gates_flowCore)[i])
+            trans_gate <- polygonGate(.gate = polygon, filterId=g$gate@filterId)
           }
           
-          rval$gates_flowCore[[i]] <- list(gate = trans_gate, parent = basename(g$parent))
+          rval$gates_flowCore[[i]] <- list(gate = trans_gate, parent = g$parent)
         }
+        
       }
       
     
@@ -1065,44 +1057,6 @@ server <- function(session, input, output) {
         rval$gating_set <- GatingSet(rval$flow_set)
         
         rval$gating_set <- add_gates_flowCore(rval$gating_set, rval$gates_flowCore)
-        
-        
-        
-        
-        
-      #}
-      # else{
-      #   
-      #   #remove gates
-      #   for(i in 1:length(rval$gates_flowCore)){
-      #     gate_name <- names(rval$gates_flowCore)[i]
-      #     if(gate_name %in% basename(getNodes(rval$gating_set))){
-      #       Rm(gate_name, rval$gating_set)
-      #     }
-      #   }
-      #   #recompute(rval$gating_set)
-      #   getNodes(rval$gating_set)
-      #   
-      #   #add gates with rescaled gate coordinates
-      #   for(i in 1:length(rval$gates_flowCore)){
-      #     g <- rval$gates_flowCore[[i]]$gate
-      #     if(.hasSlot(g, "boundaries")){
-      #       bdr <- g@boundaries
-      #       for(j in 1:dim(bdr)[2]){
-      #         if(colnames(bdr)[j] %in% rval$parameters$name[rval$parameters$display == "LOG"]){
-      #           g@boundaries[,j] <- flowJo_biexp_inverse_trans()$transform(bdr[,j])
-      #         }
-      #       }
-      #     }
-      #     rval$gates_flowCore[[i]]$gate <- g
-      #     add(rval$gating_set, g, 
-      #         parent = rval$gates_flowCore[[i]]$parent, 
-      #         name = names(rval$gates_flowCore)[i])
-      #   }
-      #   
-      #   recompute(rval$gating_set)
-      # }
-      
     
       #########################################################################################################
       # update gates
@@ -1545,12 +1499,12 @@ server <- function(session, input, output) {
           
           recompute(rval$gating_set)
           #cat("update3\n")
-          updateSelectInput(session, "gate_selected", choices = basename(getNodes(rval$gating_set)), selected = input$gate_name)
-          updateSelectInput(session, "gate_to_delete", choices = setdiff(basename(getNodes(rval$gating_set)), "root"))
-          updateSelectInput(session, "gate", choices = basename(getNodes(rval$gating_set)), selected = "root")
-          updateSelectInput(session, "gate_stat", choices = basename(getNodes(rval$gating_set)), selected = "root")
-          updateSelectInput(session, "gate_trans", choices = basename(getNodes(rval$gating_set)), selected = "root")
-          updateSelectInput(session, "gate_comp", choices = basename(getNodes(rval$gating_set)), selected = "root")
+          updateSelectInput(session, "gate_selected", choices = getNodes(rval$gating_set), selected = input$gate_name)
+          updateSelectInput(session, "gate_to_delete", choices = setdiff(getNodes(rval$gating_set), "root"))
+          updateSelectInput(session, "gate", choices = getNodes(rval$gating_set), selected = "root")
+          updateSelectInput(session, "gate_stat", choices = getNodes(rval$gating_set), selected = "root")
+          updateSelectInput(session, "gate_trans", choices = getNodes(rval$gating_set), selected = "root")
+          updateSelectInput(session, "gate_comp", choices = getNodes(rval$gating_set), selected = "root")
           
           
           gate$x <- NULL
@@ -1569,21 +1523,21 @@ server <- function(session, input, output) {
     observeEvent(input$delete_gate, {
       if(input$gate_to_delete != "root"){
         
-        idx_gh <- which( basename(getNodes(rval$gating_set)) == input$gate_to_delete )
-        target_gate <- basename(getNodes(rval$gating_set)[idx_gh])
-        child_gates <- basename(getChildren(rval$gating_set[[1]], target_gate))
+        idx_gh <- which( getNodes(rval$gating_set) == input$gate_to_delete )
+        target_gate <- getNodes(rval$gating_set)[idx_gh]
+        child_gates <- getChildren(rval$gating_set[[1]], target_gate)
         idx_delete <- which( names(rval$gates_flowCore) %in% c(target_gate, child_gates) )
         rval$gates_flowCore <- rval$gates_flowCore[-idx_delete]
         
         Rm(target_gate, rval$gating_set)
         recompute(rval$gating_set)
         #cat("update4\n")
-        updateSelectInput(session, "gate_selected", choices = basename(getNodes(rval$gating_set)), selected = "root")
-        updateSelectInput(session, "gate_to_delete", choices = setdiff(basename(getNodes(rval$gating_set)), "root"))
-        updateSelectInput(session, "gate", choices = basename(getNodes(rval$gating_set)), selected = "root")
-        updateSelectInput(session, "gate_stat", choices = basename(getNodes(rval$gating_set)), selected = "root")
-        updateSelectInput(session, "gate_trans", choices = basename(getNodes(rval$gating_set)), selected = "root")
-        updateSelectInput(session, "gate_comp", choices = basename(getNodes(rval$gating_set)), selected = "root")
+        updateSelectInput(session, "gate_selected", choices = getNodes(rval$gating_set), selected = "root")
+        updateSelectInput(session, "gate_to_delete", choices = setdiff(getNodes(rval$gating_set), "root"))
+        updateSelectInput(session, "gate", choices = getNodes(rval$gating_set), selected = "root")
+        updateSelectInput(session, "gate_stat", choices = getNodes(rval$gating_set), selected = "root")
+        updateSelectInput(session, "gate_trans", choices = getNodes(rval$gating_set), selected = "root")
+        updateSelectInput(session, "gate_comp", choices = getNodes(rval$gating_set), selected = "root")
         
       }
       
@@ -1761,7 +1715,7 @@ server <- function(session, input, output) {
       
       rval$df_tot <- get_data_gs(gs = rval$gating_set,
                         idx = 1:length(rval$gating_set), 
-                        subset = basename(getNodes(rval$gating_set)),
+                        subset = getNodes(rval$gating_set),
                         spill = rval$spill,
                         Ncells = input$ncells_per_sample,
                         updateProgress = updateProgress)
@@ -1939,8 +1893,12 @@ server <- function(session, input, output) {
       color_var <- input$color_var_gate
     }
     
+    if(input$plot_type_gate != "histogram"){
+      type <- input$plot_type_gate
+    }
+    
     p <- plot_gh(df = rval$df_tot,
-                 gs = rval$gating_set, 
+                 gs = rval$gating_set,
                  idx = rval$idx_ff_gate,
                  spill = rval$spill,
                  transformation = transformation,
@@ -1949,7 +1907,7 @@ server <- function(session, input, output) {
                  facet_vars = NULL,
                  axis_labels = axis_labels,
                  data_range = data_range,
-                 type = input$plot_type_gate,
+                 type = type,
                  alpha = input$alpha_gate,
                  size = input$size_gate,
                  show.legend = FALSE)
@@ -2019,8 +1977,10 @@ server <- function(session, input, output) {
                  show.legend = input$legend_trans,
                  axis_labels = axis_labels)
     
-    p <- p + xlab(input$xvar_trans) + ylab(input$yvar_trans)
-    
+    p <- p + xlab(input$xvar_trans) 
+    if(input$plot_type_trans != "histogram"){
+      p <- p + ylab(input$yvar_trans)
+    }
     p
     
   })
@@ -2082,8 +2042,10 @@ server <- function(session, input, output) {
                  show.legend = input$legend,
                  axis_labels = axis_labels)
     
-    p <- p + xlab(input$xvar) + ylab(input$yvar)
-
+    p <- p + xlab(input$xvar) 
+    if(input$plot_type != "histogram"){
+      p <- p + ylab(input$yvar)
+    }
     p
     
   })
@@ -2154,7 +2116,11 @@ server <- function(session, input, output) {
                  show.legend = input$legend_gate)
             
     
-    p <- p + xlab(input$xvar_gate) + ylab(input$yvar_gate)
+    p <- p + xlab(input$xvar_gate)
+    if(input$plot_type_gate != "histogram"){
+      p <- p + ylab(input$yvar_gate)
+    }
+      
     
     p
     
