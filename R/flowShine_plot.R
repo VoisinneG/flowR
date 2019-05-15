@@ -9,6 +9,8 @@ library(ClusterX)
 #devtools::install_github("JinmiaoChenLab/Rphenograph")
 library(Rphenograph)
 library(Rtsne)
+#BiocManager::install("Biobase")
+library("Biobase")
 
 flowJo_biexp_inverse_trans <- function (..., n = 6, equal.space = FALSE){
   trans <- flowJoTrans(..., inverse = TRUE)
@@ -75,8 +77,11 @@ get_gates_from_gs <- function(gs){
 
 add_gates_flowCore <- function(gs, gates){
   
+  new_gates_name <- setdiff(names(gates), getNodes(gs))
+  gates <- gates[new_gates_name]
+  
   ngates <- length(gates)
-  print(gates)
+
   
   if(ngates>0){
     
@@ -90,17 +95,25 @@ add_gates_flowCore <- function(gs, gates){
         
         g <- gates[[idx[i]]]
         
+        print(g)
         print(g$parent)
         print(union(getNodes(gs), "root"))
         
         if(g$parent %in% union(getNodes(gs), "root") ){
           
-          print(names(gates)[idx[i]])
+          #print(names(gates)[idx[i]])
           
-          add(gs,
-              g$gate,
-              parent = g$parent,
-              name = g$gate@filterId)
+          print( setdiff( names(g$gate@parameters), gs@data@colnames) )
+          
+          if( length( setdiff( names(g$gate@parameters), gs@data@colnames) ) == 0 ){
+            add(gs,
+                g$gate,
+                parent = g$parent,
+                name = g$gate@filterId)
+          }else{
+            warning("Could not find gate parameters in flowData")
+          }
+          
           
           i_added <- c(i_added, i)
         }
@@ -111,16 +124,78 @@ add_gates_flowCore <- function(gs, gates){
     recompute(gs)
   }
   
+  print("OK")
+  
   return(gs)
 }
 
+
+transform_gates <- function(gates, transformation, time_step = as.numeric(description(ff)[["$TIMESTEP"]]) ){
+  
+  # transform gate coordinates
+  
+  ngates <- length(gates)
+  
+  if(ngates>0){
+    
+    for(i in 1:ngates){
+      
+      g <- gates[[i]]
+      
+      
+      if(class(g$gate) %in% c("rectangleGate", "polygonGate")){
+        
+        polygon <- g$gate@boundaries
+        colnames(polygon) <- gsub("<", "", colnames(polygon))
+        colnames(polygon) <- gsub(">", "", colnames(polygon))
+        
+        for(j in 1:length(colnames(polygon))){
+          polygon[,j] <- transformation[[colnames(polygon)[j]]]$transform(polygon[,j])
+          if(colnames(polygon)[j] == "Time"){
+            polygon[,j] <- polygon[,j]/time_step
+          }
+        }
+        
+        trans_gate <- polygonGate(.gate = polygon, filterId=g$gate@filterId)
+      }
+      
+      if(class(g$gate) %in% c("ellipsoidGate")){
+        
+        cov <- g$gate@cov
+        mean <- g$gate@mean
+        polygon <- ellipse_path(cov = cov, mean = mean)
+        
+        colnames(polygon) <- gsub("<", "", colnames(polygon))
+        colnames(polygon) <- gsub(">", "", colnames(polygon))
+        
+        for(j in 1:length(colnames(polygon))){
+          polygon[,j] <- transformation[[colnames(polygon)[j]]]$transform(polygon[,j])
+          
+          if(colnames(polygon)[j] == "Time"){
+            polygon[,j] <- polygon[,j]/time_step
+          }
+        }
+        trans_gate <- polygonGate(.gate = polygon, filterId=g$gate@filterId)
+      }
+      
+      gates[[i]] <- list(gate = trans_gate, parent = g$parent)
+    }
+    
+  }
+  
+  return(gates)
+  
+}
+
 get_data_gs <- function(gs,
-                        idx,
+                        sample,
                         subset,
                         Ncells = NULL,
                         spill = NULL,
                         updateProgress = NULL
 ){
+  
+  idx <- match(sample, pData(gs)$name)
   
   if(!is.null(spill)){
     gates <- get_gates_from_gs(gs)
@@ -207,10 +282,10 @@ add_columns_from_metadata <- function(df,
 }
 
 plot_gs <- function(df = NULL,
-                    gs, 
-                    idx, 
+                    gs = NULL, 
+                    sample, 
                     subset,
-                    xvar = NULL, 
+                    xvar = NULL,
                     yvar = NULL,
                     axis_labels = NULL,
                     color_var = NULL, 
@@ -225,6 +300,7 @@ plot_gs <- function(df = NULL,
                     transformation = NULL,
                     default_trans = identity_trans(),
                     spill = NULL,
+                    metadata = NULL,
                     facet_vars = "name",
                     group_var = "name",
                     yridges_var = "name",
@@ -237,30 +313,37 @@ plot_gs <- function(df = NULL,
   
   
   
+  if(!is.null(gs)){
+    idx <- match(sample, pData(gs)$name)
+    print(idx)
+  }
   
   if(!is.null(gate)){
     if(class(gate) == "character"){
-      
-      gate_int <- lapply(gate, function(x){
-        if(x!="root"){
-          getGate(gs[[idx[1]]], x)
-        }else{
-          NULL
-        }})
-      names(gate_int) <- gate
-      gate <- gate_int
+      if(!is.null(gs)){
+        
+        gate_int <- lapply(gate, function(x){
+          if(x!="root"){
+            getGate(gs[[idx[1]]], x)
+          }else{
+            NULL
+          }})
+        names(gate_int) <- gate
+        gate <- gate_int
+      }else{
+        gate <- NULL
+      }
       
     }else if(grep("Gate", class(gate)) >0){
       gate <- list(gate)
     }
   }
-  
-  
+
   
   if(is.null(xvar)){
     
-    if(subset != "root"){
-      g <- getGate(gs[[idx[1]]], y= subset)
+    if(subset[1] != "root"){
+      g <- getGate(gs[[idx[1]]], y= subset[1])
       if(.hasSlot(g, "boundaries")){
         xvar <- colnames(g@boundaries)[1]
         if(dim(g@boundaries)[2]>1){
@@ -302,21 +385,27 @@ plot_gs <- function(df = NULL,
   if(is.null(df)){
     
     df <- get_data_gs(gs = gs,
-                      idx = idx,
+                      sample = sample,
                       subset = subset,
                       spill = spill)
     
   }else{
     #df <- df[df$name %in% pData(gs)[["name"]][idx],  names(df) %in% c("name", subset, xvar, yvar)]
-    df <- df[df$name %in% pData(gs)[["name"]][idx] & df$subset %in% subset, ]
+    df <- df[df$name %in% sample & df$subset %in% subset, ]
   }
   
-  df <- add_columns_from_metadata(df,
-                                  metadata = pData(gs),
-                                  color_var = color_var,
-                                  facet_vars = facet_vars,
-                                  group_var = group_var,
-                                  yridges_var = yridges_var)
+  if(is.null(metadata) & !is.null(gs)){
+    metadata <- pData(gs)
+  }
+  
+  if(!is.null(metadata)){
+    df <- add_columns_from_metadata(df,
+                                    metadata = metadata,
+                                    color_var = color_var,
+                                    facet_vars = facet_vars,
+                                    group_var = group_var,
+                                    yridges_var = yridges_var)
+  }
  
   #print(names(df))
     
@@ -551,20 +640,22 @@ plot_gs <- function(df = NULL,
 }
 
 
-plot_gh <- function(df = NULL, gs, idx, spill = NULL, ...){
+plot_gh <- function(df = NULL, gs, sample, spill = NULL, ...){
   
-  if(length(idx) != 1){
+  if(length(sample) != 1){
     stop("length of idx must be equal to 1")
   }
   
   if(is.null(df)){
     
     df <- get_data_gs(gs = gs,
-                      idx = idx,
+                      sample = sample,
                       subset = getNodes(gs),
                       spill = spill)
     
   }
+  
+  idx <- match(sample, pData(gs)$name)
   
   child_nodes <- getChildren(gs[[idx]], "root")
   plist <- list()
@@ -608,7 +699,7 @@ plot_gh <- function(df = NULL, gs, idx, spill = NULL, ...){
           count <- count + 1
           #print(parent)
           #print(unique(df$subset))
-          plist[[count]] <- plot_gs(df = df, gs=gs, idx=idx, subset = parent, gate = nodes_to_plot_parent[same_par], ...)
+          plist[[count]] <- plot_gs(df = df, gs=gs, sample=sample, subset = parent, gate = nodes_to_plot_parent[same_par], ...)
           
           all_children <- unlist(sapply(nodes_to_plot_parent[same_par], function(x){getChildren(gs[[1]], x)}))
           names(all_children) <- NULL
@@ -629,10 +720,11 @@ plot_gh <- function(df = NULL, gs, idx, spill = NULL, ...){
 
 plot_stat <- function(df = NULL,
                       gs,
-                      idx, 
+                      sample, 
                       subset,
                       yvar,
                       type = "bar",
+                      metadata = NULL,
                       color_var = NULL, 
                       axis_labels = NULL,
                       transformation = NULL,
@@ -670,12 +762,11 @@ plot_stat <- function(df = NULL,
   #}
   if(is.null(df)){
     df <- get_data_gs(gs = gs,
-                      idx = idx,
+                      sample = sample,
                       subset = subset,
                       spill = spill)
   }else{
-    df <- df[df$name %in% pData(gs)[["name"]][idx] & 
-               df$subset %in% subset, ]
+    df <- df[df$name %in% sample & df$subset %in% subset, ]
   } 
   
   
@@ -704,12 +795,18 @@ plot_stat <- function(df = NULL,
   df_melt2 <- melt(df_scale, id.vars = c("name", "subset") )
   
   
+  if(is.null(metadata) & !is.null(gs)){
+    metadata <- pData(gs)
+  }
   
-  df_melt2 <- add_columns_from_metadata(df_melt2,
-                                  metadata = pData(gs),
-                                  color_var = color_var,
-                                  facet_vars = facet_vars,
-                                  group_var = group_var)
+  if(!is.null(metadata)){
+    df_melt2 <- add_columns_from_metadata(df_melt2,
+                                          metadata = metadata,
+                                          color_var = color_var,
+                                          facet_vars = facet_vars,
+                                          group_var = group_var)
+  }
+  
   
   #print(names(df_melt2))
   
@@ -846,19 +943,15 @@ plot_stat <- function(df = NULL,
   
 }
 
-dim_reduction <- function(df=NULL,
-                          gs,
-                          idx,
-                          subset,
-                          Ncells = NULL,
-                          spill = NULL,
+dim_reduction <- function(df,
                           yvar,
+                          Ncells = NULL,
                           transformation = NULL,
-                          y_trans = NULL,
+                          y_trans = log10_trans(),
                           perplexity = 50,
                           method = "tSNE"){
   
-  yvar <- yvar[yvar %in% gs@data@colnames]
+  
   
   if(!is.null(y_trans)){
     transformation <- lapply(yvar, function(x){y_trans})
@@ -867,42 +960,103 @@ dim_reduction <- function(df=NULL,
   
   trans_name <-  unique(unlist(sapply(transformation[yvar], function(tf){tf$name})))
   
-  if(is.null(df)){
-    df <- get_data_gs(gs = gs,
-                      idx = idx,
-                      subset = subset,
-                      spill = spill)
-  }else{
-    df <- df[df$name %in% pData(gs)[["name"]][idx] & 
-               df$subset %in% subset, ]
-  } 
-  
+  print(yvar)
+  print(trans_name)
   
   df_trans <- df
+  df_filter <- df
+  
+  print(yvar)
+  print(names(df_trans))
+  print(names(transformation))
+  
   for(i in 1:length(yvar)){
     df_trans[[yvar[i]]] <- transformation[[yvar[i]]]$transform(df[[yvar[i]]])
   }
-  
-  #idx_filter <- which(rowSums(is.na(df_trans[, yvar])) > 0 | rowSums(!is.finite(df_trans[, yvar])) > 0)
-  
-  idx_filter <- which(rowSums(is.na(df_trans[, yvar])) > 0)
+
+  cell_has_non_finite <- apply(X = df_trans[, yvar], MARGIN = 1, FUN = function(x){sum(!is.finite(x) )>0})
+  cell_has_na <- rowSums(is.na(df_trans[, yvar])) > 0
+  idx_filter <- which(cell_has_na | cell_has_non_finite)
   
   if(length(idx_filter)>0){
-    message(paste("Filter out ", length(idx_filter), " cells with NA values", sep =""))
+    message(paste("Filter out ", length(idx_filter), " cells with NA or non-finite values", sep =""))
+    df_trans <- df_trans[-idx_filter, ]
+    df_filter <- df_filter[-idx_filter, ]
   }
-  df_trans <- df_trans[-idx_filter, ]
   
-  Ncells_tSNE <- dim(df_trans)[1]
+  if(!is.null(Ncells)){
+    Ncells_tSNE <- min(dim(df_trans)[1], Ncells)
+    idx_cells <- sample(1:dim(df_trans)[1], Ncells_tSNE, replace = FALSE)
+  }else{
+    Ncells_tSNE <- dim(df_trans)[1]
+    idx_cells <- 1:dim(df_trans)[1]
+  }
+  
   message(paste("Running tSNE with ", Ncells_tSNE, " cells and ",  length(yvar), " parameters", sep = ""))
   
-  if(Ncells > 3000){
+  if(Ncells_tSNE > 3000){
     message("This may take a while... Try with less cells.")
   }
-  
-  tSNE <- Rtsne(df_trans[ , yvar], perplexity = perplexity)
+
+
+  tSNE <- Rtsne(df_trans[ idx_cells , yvar], perplexity = perplexity)
   df_tSNE <- tSNE$Y
   colnames(df_tSNE) <- c("tSNE1","tSNE2")
   
-  return(cbind(df[-idx_filter, ], df_tSNE))
+  return(cbind(df_filter[idx_cells, ], df_tSNE))
   
+}
+
+
+build_flowset_from_df <- function(df,
+                                  fs = NULL,
+                                  chanel_col = setdiff(names(df), c("name", "subset")), 
+                                  sample_col = "name"){
+  
+  samples <- unique(df[[sample_col]])
+  ff_list <- list()
+  
+  for(sample in samples){
+    
+    df_sample <- df[ df[[sample_col]] == sample , chanel_col]
+    M <- as.matrix(df_sample)
+    
+    par <- NULL
+    desc <- NULL
+    
+    if(!is.null(fs)){
+      
+      idx <- match(sample, pData(fs)$name)
+      
+      if(!is.na(idx)){
+        
+        par <- parameters(fs[[idx]])
+        desc <- description(fs[[idx]])
+        new_par <- setdiff(chanel_col, par@data$name)
+        npar <- length(par@data$name)
+        
+        for(param in new_par){
+          npar <- npar +1
+          rg <- range(df_sample[[param]])
+          par@data <- rbind(par@data, c(param, NA, diff(rg), rg[1], rg[2]))
+          rownames(par@data)[npar] <- paste("$P",npar, sep = "")
+          desc[[paste("$P",npar,"DISPLAY",sep="")]] <- NA
+        }
+        
+        desc[["$TOT"]] <- dim(df_sample)[1]
+      }
+    }
+    
+    if(!is.null(par) & !is.null(desc)){
+      ff_list[[sample]] <- flowFrame(exprs = M,
+                                     parameters = par, 
+                                     description = desc)
+    }else{
+      ff_list[[sample]] <- flowFrame(exprs = M)
+    }
+    
+  }
+  
+  fs_new <- flowSet(ff_list)
+
 }
