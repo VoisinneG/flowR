@@ -795,6 +795,7 @@ server <- function(session, input, output) {
                          pdata_original = NULL,
                          df_tot = NULL,
                          df_meta = NULL,
+                         df_meta_imported = NULL,
                          df_meta_mapped = NULL,
                          df_keywords = NULL,
                          df_sample = NULL,
@@ -821,7 +822,7 @@ server <- function(session, input, output) {
     
     rval$df_files$datapath <- paste(dirname(rval$df_files$datapath[1]),"/", rval$df_files$name, sep ="")
     
-    print( list.files( dirname(rval$df_files$datapath[1])) )
+    #print( list.files( dirname(rval$df_files$datapath[1])) )
     
     #print(names(input$files))
   })
@@ -859,9 +860,9 @@ server <- function(session, input, output) {
       if(file_ext(rval$df_files$datapath[input$files_table_rows_selected[1]]) %in% c("xml", "wsp")){
         ws <- openWorkspace(rval$df_files$datapath[input$files_table_rows_selected[1]])
         #print(getSamples(ws))
-        show(ws)
-        print(dirname(rval$df_files$datapath[1]))
-        print( list.files( dirname(rval$df_files$datapath[1])) )
+        #show(ws)
+        #print(dirname(rval$df_files$datapath[1]))
+        #print( list.files( dirname(rval$df_files$datapath[1])) )
         
         gs <- try(parseWorkspace(ws,
                              name = input$groups,
@@ -928,7 +929,7 @@ server <- function(session, input, output) {
           }else if(length( grep("Comp-", params) ) >0){
             pattern <- "Comp-"
           }
-          print(pattern)
+          #print(pattern)
           replacement <- ""
           if(!is.null(pattern)){
             params <- gsub(pattern = pattern, replacement = replacement, params)
@@ -947,7 +948,7 @@ server <- function(session, input, output) {
           
           names_imported <- fsApply(fs, function(x){description(x)[["FILENAME"]]})
           names_imported <- basename(names_imported)
-          print(names_imported)
+          #print(names_imported)
           #idx_match <- sapply(names_imported, function(x){as.numeric(strsplit(x, split= ".", fixed = TRUE)[[1]][1])})
           idx_match <- match(names_imported, rval$df_files$name)
           
@@ -1467,11 +1468,15 @@ server <- function(session, input, output) {
                   "semi-column" = ";",
                   "tab" = "\t")
     
-    rval$df_meta <- read.csv(input$file_meta$datapath, sep = sep, header = TRUE, quote = "\"", fill = TRUE)
+    rval$df_meta_imported <- read.csv(input$file_meta$datapath, sep = sep, header = TRUE, quote = "\"", fill = TRUE)
 
   })
   
   observeEvent(input$append_meta, {
+    rval$df_meta <- rval$df_meta_imported
+  })
+  
+  observe({
     idx_match <- match(rval$pdata_original$name, rval$df_meta[,1])
     rval$df_meta_mapped <- rval$df_meta[idx_match, -1]
   })
@@ -1510,13 +1515,23 @@ server <- function(session, input, output) {
 
   
   observe({
+    
+    validate(
+      need(rval$pdata_original, "No metadata")
+    )
+
     df <- rval$pdata_original
     if(!is.null(rval$df_meta_mapped)){
-      df <- cbind(df, rval$df_meta_mapped)
-    }
+      if(dim(df)[1] == dim(rval$df_meta_mapped)[1]){
+        df <- cbind(df, rval$df_meta_mapped)
+      }
+    } 
     if(!is.null(rval$df_keywords)){
-      df <- cbind(df, rval$df_keywords)
+      if(dim(df)[1] == dim(rval$df_keywords)[1] ){
+        df <- cbind(df, rval$df_keywords)
+      }
     }
+    
     if(!is.null(df)){
       rval$pdata <- df
       #pData(rval$flow_set) <- df
@@ -1727,7 +1742,7 @@ server <- function(session, input, output) {
           rval$gate <- poly_gate
           rval$gates_flowCore[[input$gate_name]] <- list(gate = poly_gate, parent = rval$gate_focus)
           
-          print(names(poly_gate@parameters))
+          #print(names(poly_gate@parameters))
           add(rval$gating_set, poly_gate, parent = rval$gate_focus)
           
           recompute(rval$gating_set)
@@ -1780,8 +1795,9 @@ server <- function(session, input, output) {
       if(input$gate_selected != "root"){
         
         rval$gate <- rval$gates_flowCore[[input$gate_selected]]$gate
-        gate_params <- names(rval$gates_flowCore[[input$gate_selected]]$gate@parameters)
-        params <- gates_params[gates_params %in% rval$parameters$name]
+        gate_params <- names(rval$gate@parameters)
+        
+        params <- rval$parameters$name_long[match(gate_params, rval$parameters$name)]
         
         if(length(params) > 0){
           updateSelectInput(session, "xvar_gate", selected = params[1])
@@ -1790,18 +1806,27 @@ server <- function(session, input, output) {
           updateSelectInput(session, "yvar_gate", selected = params[2])
         }
         
+        
+        
         # g <- as.data.frame(g)
         # names(g) <- rval$parameters$name_long[match(names(g), rval$parameters$name)]
         # 
         # updateSelectInput(session, "xvar_gate", selected = names(g)[1])
         # updateSelectInput(session, "yvar_gate", selected = names(g)[2])
         # 
+        
+        gate$x <- NULL
+        gate$y <- NULL
+        
         # gate$x <- g[[1]]
         # gate$y <- g[[2]]
+        
+        updateSelectInput(session, "gate_selected",  
+                          selected = rval$gates_flowCore[[input$gate_selected]]$parent)
+        
       }
       #cat("update5\n")
-      updateSelectInput(session, "gate_selected",  
-                        selected = rval$gates_flowCore[[input$gate_selected]]$parent)
+      
 
     })
     
@@ -1834,7 +1859,7 @@ server <- function(session, input, output) {
         need(length(input$sub_sample_table_rows_selected)>0, "No sample selected")
       )
       
-      print(input$gate_sub_sample)
+      #print(input$gate_sub_sample)
       
       if( nchar(input$gate_sub_sample) == 0 ){
         showModal(modalDialog(
@@ -1976,16 +2001,19 @@ server <- function(session, input, output) {
   
   output$meta <- renderDataTable({
     validate(
-      need(rval$df_meta, "No meta data imported")
+      need(rval$df_meta_imported, "No meta data imported")
     )
     
-    idx_match <- match(rval$df_meta[,1], rval$pdata$name)
     
-    validate(
-      need(length(!is.na(idx_match))>0, "Metadata names do not match gating set names")
-    )
-    
-    as.data.frame(rval$df_meta[!is.na(idx_match), ])
+    as.data.frame(rval$df_meta_imported)
+      
+    # idx_match <- match(rval$df_meta_imported[,1], rval$pdata$name)
+    # 
+    # validate(
+    #   need(length(!is.na(idx_match))>0, "Metadata names do not match gating set names")
+    # )
+    # 
+    # as.data.frame(rval$df_meta[!is.na(idx_match), ])
     
     
   })
