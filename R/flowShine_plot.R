@@ -66,11 +66,12 @@ get_gates_from_gs <- function(gs){
   
   for(node in setdiff(nodes, "root")){
     g <- getGate(gs[[1]], node)
+    print(names(g@parameters))
     parent <- getParent(gs[[1]], node)
     gates[[node]] <- list(gate = g, parent = parent)
   } 
   
-  print(gates)
+  #print(gates)
   return(gates)
   
 }
@@ -95,21 +96,23 @@ add_gates_flowCore <- function(gs, gates){
         
         g <- gates[[idx[i]]]
         
-        print(g)
-        print(g$parent)
-        print(union(getNodes(gs), "root"))
+        #print(g)
+        #print(g$parent)
+        #print(union(getNodes(gs), "root"))
         
         if(g$parent %in% union(getNodes(gs), "root") ){
           
           #print(names(gates)[idx[i]])
+          #print( names(g$gate@parameters))
+          #print( gs@data@colnames )
           
-          print( setdiff( names(g$gate@parameters), gs@data@colnames) )
-          
-          if( length( setdiff( names(g$gate@parameters), gs@data@colnames) ) == 0 ){
+          if( !is.null(names(g$gate@parameters)) & length( setdiff( names(g$gate@parameters), gs@data@colnames) ) == 0 ){
+
             add(gs,
                 g$gate,
                 parent = g$parent,
                 name = g$gate@filterId)
+            
           }else{
             warning("Could not find gate parameters in flowData")
           }
@@ -120,17 +123,20 @@ add_gates_flowCore <- function(gs, gates){
       }
       idx <- idx[-i_added]
     }
-    
     recompute(gs)
   }
   
-  print("OK")
+  #print("OK")
   
   return(gs)
 }
 
 
-transform_gates <- function(gates, transformation, time_step = as.numeric(description(ff)[["$TIMESTEP"]]) ){
+transform_gates <- function(gates, 
+                            transformation = NULL, 
+                            pattern = "[\\<|\\>]", 
+                            replacement = "",
+                            time_step = as.numeric(description(ff)[["$TIMESTEP"]]) ){
   
   # transform gate coordinates
   
@@ -143,36 +149,66 @@ transform_gates <- function(gates, transformation, time_step = as.numeric(descri
       g <- gates[[i]]
       
       
-      if(class(g$gate) %in% c("rectangleGate", "polygonGate")){
+      if(class(g$gate) == "polygonGate"){
         
         polygon <- g$gate@boundaries
-        colnames(polygon) <- gsub("<", "", colnames(polygon))
-        colnames(polygon) <- gsub(">", "", colnames(polygon))
+        if(!is.null(pattern)){
+          colnames(polygon) <- gsub(pattern = pattern, replacement = replacement, colnames(polygon))
+        }
         
-        for(j in 1:length(colnames(polygon))){
-          polygon[,j] <- transformation[[colnames(polygon)[j]]]$transform(polygon[,j])
-          if(colnames(polygon)[j] == "Time"){
-            polygon[,j] <- polygon[,j]/time_step
+        
+        if(!is.null(transformation)){
+          for(j in 1:length(colnames(polygon))){
+            polygon[,j] <- transformation[[colnames(polygon)[j]]]$transform(polygon[,j])
+            if(colnames(polygon)[j] == "Time"){
+              polygon[,j] <- polygon[,j]/time_step
+            }
           }
         }
+        
         
         trans_gate <- polygonGate(.gate = polygon, filterId=g$gate@filterId)
       }
       
-      if(class(g$gate) %in% c("ellipsoidGate")){
+      if(class(g$gate) == "rectangleGate"){
+        
+        polygon <- rbind(g$gate@min, g$gate@max)
+        if(!is.null(pattern)){
+          colnames(polygon) <- gsub(pattern = pattern, replacement = replacement, colnames(polygon))
+        }
+
+        
+        if(!is.null(transformation)){
+          for(j in 1:length(colnames(polygon))){
+            polygon[,j] <- transformation[[colnames(polygon)[j]]]$transform(polygon[,j])
+            
+            if(colnames(polygon)[j] == "Time"){
+              polygon[,j] <- polygon[,j]/time_step
+            }
+          }
+        }
+        
+        trans_gate <- rectangleGate(.gate = polygon, filterId=g$gate@filterId)
+      }
+      
+      if(class(g$gate) == "ellipsoidGate"){
         
         cov <- g$gate@cov
         mean <- g$gate@mean
-        polygon <- ellipse_path(cov = cov, mean = mean)
+        polygon <- as.matrix(ellipse_path(cov = cov, mean = mean))
         
-        colnames(polygon) <- gsub("<", "", colnames(polygon))
-        colnames(polygon) <- gsub(">", "", colnames(polygon))
+        if(!is.null(pattern)){
+          colnames(polygon) <- gsub(pattern = pattern, replacement = replacement, colnames(polygon))
+        }
+
         
-        for(j in 1:length(colnames(polygon))){
-          polygon[,j] <- transformation[[colnames(polygon)[j]]]$transform(polygon[,j])
-          
-          if(colnames(polygon)[j] == "Time"){
-            polygon[,j] <- polygon[,j]/time_step
+        if(!is.null(transformation)){
+          for(j in 1:length(colnames(polygon))){
+            polygon[,j] <- transformation[[colnames(polygon)[j]]]$transform(polygon[,j])
+            
+            if(colnames(polygon)[j] == "Time"){
+              polygon[,j] <- polygon[,j]/time_step
+            }
           }
         }
         trans_gate <- polygonGate(.gate = polygon, filterId=g$gate@filterId)
@@ -315,7 +351,7 @@ plot_gs <- function(df = NULL,
   
   if(!is.null(gs)){
     idx <- match(sample, pData(gs)$name)
-    print(idx)
+    #print(idx)
   }
   
   if(!is.null(gate)){
@@ -373,6 +409,8 @@ plot_gs <- function(df = NULL,
   }
 
   
+  
+  
   if(is.null(transformation)){
     trans_var <- unique(c(xvar, yvar, color_var))
     transformation <- lapply(trans_var, function(x){default_trans})
@@ -392,6 +430,12 @@ plot_gs <- function(df = NULL,
   }else{
     #df <- df[df$name %in% pData(gs)[["name"]][idx],  names(df) %in% c("name", subset, xvar, yvar)]
     df <- df[df$name %in% sample & df$subset %in% subset, ]
+  }
+  
+  
+  if( !setequal( xvar[xvar %in% names(df)], xvar ) | !setequal( yvar[yvar %in% names(df)], yvar ) ){
+    warning("Some variables could not be found in flowData")
+    return(NULL)
   }
   
   if(is.null(metadata) & !is.null(gs)){
@@ -960,15 +1004,15 @@ dim_reduction <- function(df,
   
   trans_name <-  unique(unlist(sapply(transformation[yvar], function(tf){tf$name})))
   
-  print(yvar)
-  print(trans_name)
+  #print(yvar)
+  #print(trans_name)
   
   df_trans <- df
   df_filter <- df
   
-  print(yvar)
-  print(names(df_trans))
-  print(names(transformation))
+  #print(yvar)
+  #print(names(df_trans))
+  #print(names(transformation))
   
   for(i in 1:length(yvar)){
     df_trans[[yvar[i]]] <- transformation[[yvar[i]]]$transform(df[[yvar[i]]])
@@ -984,7 +1028,7 @@ dim_reduction <- function(df,
     df_filter <- df_filter[-idx_filter, ]
   }
   
-  if(!is.null(Ncells)){
+  if(!is.null(Ncells) & is.numeric(Ncells)){
     Ncells_tSNE <- min(dim(df_trans)[1], Ncells)
     idx_cells <- sample(1:dim(df_trans)[1], Ncells_tSNE, replace = FALSE)
   }else{

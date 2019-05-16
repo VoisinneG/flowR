@@ -646,43 +646,53 @@ body <- dashboardBody(
                             tabPanel("Compute",
                                      numericInput("ncells_per_sample", "Number of cells / subset / sample", 1000),
                                      actionButton("compute_data", "sample"),
-                                     actionButton("reset_data", "reset"),
+                                     #actionButton("reset_data", "reset"),
                                      br(),
                                      br(),
                                      "Summary",
                                      br(),
                                      verbatimTextOutput("summary_sub_sample")
-                            ),
-                            br(),
-                            fluidRow(
-                              valueBoxOutput("progressBoxSub", width = 6),
-                              valueBoxOutput("progressBoxSub2", width = 6)
                             )
-                     )
-              ),
-              column(width = 6,
-                     tabBox(title = "tSNE",
-                         width = NULL, height = NULL,
-                         tabPanel("Variables",
-                                  div(style = 'overflow-x: scroll', DT::dataTableOutput("tSNE_variables_table"))
-                         ),
-                         tabPanel("Options",
-                                  
-                                  selectInput("y_trans_tsne", 
-                                              label = "Transform variables:", 
-                                              choices = c("log10", "asinh", "identity", "default"), 
-                                              selected = "log10"),
-                                  numericInput("perplexity", "perplexity", 50)
-                         ),
-                         tabPanel("Compute",
-                                  numericInput("ncells_tsne", "Number of cells", 1000),
-                                  actionButton("compute_tsne", "Perform tSNE"),
-                                  br()
-                         )
+                            
+                     ),
+                     fluidRow(
+                       valueBoxOutput("progressBoxSub", width = 6),
+                       valueBoxOutput("progressBoxSub2", width = 6)
                      )
               )
-              
-              
+            )
+    ),
+    tabItem(tabName = "TSNE_tab",
+            fluidRow(
+              column(width = 6,
+                     tabBox(title = "tSNE",
+                            width = NULL, height = NULL,
+                            tabPanel("Variables",
+                                     div(style = 'overflow-x: scroll', DT::dataTableOutput("tSNE_variables_table"))
+                            ),
+                            tabPanel("Options",
+                                     
+                                     selectInput("y_trans_tsne", 
+                                                 label = "Transform variables:", 
+                                                 choices = c("log10", "asinh", "identity", "default"), 
+                                                 selected = "log10"),
+                                     numericInput("perplexity", "perplexity", 50)
+                            ),
+                            tabPanel("Compute",
+                                     numericInput("ncells_tsne", "Number of cells", 1000),
+                                     actionButton("compute_tsne", "Perform tSNE"),
+                                     br(),
+                                     br(),
+                                     "Summary",
+                                     br(),
+                                     verbatimTextOutput("summary_tsne")
+                            )
+                     ),
+                     fluidRow(
+                       valueBoxOutput("progressBoxTSNE", width = 6),
+                       valueBoxOutput("progressBoxTSNE2", width = 6)
+                     )
+              )
             )
     )
   )
@@ -727,6 +737,12 @@ sidebar <- dashboardSidebar(
               ),
               menuItem("Sub-sample",
                        tabName = "Sub_tab",
+                       startExpanded = FALSE,
+                       icon = icon("check-circle")
+                       
+              ),
+              menuItem("t-SNE",
+                       tabName = "TSNE_tab",
                        startExpanded = FALSE,
                        icon = icon("check-circle")
                        
@@ -795,12 +811,19 @@ server <- function(session, input, output) {
   ##########################################################################################################
   # Select files
   
-  observe({
+  observeEvent(input$files, {
     validate(
       need(input$files$datapath, "Please select a file to import")
     )
     rval$df_files <- input$files
-    print(names(input$files))
+    
+    file.rename(from = rval$df_files$datapath, to = paste(dirname(rval$df_files$datapath[1]),"/", rval$df_files$name, sep =""))
+    
+    rval$df_files$datapath <- paste(dirname(rval$df_files$datapath[1]),"/", rval$df_files$name, sep ="")
+    
+    print( list.files( dirname(rval$df_files$datapath[1])) )
+    
+    #print(names(input$files))
   })
   
   ##########################################################################################################
@@ -809,7 +832,7 @@ server <- function(session, input, output) {
     validate(
       need(length(input$files_table_rows_selected)>0, "Please select a file to load")
     )
-    if(file_ext(rval$df_files$datapath[input$files_table_rows_selected[1]]) == "xml"){
+    if(file_ext(rval$df_files$datapath[input$files_table_rows_selected[1]]) %in% c("xml", "wsp") ){
       ws <- openWorkspace(rval$df_files$datapath[input$files_table_rows_selected[1]])
       groups <- unique(getSampleGroups(ws)$groupName)
       updateSelectInput(session, "groups", choices = groups, selected = groups[1])
@@ -833,65 +856,103 @@ server <- function(session, input, output) {
     
     if(length(rval$df_files$datapath)>0){
       
-      if(file_ext(rval$df_files$datapath[input$files_table_rows_selected[1]]) == "xml"){
+      if(file_ext(rval$df_files$datapath[input$files_table_rows_selected[1]]) %in% c("xml", "wsp")){
         ws <- openWorkspace(rval$df_files$datapath[input$files_table_rows_selected[1]])
         #print(getSamples(ws))
-        #show(ws)
-        gs <- parseWorkspace(ws,
+        show(ws)
+        print(dirname(rval$df_files$datapath[1]))
+        print( list.files( dirname(rval$df_files$datapath[1])) )
+        
+        gs <- try(parseWorkspace(ws,
                              name = input$groups,
                              execute = TRUE, 
                              isNcdf = TRUE,
                              sampNloc = "sampleNode",
                              #sampNloc = "keyword",
-                             path = dirname(rval$df_files$datapath)[1])
-        fs <- getData(gs)
+                             #path = "/var/folders/lb"),
+                             path = dirname(rval$df_files$datapath[1])),
+                  silent = TRUE)
         
-        ###################################################################################
-        #get gates and transfrom gates
+        if(class(gs) != "GatingSet"){
+          showModal(modalDialog(
+            title = "Error pasing xml workspace",
+            paste("Please try importing FCS files directly", sep=""),
+            easyClose = TRUE,
+            footer = NULL
+          ))
+        }
         
-        gates <- get_gates_from_gs(gs)
+        validate(
+          need(class(gs) == "GatingSet", "No gating set imported")
+        )
         
-        ff <- fs[[1]]
-        
-        # time_step is needed to transform gates containing the parameter "Time"
-        time_step <- as.numeric(description(ff)[["$TIMESTEP"]])
-        
-        # Parameters with a DISPLAY = LOG have been transformed with flowJo_biexp_trans().
-        # We need to apply the inverse transfrom for such parameters
-        
-        display <- unlist(sapply(rownames(parameters(ff)@data), FUN = function(x){
-          kw <- substr(x, start = 2, stop = nchar(x))
-          kw <- paste(kw, "DISPLAY", sep = "")
-          disp <- ff@description[[kw]]
-          if(is.null(disp)){
-            disp <- "NA"
+          fs <- getData(gs)
+          
+          
+          
+          ###################################################################################
+          #get gates and transfrom gates
+          
+          gates <- get_gates_from_gs(gs)
+          
+          ff <- fs[[1]]
+          
+          # time_step is needed to transform gates containing the parameter "Time"
+          time_step <- as.numeric(description(ff)[["$TIMESTEP"]])
+          
+          # Parameters with a DISPLAY = LOG have been transformed with flowJo_biexp_trans().
+          # We need to apply the inverse transfrom for such parameters
+          
+          display <- unlist(sapply(rownames(parameters(ff)@data), FUN = function(x){
+            kw <- substr(x, start = 2, stop = nchar(x))
+            kw <- paste(kw, "DISPLAY", sep = "")
+            disp <- ff@description[[kw]]
+            if(is.null(disp)){
+              disp <- "NA"
+            }
+            return(disp)
+          }))
+          names(display) <- NULL
+          
+          myTrans <- lapply(display, function(x){
+            switch(x,
+                   "LOG" = flowJo_biexp_inverse_trans(),
+                   identity_trans())
+          })
+          
+          params <- parameters(ff)$name
+          
+          pattern <- NULL
+          if( length( grep("[\\<|\\>]", params) ) >0 ){
+            pattern <- "[\\<|\\>]"
+          }else if(length( grep("Comp-", params) ) >0){
+            pattern <- "Comp-"
           }
-          return(disp)
-        }))
-        names(display) <- NULL
-        
-        myTrans <- lapply(display, function(x){
-          switch(x,
-                 "LOG" = flowJo_biexp_inverse_trans(),
-                 identity_trans())
-        })
-        
-        params <- parameters(ff)$name
-        params <- gsub("<", "", params)
-        params <- gsub(">", "", params)
-        names(myTrans) <- params
-        
-        rval$gates_flowCore <- transform_gates(gates = gates, transformation = myTrans, time_step = time_step)
-        
-        ###################################################################################
-        #match fcs file names and import non-compensated, non-transfromed data
-        
-        names_imported <- fsApply(fs, function(x){description(x)[["FILENAME"]]})
-        names_imported <- basename(names_imported)
-        idx_match <- sapply(names_imported, function(x){as.numeric(strsplit(x, split= ".", fixed = TRUE)[[1]][1])})
-        
-        rval$flow_set <- read.ncdfFlowSet( rval$df_files$datapath[idx_match+1] )
-        phenoData(rval$flow_set)$name <- rval$df_files$name[idx_match+1]
+          print(pattern)
+          replacement <- ""
+          if(!is.null(pattern)){
+            params <- gsub(pattern = pattern, replacement = replacement, params)
+          }
+          
+          names(myTrans) <- params
+          
+          rval$gates_flowCore <- transform_gates(gates = gates, 
+                                                 pattern = pattern, 
+                                                 replacement = replacement,
+                                                 transformation = myTrans, 
+                                                 time_step = time_step)
+          
+          ###################################################################################
+          #match fcs file names and import non-compensated, non-transfromed data
+          
+          names_imported <- fsApply(fs, function(x){description(x)[["FILENAME"]]})
+          names_imported <- basename(names_imported)
+          print(names_imported)
+          #idx_match <- sapply(names_imported, function(x){as.numeric(strsplit(x, split= ".", fixed = TRUE)[[1]][1])})
+          idx_match <- match(names_imported, rval$df_files$name)
+          
+          rval$flow_set <- read.ncdfFlowSet( rval$df_files$datapath[idx_match] )
+          phenoData(rval$flow_set)$name <- rval$df_files$name[idx_match]
 
 
       }else{
@@ -903,23 +964,29 @@ server <- function(session, input, output) {
       fs <- rval$flow_set 
       rval$flow_set_imported <- fs
       
-      rval$df_spill <- as.data.frame(description(fs[[1]])[["SPILL"]])
+      if("SPILL" %in% names(description(fs[[1]]))){
+        rval$df_spill <- as.data.frame(description(fs[[1]])[["SPILL"]])
+      }else{
+        m <- diag( length(parameters(fs[[1]])$name) )
+        colnames(m) <- parameters(fs[[1]])$name
+        rval$df_spill <- as.data.frame(m)
+      }
+      
       row.names(rval$df_spill) <- colnames(rval$df_spill)
       rval$df_spill_original <- rval$df_spill
-      
-      
-      
+
       rval$flow_set_names <- unique(c(rval$flow_set_names, "imported"))
+      updateSelectInput(session, "flow_set", choices = rval$flow_set_names, selected = "imported")
     }
   })
   
   
-  observe({
-    validate(
-      need(rval$flow_set_names, "No flow set available")
-    )
-    updateSelectInput(session, "flow_set", choices = rval$flow_set_names, selected = rval$flow_set_names[length(rval$flow_set_names)])
-  })
+  # observe({
+  #   validate(
+  #     need(rval$flow_set_names, "No flow set available")
+  #   )
+  #   updateSelectInput(session, "flow_set", choices = rval$flow_set_names, selected = rval$flow_set_names[length(rval$flow_set_names)])
+  # })
   
   ##########################################################################################################
   # Create gating set
@@ -928,7 +995,7 @@ server <- function(session, input, output) {
     validate(
       need(input$flow_set, "No flow set selected")
     )
-    rval$flow_set <- switch(input$flow_set, 
+    rval$flow_set <- switch(input$flow_set,
                             "imported" = rval$flow_set_imported,
                             "sub-sample" = rval$flow_set_sample,
                             "t-SNE" = rval$flow_set_tsne)
@@ -959,7 +1026,7 @@ server <- function(session, input, output) {
     max_val <- as.data.frame(fsApply(fs, each_col, max,  na.rm = TRUE))
     max_val_all <- apply(max_val, 2, max)
 
-    print(min_val_all)
+    #print(min_val_all)
 
     
     rval$data_range <- lapply(params, function(x){
@@ -967,7 +1034,7 @@ server <- function(session, input, output) {
     })
     names(rval$data_range) <- params
     
-    print(rval$data_range)
+    #print(rval$data_range)
   })
   
   observe({
@@ -979,6 +1046,7 @@ server <- function(session, input, output) {
     rval$gating_set <- GatingSet(rval$flow_set)
     
     # add gates
+    print(names(rval$gates_flowCore))
     rval$gating_set <- add_gates_flowCore(rval$gating_set, rval$gates_flowCore)
     
     # update gates
@@ -990,7 +1058,7 @@ server <- function(session, input, output) {
     updateSelectInput(session, "gate_stat", choices = gate_names, selected = "root")
     updateSelectInput(session, "gate_trans", choices = gate_names, selected = "root")
     updateSelectInput(session, "gate_comp", choices = gate_names, selected = "root")
-    updateSelectInput(session, "gate_to_delete", choices = names(rval$gates_flowCore))
+    updateSelectInput(session, "gate_to_delete", choices = setdiff(gate_names,"root"))
     updateSelectInput(session, "gate_sub_sample", choices = gate_names, selected = gate_names)
     
   })
@@ -1037,8 +1105,8 @@ server <- function(session, input, output) {
                                     minRange = parameters(ff)@data$minRange,
                                     maxRange = parameters(ff)@data$maxRange,
                                     stringsAsFactors = FALSE)
-      print(rval$parameters)
-      print("OK")
+      #print(rval$parameters)
+      #print("OK")
     }
     
   })
@@ -1052,6 +1120,7 @@ server <- function(session, input, output) {
     
     if(! setequal(rval$plot_var, rval$parameters$name_long)){
       
+      #print("update plot vars")
       rval$plot_var <- rval$parameters$name_long
       names(rval$plot_var) <- NULL
       
@@ -1168,21 +1237,23 @@ server <- function(session, input, output) {
       need(rval$transformation, "No transformation defined")
     )
     
-    
+    validate(
+      need(rval$parameters, "No parameters")
+    )
     
     trans_name <- sapply(rval$transformation, function(x){x$name})
     trans_param <- sapply(rval$trans_parameters, function(x){
       paste( paste(names(x), as.character(x), sep = ": "), collapse="; ")})
     
-    print(trans_name)
-    print(trans_param)
+    #print(trans_name)
+    #print(trans_param)
     
     idx_match <- match(rval$parameters$name, names(rval$transformation))
     
     rval$parameters$transform <- trans_name[idx_match]
     rval$parameters[["transform parameters"]] <- trans_param[idx_match]
     
-    print(rval$parameters)
+    #print(rval$parameters)
     
   })
   
@@ -1287,10 +1358,22 @@ server <- function(session, input, output) {
       need(rval$flow_set, "No flow set available")
     )
     
+    if(setequal(pData(rval$flow_set)$name, rval$pdata$name)){
+      pData(rval$flow_set) <- rval$pdata
+    }
+    
+  })
+  
+  observe({
+    
+    validate(
+      need(rval$flow_set, "No flow set available")
+    )
+    
     if(!setequal(pData(rval$flow_set)$name, rval$pdata$name)){
-      
       rval$pdata_original <- as.data.frame(pData(rval$flow_set))
     }
+    
   })
   
   observe({
@@ -1631,17 +1714,21 @@ server <- function(session, input, output) {
         if(!is.null(gate$x)){
           polygon <- data.frame(x =gate$x, y = gate$y)
           hpts <- chull(polygon)
-          hpts <- c(hpts, hpts[1])
+          #hpts <- c(hpts, hpts[1])
           polygon <- polygon[hpts, ]
-
-          boundaries = list("x" = polygon$x, "y" = polygon$y )
-          names(boundaries) <- c(rval$parameters$name[match(input$xvar_gate, rval$parameters$name_long)],
-                                 rval$parameters$name[match(input$yvar_gate, rval$parameters$name_long)])
+          polygon <- as.matrix(polygon)
           
-          poly_gate <- polygonGate(.gate = boundaries, filterId=input$gate_name)
+          var_names <- c(rval$parameters$name[match(input$xvar_gate, rval$parameters$name_long)],
+                         rval$parameters$name[match(input$yvar_gate, rval$parameters$name_long)])
+          names(var_names)<-NULL
+          colnames(polygon) <- var_names
+          
+          poly_gate <- polygonGate(.gate = polygon, filterId=input$gate_name)
           rval$gate <- poly_gate
           rval$gates_flowCore[[input$gate_name]] <- list(gate = poly_gate, parent = rval$gate_focus)
-          add(rval$gating_set, poly_gate, parent = rval$gate_focus, name = input$gate_name)
+          
+          print(names(poly_gate@parameters))
+          add(rval$gating_set, poly_gate, parent = rval$gate_focus)
           
           recompute(rval$gating_set)
           #cat("update3\n")
@@ -1693,15 +1780,24 @@ server <- function(session, input, output) {
       if(input$gate_selected != "root"){
         
         rval$gate <- rval$gates_flowCore[[input$gate_selected]]$gate
-        g <- rval$gates_flowCore[[input$gate_selected]]$gate@boundaries
-        g <- as.data.frame(g)
-        names(g) <- rval$parameters$name_long[match(names(g), rval$parameters$name)]
+        gate_params <- names(rval$gates_flowCore[[input$gate_selected]]$gate@parameters)
+        params <- gates_params[gates_params %in% rval$parameters$name]
         
-        updateSelectInput(session, "xvar_gate", selected = names(g)[1])
-        updateSelectInput(session, "yvar_gate", selected = names(g)[2])
+        if(length(params) > 0){
+          updateSelectInput(session, "xvar_gate", selected = params[1])
+        }
+        if(length(params) > 1){
+          updateSelectInput(session, "yvar_gate", selected = params[2])
+        }
         
-        gate$x <- g[[1]]
-        gate$y <- g[[2]]
+        # g <- as.data.frame(g)
+        # names(g) <- rval$parameters$name_long[match(names(g), rval$parameters$name)]
+        # 
+        # updateSelectInput(session, "xvar_gate", selected = names(g)[1])
+        # updateSelectInput(session, "yvar_gate", selected = names(g)[2])
+        # 
+        # gate$x <- g[[1]]
+        # gate$y <- g[[2]]
       }
       #cat("update5\n")
       updateSelectInput(session, "gate_selected",  
@@ -1725,9 +1821,32 @@ server <- function(session, input, output) {
       }
       
       
+      if( length(input$sub_sample_table_rows_selected)==0){
+        showModal(modalDialog(
+          title = "No sample selected",
+          paste("Please select samples before proceeding", sep=""),
+          easyClose = TRUE,
+          footer = NULL
+        ))
+      }
       
       validate(
         need(length(input$sub_sample_table_rows_selected)>0, "No sample selected")
+      )
+      
+      print(input$gate_sub_sample)
+      
+      if( nchar(input$gate_sub_sample) == 0 ){
+        showModal(modalDialog(
+          title = "No subset selected",
+          paste("Please select a subset before proceeding", sep=""),
+          easyClose = TRUE,
+          footer = NULL
+        ))
+      }
+      
+      validate(
+        need(input$gate_sub_sample, "No subset selected")
       )
       
       sample = rval$pdata$name[input$sub_sample_table_rows_selected]
@@ -1741,22 +1860,45 @@ server <- function(session, input, output) {
                         
       rval$flow_set_sample <- build_flowset_from_df(rval$df_sample, fs = rval$flow_set)
       rval$flow_set_names <- unique(c(rval$flow_set_names, "sub-sample"))
+      updateSelectInput(session, "flow_set", choices = rval$flow_set_names, selected = "sub-sample")
     })
     
-    observeEvent(input$reset_data, {
-      rval$df_tot <- NULL
-    })
+    # observeEvent(input$reset_data, {
+    #   rval$df_tot <- NULL
+    # })
     
     
     observeEvent(input$compute_tsne, {
       
       validate(
-        need(rval$flow_set_sample, "Please sub-sample data first")
+        need(rval$flow_set, "Empty flow set")
       )
       
+      if( is.null(rval$flow_set_sample) ){
+        showModal(modalDialog(
+          title = "No sub-sample data available",
+          paste("Please sub-sample data first", sep=""),
+          easyClose = TRUE,
+          footer = NULL
+        ))
+      }
+      
+      validate(
+        need(rval$flow_set_sample, "Please sub-sample data first")
+      )
+
       validate(
         need(rval$df_sample, "Please sub-sample data first")
       )
+      
+      if( length(input$tSNE_variables_table_rows_selected)==0){
+        showModal(modalDialog(
+          title = "No variable selected",
+          paste("Please select variables before proceeding", sep=""),
+          easyClose = TRUE,
+          footer = NULL
+        ))
+      }
       
       validate(
         need(length(input$tSNE_variables_table_rows_selected) >0, "No variables selected")
@@ -1781,10 +1923,10 @@ server <- function(session, input, output) {
                         "identity" = identity_trans(),
                         NULL)
       
-      rval$gating_set <- GatingSet(rval$flow_set)
+      #rval$gating_set <- GatingSet(rval$flow_set)
       
       # add gates
-      rval$gating_set <- add_gates_flowCore(rval$gating_set, rval$gates_flowCore)
+      #rval$gating_set <- add_gates_flowCore(rval$gating_set, rval$gates_flowCore)
       
       gs <- GatingSet(rval$flow_set_sample)
       gs <- add_gates_flowCore(gs, rval$gates_flowCore)
@@ -1796,7 +1938,7 @@ server <- function(session, input, output) {
                                   Ncells = NULL,
                                   updateProgress = updateProgress)
                   
-      print(summary(rval$df_tsne))
+      #print(summary(rval$df_tsne))
       
       rval$df_tsne <- dim_reduction(df = rval$df_tsne,
                                     yvar = rval$parameters$name[input$tSNE_variables_table_rows_selected], 
@@ -1807,6 +1949,7 @@ server <- function(session, input, output) {
       
       rval$flow_set_tsne <- build_flowset_from_df(rval$df_tsne, fs = rval$flow_set_sample)
       rval$flow_set_names <- unique(c(rval$flow_set_names, "t-SNE"))
+      updateSelectInput(session, "flow_set", choices = rval$flow_set_names, selected = "t-SNE")
       
     })
     
@@ -1851,7 +1994,10 @@ server <- function(session, input, output) {
     validate(
       need(rval$df_files, "Please select a file to import")
     )
-    rval$df_files[ ,c("name", "size")]
+    df <- rval$df_files[ ,c("name", "size")]
+    df$new_name <- basename(rval$df_files$datapath)
+    df$dir_name <- dirname(rval$df_files$datapath)
+    df
   })
   
   output$parameters_table <- renderDataTable({
@@ -1859,7 +2005,6 @@ server <- function(session, input, output) {
     validate(
       need(rval$parameters, "No data imported")
     )
-    
     df <- rval$parameters
     df$minRange <- format(df$minRange, digits = 2)
     df$maxRange <- format(df$maxRange, digits = 2)
@@ -1867,8 +2012,7 @@ server <- function(session, input, output) {
     DT::datatable(
       df[, c("chanel_name", "transform", "transform parameters", "display", "range", "minRange", "maxRange")], 
       rownames = FALSE)
-    #df <- df[, c("transform", "transform_parameters", "display", "range", "minRange", "maxRange")]
-    #DT::datatable(df, rownames = rval$parameters$name_long)
+
   })
   
   
@@ -1884,7 +2028,6 @@ server <- function(session, input, output) {
     DT::datatable(
       df[, c("chanel_name", "transform", "transform parameters")], 
       rownames = FALSE)
-    
   })
   
   output$pData <- DT::renderDataTable({
@@ -1938,8 +2081,13 @@ server <- function(session, input, output) {
   
 
   output$progressBox2 <- renderValueBox({
+    ngates <- 0
+    if(!is.null(rval$gating_set)){
+      ngates <- length(setdiff(getNodes(rval$gating_set), "root"))
+    }
+    
     valueBox(
-      length(rval$gates_flowCore), "gates", icon = icon("list"),
+      ngates, "gates", icon = icon("list"),
       color = "yellow"
     )
   })
@@ -1983,6 +2131,26 @@ server <- function(session, input, output) {
       color = "green"
     )
   })
+  
+  output$progressBoxTSNE <- renderValueBox({
+    valueBox(
+      length(rval$flow_set_tsne), "samples",icon = icon("list"),
+      color = "purple"
+    )
+  })
+  
+  output$progressBoxTSNE2 <- renderValueBox({
+    ncells <- 0
+    if(!is.null(rval$flow_set_tsne)){
+      fs <- rval$flow_set_tsne
+      ncells <- sum( sapply(1:length(fs), function(x){dim(fs[[x]]@exprs)[1]}) )
+    }
+    
+    valueBox(
+      ncells, "cells", icon = icon("list"),
+      color = "green"
+    )
+  })
     
     
   ##########################################################################################################
@@ -1993,6 +2161,14 @@ server <- function(session, input, output) {
       print(summary(rval$df_sample[, c("name", "subset")]))
     }else{
       "No sub-sampling performed yet"
+    }
+  })
+  
+  output$summary_tsne <- renderPrint({
+    if(!is.null(rval$df_tsne)){
+      print(summary(rval$df_tsne[, c("name", "subset")]))
+    }else{
+      "No t-SNE performed yet"
     }
   })
   
@@ -2015,7 +2191,11 @@ server <- function(session, input, output) {
   output$tree <- renderPlot({
     
     validate(
-      need(length(rval$gates_flowCore)>0, "Empty gates set")
+      need(rval$gating_set, "Empty gating set")
+    )
+    
+    validate(
+      need(length(setdiff(getNodes(rval$gating_set), "root"))>0, "No gates in gating set")
     )
     
     p <- plot(rval$gating_set)
@@ -2038,8 +2218,8 @@ server <- function(session, input, output) {
       need(rval$idx_ff_gate, "Please select a sample")
     )
     
-    cat("sample_selected : \n")
-    print(rval$idx_ff_gate)
+    #cat("sample_selected : \n")
+    #print(rval$idx_ff_gate)
     
     axis_labels <- rval$parameters$name_long
     names(axis_labels) <- rval$parameters$name
@@ -2144,10 +2324,13 @@ server <- function(session, input, output) {
                  show.legend = input$legend_trans,
                  axis_labels = axis_labels)
     
-    p <- p + xlab(input$xvar_trans) 
-    if(input$plot_type_trans != "histogram"){
-      p <- p + ylab(input$yvar_trans)
+    if(!is.null(p)){
+      p <- p + xlab(input$xvar_trans) 
+      if(input$plot_type_trans != "histogram"){
+        p <- p + ylab(input$yvar_trans)
+      }
     }
+    
     p
     
   })
@@ -2209,9 +2392,11 @@ server <- function(session, input, output) {
                  show.legend = input$legend,
                  axis_labels = axis_labels)
     
-    p <- p + xlab(input$xvar) 
-    if(input$plot_type != "histogram"){
-      p <- p + ylab(input$yvar)
+    if(!is.null(p)){
+      p <- p + xlab(input$xvar) 
+      if(input$plot_type != "histogram"){
+        p <- p + ylab(input$yvar)
+      }
     }
     p
     
@@ -2227,6 +2412,8 @@ server <- function(session, input, output) {
     validate(
       need(rval$idx_ff_gate, "Please select a sample")
     )
+    
+    #print(input$xvar_gate)
     
     idx_x <- match(input$xvar_gate, rval$parameters$name_long)
     idx_y <- match(input$yvar_gate, rval$parameters$name_long)
@@ -2280,11 +2467,13 @@ server <- function(session, input, output) {
                  transformation = transformation,
                  show.legend = input$legend_gate)
             
-    
-    p <- p + xlab(input$xvar_gate)
-    if(input$plot_type_gate != "histogram"){
-      p <- p + ylab(input$yvar_gate)
+    if(!is.null(p)){
+      p <- p + xlab(input$xvar_gate)
+      if(input$plot_type_gate != "histogram"){
+        p <- p + ylab(input$yvar_gate)
+      }
     }
+    
       
     
     p
