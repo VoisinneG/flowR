@@ -69,7 +69,9 @@ body <- dashboardBody(
                          fileInput(inputId = "files", 
                                    label = "Choose files", 
                                    multiple = TRUE)
-                     ),
+                     )
+              ),
+              column(width = 6,
                      box(title = "Input files",
                          width = NULL, height = NULL,
                          div(style = 'overflow-x: scroll', DT::dataTableOutput("files_table")),
@@ -87,7 +89,7 @@ body <- dashboardBody(
     tabItem(tabName = "Meta_tab",
               fluidRow(
                 column(width = 6,
-                       tabBox(title = "Meta",
+                       tabBox(title = "Metadata",
                               width = NULL, height = NULL,
                               tabPanel(title = "Table",
                                        div(style = 'overflow-x: scroll', DT::dataTableOutput("pData"))      
@@ -109,6 +111,10 @@ body <- dashboardBody(
                                        actionButton("reset_meta", label = "Reset"),
                                        br()
                                        
+                              ),
+                              tabPanel(title = "Filter",
+                                       "Filter samples based on metadata",
+                                       uiOutput("filter_meta")
                               )
                        )
                 )
@@ -632,6 +638,7 @@ server <- function(session, input, output) {
   
   rval <- reactiveValues(df_files = NULL,
                          flow_set_imported = NULL,
+                         flow_set_filter = NULL,
                          flow_set_sample = NULL,
                          flow_set_tsne = NULL,
                          flow_set = NULL,
@@ -816,7 +823,7 @@ server <- function(session, input, output) {
 
 
       }else{
-        rval$flow_set <- read.ncdfFlowSet( rval$df_files$datapath[input$files_table_rows_selected] )
+        rval$flow_set <- read.ncdfFlowSet( rval$df_files$datapath[input$files_table_rows_selected] , emptyValue=FALSE)
         phenoData(rval$flow_set)$name <- rval$df_files$name[input$files_table_rows_selected]
       }
       
@@ -857,8 +864,10 @@ server <- function(session, input, output) {
     )
     rval$flow_set <- switch(input$flow_set,
                             "imported" = rval$flow_set_imported,
+                            "filter" = rval$flow_set_filter,
                             "sub-sample" = rval$flow_set_sample,
-                            "t-SNE" = rval$flow_set_tsne)
+                            "t-SNE" = rval$flow_set_tsne
+                            )
   })
 
   observe({
@@ -986,14 +995,26 @@ server <- function(session, input, output) {
       
       if(length(rval$plot_var)>1){
         
-        updateSelectInput(session, "xvar_show", choices = rval$plot_var, selected = rval$plot_var[1])
-        updateSelectInput(session, "xvar_trans", choices = rval$plot_var, selected = rval$plot_var[1])
-        updateSelectInput(session, "yvar_trans", choices = rval$plot_var, selected = rval$plot_var[2])
-        updateSelectInput(session, "xvar_gate", choices = rval$plot_var, selected = rval$plot_var[1])
-        updateSelectInput(session, "yvar_gate", choices = rval$plot_var, selected = rval$plot_var[2])
-        updateSelectInput(session, "yvar_stat", choices = rval$plot_var, selected = rval$plot_var[1])
-        updateSelectInput(session, "xvar", choices = rval$plot_var, selected = rval$plot_var[1])
-        updateSelectInput(session, "yvar", choices = rval$plot_var, selected = rval$plot_var[2])
+        
+        xvar_default <- rval$plot_var[1]
+        yvar_default <- rval$plot_var[2]
+        if(input$flow_set == "t-SNE"){
+          xvar_default <- "tSNE1"
+          yvar_default <- "tSNE2"
+          updateSelectInput(session, "plot_type", selected = "dots")
+          #updateSelectInput(session, "facet_var", selected = NULL)
+          #updateSelectInput(session, "group_var", selected = "name")
+          #updateSelectInput(session, "color_var", selected = "name")
+        }
+          
+        updateSelectInput(session, "xvar_show", choices = rval$plot_var, selected = xvar_default)
+        updateSelectInput(session, "xvar_trans", choices = rval$plot_var, selected = xvar_default)
+        updateSelectInput(session, "yvar_trans", choices = rval$plot_var, selected = yvar_default)
+        updateSelectInput(session, "xvar_gate", choices = rval$plot_var, selected = xvar_default)
+        updateSelectInput(session, "yvar_gate", choices = rval$plot_var, selected = yvar_default)
+        updateSelectInput(session, "yvar_stat", choices = rval$plot_var, selected = xvar_default)
+        updateSelectInput(session, "xvar", choices = rval$plot_var, selected = xvar_default)
+        updateSelectInput(session, "yvar", choices = rval$plot_var, selected = yvar_default)
         
         updateSelectInput(session, "color_var_gate", choices = c("none", rval$plot_var), selected = "none")
         updateSelectInput(session, "color_var", choices = c("none", rval$plot_var), selected = "none")
@@ -1212,17 +1233,25 @@ server <- function(session, input, output) {
   ##########################################################################################################
   # Observe functions for metadata
   
-  observe({
-    
-    validate(
-      need(rval$flow_set, "No flow set available")
-    )
-    
-    if(setequal(pData(rval$flow_set)$name, rval$pdata$name)){
-      pData(rval$flow_set) <- rval$pdata
-    }
-    
-  })
+  # observe({
+  #   
+  #   validate(
+  #     need(rval$flow_set, "No flow set available")
+  #   )
+  #   
+  #   if(setequal(pData(rval$flow_set)$name, rval$pdata$name)){
+  #     
+  #     meta_var <- names(rval$pdata)
+  #     meta_var_to_add <- meta_var[! meta_var %in% names(pData(rval$flow_set))]
+  #     
+  #     if(length(meta_var_to_add)>0){
+  #       for(i in 1:length(meta_var_to_add) ){
+  #         pData(rval$flow_set)[[meta_var_to_add[i]]] <- rval$pdata[[meta_var_to_add[i]]] 
+  #       }
+  #     }
+  #   }
+  #   
+  # })
   
   observe({
     
@@ -1230,7 +1259,9 @@ server <- function(session, input, output) {
       need(rval$flow_set, "No flow set available")
     )
     
-    if(!setequal(pData(rval$flow_set)$name, rval$pdata$name)){
+    
+    if(!setequal(pData(rval$flow_set)$name, rval$pdata_original$name)){
+      print(pData(rval$flow_set))
       rval$pdata_original <- as.data.frame(pData(rval$flow_set))
     }
     
@@ -1246,42 +1277,57 @@ server <- function(session, input, output) {
       need(rval$plot_var, "No plotting variables")
     )
     
+    facet_var_default <- "name"
+    group_var_default <- "subset"
+    color_var_default <- "subset"
+    plot_type_default <- "histogram"
+    
+    if(input$flow_set == "t-SNE"){
+      facet_var_default <- NULL
+      group_var_default <- "name"
+      color_var_default <- "name"
+      plot_type_default <- "dots"
+    }
+    
+    updateSelectInput(session, "plot_type", 
+                      selected = plot_type_default)
+    
     updateSelectInput(session, "facet_var", 
                       choices = c("subset", names(rval$pdata)), 
-                      selected = "name")
+                      selected = facet_var_default )
     updateSelectInput(session, "facet_var_stat", 
                       choices = c("subset", names(rval$pdata)), 
-                      selected = "name")
+                      selected = facet_var_default )
     
     updateSelectInput(session, "group_var", 
                       choices = c("subset", names(rval$pdata)), 
-                      selected = "subset")
+                      selected = group_var_default)
     updateSelectInput(session, "group_var_stat", 
                       choices = c("subset", names(rval$pdata)), 
-                      selected = "subset")
+                      selected = group_var_default)
     
     updateSelectInput(session, "yridges_var", 
                       choices = c("subset", names(rval$pdata)), 
-                      selected = "subset")
+                      selected = group_var_default)
     
     updateSelectInput(session, "color_var_gate", 
                       choices = c("subset", names(rval$pdata), rval$plot_var), 
-                      selected = "subset")
+                      selected = color_var_default)
     
     updateSelectInput(session, "color_var", 
                       choices = c("subset", names(rval$pdata), rval$plot_var), 
-                      selected = "subset")
+                      selected = color_var_default)
     
     updateSelectInput(session, "color_var_stat", 
                       choices = c("subset", names(rval$pdata)), 
-                      selected = "subset")
+                      selected = color_var_default)
     
     updateSelectInput(session, "color_var_trans", 
                       choices = c("subset", names(rval$pdata)), 
-                      selected = "subset")
+                      selected = color_var_default)
     updateSelectInput(session, "color_var_comp", 
                       choices = c("subset", names(rval$pdata)), 
-                      selected = "subset")
+                      selected = color_var_default)
     
     updateSelectInput(session, "sample_selected",
                       choices = pData(rval$flow_set)$name,
@@ -1393,7 +1439,8 @@ server <- function(session, input, output) {
     
     if(!is.null(df)){
       rval$pdata <- df
-      #pData(rval$flow_set) <- df
+      #idx_match <- match(rval$pdata$name, pData(rval$flow_set)$name)
+      #pData(rval$flow_set) <- rval$pdata
     }
     
   })
@@ -1442,7 +1489,32 @@ server <- function(session, input, output) {
     }
   })
 
+  observeEvent(input$apply_filter_meta, {
     
+    validate(
+      need(rval$pdata, "No metadata")
+    )
+    
+    df <- list()
+    for(meta_var in names(rval$pdata)){
+      df[[meta_var]] <- rval$pdata[[meta_var]] %in% input[[meta_var]]
+    }
+    
+    df1 <- do.call(cbind, df)
+    is_selected <- apply(X = df1, MARGIN = 1, FUN = function(x){sum(x) == length(x)})
+    samples <- rval$pdata$name[is_selected]
+    
+    print(samples)
+    
+    if(length(samples)>0){
+      idx_match <- match(samples, pData(rval$flow_set)$name)
+      rval$flow_set_filter <- rval$flow_set[idx_match]
+      rval$flow_set_names <- unique(c(rval$flow_set_names, "filter"))
+      updateSelectInput(session, "flow_set", choices = rval$flow_set_names, selected = "filter")
+    }
+    
+  })
+  
   ##########################################################################################################
   # Observe functions for sample selection
   
@@ -1691,9 +1763,8 @@ server <- function(session, input, output) {
     
     
     ##########################################################################################################
-    # Observe functions to store data
+    # Observe functions for sub-sampling
 
-    
     observeEvent(input$compute_data, {
       
       # Create a Progress object
@@ -1747,9 +1818,9 @@ server <- function(session, input, output) {
       updateSelectInput(session, "flow_set", choices = rval$flow_set_names, selected = "sub-sample")
     })
     
-    # observeEvent(input$reset_data, {
-    #   rval$df_tot <- NULL
-    # })
+    
+    ##########################################################################################################
+    # Observe functions for t-SNE
     
     
     observeEvent(input$compute_tsne, {
@@ -1758,22 +1829,22 @@ server <- function(session, input, output) {
         need(rval$flow_set, "Empty flow set")
       )
       
-      if( is.null(rval$flow_set_sample) ){
-        showModal(modalDialog(
-          title = "No sub-sample data available",
-          paste("Please sub-sample data first", sep=""),
-          easyClose = TRUE,
-          footer = NULL
-        ))
-      }
-      
-      validate(
-        need(rval$flow_set_sample, "Please sub-sample data first")
-      )
-
-      validate(
-        need(rval$df_sample, "Please sub-sample data first")
-      )
+      # if( is.null(rval$flow_set_sample) ){
+      #   showModal(modalDialog(
+      #     title = "No sub-sample data available",
+      #     paste("Please sub-sample data first", sep=""),
+      #     easyClose = TRUE,
+      #     footer = NULL
+      #   ))
+      # }
+      # 
+      # validate(
+      #   need(rval$flow_set_sample, "Please sub-sample data first")
+      # )
+      # 
+      # validate(
+      #   need(rval$df_sample, "Please sub-sample data first")
+      # )
       
       if( length(input$tSNE_variables_table_rows_selected)==0){
         showModal(modalDialog(
@@ -1791,7 +1862,7 @@ server <- function(session, input, output) {
       # Create a Progress object
       progress <- shiny::Progress$new(min = 0, max = 100)
       on.exit(progress$close())
-      progress$set(message = "Computing...", value = 0)
+      
       updateProgress <- function(value = NULL, detail = NULL) {
         progress$set(value = value, detail = detail)
       }
@@ -1807,22 +1878,18 @@ server <- function(session, input, output) {
                         "identity" = identity_trans(),
                         NULL)
       
-      #rval$gating_set <- GatingSet(rval$flow_set)
+      progress$set(message = "Getting data...", value = 0)
       
-      # add gates
-      #rval$gating_set <- add_gates_flowCore(rval$gating_set, rval$gates_flowCore)
-      
-      gs <- GatingSet(rval$flow_set_sample)
-      gs <- add_gates_flowCore(gs, rval$gates_flowCore)
-      
-      rval$df_tsne <- get_data_gs(gs = gs,
-                                  sample = pData(gs)$name, 
+      rval$df_tsne <- get_data_gs(gs = rval$gating_set,
+                                  sample = pData(rval$gating_set)$name, 
                                   subset = "root",
                                   spill = rval$spill,
                                   Ncells = NULL,
                                   updateProgress = updateProgress)
                   
       #print(summary(rval$df_tsne))
+      
+      progress$set(message = "Performing t-SNE...", value = 50)
       
       rval$df_tsne <- dim_reduction(df = rval$df_tsne,
                                     yvar = rval$parameters$name[input$tSNE_variables_table_rows_selected], 
@@ -1831,12 +1898,49 @@ server <- function(session, input, output) {
                                     transformation = transformation,
                                     perplexity = input$perplexity)
       
-      rval$flow_set_tsne <- build_flowset_from_df(rval$df_tsne, fs = rval$flow_set_sample)
+      
+      rval$flow_set_tsne <- build_flowset_from_df(rval$df_tsne, fs = rval$flow_set)
       rval$flow_set_names <- unique(c(rval$flow_set_names, "t-SNE"))
       updateSelectInput(session, "flow_set", choices = rval$flow_set_names, selected = "t-SNE")
-      
+
     })
     
+    
+    
+    ##########################################################################################################
+    ##########################################################################################################
+    # Output 
+    
+    
+    ##########################################################################################################
+    # Output UI
+    
+    output$filter_meta <- renderUI({
+      
+      validate(
+        need(rval$pdata, "No meta data")
+      )
+      
+      x <- list()
+      
+      for(meta_var in names(rval$pdata)){
+        uvar <- unique(rval$pdata[[meta_var]])
+        
+        x[[meta_var]] <- selectizeInput(meta_var, meta_var, 
+                                        choices = uvar, 
+                                        selected = uvar,
+                                        multiple = TRUE)
+        
+      }
+      
+      if(length(x)>0){
+        x[["apply_filter_meta"]] <- actionButton("apply_filter_meta", "apply filter")
+      }
+      
+      
+      tagList(x)
+      
+    })
     
   ##########################################################################################################
   # Output Tables
