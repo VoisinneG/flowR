@@ -554,6 +554,35 @@ body <- dashboardBody(
                      )
               )
             )
+    ),
+    tabItem(tabName = "Cluster_tab",
+            fluidRow(
+              column(width = 6,
+                     tabBox(title = "Cluster",
+                            width = NULL, height = NULL
+                            # tabPanel("Variables",
+                            #          div(style = 'overflow-x: scroll', DT::dataTableOutput("tSNE_variables_table"))
+                            # ),
+                            # tabPanel("Options",
+                            #          
+                            #          selectInput("y_trans_tsne", 
+                            #                      label = "Transform variables:", 
+                            #                      choices = c("log10", "asinh", "identity", "default"), 
+                            #                      selected = "log10"),
+                            #          numericInput("perplexity", "perplexity", 50)
+                            # ),
+                            # tabPanel("Compute",
+                            #          numericInput("ncells_tsne", "Number of cells", 1000),
+                            #          actionButton("compute_tsne", "Perform tSNE"),
+                            #          br(),
+                            #          br(),
+                            #          "Summary",
+                            #          br(),
+                            #          verbatimTextOutput("summary_tsne")
+                            #)
+                     )
+              )
+            )
     )
   )
   
@@ -563,7 +592,6 @@ body <- dashboardBody(
 
 sidebar <- dashboardSidebar(
   sidebarMenu(id = "menu",
-              
               menuItem("Import",
                        tabName = "Import_tab", 
                        startExpanded = FALSE,
@@ -588,7 +616,21 @@ sidebar <- dashboardSidebar(
                        tabName = "Gates_tab", 
                        startExpanded = FALSE,
                        icon = icon("check-circle")
-                       
+              ),
+              menuItem("Sub-sample",
+                       tabName = "Sub_tab",
+                       startExpanded = FALSE,
+                       icon = icon("check-circle")
+              ),
+              menuItem("t-SNE",
+                       tabName = "TSNE_tab",
+                       startExpanded = FALSE,
+                       icon = icon("check-circle")
+              ),
+              menuItem("Clustering",
+                       tabName = "Cluster_tab",
+                       startExpanded = FALSE,
+                       icon = icon("check-circle")
               ),
               menuItem("Plot",
                        tabName = "Plot_tab", 
@@ -599,18 +641,6 @@ sidebar <- dashboardSidebar(
                        tabName = "Stat_tab", 
                        startExpanded = FALSE,
                        icon = icon("check-circle")
-              ),
-              menuItem("Sub-sample",
-                       tabName = "Sub_tab",
-                       startExpanded = FALSE,
-                       icon = icon("check-circle")
-                       
-              ),
-              menuItem("t-SNE",
-                       tabName = "TSNE_tab",
-                       startExpanded = FALSE,
-                       icon = icon("check-circle")
-                       
               ),
               menuItem("General controls",
                       tabName = "General_tab",
@@ -831,13 +861,22 @@ server <- function(session, input, output) {
       fs <- rval$flow_set 
       rval$flow_set_imported <- fs
       
-      if("SPILL" %in% names(description(fs[[1]]))){
-        rval$df_spill <- as.data.frame(description(fs[[1]])[["SPILL"]])
-      }else{
-        m <- diag( length(parameters(fs[[1]])$name) )
-        colnames(m) <- parameters(fs[[1]])$name
-        rval$df_spill <- as.data.frame(m)
+      
+      m <- diag( length(parameters(fs[[1]])$name) )
+      colnames(m) <- parameters(fs[[1]])$name
+      rval$df_spill <- as.data.frame(m)
+      
+      for(i in 1:length(fs)){
+        if("SPILL" %in% names(description(fs[[i]]))){
+          df <- as.data.frame(description(fs[[i]])[["SPILL"]])
+          is_identity <- sum(apply(X=df, MARGIN = 1, FUN = function(x){sum(x==0) == (length(x)-1)})) == dim(df)[1]
+          if(!is_identity){
+            rval$df_spill <- df
+            break
+          }
+        }
       }
+      
       
       row.names(rval$df_spill) <- colnames(rval$df_spill)
       rval$df_spill_original <- rval$df_spill
