@@ -63,7 +63,6 @@ body <- dashboardBody(
   tabItems(
     tabItem(tabName = "Import_tab",
             fluidRow(
-              #dataTableOutput("files_table"),
               column(width = 6,
                      box(title = "Import",
                          width = NULL, height = NULL,
@@ -78,61 +77,43 @@ body <- dashboardBody(
                          selectizeInput("groups", "select groups", 
                                         choices = NULL, 
                                         selected = NULL,
-                                        multiple = TRUE),
-                         #numericInput("N_lines", label = "Number of cells to import", value = 3000),
+                                        multiple = FALSE),
                          actionButton("load", label = "Load selected files")
                      )
-                     # ,
-                     # box(title = "summary",
-                     #     width = NULL, height = NULL,
-                     #     verbatimTextOutput("message")
-                     # )
-              ),
-              column(width = 6,
-                     # fluidRow(
-                     #   valueBoxOutput("progressBox", width = 6),
-                     #   valueBoxOutput("progressBox2", width = 6)
-                     # ),
-                     # fluidRow(
-                     #   valueBoxOutput("progressBox3", width = 12)
-                     # ),
-                     tabBox(title = "Meta",
-                            width = NULL, height = NULL,
-                            tabPanel(title = "Table",
-                                     div(style = 'overflow-x: scroll', DT::dataTableOutput("pData"))
-                                     
-                                     
-                            ),
-                            tabPanel(title = "Keywords",
-                                     selectizeInput("keyword", "select keywords", 
-                                                    choices = NULL, 
-                                                    selected = NULL,
-                                                    multiple = TRUE),
-                                     actionButton("append_keywords", label = "Add keywords"),
-                                     br()
-                                     
-                                     
-                                     
-                            ),
-                            tabPanel(title = "Import",
-                                     fileInput("file_meta", "load metadata file", multiple = FALSE),
-                                     selectInput("sep_meta", "column separator", choices = c("comma", "semi-column", "tab"), selected = "tab"),
-                                     #checkboxInput("sep_meta", "Choose `;` as column separator", value = FALSE),
-                                     div(style = 'overflow-x: scroll', DT::dataTableOutput("meta")),
-                                     br(),
-                                     actionButton("append_meta", label = "Add metadata"),
-                                     actionButton("reset_meta", label = "Reset"),
-                                     br()
-                                     
-                            )
-                     )
-                     
-                     
-                     
-                     
               )
             )
       
+    ),
+    tabItem(tabName = "Meta_tab",
+              fluidRow(
+                column(width = 6,
+                       tabBox(title = "Meta",
+                              width = NULL, height = NULL,
+                              tabPanel(title = "Table",
+                                       div(style = 'overflow-x: scroll', DT::dataTableOutput("pData"))      
+                              ),
+                              tabPanel(title = "Keywords",
+                                       selectizeInput("keyword", "select keywords", 
+                                                      choices = NULL, 
+                                                      selected = NULL,
+                                                      multiple = TRUE),
+                                       actionButton("append_keywords", label = "Add keywords"),
+                                       br()   
+                              ),
+                              tabPanel(title = "Import",
+                                       fileInput("file_meta", "load metadata file", multiple = FALSE),
+                                       selectInput("sep_meta", "column separator", choices = c("comma", "semi-column", "tab"), selected = "tab"),
+                                       div(style = 'overflow-x: scroll', DT::dataTableOutput("meta")),
+                                       br(),
+                                       actionButton("append_meta", label = "Add metadata"),
+                                       actionButton("reset_meta", label = "Reset"),
+                                       br()
+                                       
+                              )
+                       )
+                )
+              )
+              
     ),
     tabItem(tabName = "Trans_tab",
             fluidRow(
@@ -176,11 +157,7 @@ body <- dashboardBody(
                                      br(),
                                      actionButton("apply_transformation", label = "apply to selected chanels"),
                                      br()
-                            )#,
-                            # tabPanel(title = "show",
-                            #          selectInput("xvar_show", label = "variable", choices = NULL, selected = NULL),
-                            #          verbatimTextOutput("message_transform")
-                            # )
+                            )
                      )
               ),
               column(width = 7,
@@ -204,43 +181,13 @@ body <- dashboardBody(
                                      selectInput("xvar_trans", label = "x variable", choices = NULL, selected = NULL),
                                      selectInput("yvar_trans", label = "y variable", choices = NULL, selected = NULL)
                             ),
-                            # tabPanel("Scale axis",
-                            #          selectInput("x_scale", 
-                            #                      label = "x scale", 
-                            #                      choices = c("identity", "log10", "asinh", "logicle"), 
-                            #                      selected = "identity"),
-                            #          selectInput("y_scale", 
-                            #                      label = "y scale", 
-                            #                      choices = c("identity", "log10", "asinh", "logicle"), 
-                            #                      selected = "identity")
-                            #          #checkboxInput("freeze_limits", label = "freeze plot limits", value = TRUE)
-                            #          
-                            # ),
                             tabPanel("Options",
                                      selectInput("plot_type_trans", label = "plot type",
                                                  choices = c("hexagonal", "histogram", "dots", "contour"),
                                                  selected = "histogram"),
-                                     #checkboxInput("apply_trans_trans", "apply tansformation", value = TRUE),
                                      checkboxInput("legend_trans", "show legend", value = FALSE),
                                      checkboxInput("norm_trans", "normalize (set max to 1)", value = TRUE),
                                      checkboxInput("smooth_trans", "smooth", value = FALSE),
-                                     #checkboxInput("ridges", "ridges", value = FALSE),
-                                     #checkboxInput("facet", "faceting", value = TRUE),
-                                     # selectizeInput("facet_var", 
-                                     #                multiple =TRUE,
-                                     #                label = "facet variables", 
-                                     #                choices = "name", 
-                                     #                selected = NULL),
-                                     # selectizeInput("group_var", 
-                                     #                multiple =FALSE,
-                                     #                label = "group variable", 
-                                     #                choices = c("name","subset"), 
-                                     #                selected = "subset"),
-                                     # selectizeInput("yridges_var", 
-                                     #                multiple =FALSE,
-                                     #                label = "y ridges variable", 
-                                     #                choices = c("name","subset"), 
-                                     #                selected = "subset"),
                                      selectInput("color_var_trans", "color variable",
                                                  choices = "none",
                                                  selected = "none"),
@@ -264,11 +211,9 @@ body <- dashboardBody(
                                      div(style = 'overflow-x: scroll', DT::dataTableOutput("spill_table")),
                                      br(),
                                      actionButton("reset_comp", "reset")
-                                     
                             ),
                             tabPanel(title = "Heatmap",
                                      plotlyOutput("heatmap_spill")
-                                     
                             ),
                             tabPanel("Set",
                                      selectInput("xvar_comp", label = "column (chanel)", choices = NULL, selected = NULL),
@@ -280,11 +225,7 @@ body <- dashboardBody(
                                                   max = 2, 
                                                   step = 0.01),
                                      numericInput("step_size", label = "step size", value = 0.01),
-                                     # sliderInput("spill_value", "spillover value (log10):",
-                                     #             min = -5, max = 1,
-                                     #             value = 0.5, step = 0.01),
                                      actionButton("set_spill_value", "set value")
-                                     
                             )
                      )
               ),
@@ -293,7 +234,6 @@ body <- dashboardBody(
                             width = NULL, height = NULL,
                             tabPanel("Plot",
                                      plotOutput("plot_comp")
-                                     
                             ),
                             tabPanel("Select",
                                      selectInput("sample_selected_comp", label = "Sample", choices = NULL, selected = NULL),
@@ -306,33 +246,14 @@ body <- dashboardBody(
                                                     choices = "root", 
                                                     selected = "root",
                                                     multiple = FALSE)
-                                     
                             ),
                             tabPanel("Options",
                                      selectInput("plot_type_comp", label = "plot type",
                                                  choices = c("hexagonal", "histogram", "dots", "contour"),
                                                  selected = "hexagonal"),
-                                     #checkboxInput("apply_trans_comp", "apply tansformation", value = TRUE),
                                      checkboxInput("legend_comp", "show legend", value = FALSE),
                                      checkboxInput("norm_comp", "normalize (set max to 1)", value = TRUE),
                                      checkboxInput("smooth_comp", "smooth", value = FALSE),
-                                     #checkboxInput("ridges", "ridges", value = FALSE),
-                                     #checkboxInput("facet", "faceting", value = TRUE),
-                                     # selectizeInput("facet_var", 
-                                     #                multiple =TRUE,
-                                     #                label = "facet variables", 
-                                     #                choices = "name", 
-                                     #                selected = NULL),
-                                     # selectizeInput("group_var", 
-                                     #                multiple =FALSE,
-                                     #                label = "group variable", 
-                                     #                choices = c("name","subset"), 
-                                     #                selected = "subset"),
-                                     # selectizeInput("yridges_var", 
-                                     #                multiple =FALSE,
-                                     #                label = "y ridges variable", 
-                                     #                choices = c("name","subset"), 
-                                     #                selected = "subset"),
                                      selectInput("color_var_comp", "color variable",
                                                  choices = "none",
                                                  selected = "none"),
@@ -369,19 +290,7 @@ body <- dashboardBody(
                      ),
                      tabBox(title = "Gates",
                          width = NULL, height = NULL,
-                         # tabPanel("Select",
-                         #          selectInput("gate_selected", 
-                         #                      label = "gate", 
-                         #                      choices = "root", 
-                         #                      selected = "root"),
-                         #          actionButton("show_gate", "show gate")
-                         #          ),
                          tabPanel("Add",
-                                  #selectInput("gate_type",
-                                  #            label = "Type of gate",
-                                  #            choices = c("rectangular", "polygonal"),
-                                  #            selected = "rectangular"),
-                                  #selectInput("parent_gate", label = "Select parent gate", choices = "root", selected = "root"),
                                   textInput("gate_name", label = "Enter gate name", value = ""),
                                   actionButton("create_gate", "create gate"),
                                   actionButton("reset_gate", "reset gate")
@@ -411,18 +320,6 @@ body <- dashboardBody(
                                              dblclick = "plot_dblclick")
                          
                          ),
-                         # tabPanel("Scale axis",
-                         #          selectInput("x_scale_gate", 
-                         #                      label = "x scale", 
-                         #                      choices = c("identity", "log10", "asinh", "logicle"), 
-                         #                      selected = "identity"),
-                         #          selectInput("y_scale_gate", 
-                         #                      label = "y scale", 
-                         #                      choices = c("identity", "log10", "asinh", "logicle"), 
-                         #                      selected = "identity"),
-                         #          checkboxInput("freeze_limits", label = "freeze plot limits", value = TRUE)
-                         #          
-                         # ),
                          tabPanel("Options",
                                   selectInput("plot_type_gate", label = "plot type",
                                               choices = c("hexagonal", "histogram", "dots","contour"),
@@ -440,13 +337,6 @@ body <- dashboardBody(
                                   numericInput("size_gate", label = "size", value = 1)
                                   )
                      ),
-                     # box("Plot gate",
-                     #     width = NULL, height = NULL,
-                     #     plotOutput("plotGate_flowCore",
-                     #                brush = "plot_brush_1",
-                     #                click = "plot_click_1",
-                     #                dblclick = "plot_dblclick_1")
-                     # ),
                      tabBox(title = "Gating hierarchy",
                          width = NULL, height = NULL,
                          tabPanel("Tree",
@@ -481,25 +371,6 @@ body <- dashboardBody(
                             )
                      ) 
               ),
-              # column(width = 4,
-              #        tabBox(title = "Sample",
-              #               width = NULL, height = NULL,
-              #               tabPanel("Select",
-              #                        selectizeInput("gate", 
-              #                                       label = "subset", 
-              #                                       choices = "root", 
-              #                                       selected = "root",
-              #                                       multiple = TRUE),
-              #                        selectInput("xvar", label = "x variable", choices = NULL, selected = NULL),
-              #                        selectInput("yvar", label = "y variable", choices = NULL, selected = NULL)
-              #               )
-              #        ),
-              #        box(title = "Select samples",
-              #            width = NULL, height = NULL,
-              #            div(style = 'overflow-x: scroll', DT::dataTableOutput("files_selection_table"))
-              #            
-              #        )
-              # ),
               column(width = 8,
                      tabBox(title = "Plot",
                             width = NULL, height = NULL,
@@ -507,28 +378,14 @@ body <- dashboardBody(
                                      plotOutput("plot_focus")
                                      
                             ),
-                            # tabPanel("Scale axis",
-                            #          selectInput("x_scale", 
-                            #                      label = "x scale", 
-                            #                      choices = c("identity", "log10", "asinh", "logicle"), 
-                            #                      selected = "identity"),
-                            #          selectInput("y_scale", 
-                            #                      label = "y scale", 
-                            #                      choices = c("identity", "log10", "asinh", "logicle"), 
-                            #                      selected = "identity")
-                            #          #checkboxInput("freeze_limits", label = "freeze plot limits", value = TRUE)
-                            #          
-                            # ),
                             tabPanel("Options",
                                      selectInput("plot_type", label = "plot type",
                                                  choices = c("hexagonal", "histogram", "dots", "contour"),
                                                  selected = "histogram"),
-                                     #checkboxInput("apply_trans_plot", "apply tansformation", value = TRUE),
                                      checkboxInput("legend", "show legend", value = TRUE),
                                      checkboxInput("norm", "normalize (set max to 1)", value = TRUE),
                                      checkboxInput("smooth", "smooth", value = FALSE),
                                      checkboxInput("ridges", "ridges", value = FALSE),
-                                     #checkboxInput("facet", "faceting", value = TRUE),
                                      selectizeInput("facet_var", 
                                                     multiple =TRUE,
                                                     label = "facet variables", 
@@ -593,7 +450,6 @@ body <- dashboardBody(
                                                  choices = c("bar", "tile"),
                                                  selected = "bar"),
                                      checkboxInput("legend_stat", "show legend", value = TRUE),
-                                     #checkboxInput("apply_trans", "apply tansformation", value = TRUE),
                                      checkboxInput("free_y_scale", "free y scale", value = FALSE),
                                      checkboxInput("scale_values", "scale values by row", value = FALSE),
                                      numericInput("max_scale", label = "scale limit", value = 2),
@@ -619,8 +475,6 @@ body <- dashboardBody(
                                      selectInput("color_var_stat", "color variable",
                                                  choices = "none",
                                                  selected = "none")
-                                     
-                                     
                             )
                      )
               )
@@ -708,6 +562,11 @@ sidebar <- dashboardSidebar(
                        tabName = "Import_tab", 
                        startExpanded = FALSE,
                        icon = icon("check-circle")
+              ),
+              menuItem("Metadata",
+                       tabName = "Meta_tab", 
+                       startExpanded = FALSE,
+                       icon = icon("check-circle")   
               ),
               menuItem("Transform",
                        tabName = "Trans_tab", 
@@ -1978,23 +1837,6 @@ server <- function(session, input, output) {
       
     })
     
-    # observe({
-    #   updateSelectInput(session, "xvar_show", choices = rval$plot_var)
-    #   updateSelectInput(session, "xvar_trans", choices = rval$plot_var)
-    #   updateSelectInput(session, "yvar_trans", choices = rval$plot_var)
-    #   
-    #   updateSelectInput(session, "xvar_gate", choices = rval$plot_var)
-    #   updateSelectInput(session, "yvar_gate", choices = rval$plot_var)
-    #   updateSelectInput(session, "yvar_stat", choices = rval$plot_var)
-    #   updateSelectInput(session, "xvar", choices = rval$plot_var)
-    #   updateSelectInput(session, "yvar", choices = rval$plot_var)
-    #   updateSelectInput(session, "color_var_gate", choices = c("none", rval$plot_var))
-    #   updateSelectInput(session, "color_var", choices = c("none", rval$plot_var))
-    #   updateSelectInput(session, "color_var_trans", choices = c("none", rval$plot_var))
-    #   updateSelectInput(session, "color_var_comp", choices = c("none", rval$plot_var))
-    # })
-    
-    
     
   ##########################################################################################################
   # Output Tables
@@ -2003,19 +1845,7 @@ server <- function(session, input, output) {
     validate(
       need(rval$df_meta_imported, "No meta data imported")
     )
-    
-    
     as.data.frame(rval$df_meta_imported)
-      
-    # idx_match <- match(rval$df_meta_imported[,1], rval$pdata$name)
-    # 
-    # validate(
-    #   need(length(!is.na(idx_match))>0, "Metadata names do not match gating set names")
-    # )
-    # 
-    # as.data.frame(rval$df_meta[!is.na(idx_match), ])
-    
-    
   })
     
   output$files_table <- renderDataTable({
