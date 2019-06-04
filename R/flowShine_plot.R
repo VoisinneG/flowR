@@ -121,7 +121,12 @@ add_gates_flowCore <- function(gs, gates){
           i_added <- c(i_added, i)
         }
       }
-      idx <- idx[-i_added]
+      if(!is.null(i_added)){
+        idx <- idx[-i_added]
+      }else{
+        break
+      }
+      
     }
     recompute(gs)
   }
@@ -393,9 +398,14 @@ plot_gs <- function(df = NULL,
     
     if(!is.null(gate)){
       for(i in 1:length(gate)){
-        if(class(gate[[i]]) %in% c("rectangleGate", "polygonGate")){
+        if(class(gate[[i]])== "polygonGate"){
           xvar <- colnames(gate[[i]]@boundaries)[1]
           yvar <- try(colnames(gate[[i]]@boundaries)[2], silent = TRUE)
+          break
+        }
+        if(class(gate[[i]]) == "rectangleGate"){
+          xvar <- names(gate[[i]]@min)[1]
+          yvar <- try(names(gate[[i]]@min)[2], silent = TRUE)
           break
         }
         if(class(gate[[i]])=="ellipsoidGate"){
@@ -572,8 +582,28 @@ plot_gs <- function(df = NULL,
       
       gate_int <- gate[[j]]
       
-      if(class(gate_int) %in% c("rectangleGate", "polygonGate") ){
+      if(class(gate_int) == "polygonGate" ){
         polygon <- as.data.frame(gate_int@boundaries)
+      }else if(class(gate_int) == "rectangleGate"){
+        idx_x <- match(xvar, names(gate_int@min))
+        idx_y <- match(yvar, names(gate_int@min))
+        if(!is.na(idx_x)){
+          range_x <- c(gate_int@min[idx_x], gate_int@max[idx_x])
+        }else{
+          range_x <- xlim
+        }
+        if(!is.na(idx_y)){
+          range_y <- c(gate_int@min[idx_y], gate_int@max[idx_y])
+        }else{
+          range_y <- ylim
+        }
+        print(range_x)
+        print(range_y)
+        print(xlim)
+        print(ylim)
+        polygon <- as.data.frame(x = c(range_x[1], range_x[2], range_x[2], range_x[1]),
+                                 y = c(range_y[1], range_y[1], range_y[2], range_y[2]))
+        names(polygon) <- c(xvar, yvar)
       }else if(class(gate_int) %in% c("ellipsoidGate")){
         cov <- gate_int@cov
         mean <- gate_int@mean
