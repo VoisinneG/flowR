@@ -1303,10 +1303,7 @@ server <- function(session, input, output) {
     validate(
       need(setequal(pData(rval$flow_set)$name, rval$pdata$name), "Meta data does not match with flow set samples")
     )
-    
-    print(pData(rval$flow_set))
-    print(rval$pdata)
-    
+
     pData(rval$flow_set) <- rval$pdata
     
   })
@@ -1320,7 +1317,6 @@ server <- function(session, input, output) {
     if(is.null(rval$pdata_original)){
       rval$pdata_original <- as.data.frame(pData(rval$flow_set))
     }else if(!setequal(pData(rval$flow_set)$name, rval$pdata_original$name)){
-      #print(pData(rval$flow_set))
       rval$pdata_original <- as.data.frame(pData(rval$flow_set))
     }
     
@@ -1471,11 +1467,9 @@ server <- function(session, input, output) {
         df <- as.data.frame(df)
         names(df) <- keys
         row.names(df) <- pData(rval$flow_set)$name
-        
-        
       }
       rval$df_keywords <- df
-      print(rval$df_keywords)
+      #print(rval$df_keywords)
     }
   })
 
@@ -1501,8 +1495,6 @@ server <- function(session, input, output) {
     if(!is.null(rval$df_keywords)){
       if(dim(df)[1] == dim(rval$df_keywords)[1] ){
         idx_new <- ! names(rval$df_keywords) %in% names(df)
-        print(idx_new)
-        print(names(rval$df_keywords))
         if(sum(idx_new)>0){
           df <- cbind(df, rval$df_keywords[idx_new])
         }
