@@ -762,7 +762,7 @@ server <- function(session, input, output) {
         
         gs <- try(parseWorkspace(ws,
                              name = input$groups,
-                             execute = TRUE, 
+                             execute = TRUE,
                              isNcdf = TRUE,
                              sampNloc = "sampleNode",
                              #sampNloc = "keyword",
@@ -907,6 +907,7 @@ server <- function(session, input, output) {
                             "sub-sample" = rval$flow_set_sample,
                             "t-SNE" = rval$flow_set_tsne
                             )
+    
   })
 
   observe({
@@ -1293,14 +1294,33 @@ server <- function(session, input, output) {
   # })
   
   observe({
+    validate(
+      need(rval$pdata, "No meta data available")
+    )
+    validate(
+      need(rval$flow_set, "No flow set available")
+    )
+    validate(
+      need(setequal(pData(rval$flow_set)$name, rval$pdata$name), "Meta data does not match with flow set samples")
+    )
+    
+    print(pData(rval$flow_set))
+    print(rval$pdata)
+    
+    pData(rval$flow_set) <- rval$pdata
+    
+  })
+  
+  observe({
     
     validate(
       need(rval$flow_set, "No flow set available")
     )
     
-    
-    if(!setequal(pData(rval$flow_set)$name, rval$pdata_original$name)){
-      print(pData(rval$flow_set))
+    if(is.null(rval$pdata_original)){
+      rval$pdata_original <- as.data.frame(pData(rval$flow_set))
+    }else if(!setequal(pData(rval$flow_set)$name, rval$pdata_original$name)){
+      #print(pData(rval$flow_set))
       rval$pdata_original <- as.data.frame(pData(rval$flow_set))
     }
     
@@ -1448,31 +1468,45 @@ server <- function(session, input, output) {
         }
         keys <- gsub(pattern = " ", replacement = "_", keys, fixed = TRUE)
         keys <- gsub(pattern = "$", replacement = "", keys, fixed = TRUE)
-        colnames(df) <- keys
-        row.names(df) <- NULL
+        df <- as.data.frame(df)
+        names(df) <- keys
+        row.names(df) <- pData(rval$flow_set)$name
         
         
       }
       rval$df_keywords <- df
+      print(rval$df_keywords)
     }
   })
 
   
   observe({
     
+    print(rval$pdata_original)
+    
     validate(
       need(rval$pdata_original, "No metadata")
     )
 
     df <- rval$pdata_original
+    
     if(!is.null(rval$df_meta_mapped)){
       if(dim(df)[1] == dim(rval$df_meta_mapped)[1]){
-        df <- cbind(df, rval$df_meta_mapped)
+        idx_new <- ! names(rval$df_meta_mapped) %in% names(df) 
+        if(sum(idx_new)>0){
+          df <- cbind(df, rval$df_meta_mapped[idx_new])
+        }
       }
     } 
     if(!is.null(rval$df_keywords)){
       if(dim(df)[1] == dim(rval$df_keywords)[1] ){
-        df <- cbind(df, rval$df_keywords)
+        idx_new <- ! names(rval$df_keywords) %in% names(df)
+        print(idx_new)
+        print(names(rval$df_keywords))
+        if(sum(idx_new)>0){
+          df <- cbind(df, rval$df_keywords[idx_new])
+        }
+        
       }
     }
     
@@ -1543,7 +1577,7 @@ server <- function(session, input, output) {
     is_selected <- apply(X = df1, MARGIN = 1, FUN = function(x){sum(x) == length(x)})
     samples <- rval$pdata$name[is_selected]
     
-    print(samples)
+    #print(samples)
     
     if(length(samples)>0){
       idx_match <- match(samples, pData(rval$flow_set)$name)
