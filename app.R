@@ -535,7 +535,7 @@ body <- dashboardBody(
                                      selectInput("y_trans_tsne", 
                                                  label = "Transform variables:", 
                                                  choices = c("log10", "asinh", "identity", "default"), 
-                                                 selected = "log10"),
+                                                 selected = "default"),
                                      numericInput("perplexity", "perplexity", 50)
                             ),
                             tabPanel("Compute",
@@ -559,27 +559,26 @@ body <- dashboardBody(
             fluidRow(
               column(width = 6,
                      tabBox(title = "Cluster",
-                            width = NULL, height = NULL
-                            # tabPanel("Variables",
-                            #          div(style = 'overflow-x: scroll', DT::dataTableOutput("tSNE_variables_table"))
-                            # ),
-                            # tabPanel("Options",
-                            #          
-                            #          selectInput("y_trans_tsne", 
-                            #                      label = "Transform variables:", 
-                            #                      choices = c("log10", "asinh", "identity", "default"), 
-                            #                      selected = "log10"),
-                            #          numericInput("perplexity", "perplexity", 50)
-                            # ),
-                            # tabPanel("Compute",
-                            #          numericInput("ncells_tsne", "Number of cells", 1000),
-                            #          actionButton("compute_tsne", "Perform tSNE"),
-                            #          br(),
-                            #          br(),
-                            #          "Summary",
-                            #          br(),
-                            #          verbatimTextOutput("summary_tsne")
-                            #)
+                            width = NULL, height = NULL,
+                            tabPanel("Variables",
+                                     div(style = 'overflow-x: scroll', DT::dataTableOutput("clustering_variables_table"))
+                            ),
+                            tabPanel("Options",
+                                     selectInput("y_trans_clustering",
+                                                 label = "Transform variables:",
+                                                 choices = c("log10", "asinh", "identity", "default"),
+                                                 selected = "default"),
+                                     numericInput("cluster_dc", "dc", 3),
+                                     numericInput("cluster_alpha", "alpha", 0.001)
+                            ),
+                            tabPanel("Cluster",
+                                     actionButton("start_clustering", "Find clusters"),
+                                     br(),
+                                     br(),
+                                     "Summary",
+                                     br(),
+                                     verbatimTextOutput("summary_cluster")
+                            )
                      )
               )
             )
@@ -671,6 +670,7 @@ server <- function(session, input, output) {
                          flow_set_filter = NULL,
                          flow_set_sample = NULL,
                          flow_set_tsne = NULL,
+                         flow_set_cluster = NULL,
                          flow_set = NULL,
                          gating_set = NULL,
                          idx_ff_gate = NULL,
@@ -696,6 +696,7 @@ server <- function(session, input, output) {
                          df_keywords = NULL,
                          df_sample = NULL,
                          df_tsne = NULL,
+                         df_cluster = NULL,
                          df_spill_original = NULL,
                          df_spill = NULL,
                          spill = NULL,
@@ -887,13 +888,6 @@ server <- function(session, input, output) {
   })
   
   
-  # observe({
-  #   validate(
-  #     need(rval$flow_set_names, "No flow set available")
-  #   )
-  #   updateSelectInput(session, "flow_set", choices = rval$flow_set_names, selected = rval$flow_set_names[length(rval$flow_set_names)])
-  # })
-  
   ##########################################################################################################
   # Create gating set
   
@@ -905,7 +899,8 @@ server <- function(session, input, output) {
                             "imported" = rval$flow_set_imported,
                             "filter" = rval$flow_set_filter,
                             "sub-sample" = rval$flow_set_sample,
-                            "t-SNE" = rval$flow_set_tsne
+                            "t-SNE" = rval$flow_set_tsne,
+                            "cluster" = rval$flow_set_cluster
                             )
     
   })
@@ -935,15 +930,11 @@ server <- function(session, input, output) {
     max_val <- as.data.frame(fsApply(fs, each_col, max,  na.rm = TRUE))
     max_val_all <- apply(max_val, 2, max)
 
-    #print(min_val_all)
-
-    
     rval$data_range <- lapply(params, function(x){
       c(min_val_all[[x]] , max_val_all[[x]])
     })
     names(rval$data_range) <- params
-    
-    #print(rval$data_range)
+
   })
   
   observe({
@@ -991,8 +982,6 @@ server <- function(session, input, output) {
       name_long <- name
       name_long[!is.na(desc)] <- paste(name[!is.na(desc)], " (", desc[!is.na(desc)], ")", sep = "")
       
-      #cat(rownames(parameters(ff)@data))
-      
       display <- unlist(sapply(rownames(parameters(ff)@data), FUN = function(x){
         kw <- substr(x, start = 2, stop = nchar(x))
         kw <- paste(kw, "DISPLAY", sep = "")
@@ -1004,7 +993,6 @@ server <- function(session, input, output) {
       }))
       
       names(display) <- parameters(ff)@data$name
-      #print(display)
       
       rval$parameters <- data.frame(name = name,
                                     desc = desc,
@@ -1014,8 +1002,6 @@ server <- function(session, input, output) {
                                     minRange = parameters(ff)@data$minRange,
                                     maxRange = parameters(ff)@data$maxRange,
                                     stringsAsFactors = FALSE)
-      #print(rval$parameters)
-      #print("OK")
     }
     
   })
@@ -1082,12 +1068,9 @@ server <- function(session, input, output) {
     )
     
     new_par <- setdiff(rval$parameters$name, names(rval$transformation))
-    #print(new_par)
     idx_new <- match(new_par, rval$parameters$name)
     
     if(length(new_par)>0){
-      
-      
       
       for(i in 1:length(new_par)){
         rval$transformation[[new_par[i]]] <- switch(rval$parameters$display[idx_new[i]],
@@ -1166,15 +1149,11 @@ server <- function(session, input, output) {
     trans_param <- sapply(rval$trans_parameters, function(x){
       paste( paste(names(x), as.character(x), sep = ": "), collapse="; ")})
     
-    #print(trans_name)
-    #print(trans_param)
-    
     idx_match <- match(rval$parameters$name, names(rval$transformation))
     
     rval$parameters$transform <- trans_name[idx_match]
     rval$parameters[["transform parameters"]] <- trans_param[idx_match]
-    
-    #print(rval$parameters)
+
     
   })
   
@@ -1272,26 +1251,6 @@ server <- function(session, input, output) {
   
   ##########################################################################################################
   # Observe functions for metadata
-  
-  # observe({
-  #   
-  #   validate(
-  #     need(rval$flow_set, "No flow set available")
-  #   )
-  #   
-  #   if(setequal(pData(rval$flow_set)$name, rval$pdata$name)){
-  #     
-  #     meta_var <- names(rval$pdata)
-  #     meta_var_to_add <- meta_var[! meta_var %in% names(pData(rval$flow_set))]
-  #     
-  #     if(length(meta_var_to_add)>0){
-  #       for(i in 1:length(meta_var_to_add) ){
-  #         pData(rval$flow_set)[[meta_var_to_add[i]]] <- rval$pdata[[meta_var_to_add[i]]] 
-  #       }
-  #     }
-  #   }
-  #   
-  # })
   
   observe({
     validate(
@@ -1453,11 +1412,8 @@ server <- function(session, input, output) {
     if(!is.null(rval$flow_set)){
       
       df <- NULL
-      #new_keys <- setdiff(input$keyword, colnames(rval$pdata))
-      
-      #print(new_keys)
-      #print(names(rval$pdata))
       keys <- input$keyword
+      
       if(length(keys)>0){
         for(key in keys){
           df <- cbind(df, fsApply(rval$flow_set, function(x){description(x)[[key]]}))
@@ -1469,7 +1425,6 @@ server <- function(session, input, output) {
         row.names(df) <- pData(rval$flow_set)$name
       }
       rval$df_keywords <- df
-      #print(rval$df_keywords)
     }
   })
 
@@ -1504,8 +1459,6 @@ server <- function(session, input, output) {
     
     if(!is.null(df)){
       rval$pdata <- df
-      #idx_match <- match(rval$pdata$name, pData(rval$flow_set)$name)
-      #pData(rval$flow_set) <- rval$pdata
     }
     
   })
@@ -1549,8 +1502,7 @@ server <- function(session, input, output) {
       updateSelectInput(session, "color_var_trans", 
                         choices = c("subset", names(rval$pdata)), 
                         selected = "subset")
-      
-      #cat("update\n")
+
     }
   })
 
@@ -1664,32 +1616,22 @@ server <- function(session, input, output) {
   
     observeEvent(input$plot_click, {
       
-      #gate$x <- c(gate$x, transform_values(input$plot_click$x, input$x_scale_gate))
-      #gate$y <- c(gate$y, transform_values(input$plot_click$y, input$y_scale_gate))
-      
       xvar <- rval$parameters$name[match(input$xvar_gate, rval$parameters$name_long)]
       yvar <- rval$parameters$name[match(input$yvar_gate, rval$parameters$name_long)]
       
       gate$x <- c(gate$x, rval$transformation[[xvar]]$inverse(input$plot_click$x))
       gate$y <- c(gate$y, rval$transformation[[yvar]]$inverse(input$plot_click$y))
       
-      #cat("click")
     })
     
     observeEvent(input$plot_brush, {
       brush <- input$plot_brush
-      #cat("brush")
+
       if (!is.null(brush)) {
         
         xvar <- rval$parameters$name[match(input$xvar_gate, rval$parameters$name_long)]
         yvar <- rval$parameters$name[match(input$yvar_gate, rval$parameters$name_long)]
-        
-        # gate$x <- sapply(c(brush$xmin, brush$xmax, brush$xmax, brush$xmin), 
-        #                  transform_values, 
-        #                  scale = input$x_scale_gate)
-        # gate$y <- sapply(c(brush$ymin, brush$ymin, brush$ymax, brush$ymax),
-        #                  transform_values, 
-        #                  scale = input$y_scale_gate)
+
         gate$x <- rval$transformation[[xvar]]$inverse(c(brush$xmin, brush$xmax, brush$xmax, brush$xmin))
         gate$y <- rval$transformation[[yvar]]$inverse(c(brush$ymin, brush$ymin, brush$ymax, brush$ymax))
         
@@ -1738,11 +1680,10 @@ server <- function(session, input, output) {
           rval$gate <- poly_gate
           rval$gates_flowCore[[input$gate_name]] <- list(gate = poly_gate, parent = rval$gate_focus)
           
-          #print(names(poly_gate@parameters))
+
           add(rval$gating_set, poly_gate, parent = rval$gate_focus)
-          
           recompute(rval$gating_set)
-          #cat("update3\n")
+
           updateSelectInput(session, "gate_selected", choices = getNodes(rval$gating_set), selected = input$gate_name)
           updateSelectInput(session, "gate_to_delete", choices = setdiff(getNodes(rval$gating_set), "root"))
           updateSelectInput(session, "gate", choices = getNodes(rval$gating_set), selected = "root")
@@ -1775,7 +1716,7 @@ server <- function(session, input, output) {
         
         Rm(target_gate, rval$gating_set)
         recompute(rval$gating_set)
-        #cat("update4\n")
+
         updateSelectInput(session, "gate_selected", choices = getNodes(rval$gating_set), selected = "root")
         updateSelectInput(session, "gate_to_delete", choices = setdiff(getNodes(rval$gating_set), "root"))
         updateSelectInput(session, "gate", choices = getNodes(rval$gating_set), selected = "root")
@@ -1801,27 +1742,14 @@ server <- function(session, input, output) {
         if(length(params) > 1){
           updateSelectInput(session, "yvar_gate", selected = params[2])
         }
-        
-        
-        
-        # g <- as.data.frame(g)
-        # names(g) <- rval$parameters$name_long[match(names(g), rval$parameters$name)]
-        # 
-        # updateSelectInput(session, "xvar_gate", selected = names(g)[1])
-        # updateSelectInput(session, "yvar_gate", selected = names(g)[2])
-        # 
-        
+  
         gate$x <- NULL
         gate$y <- NULL
-        
-        # gate$x <- g[[1]]
-        # gate$y <- g[[2]]
         
         updateSelectInput(session, "gate_selected",  
                           selected = rval$gates_flowCore[[input$gate_selected]]$parent)
         
       }
-      #cat("update5\n")
       
 
     })
@@ -1894,23 +1822,6 @@ server <- function(session, input, output) {
         need(rval$flow_set, "Empty flow set")
       )
       
-      # if( is.null(rval$flow_set_sample) ){
-      #   showModal(modalDialog(
-      #     title = "No sub-sample data available",
-      #     paste("Please sub-sample data first", sep=""),
-      #     easyClose = TRUE,
-      #     footer = NULL
-      #   ))
-      # }
-      # 
-      # validate(
-      #   need(rval$flow_set_sample, "Please sub-sample data first")
-      # )
-      # 
-      # validate(
-      #   need(rval$df_sample, "Please sub-sample data first")
-      # )
-      
       if( length(input$tSNE_variables_table_rows_selected)==0){
         showModal(modalDialog(
           title = "No variable selected",
@@ -1951,8 +1862,6 @@ server <- function(session, input, output) {
                                   spill = rval$spill,
                                   Ncells = NULL,
                                   updateProgress = updateProgress)
-                  
-      #print(summary(rval$df_tsne))
       
       progress$set(message = "Performing t-SNE...", value = 50)
       
@@ -1970,7 +1879,95 @@ server <- function(session, input, output) {
 
     })
     
+    ##########################################################################################################
+    # Observe functions for Clustering
     
+    
+    observeEvent(input$start_clustering, {
+      
+      validate(
+        need(rval$flow_set, "Empty flow set")
+      )
+      
+      
+      if( length(input$clustering_variables_table_rows_selected)==0){
+        showModal(modalDialog(
+          title = "No variable selected",
+          paste("Please select variables before proceeding", sep=""),
+          easyClose = TRUE,
+          footer = NULL
+        ))
+      }
+      
+      validate(
+        need(length(input$clustering_variables_table_rows_selected) >0, "No variables selected")
+      )
+      
+      # Create a Progress object
+      progress <- shiny::Progress$new(min = 0, max = 100)
+      on.exit(progress$close())
+      
+      updateProgress <- function(value = NULL, detail = NULL) {
+        progress$set(value = value, detail = detail)
+      }
+      
+      transformation <- NULL
+      if(input$apply_trans){
+        transformation <- rval$transformation
+      }
+      
+      y_trans <- switch(input$y_trans_clustering,
+                        "log10" = log10_trans(),
+                        "asinh" = asinh_trans(),
+                        "identity" = identity_trans(),
+                        NULL)
+      
+      progress$set(message = "Clustering...", value = 0)
+      
+      rval$df_cluster <- get_data_gs(gs = rval$gating_set,
+                                  sample = pData(rval$gating_set)$name, 
+                                  subset = "root",
+                                  spill = rval$spill,
+                                  Ncells = NULL,
+                                  updateProgress = updateProgress)
+      
+      #print(summary(rval$df_tsne))
+      
+      progress$set(message = "Clustering...", value = 50)
+      
+      rval$df_cluster <- get_cluster(df=rval$df_cluster, 
+                                     yvar = rval$parameters$name[input$clustering_variables_table_rows_selected],
+                                     y_trans = y_trans,
+                                     transformation = transformation,
+                                     dc = input$cluster_dc, 
+                                     alpha = input$cluster_alpha
+                                     )
+      
+      
+      rval$flow_set_cluster <- build_flowset_from_df(rval$df_cluster, fs = rval$flow_set)
+      
+      # create one gate per cluster
+      
+      uclust <- unique(rval$df_cluster$cluster)
+      for(i in 1:length(uclust)){
+        filterID <- paste("cluster", uclust[i], sep = "")
+        polygon <- matrix(c(as.numeric(uclust[i])-0.25, 
+                            as.numeric(uclust[i])+0.25, 
+                            range(rval$df_cluster[[rval$flow_set_cluster@colnames[1]]])
+                            ), 
+                          ncol = 2)
+        row.names(polygon) <- c("min", "max")
+        colnames(polygon) <- c("cluster", rval$flow_set_cluster@colnames[1])
+        g <- rectangleGate(.gate = polygon, filterId=filterID)
+        rval$gates_flowCore[[paste("/",filterID, sep="")]] <- list(gate = g, parent = "root")
+      }
+      
+      
+      
+      rval$flow_set_names <- unique(c(rval$flow_set_names, "cluster"))
+      updateSelectInput(session, "flow_set", choices = rval$flow_set_names, selected = "cluster")
+      
+    })
     
     ##########################################################################################################
     ##########################################################################################################
@@ -2044,6 +2041,20 @@ server <- function(session, input, output) {
   
   
   output$tSNE_variables_table <- renderDataTable({
+    
+    validate(
+      need(rval$parameters, "No data imported")
+    )
+    
+    df <- rval$parameters
+    df[["chanel_name"]] <- df$name_long
+    
+    DT::datatable(
+      df[, c("chanel_name", "transform", "transform parameters")], 
+      rownames = FALSE)
+  })
+  
+  output$clustering_variables_table <- renderDataTable({
     
     validate(
       need(rval$parameters, "No data imported")
@@ -2196,6 +2207,15 @@ server <- function(session, input, output) {
       print(summary(rval$df_tsne[, c("name", "subset")]))
     }else{
       "No t-SNE performed yet"
+    }
+  })
+  
+  output$summary_cluster <- renderPrint({
+    if(!is.null(rval$df_cluster)){
+      print("unique clusters :")
+      print(unique(rval$df_cluster$cluster))
+    }else{
+      "No clustering performed yet"
     }
   })
   

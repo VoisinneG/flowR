@@ -442,6 +442,9 @@ plot_gs <- function(df = NULL,
     df <- df[df$name %in% sample & df$subset %in% subset, ]
   }
   
+  # if("cluster" %in% names(df)){
+  #   df[["cluster"]] <- as.factor(df[["cluster"]])
+  # }
   
   if( !setequal( xvar[xvar %in% names(df)], xvar ) | !setequal( yvar[yvar %in% names(df)], yvar ) ){
     warning("Some variables could not be found in flowData")
@@ -601,8 +604,10 @@ plot_gs <- function(df = NULL,
         print(range_y)
         print(xlim)
         print(ylim)
-        polygon <- as.data.frame(x = c(range_x[1], range_x[2], range_x[2], range_x[1]),
+        polygon <- data.frame(x = c(range_x[1], range_x[2], range_x[2], range_x[1]),
                                  y = c(range_y[1], range_y[1], range_y[2], range_y[2]))
+        print(c(xvar, yvar))
+        print(names(polygon))
         names(polygon) <- c(xvar, yvar)
       }else if(class(gate_int) %in% c("ellipsoidGate")){
         cov <- gate_int@cov
@@ -973,11 +978,15 @@ plot_stat <- function(df = NULL,
       p <- p + scale_y_continuous(trans = y_trans)
     }
     
-    if(length(grep("log", trans_name))>0){
-      ylim[1] <- max(c(1, ylim[1])) 
+    if(!is.null(ylim)){
+      if(!is.finite(ylim[1])){
+        ylim[1] <- 1
+      }
     }
     
+
     p <- p + coord_cartesian(ylim = ylim, expand = FALSE)
+    
     
       #geom_boxplot(mapping = aes_string( y = "value", fill = "variable")) +
       #geom_point(mapping = aes_string(y = "value"))
@@ -1133,4 +1142,51 @@ build_flowset_from_df <- function(df,
   
   fs_new <- flowSet(ff_list)
 
+}
+
+
+
+get_cluster <- function(df,
+                        yvar,
+                        transformation = NULL,
+                        y_trans = identity_trans(),
+                        dc=3, 
+                        alpha = 0.001,
+                        method = "ClusterX"){
+                        
+  if(!is.null(y_trans)){
+    transformation <- lapply(yvar, function(x){y_trans})
+    names(transformation) <- yvar
+  }
+  
+  trans_name <-  unique(unlist(sapply(transformation[yvar], function(tf){tf$name})))
+  
+  #print(yvar)
+  #print(trans_name)
+  
+  df_trans <- df
+  df_filter <- df
+  
+  
+  for(i in 1:length(yvar)){
+    df_trans[[yvar[i]]] <- transformation[[yvar[i]]]$transform(df[[yvar[i]]])
+  }
+  
+  cell_has_non_finite <- apply(X = df_trans[, yvar], MARGIN = 1, FUN = function(x){sum(!is.finite(x) )>0})
+  cell_has_na <- rowSums(is.na(df_trans[, yvar])) > 0
+  idx_filter <- which(cell_has_na | cell_has_non_finite)
+  
+  if(length(idx_filter)>0){
+    message(paste("Filter out ", length(idx_filter), " cells with NA or non-finite values", sep =""))
+    df_trans <- df_trans[-idx_filter, ]
+    df_filter <- df_filter[-idx_filter, ]
+  }
+  
+  message(paste("Clustering ", dim(df_trans)[1], " cells using 'CluserX' on ",  length(yvar), " parameters", sep = ""))
+  
+  DC <- ClusterX(df_trans[ , yvar], dc = dc, alpha = alpha)
+  df_filter$cluster <- DC$cluster
+  
+  return(df_filter)
+  
 }
