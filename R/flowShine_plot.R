@@ -349,7 +349,9 @@ plot_gs <- function(df = NULL,
                     smooth = FALSE,
                     ridges = FALSE,
                     bw = 0.1,
-                    show.legend = TRUE
+                    show.legend = TRUE,
+                    legend.position = "right",
+                    use_log10_count = TRUE
                     ){
   
   
@@ -482,8 +484,14 @@ plot_gs <- function(df = NULL,
     p <- ggplot(df,
                 aes_(x = as.name( xvar ), 
                      y = as.name( yvar ) ) )+
-      geom_hex(bins = bins, show.legend = show.legend) +
-      scale_fill_viridis()
+      geom_hex(bins = bins, show.legend = show.legend)
+    
+    if(use_log10_count){
+      p <- p + scale_fill_viridis(trans = log10_trans())
+    }else{
+      p <- p + scale_fill_viridis()
+    }
+      
     
     #p <- as.ggplot(p)
   }
@@ -538,21 +546,34 @@ plot_gs <- function(df = NULL,
   
   if(type %in% c("dots", "contour")){
     
+    if(!is.null(color_var)){
+      if(color_var == "cluster"){
+        df[["cluster"]] <- as.factor(df[["cluster"]])
+      }
+    }
+    
+    print(group_var)
+    print(names(df))
+    
     p <- ggplot(df,
-                aes_(x = as.name( xvar ), 
+                aes_string(x = as.name( xvar ), 
                      y = as.name( yvar )))
     
     if(type == "dots"){
+
       if(!is.null(color_var)){
         
           #idx_col <- match(color_var, names(df))
-          p <- p + geom_point(mapping = aes_(colour = as.name(color_var)),
+          p <- p + geom_point(mapping = aes_( group = as.name(group_var), colour = as.name(color_var)),
                               alpha = alpha, 
                               size = size, 
                               show.legend = show.legend)
           
           if(color_var %in% gs@data@colnames){
-            p <- p + scale_colour_viridis(trans = transformation[[color_var]], name = color_var)
+            if(color_var != "cluster"){
+              p <- p + scale_colour_viridis(trans = transformation[[color_var]], name = color_var)
+            }
+            
           }
         
       }else{
@@ -703,7 +724,8 @@ plot_gs <- function(df = NULL,
   
   labx <- ifelse(is.null(axis_labels), xvar, axis_labels[[xvar]])
   p <- p + scale_x_continuous(name = labx, trans = transformation[[xvar]], limits = xlim) 
-  p <- p + theme(plot.title = element_text(face = "bold") )
+  p <- p + theme(plot.title = element_text(face = "bold"),
+                 legend.position = legend.position)
   
   if(length(subset)==1){
     p <- p + ggtitle(subset)
@@ -984,8 +1006,7 @@ plot_stat <- function(df = NULL,
       }
     }
     
-
-    p <- p + coord_cartesian(ylim = ylim, expand = FALSE)
+    p <- p + coord_cartesian(ylim = ylim, expand = free_y_scale)
     
     
       #geom_boxplot(mapping = aes_string( y = "value", fill = "variable")) +
@@ -1034,7 +1055,12 @@ dim_reduction <- function(df,
                           perplexity = 50,
                           method = "tSNE"){
   
-  
+  if(is.numeric(Ncells)){
+    if(Ncells<=0){
+      warning("Parameter Ncells must be > 0")
+      return(NULL)
+    }
+  }
   
   if(!is.null(y_trans)){
     transformation <- lapply(yvar, function(x){y_trans})

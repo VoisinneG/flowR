@@ -34,7 +34,7 @@ getOption("repos")
 
 source("./R/flowShine_plot.R")
 
-
+`%then%` <- shiny:::`%OR%`
 
 
 transform_values <- function(x, scale, ...){
@@ -320,7 +320,7 @@ body <- dashboardBody(
                      tabBox(title = "Plot",
                          width = NULL, height = NULL,
                          tabPanel("Plot",
-                                  plotOutput("plotGate2",
+                                  plotOutput("plotGate",
                                              brush = "plot_brush",
                                              click = "plot_click",
                                              dblclick = "plot_dblclick")
@@ -349,7 +349,14 @@ body <- dashboardBody(
                                   plotOutput("tree")
                                   ),
                          tabPanel("Plot gates",
-                                  plotOutput("plot_gh"))
+                                  plotOutput("plot_gh")),
+                         tabPanel("Options",
+                                  numericInput("nrow", label = "Number of rows", value = 2)),
+                         tabPanel("Save",
+                                  numericInput("width_plot_gh", label = "width", value = 7),
+                                  numericInput("height_plot_gh", label = "height", value = 7),
+                                  downloadButton("download_plot_gh", "Save plot")     
+                                  )
                          
                      )
               )
@@ -372,8 +379,29 @@ body <- dashboardBody(
                                                     multiple = TRUE)
                             ),
                             tabPanel("Variables",
-                                     selectInput("xvar", label = "x variable", choices = NULL, selected = NULL),
-                                     selectInput("yvar", label = "y variable", choices = NULL, selected = NULL)
+                                     selectizeInput("xvar", 
+                                                    multiple = TRUE,
+                                                    label = "x variable", 
+                                                    choices = NULL, 
+                                                    selected = NULL),
+                                     selectizeInput("yvar", 
+                                                    multiple = TRUE,
+                                                    label = "y variable", 
+                                                    choices = NULL, 
+                                                    selected = NULL),
+                                     selectizeInput("color_var", 
+                                                    multiple = TRUE,
+                                                    label = "color variable",
+                                                    choices = "none",
+                                                    selected = "none"),
+                                     selectInput("split_variable",
+                                                 label = "select variable used to split plots",
+                                                 choices = c("x variable", "y variable", "color variable"),
+                                                 selected = "x variable"
+                                                 ),
+                                     numericInput("nrow_split", label = "Number of rows", value = 1)
+                                     
+                                     
                             )
                      ) 
               ),
@@ -407,14 +435,20 @@ body <- dashboardBody(
                                                     label = "y ridges variable", 
                                                     choices = c("name","subset"), 
                                                     selected = "subset"),
-                                     selectInput("color_var", "color variable",
-                                                 choices = "none",
-                                                 selected = "none"),
+                                     selectInput("legend_pos", label = "legend position",
+                                                 choices = c("right", "top", "left", "bottom"),
+                                                 selected = "right"),
                                      numericInput("bin_number", label = "number of bins", value = 50),
                                      numericInput("alpha", label = "alpha", value = 0.5),
                                      numericInput("size", label = "size", value = 1)
                                      
+                            ),
+                            tabPanel("Save",
+                                     numericInput("width_plot", label = "width", value = 5),
+                                     numericInput("height_plot", label = "height", value = 5),
+                                     downloadButton("download_plot", "Save plot")
                             )
+                                     
                      )
               )
               
@@ -666,6 +700,7 @@ ui <- dashboardPage(
 server <- function(session, input, output) {
   
   rval <- reactiveValues(df_files = NULL,
+                         datasets = list(),
                          flow_set_imported = NULL,
                          flow_set_filter = NULL,
                          flow_set_sample = NULL,
@@ -773,7 +808,7 @@ server <- function(session, input, output) {
         
         if(class(gs) != "GatingSet"){
           showModal(modalDialog(
-            title = "Error pasing xml workspace",
+            title = "Error parsing xml workspace",
             paste("Please try importing FCS files directly", sep=""),
             easyClose = TRUE,
             footer = NULL
@@ -862,7 +897,6 @@ server <- function(session, input, output) {
       fs <- rval$flow_set 
       rval$flow_set_imported <- fs
       
-      
       m <- diag( length(parameters(fs[[1]])$name) )
       colnames(m) <- parameters(fs[[1]])$name
       rval$df_spill <- as.data.frame(m)
@@ -895,6 +929,7 @@ server <- function(session, input, output) {
     validate(
       need(input$flow_set, "No flow set selected")
     )
+    
     rval$flow_set <- switch(input$flow_set,
                             "imported" = rval$flow_set_imported,
                             "filter" = rval$flow_set_filter,
@@ -902,6 +937,7 @@ server <- function(session, input, output) {
                             "t-SNE" = rval$flow_set_tsne,
                             "cluster" = rval$flow_set_cluster
                             )
+
     
   })
 
@@ -1024,13 +1060,19 @@ server <- function(session, input, output) {
         
         xvar_default <- rval$plot_var[1]
         yvar_default <- rval$plot_var[2]
+        
         if(input$flow_set == "t-SNE"){
           xvar_default <- "tSNE1"
           yvar_default <- "tSNE2"
-          updateSelectInput(session, "plot_type", selected = "dots")
-          #updateSelectInput(session, "facet_var", selected = NULL)
-          #updateSelectInput(session, "group_var", selected = "name")
-          #updateSelectInput(session, "color_var", selected = "name")
+        }
+        
+        if(input$flow_set == "cluster"){
+          if("tSNE1" %in% rval$parameters$name_long){
+            xvar_default <- "tSNE1"
+          }
+          if("tSNE2" %in% rval$parameters$name_long){
+            yvar_default <- "tSNE2"
+          }
         }
           
         updateSelectInput(session, "xvar_show", choices = rval$plot_var, selected = xvar_default)
@@ -1042,10 +1084,10 @@ server <- function(session, input, output) {
         updateSelectInput(session, "xvar", choices = rval$plot_var, selected = xvar_default)
         updateSelectInput(session, "yvar", choices = rval$plot_var, selected = yvar_default)
         
-        updateSelectInput(session, "color_var_gate", choices = c("none", rval$plot_var), selected = "none")
-        updateSelectInput(session, "color_var", choices = c("none", rval$plot_var), selected = "none")
-        updateSelectInput(session, "color_var_trans", choices = c("none", rval$plot_var), selected = "none")
-        updateSelectInput(session, "color_var_comp", choices = c("none", rval$plot_var), selected = "none")
+        # updateSelectInput(session, "color_var_gate", choices = c("none", rval$plot_var), selected = "none")
+        # updateSelectInput(session, "color_var", choices = c("none", rval$plot_var), selected = "none")
+        # updateSelectInput(session, "color_var_trans", choices = c("none", rval$plot_var), selected = "none")
+        # updateSelectInput(session, "color_var_comp", choices = c("none", rval$plot_var), selected = "none")
         
         comp_params <- rval$parameters$name_long[match(colnames(rval$df_spill), rval$parameters$name)]
         names(comp_params) <- NULL
@@ -1303,7 +1345,17 @@ server <- function(session, input, output) {
       plot_type_default <- "dots"
     }
     
+    if(input$flow_set == "cluster"){
+      facet_var_default <- NULL
+      group_var_default <- NULL
+      color_var_default <- "cluster"
+      plot_type_default <- "dots"
+    }
+    
     updateSelectInput(session, "plot_type", 
+                      selected = plot_type_default)
+    
+    updateSelectInput(session, "plot_type_gate", 
                       selected = plot_type_default)
     
     updateSelectInput(session, "facet_var", 
@@ -1354,6 +1406,10 @@ server <- function(session, input, output) {
     updateSelectInput(session, "sample_selected_comp",
                       choices = pData(rval$flow_set)$name,
                       selected = pData(rval$flow_set)$name[1])
+    
+    updateSelectInput(session, "gate_stat",
+                      selected = names(rval$gates_flowCore)[grep("^/cluster[0-9]+", names(rval$gates_flowCore))])
+
     
       
   })
@@ -1464,47 +1520,47 @@ server <- function(session, input, output) {
   })
   
   
-  observe( {
-    
-    rpd <- rval$pdata
-    
-    if(!is.null(rval$pdata)){
-      updateSelectInput(session, "facet_var", 
-                        choices = c("subset", names(rval$pdata)), 
-                        selected = "name")
-      updateSelectInput(session, "facet_var_stat", 
-                        choices = c("subset", names(rval$pdata)), 
-                        selected = "name")
-      
-      updateSelectInput(session, "group_var", 
-                        choices = c("subset", names(rval$pdata)), 
-                        selected = "subset")
-      updateSelectInput(session, "group_var_stat", 
-                        choices = c("subset", names(rval$pdata)), 
-                        selected = "subset")
-      
-      updateSelectInput(session, "yridges_var", 
-                        choices = c("subset", names(rval$pdata)), 
-                        selected = "subset")
-      
-      updateSelectInput(session, "color_var_gate", 
-                        choices = c("subset", names(rval$pdata), rval$plot_var), 
-                        selected = "subset")
-      updateSelectInput(session, "color_var", 
-                        choices = c("subset", names(rval$pdata), rval$plot_var), 
-                        selected = "subset")
-      updateSelectInput(session, "color_var_stat", 
-                        choices = c("subset", names(rval$pdata)), 
-                        selected = "subset")
-      updateSelectInput(session, "color_var_trans", 
-                        choices = c("subset", names(rval$pdata)), 
-                        selected = "subset")
-      updateSelectInput(session, "color_var_trans", 
-                        choices = c("subset", names(rval$pdata)), 
-                        selected = "subset")
-
-    }
-  })
+  # observe( {
+  #   
+  #   rpd <- rval$pdata
+  #   
+  #   if(!is.null(rval$pdata)){
+  #     updateSelectInput(session, "facet_var", 
+  #                       choices = c("subset", names(rval$pdata)), 
+  #                       selected = "name")
+  #     updateSelectInput(session, "facet_var_stat", 
+  #                       choices = c("subset", names(rval$pdata)), 
+  #                       selected = "name")
+  #     
+  #     updateSelectInput(session, "group_var", 
+  #                       choices = c("subset", names(rval$pdata)), 
+  #                       selected = "subset")
+  #     updateSelectInput(session, "group_var_stat", 
+  #                       choices = c("subset", names(rval$pdata)), 
+  #                       selected = "subset")
+  #     
+  #     updateSelectInput(session, "yridges_var", 
+  #                       choices = c("subset", names(rval$pdata)), 
+  #                       selected = "subset")
+  #     
+  #     updateSelectInput(session, "color_var_gate", 
+  #                       choices = c("subset", names(rval$pdata), rval$plot_var), 
+  #                       selected = "subset")
+  #     updateSelectInput(session, "color_var", 
+  #                       choices = c("subset", names(rval$pdata), rval$plot_var), 
+  #                       selected = "subset")
+  #     updateSelectInput(session, "color_var_stat", 
+  #                       choices = c("subset", names(rval$pdata)), 
+  #                       selected = "subset")
+  #     updateSelectInput(session, "color_var_trans", 
+  #                       choices = c("subset", names(rval$pdata)), 
+  #                       selected = "subset")
+  #     updateSelectInput(session, "color_var_trans", 
+  #                       choices = c("subset", names(rval$pdata)), 
+  #                       selected = "subset")
+  # 
+  #   }
+  # })
 
   observeEvent(input$apply_filter_meta, {
     
@@ -1819,8 +1875,9 @@ server <- function(session, input, output) {
     observeEvent(input$compute_tsne, {
       
       validate(
-        need(rval$flow_set, "Empty flow set")
+        need(rval$flow_set, "Empty flow set") 
       )
+
       
       if( length(input$tSNE_variables_table_rows_selected)==0){
         showModal(modalDialog(
@@ -1872,10 +1929,12 @@ server <- function(session, input, output) {
                                     transformation = transformation,
                                     perplexity = input$perplexity)
       
+      if(!is.null(rval$df_tsne)){
+        rval$flow_set_tsne <- build_flowset_from_df(rval$df_tsne, fs = rval$flow_set)
+        rval$flow_set_names <- unique(c(rval$flow_set_names, "t-SNE"))
+        updateSelectInput(session, "flow_set", choices = rval$flow_set_names, selected = "t-SNE")
+      }
       
-      rval$flow_set_tsne <- build_flowset_from_df(rval$df_tsne, fs = rval$flow_set)
-      rval$flow_set_names <- unique(c(rval$flow_set_names, "t-SNE"))
-      updateSelectInput(session, "flow_set", choices = rval$flow_set_names, selected = "t-SNE")
 
     })
     
@@ -1946,9 +2005,19 @@ server <- function(session, input, output) {
       
       rval$flow_set_cluster <- build_flowset_from_df(rval$df_cluster, fs = rval$flow_set)
       
+      # delete previous cluster gates
+      
+      idx_cluster_gates <- grep("^/cluster[0-9]+", names(rval$gates_flowCore))
+      
+      if(length(idx_cluster_gates)>0){
+        rval$gates_flowCore <- rval$gates_flowCore[-idx_cluster_gates]
+      }
+      
       # create one gate per cluster
       
       uclust <- unique(rval$df_cluster$cluster)
+      uclust <- uclust[ order(as.numeric(uclust), decreasing = FALSE) ]
+      
       for(i in 1:length(uclust)){
         filterID <- paste("cluster", uclust[i], sep = "")
         polygon <- matrix(c(as.numeric(uclust[i])-0.25, 
@@ -1961,8 +2030,6 @@ server <- function(session, input, output) {
         g <- rectangleGate(.gate = polygon, filterId=filterID)
         rval$gates_flowCore[[paste("/",filterID, sep="")]] <- list(gate = g, parent = "root")
       }
-      
-      
       
       rval$flow_set_names <- unique(c(rval$flow_set_names, "cluster"))
       updateSelectInput(session, "flow_set", choices = rval$flow_set_names, selected = "cluster")
@@ -2212,8 +2279,7 @@ server <- function(session, input, output) {
   
   output$summary_cluster <- renderPrint({
     if(!is.null(rval$df_cluster)){
-      print("unique clusters :")
-      print(unique(rval$df_cluster$cluster))
+      print(paste("Number of unique clusters :", length(unique(rval$df_cluster$cluster))))
     }else{
       "No clustering performed yet"
     }
@@ -2235,6 +2301,10 @@ server <- function(session, input, output) {
   ##########################################################################################################
   # Output plots
   
+  output$flow_set_tree <- renderPlot({
+    
+  })
+  
   output$tree <- renderPlot({
     
     validate(
@@ -2252,17 +2322,15 @@ server <- function(session, input, output) {
   })
   
   output$plot_gh <- renderPlot({
+    plot_all_gates()
+  })
+  
+  plot_all_gates <- reactive({
     
     validate(
-      need(rval$gating_set, "Empty gating set")
-    )
-    
-    validate(
-      need(length(getNodes(rval$gating_set))>1, "No gates to display")
-    )
-    
-    validate(
-      need(rval$idx_ff_gate, "Please select a sample")
+      need(rval$gating_set, "Empty gating set") %then%
+        need(length(getNodes(rval$gating_set))>1, "No gates to display") %then%
+        need(rval$idx_ff_gate, "Please select a sample")
     )
     
     #cat("sample_selected : \n")
@@ -2308,11 +2376,16 @@ server <- function(session, input, output) {
     
     n <- length(p)
     
-    if(n>2){
-      g <- marrangeGrob(p, nrow = 2, ncol = n%/%2 + n%%2  , top = input$sample_selected)
-    }else{
-      g <- marrangeGrob(p, nrow = 1, ncol = n  , top = input$sample_selected)
-    }
+    ncol <- ceiling(n/input$nrow)
+    g <- marrangeGrob(p, nrow = input$nrow, ncol = ncol, top = input$sample_selected)
+    
+    # if(n>2){
+    #   ncol <- n%/%input$nrow + n%%input$nrow
+    #   ncol <- ceiling(n/input$nrow)
+    #   g <- marrangeGrob(p, nrow = input$nrow, ncol = ncol, top = input$sample_selected)
+    # }else{
+    #   g <- marrangeGrob(p, nrow = 1, ncol = n  , top = input$sample_selected)
+    # }
     
     g
     
@@ -2321,19 +2394,15 @@ server <- function(session, input, output) {
   output$plot_trans <- renderPlot({
     
     validate(
-      need(rval$gating_set, "Empty gating set")
-    )
-    
-    validate(
-      need(input$sample_selected_trans, "Please select a sample")
+      need(rval$gating_set, "Empty gating set") %then%
+        need(input$sample_selected_trans, "Please select a sample") %then%
+        need(input$gate_trans, "Please select a subset")
     )
   
-    
     idx_x <- match(input$xvar_trans, rval$parameters$name_long)
     idx_y <- match(input$yvar_trans, rval$parameters$name_long)
     xvar <- rval$parameters$name[idx_x]
     yvar <- rval$parameters$name[idx_y]
-    
     
     if(input$color_var_trans %in% rval$parameters$name_long){
       color_var <- rval$parameters$name[match(input$color_var_trans, rval$parameters$name_long)]
@@ -2382,28 +2451,37 @@ server <- function(session, input, output) {
     
   })
   
-  
   output$plot_focus <- renderPlot({
+    plot_focus()
+  })
+  
+  plot_focus <- reactive({
     
     validate(
-      need(rval$gating_set, "Empty gating set")
+      need(rval$gating_set, "Empty gating set") %then%
+        need(input$files_selection_table_rows_selected, "Please select samples") %then%
+        need(input$gate, "Please select subsets")
     )
-    
-    validate(
-      need(input$files_selection_table_rows_selected, "Please select samples")
-    )
+
     
     idx_x <- match(input$xvar, rval$parameters$name_long)
     idx_y <- match(input$yvar, rval$parameters$name_long)
     xvar <- rval$parameters$name[idx_x]
     yvar <- rval$parameters$name[idx_y]
     
-    
-    if(input$color_var %in% rval$parameters$name_long){
-      color_var <- rval$parameters$name[match(input$color_var, rval$parameters$name_long)]
-    }else{
-      color_var <- input$color_var
+    color_var <- input$color_var
+    if(!is.null(input$color_var)){
+      
+      for(i in 1:length(input$color_var)){
+        if(input$color_var[i] %in% rval$parameters$name_long){
+          color_var[i] <- rval$parameters$name[match(input$color_var[i], rval$parameters$name_long)]
+        }else{
+          color_var[i] <- input$color_var[i]
+        }
+      }
     }
+    
+    
     
     #color_var <- rval$parameters$name[match(input$color_var_gate, rval$parameters$name_long)]
     #color_var <- input$color_var
@@ -2416,48 +2494,91 @@ server <- function(session, input, output) {
       transformation <- rval$transformation
     }
     
-    p <- plot_gs(df = rval$df_tot,
-                 gs = rval$gating_set, 
-                 sample = rval$pdata$name[input$files_selection_table_rows_selected],
-                 subset = input$gate, 
-                 spill = rval$spill,
-                 xvar = xvar, 
-                 yvar = yvar, 
-                 color_var = color_var, 
-                 #gate = NULL, 
-                 type = input$plot_type, 
-                 bins = input$bin_number,
-                 alpha = input$alpha,
-                 size = input$size,
-                 norm_density = input$norm,
-                 smooth = input$smooth,
-                 ridges = input$ridges,
-                 transformation =  transformation,
-                 facet_vars = input$facet_var,
-                 group_var = input$group_var,
-                 yridges_var = input$yridges_var,
-                 show.legend = input$legend,
-                 axis_labels = axis_labels)
+    plist <- list()
     
-    if(!is.null(p)){
-      p <- p + xlab(input$xvar) 
-      if(input$plot_type != "histogram"){
-        p <- p + ylab(input$yvar)
+    split_var <- switch(input$split_variable, 
+                        "x variable" = "xvar",
+                        "y variable" = "yvar",
+                        "color variable" = "color_var"
+                        )
+    
+    for(i in 1:length(input[[split_var]])){
+      
+      color_var_int <- color_var[1]
+      xvar_int <- xvar[1]
+      yvar_int <- yvar[1]
+      
+      if(split_var == "color_var"){
+        color_var_int <- color_var[i]
+      }else if(split_var == "xvar"){
+        xvar_int <- xvar[i]
+      }else if(split_var == "yvar"){
+        yvar_int <- yvar[i]
       }
+      
+      
+      p <- plot_gs(df = rval$df_tot,
+                   gs = rval$gating_set, 
+                   sample = rval$pdata$name[input$files_selection_table_rows_selected],
+                   subset = input$gate, 
+                   spill = rval$spill,
+                   xvar = xvar_int, 
+                   yvar = yvar_int, 
+                   color_var = color_var_int, 
+                   #gate = NULL, 
+                   type = input$plot_type, 
+                   bins = input$bin_number,
+                   alpha = input$alpha,
+                   size = input$size,
+                   norm_density = input$norm,
+                   smooth = input$smooth,
+                   ridges = input$ridges,
+                   transformation =  transformation,
+                   facet_vars = input$facet_var,
+                   group_var = input$group_var,
+                   yridges_var = input$yridges_var,
+                   show.legend = input$legend,
+                   axis_labels = axis_labels,
+                   legend.position = input$legend_pos)
+      
+      if(!is.null(p)){
+        p <- p + xlab(input$xvar) 
+        if(input$plot_type != "histogram"){
+          p <- p + ylab(input$yvar)
+        }
+      }
+      
+      plist[[i]] <- p
+      
     }
-    p
+    
+    
+    n <- length(plist)
+    
+    nrow <- min(n, input$nrow_split)
+    ncol <- ceiling(n/nrow)
+    g <- marrangeGrob(plist, nrow = nrow, ncol = ncol, top = "")
+    
+    # if(input$split_direction == "horizontal"){
+    #   g <- marrangeGrob(plist, nrow = n, ncol = 1)
+    # }else{
+    #   g <- marrangeGrob(plist, nrow = 1, ncol = n)
+    # }
+    
+    g
     
   })
 
-
-  output$plotGate2 <- renderPlot({
+  output$plotGate <- renderPlot({
+    plotGate()
+  })
+  
+  plotGate <- reactive({
     
     validate(
-      need(rval$gating_set, "Empty gating set")
-    )
-    
-    validate(
-      need(rval$idx_ff_gate, "Please select a sample")
+      need(rval$gating_set, "Empty gating set") %then%
+        need(rval$idx_ff_gate, "Please select a sample") %then%
+        need(rval$gate_focus, "Please select a subset")
     )
     
     #print(input$xvar_gate)
@@ -2531,11 +2652,9 @@ server <- function(session, input, output) {
   output$plot_stat <- renderPlot({
     
     validate(
-      need(rval$gating_set, "Empty gating set")
-    )
-    
-    validate(
-      need(input$samples_stat_rows_selected, "Please select a sample")
+      need(rval$gating_set, "Empty gating set") %then%
+        need(input$samples_stat_rows_selected, "Please select a sample") %then%
+        need(input$gate_stat, "Please select subsets")
     )
     
     idx_y <- match(input$yvar_stat, rval$parameters$name_long)
@@ -2583,11 +2702,10 @@ server <- function(session, input, output) {
   output$plot_comp <- renderPlot({
     
     validate(
-      need(rval$gating_set, "Empty gating set")
-    )
-    
-    validate(
-      need(input$sample_selected_comp, "Please select a sample")
+      need(rval$gating_set, "Empty gating set") %then%
+        need(input$sample_selected_comp, "Please select a sample") %then%
+        need(input$gate_comp, "Please select a subset")
+      
     )
     
     
@@ -2672,6 +2790,27 @@ server <- function(session, input, output) {
     p
   })
  
+  ##########################################################################################################
+  #Output Download functions
+  
+  output$download_plot <- downloadHandler(
+    filename = "plot.pdf",
+    content = function(file) {
+      pdf(file, width = input$width_plot, height = input$height_plot)
+      print(plot_focus())
+      dev.off()
+    }
+  )
+  
+  output$download_plot_gh <- downloadHandler(
+    filename = paste("gates_", input$sample_selected, ".pdf", sep = ""),
+    content = function(file) {
+      pdf(file, width = input$width_plot_gh, height = input$height_plot_gh)
+      print(plot_all_gates())
+      dev.off()
+    }
+  )
+  
 }
   
 shinyApp(ui, server)
