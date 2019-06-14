@@ -11,6 +11,95 @@ library(Rphenograph)
 library(Rtsne)
 #BiocManager::install("Biobase")
 library("Biobase")
+library(xml2)
+
+####################################################################################################
+# Parse workspace
+
+parseSampleNodes <- function(x){
+  name <- xml_text(xml_find_all(x, ".//@name"))[1]
+  sampleID <- xml_integer(xml_find_all(x, ".//@sampleID"))[1]
+  return(list("name" = name, "sampleID" = sampleID))
+}
+
+parseGroupNodes <- function(x){
+  name <- xml_text(xml_find_all(x, ".//@name"))[1]
+  sampleID <- xml_integer(xml_find_all(xml_find_all(x, ".//SampleRefs"), ".//@sampleID"))
+  return(list("name" = name, "sampleID" = sampleID))
+}
+
+parseGate <- function(x){
+  res <- list()
+  
+  name <- xml_text( xml_find_all(xml_parent(x), ".//@name")[1] )
+  
+  if( xml_name( xml_parent(xml_parent(xml_parent(x))) ) == "Population"){
+    parent <- xml_text(xml_find_all( xml_parent(xml_parent(xml_parent(x))), ".//@name")[1])
+  }else{
+    parent <- "root"
+  }
+  
+  # find all parent gates recursively
+  all_parents <- find_all_parent_gates(x)
+  
+  if(length(all_parents)>0){
+    parent_long <- paste("/",paste(all_parents, collapse = "/"), sep = "")
+  }else{
+    parent_long <- "root"
+  }
+  
+  name_long <- paste("/",paste(c(all_parents, name), collapse = "/"), sep = "")
+
+
+  
+  
+  type <- xml_name(xml_child(x))
+  dim <- xml_text(xml_find_all(xml_find_all(x, ".//gating:dimension"), ".//@data-type:name"))
+  res <- c(res, list("name" = name, 
+                     "parent" =  parent, 
+                     "name_long" = name_long, 
+                     "parent_long" = parent_long, 
+                     "type" = type, 
+                     "dim" = dim))
+  
+  if(type == "RectangleGate"){
+    min <- xml_double(xml_find_all(x, ".//@gating:min"))
+    max <- xml_double(xml_find_all(x, ".//@gating:max"))
+    m <- rbind(min, max)
+    colnames(m) <- dim
+    res <- c(res, list("boundaries" = m))
+  }
+  if(type == "PolygonGate" ){
+    vertexes <- xml_double(xml_find_all(xml_find_all(x, ".//gating:vertex"), ".//@data-type:value"))
+    polygon <- matrix(vertexes, nrow = 2)
+    polygon <- t(polygon)
+    colnames(polygon) <- res[["dim"]]
+    res <- c(res, list("polygon" = polygon))
+  }
+  return(res)
+}
+
+# find all parent gates recursively
+find_all_parent_gates <- function(x){
+  all_parents <- NULL
+  y <- x
+  while(xml_name( xml_parent(xml_parent(xml_parent(y))) ) == "Population"){
+    all_parents <- c(xml_text(xml_find_all( xml_parent(xml_parent(xml_parent(y))), ".//@name")[1]), all_parents)
+    y <- xml_parent(xml_parent(xml_parent(y)))
+    idx_gate <- which( xml_name( xml_children(y) ) == "Gate")
+    if(length(idx_gate)>0){
+      y <- xml_children(y)[[idx_gate]]
+    }else{
+      break
+    }
+    
+  }
+  return(all_parents)
+}
+
+
+####################################################################################################
+# Transformations
 
 flowJo_biexp_inverse_trans <- function (..., n = 6, equal.space = FALSE){
   trans <- flowJoTrans(..., inverse = TRUE)
@@ -34,6 +123,8 @@ asinh_trans <- function (..., n = 6, equal.space = FALSE){
              n = n, equal.space = equal.space)
 }
 
+####################################################################################################
+# Gating
 
 ellipse_path <- function(cov, mean, n = 100){
   
@@ -73,6 +164,64 @@ get_gates_from_gs <- function(gs){
   
   #print(gates)
   return(gates)
+  
+}
+
+get_gates_from_ws <- function(ws_path, group = NULL){
+  
+  ws <- read_xml(ws_path)
+  
+  # get Groups info
+  GroupNodes <- xml_find_all(ws, "//GroupNode")
+  group_info <-  lapply(GroupNodes, parseGroupNodes)
+  group_info <- data.frame( do.call(rbind, group_info ) )
+  print(group_info)
+  
+  # get Samples info
+  SampleNodes <- xml_find_all(ws, "//SampleNode")
+  sample_info <- lapply(SampleNodes , parseSampleNodes)
+  sample_info <- data.frame( do.call(rbind, sample_info ) )
+  print(sample_info)
+  
+  if(is.null(group)){
+    group_selected <- group_info$name[1]
+  }else{
+    group_selected <- group
+  }
+  
+  # get Gates for first sample in group
+  sampleID <- group_info$sampleID[[which(group_info$name == group_selected)]][1]
+  if(length(sampleID) > 0){
+    SampleNode <- SampleNodes[ which( sample_info$sampleID == sampleID) ]
+  }else{
+    stop("Could not find sample in group")
+  }
+  
+  #print(SampleNode)
+  gates <- lapply(xml_find_all(SampleNode, ".//Gate"), parseGate)
+  
+  #print(gates)
+  
+  gate_list <- list()
+  
+  for(i in 1:length(gates)){
+    parent <- gates[[i]]$parent_long
+    name <- gates[[i]]$name_long
+    name_long <- gates[[i]]$name_long
+    if(gates[[i]]$type == "RectangleGate"){
+      boundaries <- gates[[i]]$boundaries
+      g <- rectangleGate(.gate = boundaries, filterId = basename(name))
+    }else if(gates[[i]]$type == "PolygonGate"){
+      polygon <- gates[[i]]$polygon
+      g <- polygonGate(.gate = polygon, filterId = basename(name) )
+    }else{
+      warning(paste("gate type", gates[[i]]$type ,"not supported"))
+      g <- NULL
+    }
+    gate_list[[name_long]] <- list(gate = g, parent = parent)
+    
+  } 
+  return(gate_list)
   
 }
 
@@ -228,6 +377,10 @@ transform_gates <- function(gates,
   
 }
 
+
+####################################################################################################
+# Getting data
+
 get_data_gs <- function(gs,
                         sample,
                         subset,
@@ -290,7 +443,12 @@ get_data_gs <- function(gs,
   df_tot[["subset"]] <- factor(df_tot[["subset"]], levels = subset)
   df_tot[["name"]] <- factor(df_tot[["name"]], levels = pData(gs)$name[idx])
   
-  return(df_tot)
+  if(length(df_tot[["name"]]) > 0){
+    return(df_tot)
+  }else{
+    return(NULL)
+  }
+  
   
 }
 
@@ -321,6 +479,10 @@ add_columns_from_metadata <- function(df,
   
   return(df)
 }
+
+
+####################################################################################################
+# Plotting
 
 plot_gs <- function(df = NULL,
                     gs = NULL, 
@@ -476,6 +638,16 @@ plot_gs <- function(df = NULL,
     ylim <- data_range[[yvar]]
   }
   
+  if(!is.null(color_var)){
+    if(color_var == "cluster"){
+      df[["cluster"]] <- as.factor(df[["cluster"]])
+    }
+  }
+  
+  if(is.null(color_var)){
+    color_var <- group_var
+  }
+  
   ##################################################################################
   # plot density hexagonal
   if(type == "hexagonal"){
@@ -510,10 +682,12 @@ plot_gs <- function(df = NULL,
       stat_var <- "stat(density)"
     }
     
+    
+    
     if(smooth){
       if(ridges){
-        p <- p + geom_density_ridges(mapping = aes_string(fill = group_var, 
-                                                          color = group_var, 
+        p <- p + geom_density_ridges(mapping = aes_string(fill = color_var, 
+                                                          color = color_var, 
                                                           y = yridges_var, 
                                                           height = stat_var), 
                                      alpha = alpha, 
@@ -523,7 +697,7 @@ plot_gs <- function(df = NULL,
                                      stat = "density",
                                      show.legend = show.legend)
       }else{
-        p <- p + geom_density(mapping = aes_string(fill = group_var, color = group_var, y = stat_var), 
+        p <- p + geom_density(mapping = aes_string(fill = color_var, color = color_var, y = stat_var), 
                               alpha = alpha, 
                               #bw = dist(transformation[[xvar]]$transform( range(df[[xvar]]) / bins ))[1], 
                               #bw = dist(range(df[[xvar]])/bins)[1], 
@@ -531,7 +705,7 @@ plot_gs <- function(df = NULL,
                               show.legend = show.legend)
       }
     }else{
-      p <- p + geom_histogram(mapping = aes_string(fill = group_var, color = group_var, y = stat_var), 
+      p <- p + geom_histogram(mapping = aes_string(fill = color_var, color = color_var, y = stat_var), 
                               alpha = alpha,  
                               bins = bins, 
                               position = "identity", 
@@ -545,16 +719,7 @@ plot_gs <- function(df = NULL,
   # plot dots
   
   if(type %in% c("dots", "contour")){
-    
-    if(!is.null(color_var)){
-      if(color_var == "cluster"){
-        df[["cluster"]] <- as.factor(df[["cluster"]])
-      }
-    }
-    
-    print(group_var)
-    print(names(df))
-    
+
     p <- ggplot(df,
                 aes_string(x = as.name( xvar ), 
                      y = as.name( yvar )))
@@ -577,7 +742,7 @@ plot_gs <- function(df = NULL,
           }
         
       }else{
-        p <- p + geom_point(mapping = aes_string(colour = group_var), 
+        p <- p + geom_point(mapping = aes_string(colour = color_var), 
                             alpha = alpha, 
                             size = size, 
                             show.legend = show.legend)
@@ -586,7 +751,7 @@ plot_gs <- function(df = NULL,
 
     
     if(type == "contour"){
-      p <- p + geom_density_2d(mapping = aes_string(color = group_var), 
+      p <- p + geom_density_2d(mapping = aes_string(color = color_var), 
                               alpha = alpha, 
                               size =size, 
                               n = bins, 
@@ -716,11 +881,23 @@ plot_gs <- function(df = NULL,
     ylim[1] <- min_value
   }
   
+  
   if(!is.null(facet_vars)){
-    p <- p + facet_wrap(facets = sapply(facet_vars, as.name), labeller = label_both)
+    formula_facet <- as.formula(paste(" ~", paste(facet_vars, collapse = " + ")))
+    p <- p + facet_grid(formula_facet,
+                        labeller = label_both, 
+                        #scales = scale_y,
+                        scales = "free")
   }else{
     p <- p + facet_null()
   }
+  
+
+  # if(!is.null(facet_vars)){
+  #   p <- p + facet_wrap(facets = sapply(facet_vars, as.name), labeller = label_both)
+  # }else{
+  #   p <- p + facet_null()
+  # }
   
   labx <- ifelse(is.null(axis_labels), xvar, axis_labels[[xvar]])
   p <- p + scale_x_continuous(name = labx, trans = transformation[[xvar]], limits = xlim) 
@@ -839,7 +1016,8 @@ plot_stat <- function(df = NULL,
                       expand_factor = 0.2,
                       stat_function = "mean",
                       show.legend = TRUE,
-                      y_trans = NULL
+                      y_trans = NULL,
+                      strip.text.y.angle = 0
                     
 ){
   
@@ -1006,6 +1184,7 @@ plot_stat <- function(df = NULL,
       }
     }
     
+   
     p <- p + coord_cartesian(ylim = ylim, expand = free_y_scale)
     
     
@@ -1021,10 +1200,12 @@ plot_stat <- function(df = NULL,
   }
   
   #if(!is.null(formula_facet)){
-    p <- p + facet_grid(formula_facet,
-                        labeller = label_both, 
-                        #scales = scale_y,
-                        scales = "free")
+  
+  p <- p + facet_grid(formula_facet,
+                      labeller = label_both, 
+                      #scales = scale_y,
+                      scales = "free")
+
   #}
   
   
@@ -1033,7 +1214,7 @@ plot_stat <- function(df = NULL,
   
   
   p <- p + theme( axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5), 
-                  strip.text.y = element_text(angle = 0)
+                  strip.text.y = element_text(angle = strip.text.y.angle)
                   )
     
   trans_name_plot <- trans_name
@@ -1046,6 +1227,10 @@ plot_stat <- function(df = NULL,
   p
   
 }
+
+
+####################################################################################################
+# Dimensionality Reduction 
 
 dim_reduction <- function(df,
                           yvar,
@@ -1117,60 +1302,11 @@ dim_reduction <- function(df,
 }
 
 
-build_flowset_from_df <- function(df,
-                                  fs = NULL,
-                                  chanel_col = setdiff(names(df), c("name", "subset")), 
-                                  sample_col = "name"){
-  
-  samples <- unique(df[[sample_col]])
-  ff_list <- list()
-  
-  for(sample in samples){
-    
-    df_sample <- df[ df[[sample_col]] == sample , chanel_col]
-    M <- as.matrix(df_sample)
-    
-    par <- NULL
-    desc <- NULL
-    
-    if(!is.null(fs)){
-      
-      idx <- match(sample, pData(fs)$name)
-      
-      if(!is.na(idx)){
-        
-        par <- parameters(fs[[idx]])
-        desc <- description(fs[[idx]])
-        new_par <- setdiff(chanel_col, par@data$name)
-        npar <- length(par@data$name)
-        
-        for(param in new_par){
-          npar <- npar +1
-          rg <- range(df_sample[[param]])
-          par@data <- rbind(par@data, c(param, NA, diff(rg), rg[1], rg[2]))
-          rownames(par@data)[npar] <- paste("$P",npar, sep = "")
-          desc[[paste("$P",npar,"DISPLAY",sep="")]] <- NA
-        }
-        
-        desc[["$TOT"]] <- dim(df_sample)[1]
-      }
-    }
-    
-    if(!is.null(par) & !is.null(desc)){
-      ff_list[[sample]] <- flowFrame(exprs = M,
-                                     parameters = par, 
-                                     description = desc)
-    }else{
-      ff_list[[sample]] <- flowFrame(exprs = M)
-    }
-    
-  }
-  
-  fs_new <- flowSet(ff_list)
-
-}
 
 
+
+####################################################################################################
+# Clustering
 
 get_cluster <- function(df,
                         yvar,
@@ -1214,5 +1350,75 @@ get_cluster <- function(df,
   df_filter$cluster <- DC$cluster
   
   return(df_filter)
+  
+}
+
+
+####################################################################################################
+# Build FlowSet
+
+build_flowset_from_df <- function(df,
+                                  fs = NULL,
+                                  chanel_col = setdiff(names(df), c("name", "subset")), 
+                                  sample_col = "name"){
+  
+  samples <- unique(df[[sample_col]])
+  ff_list <- list()
+  
+  for(sample in samples){
+    
+    idx_cells <- which(df[[sample_col]] == sample)
+    ncells <- length(idx_cells)
+    if(ncells >0){
+      df_sample <- df[ idx_cells , chanel_col]
+      
+      
+      M <- as.matrix(df_sample)
+      
+      par <- NULL
+      desc <- NULL
+      
+      if(!is.null(fs)){
+        
+        idx <- match(sample, pData(fs)$name)
+        
+        if(!is.na(idx)){
+          
+          par <- parameters(fs[[idx]])
+          desc <- description(fs[[idx]])
+          new_par <- setdiff(chanel_col, par@data$name)
+          npar <- length(par@data$name)
+          
+          for(param in new_par){
+            npar <- npar +1
+            rg <- range(df_sample[[param]])
+            par@data <- rbind(par@data, c(param, NA, diff(rg), rg[1], rg[2]))
+            rownames(par@data)[npar] <- paste("$P",npar, sep = "")
+            desc[[paste("$P",npar,"DISPLAY",sep="")]] <- NA
+          }
+          
+          desc[["$TOT"]] <- dim(df_sample)[1]
+        }
+      }
+      
+      if(!is.null(par) & !is.null(desc)){
+        ff_list[[sample]] <- flowFrame(exprs = M,
+                                       parameters = par, 
+                                       description = desc)
+      }else{
+        ff_list[[sample]] <- flowFrame(exprs = M)
+      }
+      
+    }
+
+  }
+  
+  if(length(ff_list)>0){
+    fs_new <- flowSet(ff_list)
+  }else{
+    fs_new <- NULL
+  }
+  
+  return(fs_new)
   
 }

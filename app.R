@@ -1,9 +1,10 @@
 #BiocManager::install("flowCore")
 #BiocManager::install("flowViz")
 library(openCyto)
+library(ggcyto)
 library(CytoML)
 #library(flowWorkspace)
-library(ggcyto)
+
 library(ggridges)
 library(gridExtra)
 
@@ -69,7 +70,12 @@ body <- dashboardBody(
                          fileInput(inputId = "files", 
                                    label = "Choose files", 
                                    multiple = TRUE)
+                     ),
+                     box(title = "Options",
+                         width = NULL, height = NULL,
+                         checkboxInput("apply_biexp_inverse", "apply inverse biexponential on gate coordinates")
                      )
+                     
               ),
               column(width = 6,
                      box(title = "Input files",
@@ -94,6 +100,15 @@ body <- dashboardBody(
                               tabPanel(title = "Table",
                                        div(style = 'overflow-x: scroll', DT::dataTableOutput("pData"))      
                               ),
+                              tabPanel(title = "Filter",
+                                       "Filter samples based on metadata",
+                                       uiOutput("filter_meta")
+                              )
+                       )
+                ),
+                column(width = 6,
+                       tabBox(title = "Import",
+                              width = NULL, height = NULL,
                               tabPanel(title = "Keywords",
                                        selectizeInput("keyword", "select keywords", 
                                                       choices = NULL, 
@@ -102,19 +117,15 @@ body <- dashboardBody(
                                        actionButton("append_keywords", label = "Add keywords"),
                                        br()   
                               ),
-                              tabPanel(title = "Import",
+                              tabPanel(title = "Load",
                                        fileInput("file_meta", "load metadata file", multiple = FALSE),
-                                       selectInput("sep_meta", "column separator", choices = c("comma", "semi-column", "tab"), selected = "tab"),
+                                       selectInput("sep_meta", "column separator", choices = c("comma", "semi-column", "tab", "space"), selected = "tab"),
                                        div(style = 'overflow-x: scroll', DT::dataTableOutput("meta")),
                                        br(),
                                        actionButton("append_meta", label = "Add metadata"),
                                        actionButton("reset_meta", label = "Reset"),
                                        br()
                                        
-                              ),
-                              tabPanel(title = "Filter",
-                                       "Filter samples based on metadata",
-                                       uiOutput("filter_meta")
                               )
                        )
                 )
@@ -211,12 +222,17 @@ body <- dashboardBody(
             fluidRow(
               
               column(width = 6,
-                     tabBox(title = "Comp",
+                     tabBox(title = "",
                             width = NULL, height = NULL,
                             tabPanel(title = "Table",
-                                     div(style = 'overflow-x: scroll', DT::dataTableOutput("spill_table")),
+                                     actionButton("reset_comp", "reset"),
+                                     downloadButton("download_spill"),
                                      br(),
-                                     actionButton("reset_comp", "reset")
+                                     br(),
+                                     div(style = 'overflow-x: scroll', DT::dataTableOutput("spill_table")),
+                                     br()
+                                     
+                                       
                             ),
                             tabPanel(title = "Heatmap",
                                      plotlyOutput("heatmap_spill")
@@ -232,7 +248,59 @@ body <- dashboardBody(
                                                   step = 0.01),
                                      numericInput("step_size", label = "step size", value = 0.01),
                                      actionButton("set_spill_value", "set value")
+                                     
                             )
+                            # tabPanel("Save",
+                            #          width = NULL, height = NULL,
+                            #          "Save spillover matrix in .txt format :",
+                            #          br(),
+                            #          br(),
+                            #          downloadButton("download_spill")
+                            # ),
+                            # tabPanel("Import",
+                            #          width = NULL, height = NULL,
+                            #          fileInput(inputId = "spill_file", 
+                            #                    label = "Choose spillover matrix file", 
+                            #                    multiple = FALSE),
+                            #          selectInput("sep_spill", "column separator", choices = c("comma", "semi-column", "tab", "space"), selected = "tab"),
+                            #          div(style = 'overflow-x: scroll', DT::dataTableOutput("spill_imported")),
+                            #          br(),
+                            #          actionButton("set_spillover_matrix", "Set spillover matrix")
+                            # ),
+                            # tabPanel("Compute",
+                            #          width = NULL, height = NULL,
+                            #          uiOutput("ui_compute_spill"),
+                            #          actionButton("add_spill_param", "Add parameter"),
+                            #          br(),
+                            #          br(),
+                            #          selectizeInput("spill_params", "Spillover parameters", choices = NULL, selected = NULL, multiple = TRUE),
+                            #          actionButton("compute_spillover_matrix", "Compute spillover matrix")
+                            #          
+                            # )
+                     ),
+                     tabBox(title = "",
+                            width = NULL, height = NULL,
+                            tabPanel("Import",
+                                     width = NULL, height = NULL,
+                                     fileInput(inputId = "spill_file", 
+                                               label = "Choose spillover matrix file", 
+                                               multiple = FALSE),
+                                     selectInput("sep_spill", "column separator", choices = c("comma", "semi-column", "tab", "space"), selected = "tab"),
+                                     div(style = 'overflow-x: scroll', DT::dataTableOutput("spill_imported")),
+                                     br(),
+                                     actionButton("set_spillover_matrix", "Set spillover matrix")
+                            ),
+                            tabPanel("Compute",
+                                     width = NULL, height = NULL,
+                                     uiOutput("ui_compute_spill"),
+                                     actionButton("add_spill_param", "Add parameter"),
+                                     br(),
+                                     br(),
+                                     selectizeInput("spill_params", "Spillover parameters", choices = NULL, selected = NULL, multiple = TRUE),
+                                     actionButton("compute_spillover_matrix", "Compute spillover matrix")
+                                     
+                            )
+                       
                      )
               ),
               column(width = 6,
@@ -366,7 +434,7 @@ body <- dashboardBody(
     tabItem(tabName = "Plot_tab",
             fluidRow(
               column(width = 4,
-                     tabBox(title = "Select",
+                     tabBox(title = "",
                             width = NULL, height = NULL,
                             tabPanel("Samples",
                                      div(style = 'overflow-x: scroll', DT::dataTableOutput("files_selection_table"))
@@ -409,8 +477,11 @@ body <- dashboardBody(
                      tabBox(title = "Plot",
                             width = NULL, height = NULL,
                             tabPanel("Plot",
-                                     plotOutput("plot_focus")
-                                     
+                                     actionButton("update_plot", "update"),
+                                     br(),
+                                     uiOutput("ui_plot")
+                                     #plotOutput("plot_focus", height = input$nrow_split * 300)
+
                             ),
                             tabPanel("Options",
                                      selectInput("plot_type", label = "plot type",
@@ -424,7 +495,7 @@ body <- dashboardBody(
                                                     multiple =TRUE,
                                                     label = "facet variables", 
                                                     choices = "name", 
-                                                    selected = NULL),
+                                                    selected = "name"),
                                      selectizeInput("group_var", 
                                                     multiple =FALSE,
                                                     label = "group variable", 
@@ -440,16 +511,17 @@ body <- dashboardBody(
                                                  selected = "right"),
                                      numericInput("bin_number", label = "number of bins", value = 50),
                                      numericInput("alpha", label = "alpha", value = 0.5),
-                                     numericInput("size", label = "size", value = 1)
-                                     
+                                     numericInput("size", label = "size", value = 1),
+                                     numericInput("row_size", label = "row size (px)", value = 400)
                             ),
                             tabPanel("Save",
                                      numericInput("width_plot", label = "width", value = 5),
                                      numericInput("height_plot", label = "height", value = 5),
                                      downloadButton("download_plot", "Save plot")
                             )
-                                     
+                            
                      )
+                    
               )
               
           )
@@ -457,7 +529,7 @@ body <- dashboardBody(
     tabItem(tabName = "Stat_tab",
             fluidRow(
               column(width = 4,
-                     tabBox(title = "Select",
+                     tabBox(title = "",
                             width = NULL, height = NULL,
                             tabPanel("Samples",
                                      div(style = 'overflow-x: scroll', DT::dataTableOutput("samples_stat"))
@@ -482,7 +554,9 @@ body <- dashboardBody(
                      tabBox(title = "Plot",
                             width = NULL, height = NULL,
                             tabPanel("Plot",
-                                     plotOutput("plot_stat")
+                                     actionButton("update_plot_stat", "update"),
+                                     br(),
+                                     uiOutput("ui_plot_stat")
                                      
                             ),
                             tabPanel("Options",
@@ -490,7 +564,7 @@ body <- dashboardBody(
                                                  choices = c("bar", "tile"),
                                                  selected = "bar"),
                                      checkboxInput("legend_stat", "show legend", value = TRUE),
-                                     checkboxInput("free_y_scale", "free y scale", value = FALSE),
+                                     checkboxInput("free_y_scale", "free y scale", value = TRUE),
                                      checkboxInput("scale_values", "scale values by row", value = FALSE),
                                      numericInput("max_scale", label = "scale limit", value = 2),
                                      numericInput("expand_factor", label = "expand factor", value = 0.1),
@@ -514,7 +588,14 @@ body <- dashboardBody(
                                                     selected = "subset"),
                                      selectInput("color_var_stat", "color variable",
                                                  choices = "none",
-                                                 selected = "none")
+                                                 selected = "none"),
+                                     numericInput("row_size_stat", label = "row size (px)", value = 150),
+                                     numericInput("strip_text_angle", label = "strip text angle", value = 0)
+                            ),
+                            tabPanel("Save",
+                                     numericInput("width_plot_stat", label = "width", value = 5),
+                                     numericInput("height_plot_stat", label = "height", value = 5),
+                                     downloadButton("download_plot_stat", "Save plot")
                             )
                      )
               )
@@ -525,7 +606,7 @@ body <- dashboardBody(
     tabItem(tabName = "Sub_tab",
             fluidRow(
               column(width = 6,
-                     tabBox(title = "Sub-sample",
+                     tabBox(title = "",
                             width = NULL, height = NULL,
                             tabPanel("Samples",
                                      div(style = 'overflow-x: scroll', DT::dataTableOutput("sub_sample_table"))
@@ -559,7 +640,7 @@ body <- dashboardBody(
     tabItem(tabName = "TSNE_tab",
             fluidRow(
               column(width = 6,
-                     tabBox(title = "tSNE",
+                     tabBox(title = "",
                             width = NULL, height = NULL,
                             tabPanel("Variables",
                                      div(style = 'overflow-x: scroll', DT::dataTableOutput("tSNE_variables_table"))
@@ -592,7 +673,7 @@ body <- dashboardBody(
     tabItem(tabName = "Cluster_tab",
             fluidRow(
               column(width = 6,
-                     tabBox(title = "Cluster",
+                     tabBox(title = "",
                             width = NULL, height = NULL,
                             tabPanel("Variables",
                                      div(style = 'overflow-x: scroll', DT::dataTableOutput("clustering_variables_table"))
@@ -602,8 +683,8 @@ body <- dashboardBody(
                                                  label = "Transform variables:",
                                                  choices = c("log10", "asinh", "identity", "default"),
                                                  selected = "default"),
-                                     numericInput("cluster_dc", "dc", 3),
-                                     numericInput("cluster_alpha", "alpha", 0.001)
+                                     numericInput("cluster_dc", "dc", 5),
+                                     numericInput("cluster_alpha", "alpha", 0.0001)
                             ),
                             tabPanel("Cluster",
                                      actionButton("start_clustering", "Find clusters"),
@@ -612,6 +693,22 @@ body <- dashboardBody(
                                      "Summary",
                                      br(),
                                      verbatimTextOutput("summary_cluster")
+                            )
+                     )
+              )
+            )
+    ),
+    tabItem(tabName = "Save_tab",
+            fluidRow(
+              column(width = 6,
+                     tabBox(title = "",
+                            width = NULL, height = NULL,
+                            tabPanel("Gating set",
+                                     selectInput("export_format",
+                                                 label = "format",
+                                                 choices = c("Cytobank", "FlowJo"),
+                                                 selected = "FlowJo"),
+                                     downloadButton("export_gating_set", "Export")
                             )
                      )
               )
@@ -675,6 +772,11 @@ sidebar <- dashboardSidebar(
                        startExpanded = FALSE,
                        icon = icon("check-circle")
               ),
+              menuItem("Save",
+                       tabName = "Save_tab", 
+                       startExpanded = FALSE,
+                       icon = icon("check-circle")
+              ),
               menuItem("General controls",
                       tabName = "General_tab",
                       startExpanded = TRUE,
@@ -690,7 +792,7 @@ sidebar <- dashboardSidebar(
 )
 
 ui <- dashboardPage(
-  dashboardHeader(title = "flowShine"),
+  dashboardHeader(title = "flowR"),
   sidebar,
   body
 )
@@ -734,9 +836,13 @@ server <- function(session, input, output) {
                          df_cluster = NULL,
                          df_spill_original = NULL,
                          df_spill = NULL,
+                         df_spill_imported = NULL,
                          spill = NULL,
                          Ncells_tot = 0,
-                         flow_set_names = NULL
+                         flow_set_names = NULL,
+                         pos_values = list(),
+                         neg_values = list(),
+                         time_step = 1
                          )
   
   gate <- reactiveValues(x = NULL, y = NULL)
@@ -821,17 +927,21 @@ server <- function(session, input, output) {
         
           fs <- getData(gs)
           
-          
-          
           ###################################################################################
           #get gates and transfrom gates
           
           gates <- get_gates_from_gs(gs)
+          if(file_ext(rval$df_files$datapath[input$files_table_rows_selected[1]]) %in% c("wsp")){
+            gates <- get_gates_from_ws(ws_path = rval$df_files$datapath[input$files_table_rows_selected[1]], 
+                                       group = input$groups)
+          }
+          
+          print(gates)
           
           ff <- fs[[1]]
           
           # time_step is needed to transform gates containing the parameter "Time"
-          time_step <- as.numeric(description(ff)[["$TIMESTEP"]])
+          rval$time_step <- as.numeric(description(ff)[["$TIMESTEP"]])
           
           # Parameters with a DISPLAY = LOG have been transformed with flowJo_biexp_trans().
           # We need to apply the inverse transfrom for such parameters
@@ -847,9 +957,15 @@ server <- function(session, input, output) {
           }))
           names(display) <- NULL
           
+          if(input$apply_biexp_inverse){
+            trans.log <- flowJo_biexp_inverse_trans()
+          }else{
+            trans.log <- identity_trans()
+          }
+          
           myTrans <- lapply(display, function(x){
             switch(x,
-                   "LOG" = flowJo_biexp_inverse_trans(),
+                   "LOG" = trans.log,
                    identity_trans())
           })
           
@@ -870,10 +986,10 @@ server <- function(session, input, output) {
           names(myTrans) <- params
           
           rval$gates_flowCore <- transform_gates(gates = gates, 
-                                                 pattern = pattern, 
+                                                 pattern = pattern,
                                                  replacement = replacement,
                                                  transformation = myTrans, 
-                                                 time_step = time_step)
+                                                 time_step = rval$time_step)
           
           ###################################################################################
           #match fcs file names and import non-compensated, non-transfromed data
@@ -897,9 +1013,11 @@ server <- function(session, input, output) {
       fs <- rval$flow_set 
       rval$flow_set_imported <- fs
       
-      m <- diag( length(parameters(fs[[1]])$name) )
-      colnames(m) <- parameters(fs[[1]])$name
-      rval$df_spill <- as.data.frame(m)
+      # m <- diag( length(parameters(fs[[1]])$name) )
+      # colnames(m) <- parameters(fs[[1]])$name
+      # rval$df_spill <- as.data.frame(m)
+      
+      rval$df_spill <- NULL
       
       for(i in 1:length(fs)){
         if("SPILL" %in% names(description(fs[[i]]))){
@@ -907,13 +1025,12 @@ server <- function(session, input, output) {
           is_identity <- sum(apply(X=df, MARGIN = 1, FUN = function(x){sum(x==0) == (length(x)-1)})) == dim(df)[1]
           if(!is_identity){
             rval$df_spill <- df
+            row.names(rval$df_spill) <- colnames(rval$df_spill)
             break
           }
         }
       }
-      
-      
-      row.names(rval$df_spill) <- colnames(rval$df_spill)
+
       rval$df_spill_original <- rval$df_spill
 
       rval$flow_set_names <- unique(c(rval$flow_set_names, "imported"))
@@ -995,7 +1112,7 @@ server <- function(session, input, output) {
     updateSelectInput(session, "gate_trans", choices = gate_names, selected = "root")
     updateSelectInput(session, "gate_comp", choices = gate_names, selected = "root")
     updateSelectInput(session, "gate_to_delete", choices = setdiff(gate_names,"root"))
-    updateSelectInput(session, "gate_sub_sample", choices = gate_names, selected = gate_names)
+    updateSelectInput(session, "gate_sub_sample", choices = gate_names, selected = "root")
     
   })
   
@@ -1088,11 +1205,6 @@ server <- function(session, input, output) {
         # updateSelectInput(session, "color_var", choices = c("none", rval$plot_var), selected = "none")
         # updateSelectInput(session, "color_var_trans", choices = c("none", rval$plot_var), selected = "none")
         # updateSelectInput(session, "color_var_comp", choices = c("none", rval$plot_var), selected = "none")
-        
-        comp_params <- rval$parameters$name_long[match(colnames(rval$df_spill), rval$parameters$name)]
-        names(comp_params) <- NULL
-        updateSelectInput(session, "xvar_comp", choices = comp_params, selected = comp_params[1])
-        updateSelectInput(session, "yvar_comp", choices = comp_params, selected = comp_params[2])
         
         
       }
@@ -1210,6 +1322,106 @@ server <- function(session, input, output) {
   
   ##########################################################################################################
   # Observe functions for compensation
+  
+  observeEvent(input$add_spill_param, {
+    
+    validate(
+      need(rval$gating_set, "No gating set available")
+    )
+    
+    
+    df_pos <- get_data_gs(gs = rval$gating_set,
+                          sample = input$sample_pos,
+                          subset = input$gate_pos,
+                          spill = NULL)
+    df_pos <- df_pos[names(df_pos) %in% rval$flow_set@colnames]
+    pos_values <- apply(df_pos, MARGIN = 2, FUN = median,  na.rm = TRUE)
+    pos_values <- pos_values[rval$flow_set@colnames]
+    names(pos_values) <- rval$flow_set@colnames
+    rval$pos_values[[input$fluo]] <- pos_values
+    
+    
+    df_neg <- get_data_gs(gs = rval$gating_set,
+                          sample = input$sample_neg,
+                          subset = input$gate_neg,
+                          spill = NULL)
+    df_neg <- df_neg[names(df_neg) %in% rval$flow_set@colnames]
+    neg_values <- apply(df_neg, MARGIN = 2, FUN = median, na.rm = TRUE)
+    neg_values <- neg_values[rval$flow_set@colnames]
+    names(neg_values) <- rval$flow_set@colnames
+    rval$neg_values[[input$fluo]] <- neg_values
+    
+  })
+  
+  observe({
+    updateSelectInput(session, "spill_params", choices = names(rval$pos_values), selected = names(rval$pos_values))
+  })
+  
+  observeEvent(input$compute_spillover_matrix, {
+    validate(
+      need(length(input$spill_params)>0, "Not enough parameters selected")
+    )
+    
+    df_pos_tot <- data.frame(do.call(rbind, rval$pos_values[input$spill_params]), check.names = FALSE)
+    row.names(df_pos_tot) <- input$spill_params
+    df_pos_tot <- df_pos_tot[input$spill_params]
+    print(df_pos_tot)
+    
+    df_neg_tot <- data.frame(do.call(rbind, rval$neg_values[input$spill_params]), check.names = FALSE)
+    row.names(df_neg_tot) <- input$spill_params
+    df_neg_tot <- df_neg_tot[input$spill_params]
+    print(df_neg_tot)
+    
+    df_spill <- df_pos_tot
+    for(i in 1:length(input$spill_params)){
+      neg <- rval$neg_values[[input$spill_params[i]]][[input$spill_params[i]]]
+      pos <- rval$pos_values[[input$spill_params[i]]][[input$spill_params[i]]]
+      df_spill[input$spill_params[i]] <- (df_pos_tot[input$spill_params[i]] - neg)/(pos - neg)
+    }
+    
+    print(df_spill)
+    rval$df_spill <- df_spill
+    
+  })
+  
+  observe({
+    validate(
+      need(rval$parameters, "No parameters available")
+    )
+    comp_params <- rval$parameters$name_long
+    names(comp_params) <- NULL
+    updateSelectInput(session, "xvar_comp", choices = comp_params, selected = comp_params[1])
+    updateSelectInput(session, "yvar_comp", choices = comp_params, selected = comp_params[2])
+  })
+  
+  observe({
+    validate(
+      need(input$spill_file$datapath, "Please select a file to import")
+    )
+    
+    sep <- switch(input$sep_spill,
+                  "comma" = ",",
+                  "semi-column" = ";",
+                  "tab" = "\t",
+                  "space" = " ")
+    
+    rval$df_spill_imported <- read.table(file = input$spill_file$datapath, 
+                                         sep = sep, 
+                                         fill = TRUE, 
+                                         quote = "\"", 
+                                         header = TRUE, 
+                                         check.names = FALSE)
+    
+  })
+  
+  observeEvent(input$set_spillover_matrix,{
+    df <- as.data.frame(rval$df_spill_imported)
+    row.names(df) <- colnames(df)
+    df <- df[row.names(df) %in% rval$flow_set@colnames, colnames(df) %in% rval$flow_set@colnames]
+    rval$df_spill <- df
+    
+  })
+  
   
   observe({
     
@@ -1337,12 +1549,16 @@ server <- function(session, input, output) {
     group_var_default <- "subset"
     color_var_default <- "subset"
     plot_type_default <- "histogram"
+    plot_type_gate_default <- "hexagonal"
     
     if(input$flow_set == "t-SNE"){
       facet_var_default <- NULL
       group_var_default <- "name"
       color_var_default <- "name"
       plot_type_default <- "dots"
+      plot_type_gate_default <- "dots"
+      
+      
     }
     
     if(input$flow_set == "cluster"){
@@ -1350,13 +1566,14 @@ server <- function(session, input, output) {
       group_var_default <- NULL
       color_var_default <- "cluster"
       plot_type_default <- "dots"
+      plot_type_gate_default <- "dots"
     }
     
     updateSelectInput(session, "plot_type", 
                       selected = plot_type_default)
     
     updateSelectInput(session, "plot_type_gate", 
-                      selected = plot_type_default)
+                      selected = plot_type_gate_default)
     
     updateSelectInput(session, "facet_var", 
                       choices = c("subset", names(rval$pdata)), 
@@ -1395,6 +1612,13 @@ server <- function(session, input, output) {
                       choices = c("subset", names(rval$pdata)), 
                       selected = color_var_default)
     
+  })
+  
+  observe({
+    validate(
+      need(rval$flow_set, "No flow set available")
+    )
+    
     updateSelectInput(session, "sample_selected",
                       choices = pData(rval$flow_set)$name,
                       selected = pData(rval$flow_set)$name[1])
@@ -1407,14 +1631,13 @@ server <- function(session, input, output) {
                       choices = pData(rval$flow_set)$name,
                       selected = pData(rval$flow_set)$name[1])
     
-    updateSelectInput(session, "gate_stat",
-                      selected = names(rval$gates_flowCore)[grep("^/cluster[0-9]+", names(rval$gates_flowCore))])
-
-    
-      
   })
   
-
+  observe({
+    updateSelectInput(session, "gate_stat",
+                      selected = names(rval$gates_flowCore)[grep("^/cluster[0-9]+", names(rval$gates_flowCore))])
+  })
+  
   #Update available keywords
   observe({
     
@@ -1441,7 +1664,8 @@ server <- function(session, input, output) {
     sep <- switch(input$sep_meta,
                   "comma" = ",",
                   "semi-column" = ";",
-                  "tab" = "\t")
+                  "tab" = "\t",
+                  "space" = " ")
     
     rval$df_meta_imported <- read.csv(input$file_meta$datapath, sep = sep, header = TRUE, quote = "\"", fill = TRUE)
 
@@ -1746,6 +1970,7 @@ server <- function(session, input, output) {
           updateSelectInput(session, "gate_stat", choices = getNodes(rval$gating_set), selected = "root")
           updateSelectInput(session, "gate_trans", choices = getNodes(rval$gating_set), selected = "root")
           updateSelectInput(session, "gate_comp", choices = getNodes(rval$gating_set), selected = "root")
+          updateSelectInput(session, "gate_sub_sample", choices = getNodes(rval$gating_set), selected = "root")
           
           
           gate$x <- NULL
@@ -1861,8 +2086,23 @@ server <- function(session, input, output) {
                                     spill = NULL,
                                     Ncells = input$ncells_per_sample,
                                     updateProgress = updateProgress)
-                        
+      print(rval$df_sample)
+      
+      if( length(rval$df_sample) == 0 ){
+        showModal(modalDialog(
+          title = "No cells in selection",
+          paste("Please modify selection", sep=""),
+          easyClose = TRUE,
+          footer = NULL
+        ))
+      }
+      
+      validate(
+        need(length(rval$df_sample)>0, "No cells in selection")
+      )
+      
       rval$flow_set_sample <- build_flowset_from_df(rval$df_sample, fs = rval$flow_set)
+
       rval$flow_set_names <- unique(c(rval$flow_set_names, "sub-sample"))
       updateSelectInput(session, "flow_set", choices = rval$flow_set_names, selected = "sub-sample")
     })
@@ -2041,39 +2281,18 @@ server <- function(session, input, output) {
     # Output 
     
     
-    ##########################################################################################################
-    # Output UI
     
-    output$filter_meta <- renderUI({
-      
-      validate(
-        need(rval$pdata, "No meta data")
-      )
-      
-      x <- list()
-      
-      for(meta_var in names(rval$pdata)){
-        uvar <- unique(rval$pdata[[meta_var]])
-        
-        x[[meta_var]] <- selectizeInput(meta_var, meta_var, 
-                                        choices = uvar, 
-                                        selected = uvar,
-                                        multiple = TRUE)
-        
-      }
-      
-      if(length(x)>0){
-        x[["apply_filter_meta"]] <- actionButton("apply_filter_meta", "apply filter")
-      }
-      
-      
-      tagList(x)
-      
-    })
     
   ##########################################################################################################
   # Output Tables
   
+    output$spill_imported <- renderDataTable({
+      validate(
+        need(rval$df_spill_imported, "No spillover data imported")
+      )
+      as.data.frame(rval$df_spill_imported)
+    })
+    
   output$meta <- renderDataTable({
     validate(
       need(rval$df_meta_imported, "No meta data imported")
@@ -2451,17 +2670,43 @@ server <- function(session, input, output) {
     
   })
   
-  output$plot_focus <- renderPlot({
-    plot_focus()
+  
+  update_data_plot_focus <- eventReactive(input$update_plot, {
+    data_plot_focus()
   })
   
-  plot_focus <- reactive({
-    
+  data_plot_focus <- reactive({
     validate(
       need(rval$gating_set, "Empty gating set") %then%
         need(input$files_selection_table_rows_selected, "Please select samples") %then%
         need(input$gate, "Please select subsets")
     )
+    
+    print("get data plot_focus")
+    df <- get_data_gs(gs = rval$gating_set, 
+                      sample = rval$pdata$name[input$files_selection_table_rows_selected],
+                      subset = input$gate, 
+                      spill = rval$spill)
+    return(df)
+    
+  })
+  
+  
+  
+  output$plot_focus <- renderPlot({
+    plot_focus()
+  })
+  
+  
+  
+  
+  plot_focus <- eventReactive(input$update_plot, {
+    
+    # validate(
+    #   need(rval$gating_set, "Empty gating set") %then%
+    #     need(input$files_selection_table_rows_selected, "Please select samples") %then%
+    #     need(input$gate, "Please select subsets")
+    # )
 
     
     idx_x <- match(input$xvar, rval$parameters$name_long)
@@ -2517,7 +2762,7 @@ server <- function(session, input, output) {
       }
       
       
-      p <- plot_gs(df = rval$df_tot,
+      p <- plot_gs(df = update_data_plot_focus(),
                    gs = rval$gating_set, 
                    sample = rval$pdata$name[input$files_selection_table_rows_selected],
                    subset = input$gate, 
@@ -2648,8 +2893,11 @@ server <- function(session, input, output) {
     
   })
   
+  output$plotStat <- renderPlot({
+    plotStat()
+  })
   
-  output$plot_stat <- renderPlot({
+  plotStat <- eventReactive(input$update_plot_stat, {
     
     validate(
       need(rval$gating_set, "Empty gating set") %then%
@@ -2693,7 +2941,8 @@ server <- function(session, input, output) {
                    expand_factor = input$expand_factor,
                    stat_function = input$stat_function,
                    show.legend = input$legend_stat,
-                   y_trans = y_trans)
+                   y_trans = y_trans,
+                   strip.text.y.angle = input$strip_text_angle)
     
     p                          
       
@@ -2802,6 +3051,15 @@ server <- function(session, input, output) {
     }
   )
   
+  output$download_plot_stat <- downloadHandler(
+    filename = "stat.pdf",
+    content = function(file) {
+      pdf(file, width = input$width_plot_stat, height = input$height_plot_stat)
+      print(plotStat())
+      dev.off()
+    }
+  )
+  
   output$download_plot_gh <- downloadHandler(
     filename = paste("gates_", input$sample_selected, ".pdf", sep = ""),
     content = function(file) {
@@ -2810,6 +3068,210 @@ server <- function(session, input, output) {
       dev.off()
     }
   )
+  
+  output$download_spill <- downloadHandler(
+    filename = "spillover_matrix.txt",
+    content = function(file) {
+      write.table(rval$df_spill, file = file, row.names = FALSE, quote = FALSE, sep = "\t")
+    }
+  )
+  
+  output$export_gating_set <- downloadHandler(
+    
+    filename = switch(input$export_format,
+                       "FlowJo" = "workspace.wsp",
+                       "Cytobank" = "workspace.xml"),
+    
+    content = function(file) {
+      
+      gs <- GatingSet(rval$flow_set)
+      
+      ####################################################
+      #transform
+      
+      trans.lin <- trans_new("flowJo_linear", 
+                             transform = function(x){x}, 
+                             inverse = function(x){x})
+      
+      trans_list <- rval$transformation
+      
+      for(i in 1:length(trans_list)){
+        
+        trans_list[[i]] <- trans.lin
+        
+        # if(trans_list[[i]]$name == "identity"){
+        #   trans_list[[i]] <- trans.lin
+        # }else if(trans_list[[i]]$name == "logicle"){
+        #   trans_list[[i]] <- flowJo_biexp_trans()
+        # }
+      }
+      
+      trans <- transformerList(colnames(gs), trans_list)
+      
+      gs <- transform(gs, trans)
+      print(gs@transformation)
+      
+      ####################################################
+      #compensate
+      
+      if(input$apply_comp & !is.null(rval$df_spill)){
+        comp <- rval$df_spill
+      }else{
+        comp <- diag( length(rval$flow_set@colnames) )
+        colnames(comp) <- rval$flow_set@colnames
+        row.names(comp) <- colnames(comp)
+      }
+      comp <- compensation(comp)
+      gs <- compensate(gs, comp)
+      print(gs@compensation)
+      
+      
+      ####################################################
+      #add gates
+      
+      # print(getNodes(gs))
+      gates <- transform_gates(gates = rval$gates_flowCore, 
+                               transformation = trans_list,
+                               pattern = "", 
+                               replacement = "",
+                               time_step = 1/rval$time_step
+                               )
+      
+      gs <- add_gates_flowCore(gs, gates)
+      
+      g <- getGate(gs, "/live")
+      print(g[[1]]@boundaries)
+      
+      #gs <- rval$gating_set
+      
+      
+      if(input$export_format == "FlowJo"){
+        CytoML::GatingSet2flowJo(gs = gs, outFile = file)
+      }else if(input$export_format == "Cytobank"){
+        CytoML::GatingSet2cytobank(gs = gs, outFile = file)
+      }
+      
+    }
+  )
+  
+  ##########################################################################################################
+  #Dynamic ui output
+  
+  output$filter_meta <- renderUI({
+    
+    validate(
+      need(rval$pdata, "No meta data")
+    )
+    
+    x <- list()
+    
+    for(meta_var in names(rval$pdata)){
+      uvar <- unique(rval$pdata[[meta_var]])
+      
+      x[[meta_var]] <- selectizeInput(meta_var, meta_var, 
+                                      choices = uvar, 
+                                      selected = uvar,
+                                      multiple = TRUE)
+      
+    }
+    
+    if(length(x)>0){
+      x[["apply_filter_meta"]] <- actionButton("apply_filter_meta", "apply filter")
+    }
+    
+    tagList(x)
+    
+  })
+  
+  plot_height <- eventReactive(input$update_plot,{
+    split_var <- switch(input$split_variable, 
+                        "x variable" = "xvar",
+                        "y variable" = "yvar",
+                        "color variable" = "color_var"
+    )
+    
+    min(input$nrow_split, length(input[[split_var]])) * input$row_size + 50
+    
+  })
+  
+   output$ui_plot <- renderUI({
+     if(input$update_plot){
+       split_var <- switch(input$split_variable, 
+                           "x variable" = "xvar",
+                           "y variable" = "yvar",
+                           "color variable" = "color_var"
+       )
+       plotOutput("plot_focus", height = plot_height())
+     }
+     
+
+   })
+
+   plot_height_stat <- eventReactive(input$update_plot_stat,{
+     
+     length(input$yvar_stat) * input$row_size_stat + 50
+     
+   })
+   
+   output$ui_plot_stat <- renderUI({
+
+       plotOutput("plotStat", height = plot_height_stat())
+
+   })
+   
+   output$ui_compute_spill <- renderUI({
+     
+     validate(
+       need(rval$flow_set, "No flow set available")
+     )
+     
+     tagList(
+       selectInput("fluo", 
+                   "fluorophore",
+                   choices = rval$flow_set@colnames,
+                   selected = rval$flow_set@colnames[1]),
+       
+       selectInput("sample_pos",
+                   "sample pos",
+                   choices = pData(rval$flow_set)$name,
+                   selected = pData(rval$flow_set)$name[1]),
+       
+       selectInput("gate_pos",
+                   "gate pos",
+                   choices = getNodes(rval$gating_set),
+                   selected = "root"),
+       
+       selectInput("sample_neg", 
+                   "sample neg",
+                   choices = pData(rval$flow_set)$name,
+                   selected = pData(rval$flow_set)$name[1]),
+       
+       selectInput("gate_neg",
+                   "gate neg",
+                   choices = getNodes(rval$gating_set),
+                   selected = "root")
+     )
+     
+     # x <- list()
+     # 
+     # for(meta_var in names(rval$pdata)){
+     #   uvar <- unique(rval$pdata[[meta_var]])
+     #   
+     #   x[[meta_var]] <- selectizeInput(meta_var, meta_var, 
+     #                                   choices = uvar, 
+     #                                   selected = uvar,
+     #                                   multiple = TRUE)
+     #   
+     # }
+     # 
+     # if(length(x)>0){
+     #   x[["apply_filter_meta"]] <- actionButton("apply_filter_meta", "apply filter")
+     # }
+     # 
+     # tagList(x)
+     
+   })
+  
   
 }
   
