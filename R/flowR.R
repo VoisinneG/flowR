@@ -50,9 +50,6 @@ parseGate <- function(x){
   
   name_long <- paste("/",paste(c(all_parents, name), collapse = "/"), sep = "")
 
-
-  
-  
   type <- xml_name(xml_child(x))
   dim <- xml_text(xml_find_all(xml_find_all(x, ".//gating:dimension"), ".//@data-type:name"))
   res <- c(res, list("name" = name, 
@@ -175,13 +172,13 @@ get_gates_from_ws <- function(ws_path, group = NULL){
   GroupNodes <- xml_find_all(ws, "//GroupNode")
   group_info <-  lapply(GroupNodes, parseGroupNodes)
   group_info <- data.frame( do.call(rbind, group_info ) )
-  print(group_info)
+  #print(group_info)
   
   # get Samples info
   SampleNodes <- xml_find_all(ws, "//SampleNode")
   sample_info <- lapply(SampleNodes , parseSampleNodes)
   sample_info <- data.frame( do.call(rbind, sample_info ) )
-  print(sample_info)
+  #print(sample_info)
   
   if(is.null(group)){
     group_selected <- group_info$name[1]
@@ -205,20 +202,27 @@ get_gates_from_ws <- function(ws_path, group = NULL){
   gate_list <- list()
   
   for(i in 1:length(gates)){
+    
     parent <- gates[[i]]$parent_long
     name <- gates[[i]]$name_long
-    name_long <- gates[[i]]$name_long
+    
+    parent <- gsub(" ", "_", parent)
+    name <- gsub(" ", "_", name)
+    
     if(gates[[i]]$type == "RectangleGate"){
       boundaries <- gates[[i]]$boundaries
       g <- rectangleGate(.gate = boundaries, filterId = basename(name))
+      gate_list[[name]] <- list(gate = g, parent = parent)
     }else if(gates[[i]]$type == "PolygonGate"){
       polygon <- gates[[i]]$polygon
       g <- polygonGate(.gate = polygon, filterId = basename(name) )
+      gate_list[[name]] <- list(gate = g, parent = parent)
     }else{
-      warning(paste("gate type", gates[[i]]$type ,"not supported"))
-      g <- NULL
+      warning(paste("gate type", gates[[i]]$type, "not supported"))
+      #g <- NULL
+      #gate_list[[name_long]] <- list(gate = g, parent = parent)
     }
-    gate_list[[name_long]] <- list(gate = g, parent = parent)
+    
     
   } 
   return(gate_list)
@@ -280,7 +284,7 @@ add_gates_flowCore <- function(gs, gates){
     recompute(gs)
   }
   
-  #print("OK")
+  print("OK")
   
   return(gs)
 }
@@ -386,10 +390,17 @@ get_data_gs <- function(gs,
                         subset,
                         Ncells = NULL,
                         spill = NULL,
+                        return_comp_data = TRUE,
                         updateProgress = NULL
 ){
   
   idx <- match(sample, pData(gs)$name)
+  idx <- idx[!is.na(idx)]
+  print(sample)
+  
+  if(length(idx) == 0){
+    stop("sample not found in gating set")
+  }
   
   if(!is.null(spill)){
     gates <- get_gates_from_gs(gs)
@@ -397,9 +408,12 @@ get_data_gs <- function(gs,
     spill_list <- lapply(1:length(idx), function(x){return(spill)})
     names(spill_list) <- sampleNames(fs)
     fs <- compensate(fs, spill_list)
-    gs <- GatingSet(fs)
-    gs <- add_gates_flowCore(gs, gates)
-    idx <- 1:length(gs)
+    gs_comp <- GatingSet(fs)
+    gs_comp <- add_gates_flowCore(gs_comp, gates)
+    print(colnames(gs_comp))
+    print(getNodes(gs_comp))
+    print(pData(gs_comp)$name)
+    
   }
   
   df <- list()
@@ -408,10 +422,35 @@ get_data_gs <- function(gs,
   for(i in 1:length(idx)){
     
     for(k in 1:length(subset)){
-    
-      ff <- getData(gs[[idx[i]]], subset[k])
-      df_int <- as.data.frame(exprs(ff))
       
+      print(as.name(subset[k]))
+      idx_subset <- NULL
+      idx_comp <- match(pData(gs)$name[idx[i]], pData(gs_comp)$name)
+      print(idx_comp)
+      
+      if(subset[k] != "root"){
+        if(!is.null(spill)){
+          idx_subset <- getIndices(gs_comp[[idx_comp]], as.name(subset[k]))[[1]]
+          print("ok idx1\n")
+        }else{
+          idx_subset <- getIndices(gs[[idx[i]]], as.name(subset[k]))[[1]]
+          print("ok idx2\n")
+        }
+      }
+      
+      if(return_comp_data & !is.null(spill) ){
+        ff <- getData(gs_comp[[idx_comp]])
+      }else{
+        ff <- getData(gs[[idx[i]]])
+      }
+      
+      
+      df_int <- as.data.frame(exprs(ff))
+      if(!is.null(idx_subset)){
+        df_int <- df_int[idx_subset, ]
+      }
+      
+      print("ok sub\n")
       if(dim(df_int)[1]>0){
         
         df_int[["name"]] <- pData(gs)$name[idx[i]]
@@ -452,7 +491,7 @@ get_data_gs <- function(gs,
   
 }
 
-add_columns_from_metadata <- function(df, 
+add_columns_from_metadata <- function(df,
                                       metadata,
                                       color_var = NULL, 
                                       facet_vars = "name",
@@ -1240,6 +1279,8 @@ dim_reduction <- function(df,
                           perplexity = 50,
                           method = "tSNE"){
   
+  idx_cells_kept <- 1:dim(df)[1]
+  
   if(is.numeric(Ncells)){
     if(Ncells<=0){
       warning("Parameter Ncells must be > 0")
@@ -1276,6 +1317,7 @@ dim_reduction <- function(df,
     message(paste("Filter out ", length(idx_filter), " cells with NA or non-finite values", sep =""))
     df_trans <- df_trans[-idx_filter, ]
     df_filter <- df_filter[-idx_filter, ]
+    idx_cells_kept <- idx_cells_kept[-idx_filter]
   }
   
   if(!is.null(Ncells) & is.numeric(Ncells)){
@@ -1285,6 +1327,9 @@ dim_reduction <- function(df,
     Ncells_tSNE <- dim(df_trans)[1]
     idx_cells <- 1:dim(df_trans)[1]
   }
+  
+  idx_cells_kept <- idx_cells_kept[idx_cells]
+  print(length(idx_cells_kept))
   
   message(paste("Running tSNE with ", Ncells_tSNE, " cells and ",  length(yvar), " parameters", sep = ""))
   
@@ -1297,7 +1342,7 @@ dim_reduction <- function(df,
   df_tSNE <- tSNE$Y
   colnames(df_tSNE) <- c("tSNE1","tSNE2")
   
-  return(cbind(df_filter[idx_cells, ], df_tSNE))
+  return(list( df = cbind(df_filter[idx_cells, ], df_tSNE), keep = idx_cells_kept))
   
 }
 
@@ -1315,7 +1360,9 @@ get_cluster <- function(df,
                         dc=3, 
                         alpha = 0.001,
                         method = "ClusterX"){
-                        
+         
+  idx_cells_kept <- 1:dim(df)[1]
+  
   if(!is.null(y_trans)){
     transformation <- lapply(yvar, function(x){y_trans})
     names(transformation) <- yvar
@@ -1342,6 +1389,7 @@ get_cluster <- function(df,
     message(paste("Filter out ", length(idx_filter), " cells with NA or non-finite values", sep =""))
     df_trans <- df_trans[-idx_filter, ]
     df_filter <- df_filter[-idx_filter, ]
+    idx_cells_kept <- idx_cells_kept[-idx_filter]
   }
   
   message(paste("Clustering ", dim(df_trans)[1], " cells using 'CluserX' on ",  length(yvar), " parameters", sep = ""))
@@ -1349,7 +1397,7 @@ get_cluster <- function(df,
   DC <- ClusterX(df_trans[ , yvar], dc = dc, alpha = alpha)
   df_filter$cluster <- DC$cluster
   
-  return(df_filter)
+  return(list(df = df_filter, keep = idx_cells_kept))
   
 }
 

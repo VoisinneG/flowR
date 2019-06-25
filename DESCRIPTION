@@ -1,0 +1,16 @@
+Package: flowR
+Title: Annalyze flow cytometry data using R
+Version: 0.1.0
+Date: 2019-06-19
+Author: Guillaume Voisinne
+Maintainer: Guillaume Voisinne <voisinne@ciml.univ-mrs.fr>
+Description: Annalyze flow cytometry data using R
+Imports:
+  ggplot2, 
+  xml2
+biocViews:
+LazyData: TRUE
+License: file LICENSE
+RoxygenNote: 6.1.1
+Depends:
+  R (>= 2.10)

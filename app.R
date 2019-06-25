@@ -33,7 +33,7 @@ library("Rgraphviz")
 options(repos = BiocManager::repositories(), shiny.maxRequestSize = 300*1024^2)
 getOption("repos")
 
-source("./R/flowShine_plot.R")
+source("./R/flowR.R")
 
 `%then%` <- shiny:::`%OR%`
 
@@ -970,6 +970,7 @@ server <- function(session, input, output) {
           })
           
           params <- parameters(ff)$name
+          print(params)
           
           pattern <- NULL
           if( length( grep("[\\<|\\>]", params) ) >0 ){
@@ -1013,11 +1014,12 @@ server <- function(session, input, output) {
       fs <- rval$flow_set 
       rval$flow_set_imported <- fs
       
-      # m <- diag( length(parameters(fs[[1]])$name) )
-      # colnames(m) <- parameters(fs[[1]])$name
-      # rval$df_spill <- as.data.frame(m)
+      m <- diag( length(parameters(fs[[1]])$name) )
+      colnames(m) <- parameters(fs[[1]])$name
+      rval$df_spill <- as.data.frame(m)
+      row.names(rval$df_spill) <- colnames(rval$df_spill)
       
-      rval$df_spill <- NULL
+      #rval$df_spill <- NULL
       
       for(i in 1:length(fs)){
         if("SPILL" %in% names(description(fs[[i]]))){
@@ -1102,6 +1104,10 @@ server <- function(session, input, output) {
     print(names(rval$gates_flowCore))
     rval$gating_set <- add_gates_flowCore(rval$gating_set, rval$gates_flowCore)
     
+    #print(colnames(rval$gating_set))
+    #print(rval$gates_flowCore)
+    #print(getPopStats(rval$gating_set))
+    
     # update gates
     
     gate_names <- getNodes(rval$gating_set)
@@ -1132,6 +1138,7 @@ server <- function(session, input, output) {
     if(!setequal(rval$parameters$name, parameters(ff)$name)){
       desc <- parameters(ff)$desc
       name <- parameters(ff)$name
+      print(parameters(ff)$name)
       name_long <- name
       name_long[!is.na(desc)] <- paste(name[!is.na(desc)], " (", desc[!is.na(desc)], ")", sep = "")
       
@@ -2083,8 +2090,9 @@ server <- function(session, input, output) {
       rval$df_sample <- get_data_gs(gs = rval$gating_set,
                                     sample = sample, 
                                     subset = input$gate_sub_sample,
-                                    spill = NULL,
+                                    spill = rval$spill,
                                     Ncells = input$ncells_per_sample,
+                                    return_comp_data = FALSE,
                                     updateProgress = updateProgress)
       print(rval$df_sample)
       
@@ -2102,7 +2110,8 @@ server <- function(session, input, output) {
       )
       
       rval$flow_set_sample <- build_flowset_from_df(rval$df_sample, fs = rval$flow_set)
-
+      print("OK")
+      print(dim(rval$df_sample))
       rval$flow_set_names <- unique(c(rval$flow_set_names, "sub-sample"))
       updateSelectInput(session, "flow_set", choices = rval$flow_set_names, selected = "sub-sample")
     })
@@ -2153,24 +2162,37 @@ server <- function(session, input, output) {
       
       progress$set(message = "Getting data...", value = 0)
       
+      df_raw <- get_data_gs(gs = rval$gating_set,
+                               sample = pData(rval$gating_set)$name, 
+                               subset = "root",
+                               spill = rval$spill,
+                               Ncells = NULL,
+                               return_comp_data = FALSE,
+                               updateProgress = updateProgress)
+      
       rval$df_tsne <- get_data_gs(gs = rval$gating_set,
                                   sample = pData(rval$gating_set)$name, 
                                   subset = "root",
                                   spill = rval$spill,
                                   Ncells = NULL,
+                                  return_comp_data = TRUE,
                                   updateProgress = updateProgress)
       
       progress$set(message = "Performing t-SNE...", value = 50)
       
-      rval$df_tsne <- dim_reduction(df = rval$df_tsne,
+      res <- dim_reduction(df = rval$df_tsne,
                                     yvar = rval$parameters$name[input$tSNE_variables_table_rows_selected], 
                                     Ncells = input$ncells_tsne, 
                                     y_trans = y_trans,
                                     transformation = transformation,
                                     perplexity = input$perplexity)
+      rval$df_tsne <- res$df
+      
+      df <- cbind( df_raw[res$keep, ], rval$df_tsne[ , c("tSNE1","tSNE2")])
+      
       
       if(!is.null(rval$df_tsne)){
-        rval$flow_set_tsne <- build_flowset_from_df(rval$df_tsne, fs = rval$flow_set)
+        rval$flow_set_tsne <- build_flowset_from_df(df = df, fs = rval$flow_set)
         rval$flow_set_names <- unique(c(rval$flow_set_names, "t-SNE"))
         updateSelectInput(session, "flow_set", choices = rval$flow_set_names, selected = "t-SNE")
       }
@@ -2223,25 +2245,37 @@ server <- function(session, input, output) {
       
       progress$set(message = "Clustering...", value = 0)
       
+      df_raw <- get_data_gs(gs = rval$gating_set,
+                               sample = pData(rval$gating_set)$name, 
+                               subset = "root",
+                               spill = rval$spill,
+                               return_comp_data = FALSE,
+                               Ncells = NULL,
+                               updateProgress = updateProgress)
+      
       rval$df_cluster <- get_data_gs(gs = rval$gating_set,
                                   sample = pData(rval$gating_set)$name, 
                                   subset = "root",
                                   spill = rval$spill,
+                                  return_comp_data = TRUE,
                                   Ncells = NULL,
                                   updateProgress = updateProgress)
+       
+       
       
       #print(summary(rval$df_tsne))
       
       progress$set(message = "Clustering...", value = 50)
       
-      rval$df_cluster <- get_cluster(df=rval$df_cluster, 
+      res <- get_cluster(df=rval$df_cluster, 
                                      yvar = rval$parameters$name[input$clustering_variables_table_rows_selected],
                                      y_trans = y_trans,
                                      transformation = transformation,
                                      dc = input$cluster_dc, 
                                      alpha = input$cluster_alpha
                                      )
-      
+      rval$df_cluster <- res$df
+      df <- cbind(df_raw[res$keep, ], rval$df_cluster[c("cluster")])
       
       rval$flow_set_cluster <- build_flowset_from_df(rval$df_cluster, fs = rval$flow_set)
       
@@ -2320,7 +2354,7 @@ server <- function(session, input, output) {
     df$maxRange <- format(df$maxRange, digits = 2)
     df[["chanel_name"]] <- df$name_long
     DT::datatable(
-      df[, c("chanel_name", "transform", "transform parameters", "display", "range", "minRange", "maxRange")], 
+      df[, c("chanel_name", "transform", "transform parameters", "display", "range", "minRange", "maxRange", "name", "desc")], 
       rownames = FALSE)
 
   })
@@ -2983,6 +3017,8 @@ server <- function(session, input, output) {
       transformation <- rval$transformation
     }
     
+    print(rval$spill)
+    
     p <- plot_gs(df = rval$df_tot,
                  gs = rval$gating_set, 
                  sample = input$sample_selected_comp,
@@ -3078,32 +3114,31 @@ server <- function(session, input, output) {
   
   output$export_gating_set <- downloadHandler(
     
-    filename = switch(input$export_format,
-                       "FlowJo" = "workspace.wsp",
-                       "Cytobank" = "workspace.xml"),
+    filename = function(){
+      switch(input$export_format,
+                       "FlowJo" = "workspace_flowJo.wsp",
+                       "Cytobank" = "workspace_cytobank.xml")
+      },
     
     content = function(file) {
-      
+      print(input$export_format)
       gs <- GatingSet(rval$flow_set)
       
       ####################################################
       #transform
+      if(input$export_format == "FlowJo"){
+        trans.def <- trans_new("flowJo_linear", 
+                               transform = function(x){x}, 
+                               inverse = function(x){x})
+      }else if(input$export_format == "Cytobank"){
+        trans.def <- asinhtGml2_trans()
+      }
       
-      trans.lin <- trans_new("flowJo_linear", 
-                             transform = function(x){x}, 
-                             inverse = function(x){x})
       
       trans_list <- rval$transformation
       
       for(i in 1:length(trans_list)){
-        
-        trans_list[[i]] <- trans.lin
-        
-        # if(trans_list[[i]]$name == "identity"){
-        #   trans_list[[i]] <- trans.lin
-        # }else if(trans_list[[i]]$name == "logicle"){
-        #   trans_list[[i]] <- flowJo_biexp_trans()
-        # }
+        trans_list[[i]] <- trans.def
       }
       
       trans <- transformerList(colnames(gs), trans_list)
@@ -3148,7 +3183,7 @@ server <- function(session, input, output) {
       if(input$export_format == "FlowJo"){
         CytoML::GatingSet2flowJo(gs = gs, outFile = file)
       }else if(input$export_format == "Cytobank"){
-        CytoML::GatingSet2cytobank(gs = gs, outFile = file)
+        CytoML::GatingSet2cytobank(gs = gs, outFile = file, cytobank.default.scale = FALSE)
       }
       
     }
