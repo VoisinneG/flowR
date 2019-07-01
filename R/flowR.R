@@ -438,8 +438,10 @@ get_data_gs <- function(gs,
       
       print(as.name(subset[k]))
       idx_subset <- NULL
-      idx_comp <- match(pData(gs)$name[idx[i]], pData(gs_comp)$name)
-      print(idx_comp)
+      if(!is.null(spill)){
+        idx_comp <- match(pData(gs)$name[idx[i]], pData(gs_comp)$name)
+        print(idx_comp)
+      }
       
       if(subset[k] != "root"){
         if(!is.null(spill)){
