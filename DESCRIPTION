@@ -6,8 +6,28 @@ Author: Guillaume Voisinne
 Maintainer: Guillaume Voisinne <voisinne@ciml.univ-mrs.fr>
 Description: Annalyze flow cytometry data using R
 Imports:
+  shiny,
+  shinydashboard,
+  openCyto,
+  flowWorkspace,
+  flowCore,
+  DT,
+  plotly,
+  heatmaply,
   ggplot2, 
-  xml2
+  xml2,
+  gridExtra,
+  CytoML,
+  Rgraphviz,
+  scales,
+  tools,
+  utils,
+  sp,
+  viridis,
+  Rtsne,
+  ClusterX
+Remotes: 
+  JinmiaoChenLab/ClusterX,
 biocViews:
 LazyData: TRUE
 License: file LICENSE

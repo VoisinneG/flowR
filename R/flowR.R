@@ -16,18 +16,21 @@ library(xml2)
 ####################################################################################################
 # Parse workspace
 
+#' @import xml2
 parseSampleNodes <- function(x){
   name <- xml_text(xml_find_all(x, ".//@name"))[1]
   sampleID <- xml_integer(xml_find_all(x, ".//@sampleID"))[1]
   return(list("name" = name, "sampleID" = sampleID))
 }
 
+#' @import xml2
 parseGroupNodes <- function(x){
   name <- xml_text(xml_find_all(x, ".//@name"))[1]
   sampleID <- xml_integer(xml_find_all(xml_find_all(x, ".//SampleRefs"), ".//@sampleID"))
   return(list("name" = name, "sampleID" = sampleID))
 }
 
+#' @import xml2
 parseGate <- function(x){
   res <- list()
   
@@ -76,7 +79,8 @@ parseGate <- function(x){
   return(res)
 }
 
-# find all parent gates recursively
+#' @description  find all parent gates recursively
+#' @import xml2
 find_all_parent_gates <- function(x){
   all_parents <- NULL
   y <- x
@@ -98,6 +102,7 @@ find_all_parent_gates <- function(x){
 ####################################################################################################
 # Transformations
 
+#' @import flowWorkspace
 flowJo_biexp_inverse_trans <- function (..., n = 6, equal.space = FALSE){
   trans <- flowJoTrans(..., inverse = TRUE)
   inv <- flowJoTrans(...)
@@ -113,6 +118,7 @@ asinh_transform <- function(b=5, inverse = FALSE){
   }
 }
 
+#' @import flowWorkspace
 asinh_trans <- function (..., n = 6, equal.space = FALSE){
   trans <- asinh_transform(...)
   inv <- asinh_transform(..., inverse = TRUE)
@@ -147,6 +153,8 @@ ellipse_path <- function(cov, mean, n = 100){
   return(df)
 }
 
+
+#' @import flowWorkspace
 get_gates_from_gs <- function(gs){
   
   nodes <- getNodes(gs)
@@ -164,6 +172,8 @@ get_gates_from_gs <- function(gs){
   
 }
 
+#' @import xml2
+#' @import flowCore
 get_gates_from_ws <- function(ws_path, group = NULL){
   
   ws <- read_xml(ws_path)
@@ -229,6 +239,7 @@ get_gates_from_ws <- function(ws_path, group = NULL){
   
 }
 
+#' @import flowWorkspace
 add_gates_flowCore <- function(gs, gates){
   
   new_gates_name <- setdiff(names(gates), getNodes(gs))
@@ -289,7 +300,7 @@ add_gates_flowCore <- function(gs, gates){
   return(gs)
 }
 
-
+#' @import flowWorkspace
 transform_gates <- function(gates, 
                             transformation = NULL, 
                             pattern = "[\\<|\\>]", 
@@ -385,6 +396,8 @@ transform_gates <- function(gates,
 ####################################################################################################
 # Getting data
 
+#' @import flowWorkspace
+#' @import flowCore
 get_data_gs <- function(gs,
                         sample,
                         subset,
@@ -523,6 +536,11 @@ add_columns_from_metadata <- function(df,
 ####################################################################################################
 # Plotting
 
+#' @import flowWorkspace
+#' @import ggplot2
+#' @import ggridges
+#' @import viridis
+#' @import scales
 plot_gs <- function(df = NULL,
                     gs = NULL, 
                     sample, 
@@ -956,7 +974,7 @@ plot_gs <- function(df = NULL,
   
 }
 
-
+#' @import flowWorkspace
 plot_gh <- function(df = NULL, gs, sample, spill = NULL, ...){
   
   if(length(sample) != 1){
@@ -1034,7 +1052,11 @@ plot_gh <- function(df = NULL, gs, sample, spill = NULL, ...){
   return(plist)
 }
 
-
+#' @import flowWorkspace
+#' @import ggplot2
+#' @import viridis
+#' @import scales
+#' @import data.table
 plot_stat <- function(df = NULL,
                       gs,
                       sample, 
@@ -1271,6 +1293,8 @@ plot_stat <- function(df = NULL,
 ####################################################################################################
 # Dimensionality Reduction 
 
+#' @import Rtsne
+#' @import scales
 dim_reduction <- function(df,
                           yvar,
                           Ncells = NULL,
@@ -1353,6 +1377,8 @@ dim_reduction <- function(df,
 ####################################################################################################
 # Clustering
 
+#' @import ClusterX
+#' @import scales
 get_cluster <- function(df,
                         yvar,
                         transformation = NULL,
@@ -1405,6 +1431,7 @@ get_cluster <- function(df,
 ####################################################################################################
 # Build FlowSet
 
+#' @import flowCore
 build_flowset_from_df <- function(df,
                                   fs = NULL,
                                   chanel_col = setdiff(names(df), c("name", "subset")), 
