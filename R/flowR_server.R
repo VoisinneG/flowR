@@ -1535,21 +1535,21 @@ flowR_server <- function(session, input, output) {
   ##########################################################################################################
   # Output Tables
   
-  output$spill_imported <- renderDataTable({
+  output$spill_imported <- DT::renderDataTable({
     validate(
       need(rval$df_spill_imported, "No spillover data imported")
     )
     as.data.frame(rval$df_spill_imported)
   })
   
-  output$meta <- renderDataTable({
+  output$meta <- DT::renderDataTable({
     validate(
       need(rval$df_meta_imported, "No meta data imported")
     )
     as.data.frame(rval$df_meta_imported)
   })
   
-  output$files_table <- renderDataTable({
+  output$files_table <- DT::renderDataTable({
     validate(
       need(rval$df_files, "Please select a file to import")
     )
@@ -1559,7 +1559,7 @@ flowR_server <- function(session, input, output) {
     df
   })
   
-  output$parameters_table <- renderDataTable({
+  output$parameters_table <- DT::renderDataTable({
     
     validate(
       need(rval$parameters, "No data imported")
@@ -1575,7 +1575,7 @@ flowR_server <- function(session, input, output) {
   })
   
   
-  output$tSNE_variables_table <- renderDataTable({
+  output$tSNE_variables_table <- DT::renderDataTable({
     
     validate(
       need(rval$parameters, "No data imported")
@@ -1589,7 +1589,7 @@ flowR_server <- function(session, input, output) {
       rownames = FALSE)
   })
   
-  output$clustering_variables_table <- renderDataTable({
+  output$clustering_variables_table <- DT::renderDataTable({
     
     validate(
       need(rval$parameters, "No data imported")
@@ -1627,7 +1627,7 @@ flowR_server <- function(session, input, output) {
     }
   })
   
-  output$spill_table <- renderDataTable({
+  output$spill_table <- DT::renderDataTable({
     
     validate(
       need(rval$df_spill, "No spillover matrix")

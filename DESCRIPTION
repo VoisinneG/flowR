@@ -15,6 +15,8 @@ Imports:
   plotly,
   heatmaply,
   ggplot2, 
+  ggridges,
+  ggsignif,
   xml2,
   gridExtra,
   CytoML,

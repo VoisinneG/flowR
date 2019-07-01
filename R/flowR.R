@@ -1,17 +1,17 @@
-library(scales)
-library(viridis)
-library(ggcyto)
-library(data.table)
-library(ggsignif)
-#library(sf) # need libudunits2-dev
-#devtools::install_github("JinmiaoChenLab/ClusterX")
-library(ClusterX)
-#devtools::install_github("JinmiaoChenLab/Rphenograph")
-library(Rphenograph)
-library(Rtsne)
-#BiocManager::install("Biobase")
-library("Biobase")
-library(xml2)
+# library(scales)
+# library(viridis)
+# library(ggcyto)
+# library(data.table)
+# library(ggsignif)
+# #library(sf) # need libudunits2-dev
+# #devtools::install_github("JinmiaoChenLab/ClusterX")
+# library(ClusterX)
+# #devtools::install_github("JinmiaoChenLab/Rphenograph")
+# library(Rphenograph)
+# library(Rtsne)
+# #BiocManager::install("Biobase")
+# library("Biobase")
+# library(xml2)
 
 ####################################################################################################
 # Parse workspace
