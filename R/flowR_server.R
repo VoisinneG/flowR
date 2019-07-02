@@ -59,7 +59,8 @@ flowR_server <- function(session, input, output) {
                          flow_set_names = NULL,
                          pos_values = list(),
                          neg_values = list(),
-                         time_step = 1
+                         time_step = 1,
+                         dim_red_var = NULL
   )
   
   gate <- reactiveValues(x = NULL, y = NULL)
@@ -270,7 +271,7 @@ flowR_server <- function(session, input, output) {
                             "imported" = rval$flow_set_imported,
                             "filter" = rval$flow_set_filter,
                             "sub-sample" = rval$flow_set_sample,
-                            "t-SNE" = rval$flow_set_tsne,
+                            "dim-reduction" = rval$flow_set_tsne,
                             "cluster" = rval$flow_set_cluster
     )
     
@@ -402,9 +403,9 @@ flowR_server <- function(session, input, output) {
         xvar_default <- rval$plot_var[1]
         yvar_default <- rval$plot_var[2]
         
-        if(input$flow_set == "t-SNE"){
-          xvar_default <- "tSNE1"
-          yvar_default <- "tSNE2"
+        if(input$flow_set == "dim-reduction"){
+          xvar_default <- rval$dim_red_var[1]
+          yvar_default <- rval$dim_red_var[2]
         }
         
         if(input$flow_set == "cluster"){
@@ -1395,23 +1396,25 @@ flowR_server <- function(session, input, output) {
                                 return_comp_data = TRUE,
                                 updateProgress = updateProgress)
     
-    progress$set(message = "Performing t-SNE...", value = 50)
+    progress$set(message = paste("Performing", input$dim_red_method, "..."), value = 0)
     
     res <- dim_reduction(df = rval$df_tsne,
                          yvar = rval$parameters$name[input$tSNE_variables_table_rows_selected], 
                          Ncells = input$ncells_tsne, 
                          y_trans = y_trans,
                          transformation = transformation,
+                         method = input$dim_red_method,
                          perplexity = input$perplexity)
     rval$df_tsne <- res$df
     
-    df <- cbind( df_raw[res$keep, ], rval$df_tsne[ , c("tSNE1","tSNE2")])
+    df <- cbind( df_raw[res$keep, ], rval$df_tsne[ , setdiff(names(rval$df_tsne), names(df_raw))])
     
+    rval$dim_red_var <- res$vars
     
     if(!is.null(rval$df_tsne)){
       rval$flow_set_tsne <- build_flowset_from_df(df = df, fs = rval$flow_set)
-      rval$flow_set_names <- unique(c(rval$flow_set_names, "t-SNE"))
-      updateSelectInput(session, "flow_set", choices = rval$flow_set_names, selected = "t-SNE")
+      rval$flow_set_names <- unique(c(rval$flow_set_names, "dim-reduction"))
+      updateSelectInput(session, "flow_set", choices = rval$flow_set_names, selected = "dim-reduction")
     }
     
     

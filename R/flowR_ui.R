@@ -603,7 +603,11 @@ flowR_ui <- function() {
                                                    label = "Transform variables:", 
                                                    choices = c("log10", "asinh", "identity", "default"), 
                                                    selected = "default"),
-                                       numericInput("perplexity", "perplexity", 50)
+                                       selectInput("dim_red_method", label = "method", choices = c("tSNE" , "umap"), selected = "tSNE"),
+                                       conditionalPanel(condition = "input.dim_red_method == 'tSNE'",
+                                                        numericInput("perplexity", "perplexity", 50)
+                                                        )
+                                       
                               ),
                               tabPanel("Compute",
                                        numericInput("ncells_tsne", "Number of cells", 1000),

@@ -1297,6 +1297,7 @@ plot_stat <- function(df = NULL,
 # Dimensionality Reduction 
 
 #' @import Rtsne
+#' @import umap
 #' @import scales
 dim_reduction <- function(df,
                           yvar,
@@ -1348,28 +1349,37 @@ dim_reduction <- function(df,
   }
   
   if(!is.null(Ncells) & is.numeric(Ncells)){
-    Ncells_tSNE <- min(dim(df_trans)[1], Ncells)
-    idx_cells <- sample(1:dim(df_trans)[1], Ncells_tSNE, replace = FALSE)
+    Ncells_used <- min(dim(df_trans)[1], Ncells)
+    idx_cells <- sample(1:dim(df_trans)[1], Ncells_used, replace = FALSE)
   }else{
-    Ncells_tSNE <- dim(df_trans)[1]
+    Ncells_used <- dim(df_trans)[1]
     idx_cells <- 1:dim(df_trans)[1]
   }
   
   idx_cells_kept <- idx_cells_kept[idx_cells]
   print(length(idx_cells_kept))
   
-  message(paste("Running tSNE with ", Ncells_tSNE, " cells and ",  length(yvar), " parameters", sep = ""))
+  message(paste("Running ", method, " with ", Ncells_used, " cells and ",  length(yvar), " parameters", sep = ""))
   
-  if(Ncells_tSNE > 3000){
+  if(Ncells_used > 3000){
     message("This may take a while... Try with less cells.")
   }
 
-
-  tSNE <- Rtsne(df_trans[ idx_cells , yvar], perplexity = perplexity)
-  df_tSNE <- tSNE$Y
-  colnames(df_tSNE) <- c("tSNE1","tSNE2")
+  if(method == "tSNE"){
+    tSNE <- Rtsne(df_trans[ idx_cells , yvar], perplexity = perplexity)
+    df_tSNE <- tSNE$Y
+    colnames(df_tSNE) <- c("tSNE1","tSNE2")
+    return(list( df = cbind(df_filter[idx_cells, ], df_tSNE), keep = idx_cells_kept, vars = c("tSNE1","tSNE2")))
+  }
   
-  return(list( df = cbind(df_filter[idx_cells, ], df_tSNE), keep = idx_cells_kept))
+  if(method == "umap"){
+    df_umap <- umap(df_trans[ idx_cells , yvar])
+    df_umap <- df_umap$layout
+    colnames(df_umap) <- c("UMAP1","UMAP2")
+    return(list( df = cbind(df_filter[idx_cells, ], df_umap), keep = idx_cells_kept, vars = c("UMAP1","UMAP2")))
+  }
+  
+  return(NULL)
   
 }
 

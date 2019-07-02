@@ -28,6 +28,7 @@ Imports:
   sp,
   viridis,
   Rtsne,
+  umap,
   ClusterX
 Remotes: 
   JinmiaoChenLab/ClusterX,
