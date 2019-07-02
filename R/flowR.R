@@ -1058,6 +1058,7 @@ plot_gh <- function(df = NULL, gs, sample, spill = NULL, ...){
 #' @import ggplot2
 #' @import viridis
 #' @import scales
+#' @import ggsignif
 #' @import data.table
 plot_stat <- function(df = NULL,
                       gs,

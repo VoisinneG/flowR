@@ -1,6 +1,7 @@
 #' @import shiny
 #' @import flowWorkspace
 #' @import flowCore
+#' @import ncdfFlow
 #' @import gridExtra
 #' @import DT
 #' @import plotly
@@ -216,12 +217,12 @@ flowR_server <- function(session, input, output) {
         #idx_match <- sapply(names_imported, function(x){as.numeric(strsplit(x, split= ".", fixed = TRUE)[[1]][1])})
         idx_match <- match(names_imported, rval$df_files$name)
         
-        rval$flow_set <- read.ncdfFlowSet( rval$df_files$datapath[idx_match] )
+        rval$flow_set <- ncdfFlow::read.ncdfFlowSet( rval$df_files$datapath[idx_match] )
         phenoData(rval$flow_set)$name <- rval$df_files$name[idx_match]
         
         
       }else{
-        rval$flow_set <- read.ncdfFlowSet( rval$df_files$datapath[input$files_table_rows_selected] , emptyValue=FALSE)
+        rval$flow_set <- ncdfFlow::read.ncdfFlowSet( rval$df_files$datapath[input$files_table_rows_selected] , emptyValue=FALSE)
         phenoData(rval$flow_set)$name <- rval$df_files$name[input$files_table_rows_selected]
       }
       
