@@ -2,6 +2,7 @@
 #' @import shinydashboard
 #' @import DT
 #' @import plotly
+#' @export
 flowR_ui <- function() {
   
   body <- dashboardBody(

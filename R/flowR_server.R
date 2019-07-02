@@ -13,6 +13,7 @@
 #' @import utils
 #' @import sp
 #' @import viridis
+#' @export
 flowR_server <- function(session, input, output) {
   
   `%then%` <- shiny:::`%OR%`
