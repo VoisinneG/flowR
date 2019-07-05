@@ -1,0 +1,45 @@
+---
+title: ""
+output:
+  html_document
+---
+
+
+## Install flowR on Windows (inside CIML)
+
+
+To install flowR, you will need R version 3.5.3 or later
+
+### Setup R in windows
+
+If you use windows 10, you can get R-3.6.0 and Rstudio using the 'Centre Logiciel:
+
+- go to 'Centre Logiciel'
+- download R-3.6.0
+- download Rstudio
+- open Rstudio
+
+Now we need to create a R library folder with read/write permissions.
+To do that using R studio, type in the console :
+```
+dir.create("C:/Temp/R_library")
+cat(".libPaths('C:/Temp/R_library')\n", file = paste0(getwd(), "/.Rprofile"))
+```
+
+Now close and restart Rstudio.
+By default, all your packages will be saved in `C:/Temp/R_library`.
+
+### Install flowR
+
+```
+install.packages("devtools")
+devtools::install_github("VoisinneG/flowR")
+```
+
+### Run flowR GUI
+
+Load flowR package and run
+```
+library(flowR)
+run_flowR()
+```
