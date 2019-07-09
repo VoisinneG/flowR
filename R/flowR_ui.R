@@ -22,11 +22,16 @@ flowR_ui <- function() {
                            fileInput(inputId = "files", 
                                      label = "Choose files", 
                                      multiple = TRUE)
-                       ),
-                       box(title = "Options",
-                           width = NULL, height = NULL,
-                           checkboxInput("apply_biexp_inverse", "apply inverse biexponential on gate coordinates")
                        )
+                       # box(title = "Import",
+                       #     width = NULL, height = NULL,
+                       #     csvFileInput(id = "datafile"),
+                       #     dataTableOutput("table")
+                       # )
+                       # box(title = "Options",
+                       #     width = NULL, height = NULL,
+                       #     checkboxInput("apply_biexp_inverse", "apply inverse biexponential on gate coordinates")
+                       # )
                        
                 ),
                 column(width = 6,
@@ -568,7 +573,7 @@ flowR_ui <- function() {
                                                       label = "subset", 
                                                       choices = "root", 
                                                       selected = "root",
-                                                      multiple = FALSE)
+                                                      multiple = TRUE)
                               ),
                               tabPanel("Compute",
                                        numericInput("ncells_per_sample", "Number of cells / subset / sample", 1000),

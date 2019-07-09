@@ -68,6 +68,12 @@ flowR_server <- function(session, input, output) {
   ##########################################################################################################
   # Select files
   
+  datafile <- callModule(csvFile, "datafile", stringsAsFactors = FALSE)
+  
+  output$table <- renderDataTable({
+    datafile()
+  })
+  
   observeEvent(input$files, {
     validate(
       need(input$files$datapath, "Please select a file to import")
@@ -892,17 +898,23 @@ flowR_server <- function(session, input, output) {
                   "tab" = "\t",
                   "space" = " ")
     
-    rval$df_meta_imported <- read.csv(input$file_meta$datapath, sep = sep, header = TRUE, quote = "\"", fill = TRUE)
+    rval$df_meta_imported <- read.csv(input$file_meta$datapath, sep = sep, header = TRUE, quote = "\"", fill = TRUE, stringsAsFactors = FALSE)
     
   })
   
   observeEvent(input$append_meta, {
+    print(rval$df_meta_imported)
     rval$df_meta <- rval$df_meta_imported
   })
   
   observe({
     idx_match <- match(rval$pdata_original$name, rval$df_meta[,1])
-    rval$df_meta_mapped <- rval$df_meta[idx_match, -1]
+    #idx_match <- idx_match[!is.na(idx_match)]
+    #if(length(idx_match)>0){
+      rval$df_meta_mapped <- rval$df_meta[idx_match, ]
+    #  print(rval$df_meta_mapped)
+    #}
+    
   })
   
   observeEvent(input$reset_meta, {
@@ -1497,7 +1509,7 @@ flowR_server <- function(session, input, output) {
     rval$df_cluster <- res$df
     df <- cbind(df_raw[res$keep, ], rval$df_cluster[c("cluster")])
     
-    rval$flow_set_cluster <- build_flowset_from_df(rval$df_cluster, fs = rval$flow_set)
+    rval$flow_set_cluster <- build_flowset_from_df(df, fs = rval$flow_set)
     
     # delete previous cluster gates
     
