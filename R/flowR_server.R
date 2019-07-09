@@ -68,11 +68,11 @@ flowR_server <- function(session, input, output) {
   ##########################################################################################################
   # Select files
   
-  datafile <- callModule(csvFile, "datafile", stringsAsFactors = FALSE)
-  
-  output$table <- renderDataTable({
-    datafile()
-  })
+  # datafile <- callModule(csvFile, "datafile", stringsAsFactors = FALSE)
+  # 
+  # output$table <- renderDataTable({
+  #   datafile()
+  # })
   
   observeEvent(input$files, {
     validate(
