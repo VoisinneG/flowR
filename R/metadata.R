@@ -206,6 +206,8 @@ metadata <- function(input, output, session, rval) {
   
   observeEvent(input$apply_filter_meta, {
     
+    ns <- session$ns
+    
     validate(
       need(rval$pdata, "No metadata")
     )
@@ -225,7 +227,8 @@ metadata <- function(input, output, session, rval) {
       idx_match <- match(samples, pData(rval$flow_set)$name)
       rval$flow_set_filter <- rval$flow_set[idx_match]
       rval$flow_set_names <- unique(c(rval$flow_set_names, "filter"))
-      updateSelectInput(session, "flow_set", choices = rval$flow_set_names, selected = "filter")
+      rval$flow_set_selected <- "filter"
+      #updateSelectInput(session, ns("flow_set"), choices = rval$flow_set_names, selected = "filter")
     }
     
   })

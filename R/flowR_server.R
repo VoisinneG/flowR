@@ -77,7 +77,9 @@ flowR_server <- function(session, input, output) {
   
   rval <- callModule(metadata, "metadata_module", rval)
 
-
+  observeEvent(rval$flow_set_selected, {
+    updateSelectInput(session, "flow_set", choices = rval$flow_set_names, selected = rval$flow_set_selected)
+  })
   ##########################################################################################################
   # Create gating set
   
