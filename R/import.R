@@ -2,6 +2,7 @@
 #' @description  A shiny Module that imports a flow set and gates from fcs files and a workspace 
 #' @param id shiny id
 #' @importFrom shinydashboard box
+#' @import DT
 #' @import shiny
 importUI <- function(id) {
   # Create a namespace function using the provided id
@@ -46,6 +47,7 @@ importUI <- function(id) {
 #' @import flowCore
 #' @import ncdfFlow
 #' @import shiny
+#' @import DT
 #' @export
 #' @rdname importUI
 import <- function(input, output, session) {

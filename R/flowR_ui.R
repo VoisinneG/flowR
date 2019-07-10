@@ -18,45 +18,7 @@ flowR_ui <- function() {
               importUI(id = "import_module")
       ),
       tabItem(tabName = "Meta_tab",
-              #metadataUI(id = "metadata_module")
-              fluidRow(
-                column(width = 6,
-                       tabBox(title = "Metadata",
-                              width = NULL, height = NULL,
-                              tabPanel(title = "Table",
-                                       div(style = 'overflow-x: scroll', DT::dataTableOutput("pData"))
-                              ),
-                              tabPanel(title = "Filter",
-                                       "Filter samples based on metadata",
-                                       uiOutput("filter_meta")
-                              )
-                       )
-                ),
-                column(width = 6,
-                       tabBox(title = "Import",
-                              width = NULL, height = NULL,
-                              tabPanel(title = "Keywords",
-                                       selectizeInput("keyword", "select keywords",
-                                                      choices = NULL,
-                                                      selected = NULL,
-                                                      multiple = TRUE),
-                                       actionButton("append_keywords", label = "Add keywords"),
-                                       br()
-                              ),
-                              tabPanel(title = "Load",
-                                       fileInput("file_meta", "load metadata file", multiple = FALSE),
-                                       selectInput("sep_meta", "column separator", choices = c("comma", "semi-column", "tab", "space"), selected = "tab"),
-                                       div(style = 'overflow-x: scroll', DT::dataTableOutput("meta")),
-                                       br(),
-                                       actionButton("append_meta", label = "Add metadata"),
-                                       actionButton("reset_meta", label = "Reset"),
-                                       br()
-
-                              )
-                       )
-                )
-              )
-              
+              metadataUI(id = "metadata_module")       
       ),
       tabItem(tabName = "Trans_tab",
               fluidRow(

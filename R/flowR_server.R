@@ -72,16 +72,11 @@ flowR_server <- function(session, input, output) {
   
   rval <- callModule(import, "import_module")
   
-  #import_val <- callModule(import, "import_files")
+  ##########################################################################################################
+  # Deal with metadata
   
-  # observe({
-  #   print(names(rval))
-  #   print(names(import_val))
-  #   for(name in names(rval)[names(rval) %in% names( import_val )]){
-  #     rval[[name]] <- import_val[[name]]
-  #   }
-  # })
-  
+  rval <- callModule(metadata, "metadata_module", rval)
+
 
   ##########################################################################################################
   # Create gating set
@@ -587,34 +582,6 @@ flowR_server <- function(session, input, output) {
   ##########################################################################################################
   # Observe functions for metadata
   
-  observe({
-    validate(
-      need(rval$pdata, "No meta data available")
-    )
-    validate(
-      need(rval$flow_set, "No flow set available")
-    )
-    validate(
-      need(setequal(pData(rval$flow_set)$name, rval$pdata$name), "Meta data does not match with flow set samples")
-    )
-    
-    pData(rval$flow_set) <- rval$pdata
-    
-  })
-  
-  observe({
-    
-    validate(
-      need(rval$flow_set, "No flow set available")
-    )
-    
-    if(is.null(rval$pdata_original)){
-      rval$pdata_original <- as.data.frame(pData(rval$flow_set))
-    }else if(!setequal(pData(rval$flow_set)$name, rval$pdata_original$name)){
-      rval$pdata_original <- as.data.frame(pData(rval$flow_set))
-    }
-    
-  })
   
   observe({
     
@@ -719,185 +686,6 @@ flowR_server <- function(session, input, output) {
                       selected = names(rval$gates_flowCore)[grep("^/cluster[0-9]+", names(rval$gates_flowCore))])
   })
   
-  #Update available keywords
-  observe({
-    
-    validate(
-      need(rval$flow_set, "No flow set available")
-    )
-    
-    ff <- rval$flow_set[[1]]
-    
-    rval$keywords <- names( ff@description )
-    
-    updateSelectInput(session, "keyword",
-                      choices = rval$keywords,
-                      selected = NULL)  
-  })
-  
-  
-  observe({
-    
-    validate(
-      need(length(input$file_meta)>0, "Please select a file to load")
-    )
-    
-    sep <- switch(input$sep_meta,
-                  "comma" = ",",
-                  "semi-column" = ";",
-                  "tab" = "\t",
-                  "space" = " ")
-    
-    rval$df_meta_imported <- read.csv(input$file_meta$datapath, sep = sep, header = TRUE, quote = "\"", fill = TRUE, stringsAsFactors = FALSE)
-    
-  })
-  
-  observeEvent(input$append_meta, {
-    print(rval$df_meta_imported)
-    rval$df_meta <- rval$df_meta_imported
-  })
-  
-  observe({
-    idx_match <- match(rval$pdata_original$name, rval$df_meta[,1])
-    #idx_match <- idx_match[!is.na(idx_match)]
-    #if(length(idx_match)>0){
-      rval$df_meta_mapped <- rval$df_meta[idx_match, ]
-    #  print(rval$df_meta_mapped)
-    #}
-    
-  })
-  
-  observeEvent(input$reset_meta, {
-    rval$df_meta <- NULL
-    rval$df_meta_mapped <- NULL
-  })
-  
-  
-  
-  observeEvent(input$append_keywords, {
-    
-    if(!is.null(rval$flow_set)){
-      
-      df <- NULL
-      keys <- input$keyword
-      
-      if(length(keys)>0){
-        for(key in keys){
-          df <- cbind(df, fsApply(rval$flow_set, function(x){description(x)[[key]]}))
-        }
-        keys <- gsub(pattern = " ", replacement = "_", keys, fixed = TRUE)
-        keys <- gsub(pattern = "$", replacement = "", keys, fixed = TRUE)
-        df <- as.data.frame(df)
-        names(df) <- keys
-        row.names(df) <- pData(rval$flow_set)$name
-      }
-      rval$df_keywords <- df
-    }
-  })
-  
-  
-  observe({
-    
-    print(rval$pdata_original)
-    
-    validate(
-      need(rval$pdata_original, "No metadata")
-    )
-    
-    df <- rval$pdata_original
-    
-    if(!is.null(rval$df_meta_mapped)){
-      if(dim(df)[1] == dim(rval$df_meta_mapped)[1]){
-        idx_new <- ! names(rval$df_meta_mapped) %in% names(df) 
-        if(sum(idx_new)>0){
-          df <- cbind(df, rval$df_meta_mapped[idx_new])
-        }
-      }
-    } 
-    if(!is.null(rval$df_keywords)){
-      if(dim(df)[1] == dim(rval$df_keywords)[1] ){
-        idx_new <- ! names(rval$df_keywords) %in% names(df)
-        if(sum(idx_new)>0){
-          df <- cbind(df, rval$df_keywords[idx_new])
-        }
-        
-      }
-    }
-    
-    if(!is.null(df)){
-      rval$pdata <- df
-    }
-    
-  })
-  
-  
-  # observe( {
-  #   
-  #   rpd <- rval$pdata
-  #   
-  #   if(!is.null(rval$pdata)){
-  #     updateSelectInput(session, "facet_var", 
-  #                       choices = c("subset", names(rval$pdata)), 
-  #                       selected = "name")
-  #     updateSelectInput(session, "facet_var_stat", 
-  #                       choices = c("subset", names(rval$pdata)), 
-  #                       selected = "name")
-  #     
-  #     updateSelectInput(session, "group_var", 
-  #                       choices = c("subset", names(rval$pdata)), 
-  #                       selected = "subset")
-  #     updateSelectInput(session, "group_var_stat", 
-  #                       choices = c("subset", names(rval$pdata)), 
-  #                       selected = "subset")
-  #     
-  #     updateSelectInput(session, "yridges_var", 
-  #                       choices = c("subset", names(rval$pdata)), 
-  #                       selected = "subset")
-  #     
-  #     updateSelectInput(session, "color_var_gate", 
-  #                       choices = c("subset", names(rval$pdata), rval$plot_var), 
-  #                       selected = "subset")
-  #     updateSelectInput(session, "color_var", 
-  #                       choices = c("subset", names(rval$pdata), rval$plot_var), 
-  #                       selected = "subset")
-  #     updateSelectInput(session, "color_var_stat", 
-  #                       choices = c("subset", names(rval$pdata)), 
-  #                       selected = "subset")
-  #     updateSelectInput(session, "color_var_trans", 
-  #                       choices = c("subset", names(rval$pdata)), 
-  #                       selected = "subset")
-  #     updateSelectInput(session, "color_var_trans", 
-  #                       choices = c("subset", names(rval$pdata)), 
-  #                       selected = "subset")
-  # 
-  #   }
-  # })
-  
-  observeEvent(input$apply_filter_meta, {
-    
-    validate(
-      need(rval$pdata, "No metadata")
-    )
-    
-    df <- list()
-    for(meta_var in names(rval$pdata)){
-      df[[meta_var]] <- rval$pdata[[meta_var]] %in% input[[meta_var]]
-    }
-    
-    df1 <- do.call(cbind, df)
-    is_selected <- apply(X = df1, MARGIN = 1, FUN = function(x){sum(x) == length(x)})
-    samples <- rval$pdata$name[is_selected]
-    
-    #print(samples)
-    
-    if(length(samples)>0){
-      idx_match <- match(samples, pData(rval$flow_set)$name)
-      rval$flow_set_filter <- rval$flow_set[idx_match]
-      rval$flow_set_names <- unique(c(rval$flow_set_names, "filter"))
-      updateSelectInput(session, "flow_set", choices = rval$flow_set_names, selected = "filter")
-    }
-    
-  })
   
   ##########################################################################################################
   # Observe functions for sample selection
@@ -1409,12 +1197,12 @@ flowR_server <- function(session, input, output) {
     as.data.frame(rval$df_spill_imported)
   })
   
-  output$meta <- DT::renderDataTable({
-    validate(
-      need(rval$df_meta_imported, "No meta data imported")
-    )
-    as.data.frame(rval$df_meta_imported)
-  })
+  # output$meta <- DT::renderDataTable({
+  #   validate(
+  #     need(rval$df_meta_imported, "No meta data imported")
+  #   )
+  #   as.data.frame(rval$df_meta_imported)
+  # })
   
   # output$files_table <- DT::renderDataTable({
   #   validate(
@@ -1470,17 +1258,17 @@ flowR_server <- function(session, input, output) {
       rownames = FALSE)
   })
   
-  output$pData <- DT::renderDataTable({
-    if(!is.null(rval$flow_set)){
-      DT::datatable(rval$pdata, rownames = FALSE)
-    }
-  })
-  
-  output$files_selection_table <- DT::renderDataTable({
-    if(!is.null(rval$flow_set)){
-      data.frame("name" = rval$pdata$name, row.names = NULL)
-    }
-  })
+  # output$pData <- DT::renderDataTable({
+  #   if(!is.null(rval$flow_set)){
+  #     DT::datatable(rval$pdata, rownames = FALSE)
+  #   }
+  # })
+  # 
+  # output$files_selection_table <- DT::renderDataTable({
+  #   if(!is.null(rval$flow_set)){
+  #     data.frame("name" = rval$pdata$name, row.names = NULL)
+  #   }
+  # })
   
   output$samples_stat <- DT::renderDataTable({
     if(!is.null(rval$flow_set)){
@@ -2277,31 +2065,31 @@ flowR_server <- function(session, input, output) {
   ##########################################################################################################
   #Dynamic ui output
   
-  output$filter_meta <- renderUI({
-    
-    validate(
-      need(rval$pdata, "No meta data")
-    )
-    
-    x <- list()
-    
-    for(meta_var in names(rval$pdata)){
-      uvar <- unique(rval$pdata[[meta_var]])
-      
-      x[[meta_var]] <- selectizeInput(meta_var, meta_var, 
-                                      choices = uvar, 
-                                      selected = uvar,
-                                      multiple = TRUE)
-      
-    }
-    
-    if(length(x)>0){
-      x[["apply_filter_meta"]] <- actionButton("apply_filter_meta", "apply filter")
-    }
-    
-    tagList(x)
-    
-  })
+  # output$filter_meta <- renderUI({
+  #   
+  #   validate(
+  #     need(rval$pdata, "No meta data")
+  #   )
+  #   
+  #   x <- list()
+  #   
+  #   for(meta_var in names(rval$pdata)){
+  #     uvar <- unique(rval$pdata[[meta_var]])
+  #     
+  #     x[[meta_var]] <- selectizeInput(meta_var, meta_var, 
+  #                                     choices = uvar, 
+  #                                     selected = uvar,
+  #                                     multiple = TRUE)
+  #     
+  #   }
+  #   
+  #   if(length(x)>0){
+  #     x[["apply_filter_meta"]] <- actionButton("apply_filter_meta", "apply filter")
+  #   }
+  #   
+  #   tagList(x)
+  #   
+  # })
   
   plot_height <- eventReactive(input$update_plot,{
     split_var <- switch(input$split_variable, 

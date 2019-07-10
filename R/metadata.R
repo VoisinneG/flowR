@@ -1,8 +1,9 @@
 #' @title   metadataUI and metadata
 #' @description  A shiny Module that deals with metadata
 #' @param id shiny id
-#' @importFrom shinydashboard box
+#' @importFrom shinydashboard box tabPanel
 #' @import shiny
+#' @import DT
 metadataUI <- function(id) {
   # Create a namespace function using the provided id
   ns <- NS(id)
@@ -12,11 +13,11 @@ metadataUI <- function(id) {
            tabBox(title = "Metadata",
                   width = NULL, height = NULL,
                   tabPanel(title = "Table",
-                           div(style = 'overflow-x: scroll', DT::dataTableOutput("pData"))      
+                           div(style = 'overflow-x: scroll', DT::dataTableOutput(ns("pData")))      
                   ),
                   tabPanel(title = "Filter",
                            "Filter samples based on metadata",
-                           uiOutput("filter_meta")
+                           uiOutput(ns("filter_meta"))
                   )
            )
     ),
@@ -24,20 +25,20 @@ metadataUI <- function(id) {
            tabBox(title = "Import",
                   width = NULL, height = NULL,
                   tabPanel(title = "Keywords",
-                           selectizeInput("keyword", "select keywords", 
+                           selectizeInput(ns("keyword"), "select keywords", 
                                           choices = NULL, 
                                           selected = NULL,
                                           multiple = TRUE),
-                           actionButton("append_keywords", label = "Add keywords"),
+                           actionButton(ns("append_keywords"), label = "Add keywords"),
                            br()   
                   ),
                   tabPanel(title = "Load",
-                           fileInput("file_meta", "load metadata file", multiple = FALSE),
-                           selectInput("sep_meta", "column separator", choices = c("comma", "semi-column", "tab", "space"), selected = "tab"),
-                           div(style = 'overflow-x: scroll', DT::dataTableOutput("meta")),
+                           fileInput(ns("file_meta"), "load metadata file", multiple = FALSE),
+                           selectInput(ns("sep_meta"), "column separator", choices = c("comma", "semi-column", "tab", "space"), selected = "tab"),
+                           div(style = 'overflow-x: scroll', DT::dataTableOutput(ns("meta"))),
                            br(),
-                           actionButton("append_meta", label = "Add metadata"),
-                           actionButton("reset_meta", label = "Reset"),
+                           actionButton(ns("append_meta"), label = "Add metadata"),
+                           actionButton(ns("reset_meta"), label = "Reset"),
                            br()
                            
                   )
@@ -48,191 +49,228 @@ metadataUI <- function(id) {
   
 }
 
+
 #' metadata server function
 #' @param input shiny input
 #' @param output shiny output
 #' @param session shiny session
 #' @return a reactivevalues object with values "df_files", "flow_set_imported" and "gates_flowCore"
-#' @importFrom CytoML parseWorkspace, openWorkspace
 #' @import flowWorkspace
 #' @import flowCore
-#' @import ncdfFlow
 #' @import shiny
+#' @import DT
 #' @export
 #' @rdname importUI
-metadata <- function(input, output, session) {
+metadata <- function(input, output, session, rval) {
   
-  rval <- reactiveValues(df_files = NULL,
-                         flow_set_imported = NULL,
-                         gates_flowCore = list()
-  )
-  
-  observeEvent(input$files, {
-    validate(
-      need(input$files$datapath, "Please select a file to import")
-    )
-    df <- input$files
-    file.rename(from = df$datapath, to = paste(dirname(df$datapath[1]),"/", df$name, sep =""))
-    df$datapath <- paste(dirname(df$datapath[1]),"/", df$name, sep ="")
-    rval$df_files <- df
-  })
-  
-  
-  ##########################################################################################################
-  # Select group within a workspace
   observe({
     validate(
-      need(length(input$files_table_rows_selected)>0, "Please select a file to load")
+      need(rval$pdata, "No meta data available")
     )
-    if(file_ext(rval$df_files$datapath[input$files_table_rows_selected[1]]) %in% c("xml", "wsp") ){
-      ws <- openWorkspace(rval$df_files$datapath[input$files_table_rows_selected[1]])
-      groups <- unique(getSampleGroups(ws)$groupName)
-      updateSelectInput(session, ns("groups"), choices = groups, selected = groups[1])
+    validate(
+      need(rval$flow_set, "No flow set available")
+    )
+    validate(
+      need(setequal(pData(rval$flow_set)$name, rval$pdata$name), "Meta data does not match with flow set samples")
+    )
+    
+    pData(rval$flow_set) <- rval$pdata
+    
+  })
+  
+  observe({
+    
+    validate(
+      need(rval$flow_set, "No flow set available")
+    )
+    
+    if(is.null(rval$pdata_original)){
+      rval$pdata_original <- as.data.frame(pData(rval$flow_set))
+    }else if(!setequal(pData(rval$flow_set)$name, rval$pdata_original$name)){
+      rval$pdata_original <- as.data.frame(pData(rval$flow_set))
     }
     
   })
   
-  observeEvent(input$load, {
+  #Update available keywords
+  observe({
     
     validate(
-      need(length(input$files_table_rows_selected)>0, "Please select a file to load")
+      need(rval$flow_set, "No flow set available")
     )
     
-    # Create a Progress object
-    progress <- shiny::Progress$new(min = 0, max = 1)
-    on.exit(progress$close())
-    progress$set(message = "Loading data", value = 0.5)
+    ff <- rval$flow_set[[1]]
     
+    rval$keywords <- names( ff@description )
     
+    updateSelectInput(session, "keyword",
+                      choices = rval$keywords,
+                      selected = NULL)  
+  })
+  
+  
+  observe({
     
+    validate(
+      need(length(input$file_meta)>0, "Please select a file to load")
+    )
     
-    if(file_ext(rval$df_files$datapath[input$files_table_rows_selected[1]]) %in% c("xml", "wsp")){
-      ws <- openWorkspace(rval$df_files$datapath[input$files_table_rows_selected[1]])
+    sep <- switch(input$sep_meta,
+                  "comma" = ",",
+                  "semi-column" = ";",
+                  "tab" = "\t",
+                  "space" = " ")
+    
+    rval$df_meta_imported <- read.csv(input$file_meta$datapath, sep = sep, header = TRUE, quote = "\"", fill = TRUE, stringsAsFactors = FALSE)
+    
+  })
+  
+  observeEvent(input$append_meta, {
+    print(rval$df_meta_imported)
+    rval$df_meta <- rval$df_meta_imported
+  })
+  
+  observe({
+    idx_match <- match(rval$pdata_original$name, rval$df_meta[,1])
+    #idx_match <- idx_match[!is.na(idx_match)]
+    #if(length(idx_match)>0){
+    rval$df_meta_mapped <- rval$df_meta[idx_match, ]
+    #  print(rval$df_meta_mapped)
+    #}
+    
+  })
+  
+  observeEvent(input$reset_meta, {
+    rval$df_meta <- NULL
+    rval$df_meta_mapped <- NULL
+  })
+  
+  
+  
+  observeEvent(input$append_keywords, {
+    
+    if(!is.null(rval$flow_set)){
       
-      gs <- try(parseWorkspace(ws,
-                               name = input$groups,
-                               execute = TRUE,
-                               isNcdf = TRUE,
-                               sampNloc = "sampleNode",
-                               path = dirname(rval$df_files$datapath[1])),
-                silent = TRUE)
+      df <- NULL
+      keys <- input$keyword
       
-      if(class(gs) != "GatingSet"){
-        showModal(modalDialog(
-          title = "Error parsing xml workspace",
-          paste("Please try importing FCS files directly", sep=""),
-          easyClose = TRUE,
-          footer = NULL
-        ))
-      }
-      
-      validate(
-        need(class(gs) == "GatingSet", "No gating set imported")
-      )
-      
-      fs <- getData(gs)
-      
-      ###################################################################################
-      #get gates and transfrom gates
-      
-      gates <- get_gates_from_gs(gs)
-      if(file_ext(rval$df_files$datapath[input$files_table_rows_selected[1]]) %in% c("wsp")){
-        gates <- get_gates_from_ws(ws_path = rval$df_files$datapath[input$files_table_rows_selected[1]], 
-                                   group = input$groups)
-      }
-      
-      print(gates)
-      
-      ff <- fs[[1]]
-      
-      # time_step is needed to transform gates containing the parameter "Time"
-      time_step <- as.numeric(description(ff)[["$TIMESTEP"]])
-      
-      # Parameters with a DISPLAY = LOG have been transformed with flowJo_biexp_trans().
-      # We need to apply the inverse transfrom for such parameters
-      
-      display <- unlist(sapply(rownames(parameters(ff)@data), FUN = function(x){
-        kw <- substr(x, start = 2, stop = nchar(x))
-        kw <- paste(kw, "DISPLAY", sep = "")
-        disp <- ff@description[[kw]]
-        if(is.null(disp)){
-          disp <- "NA"
+      if(length(keys)>0){
+        for(key in keys){
+          df <- cbind(df, fsApply(rval$flow_set, function(x){description(x)[[key]]}))
         }
-        return(disp)
-      }))
-      names(display) <- NULL
-      
-      if(input$apply_biexp_inverse){
-        trans.log <- flowJo_biexp_inverse_trans()
-      }else{
-        trans.log <- identity_trans()
+        keys <- gsub(pattern = " ", replacement = "_", keys, fixed = TRUE)
+        keys <- gsub(pattern = "$", replacement = "", keys, fixed = TRUE)
+        df <- as.data.frame(df)
+        names(df) <- keys
+        row.names(df) <- pData(rval$flow_set)$name
       }
-      
-      myTrans <- lapply(display, function(x){
-        switch(x,
-               "LOG" = trans.log,
-               identity_trans())
-      })
-      
-      params <- parameters(ff)$name
-      print(params)
-      
-      pattern <- NULL
-      if( length( grep("[\\<|\\>]", params) ) >0 ){
-        pattern <- "[\\<|\\>]"
-      }else if(length( grep("Comp-", params) ) >0){
-        pattern <- "Comp-"
+      rval$df_keywords <- df
+    }
+  })
+  
+  
+  observe({
+    
+    print(rval$pdata_original)
+    
+    validate(
+      need(rval$pdata_original, "No metadata")
+    )
+    
+    df <- rval$pdata_original
+    
+    if(!is.null(rval$df_meta_mapped)){
+      if(dim(df)[1] == dim(rval$df_meta_mapped)[1]){
+        idx_new <- ! names(rval$df_meta_mapped) %in% names(df) 
+        if(sum(idx_new)>0){
+          df <- cbind(df, rval$df_meta_mapped[idx_new])
+        }
       }
-      #print(pattern)
-      replacement <- ""
-      if(!is.null(pattern)){
-        params <- gsub(pattern = pattern, replacement = replacement, params)
+    } 
+    if(!is.null(rval$df_keywords)){
+      if(dim(df)[1] == dim(rval$df_keywords)[1] ){
+        idx_new <- ! names(rval$df_keywords) %in% names(df)
+        if(sum(idx_new)>0){
+          df <- cbind(df, rval$df_keywords[idx_new])
+        }
+        
       }
-      
-      names(myTrans) <- params
-      
-      rval$gates_flowCore <- transform_gates(gates = gates, 
-                                             pattern = pattern,
-                                             replacement = replacement,
-                                             transformation = myTrans, 
-                                             time_step = time_step)
-      
-      ###################################################################################
-      #match fcs file names and import non-compensated, non-transfromed data
-      
-      names_imported <- fsApply(fs, function(x){description(x)[["FILENAME"]]})
-      names_imported <- basename(names_imported)
-      #print(names_imported)
-      #idx_match <- sapply(names_imported, function(x){as.numeric(strsplit(x, split= ".", fixed = TRUE)[[1]][1])})
-      idx_match <- match(names_imported, rval$df_files$name)
-      
-      fs <- ncdfFlow::read.ncdfFlowSet( rval$df_files$datapath[idx_match] )
-      phenoData(fs)$name <- rval$df_files$name[idx_match]
-      
-      
-    }else{
-      fs <- ncdfFlow::read.ncdfFlowSet( rval$df_files$datapath[input$files_table_rows_selected] , emptyValue=FALSE)
-      phenoData(fs)$name <- rval$df_files$name[input$files_table_rows_selected]
     }
     
-    #Initialization of some reactive variables
-    
-    rval$flow_set_imported <- fs
-    
+    if(!is.null(df)){
+      rval$pdata <- df
+    }
     
   })
   
   
-  
-  output$files_table <- DT::renderDataTable({
+  observeEvent(input$apply_filter_meta, {
+    
     validate(
-      need(rval$df_files, "Please select a file to import")
+      need(rval$pdata, "No metadata")
     )
-    df <- rval$df_files[ ,c("name", "size")]
-    df$new_name <- basename(rval$df_files$datapath)
-    df$dir_name <- dirname(rval$df_files$datapath)
-    df
+    
+    df <- list()
+    for(meta_var in names(rval$pdata)){
+      df[[meta_var]] <- rval$pdata[[meta_var]] %in% input[[meta_var]]
+    }
+    
+    df1 <- do.call(cbind, df)
+    is_selected <- apply(X = df1, MARGIN = 1, FUN = function(x){sum(x) == length(x)})
+    samples <- rval$pdata$name[is_selected]
+    
+    #print(samples)
+    
+    if(length(samples)>0){
+      idx_match <- match(samples, pData(rval$flow_set)$name)
+      rval$flow_set_filter <- rval$flow_set[idx_match]
+      rval$flow_set_names <- unique(c(rval$flow_set_names, "filter"))
+      updateSelectInput(session, "flow_set", choices = rval$flow_set_names, selected = "filter")
+    }
+    
   })
+  
+  output$filter_meta <- renderUI({
+    
+    ns <- session$ns
+    
+    validate(
+      need(rval$pdata, "No meta data")
+    )
+    
+    x <- list()
+    
+    for(meta_var in names(rval$pdata)){
+      uvar <- unique(rval$pdata[[meta_var]])
+      
+      x[[meta_var]] <- selectizeInput(ns(meta_var), meta_var, 
+                                      choices = uvar, 
+                                      selected = uvar,
+                                      multiple = TRUE)
+      
+    }
+    
+    if(length(x)>0){
+      x[["apply_filter_meta"]] <- actionButton(ns("apply_filter_meta"), "apply filter")
+    }
+    
+    tagList(x)
+    
+  })
+  
+  output$pData <- DT::renderDataTable({
+    if(!is.null(rval$flow_set)){
+      DT::datatable(rval$pdata, rownames = FALSE)
+    }
+  })
+  
+  output$meta <- DT::renderDataTable({
+    validate(
+      need(rval$df_meta_imported, "No meta data imported")
+    )
+    as.data.frame(rval$df_meta_imported)
+  })
+  
   
   return(rval)
   

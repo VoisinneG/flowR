@@ -10,7 +10,7 @@ importUI(id)
 
 import(input, output, session)
 
-metadata(input, output, session)
+metadata(input, output, session, rval)
 }
 \arguments{
 \item{id}{shiny id}
