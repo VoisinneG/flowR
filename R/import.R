@@ -15,6 +15,10 @@ importUI <- function(id) {
                          label = "Choose files", 
                          multiple = TRUE)
            )
+           # box(title = "Options",
+           #     width = NULL, height = NULL,
+           #    checkboxInput(ns("apply_biexp_inverse"), "apply inverse biexponential on gate coordinates")
+           # )
     ),
     column(width = 6,
            box(title = "Input files",
@@ -71,7 +75,7 @@ import <- function(input, output, session) {
     if(file_ext(rval$df_files$datapath[input$files_table_rows_selected[1]]) %in% c("xml", "wsp") ){
       ws <- openWorkspace(rval$df_files$datapath[input$files_table_rows_selected[1]])
       groups <- unique(getSampleGroups(ws)$groupName)
-      updateSelectInput(session, ns("groups"), choices = groups, selected = groups[1])
+      updateSelectInput(session, "groups", choices = groups, selected = groups[1])
     }
     
   })
@@ -146,11 +150,12 @@ import <- function(input, output, session) {
         }))
         names(display) <- NULL
         
-        if(input$apply_biexp_inverse){
-          trans.log <- flowJo_biexp_inverse_trans()
-        }else{
-          trans.log <- identity_trans()
-        }
+        trans.log <- identity_trans()
+        # if(input$apply_biexp_inverse){
+        #   trans.log <- flowJo_biexp_inverse_trans()
+        # }else{
+        #   trans.log <- identity_trans()
+        # }
         
         myTrans <- lapply(display, function(x){
           switch(x,
