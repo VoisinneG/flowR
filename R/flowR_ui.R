@@ -15,47 +15,16 @@ flowR_ui <- function() {
     ),
     tabItems(
       tabItem(tabName = "Import_tab",
-              fluidRow(
-                column(width = 6,
-                       box(title = "Import",
-                           width = NULL, height = NULL,
-                           fileInput(inputId = "files", 
-                                     label = "Choose files", 
-                                     multiple = TRUE)
-                       )
-                       # box(title = "Import",
-                       #     width = NULL, height = NULL,
-                       #     csvFileInput(id = "datafile"),
-                       #     dataTableOutput("table")
-                       # )
-                       # box(title = "Options",
-                       #     width = NULL, height = NULL,
-                       #     checkboxInput("apply_biexp_inverse", "apply inverse biexponential on gate coordinates")
-                       # )
-                       
-                ),
-                column(width = 6,
-                       box(title = "Input files",
-                           width = NULL, height = NULL,
-                           div(style = 'overflow-x: scroll', DT::dataTableOutput("files_table")),
-                           br(),
-                           selectizeInput("groups", "select groups", 
-                                          choices = NULL, 
-                                          selected = NULL,
-                                          multiple = FALSE),
-                           actionButton("load", label = "Load selected files")
-                       )
-                )
-              )
-              
+              importUI(id = "import_module")
       ),
       tabItem(tabName = "Meta_tab",
+              #metadataUI(id = "metadata_module")
               fluidRow(
                 column(width = 6,
                        tabBox(title = "Metadata",
                               width = NULL, height = NULL,
                               tabPanel(title = "Table",
-                                       div(style = 'overflow-x: scroll', DT::dataTableOutput("pData"))      
+                                       div(style = 'overflow-x: scroll', DT::dataTableOutput("pData"))
                               ),
                               tabPanel(title = "Filter",
                                        "Filter samples based on metadata",
@@ -67,12 +36,12 @@ flowR_ui <- function() {
                        tabBox(title = "Import",
                               width = NULL, height = NULL,
                               tabPanel(title = "Keywords",
-                                       selectizeInput("keyword", "select keywords", 
-                                                      choices = NULL, 
+                                       selectizeInput("keyword", "select keywords",
+                                                      choices = NULL,
                                                       selected = NULL,
                                                       multiple = TRUE),
                                        actionButton("append_keywords", label = "Add keywords"),
-                                       br()   
+                                       br()
                               ),
                               tabPanel(title = "Load",
                                        fileInput("file_meta", "load metadata file", multiple = FALSE),
@@ -82,7 +51,7 @@ flowR_ui <- function() {
                                        actionButton("append_meta", label = "Add metadata"),
                                        actionButton("reset_meta", label = "Reset"),
                                        br()
-                                       
+
                               )
                        )
                 )

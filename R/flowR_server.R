@@ -18,255 +18,79 @@ flowR_server <- function(session, input, output) {
   
   `%then%` <- shiny:::`%OR%`
   
-  rval <- reactiveValues(df_files = NULL,
-                         datasets = list(),
-                         flow_set_imported = NULL,
-                         flow_set_filter = NULL,
-                         flow_set_sample = NULL,
-                         flow_set_tsne = NULL,
-                         flow_set_cluster = NULL,
-                         flow_set = NULL,
-                         gating_set = NULL,
-                         idx_ff_gate = NULL,
-                         parameters = NULL,
-                         gates = list(),
-                         gate_focus = NULL,
-                         df_gate_focus = NULL,
-                         gates_flowCore = list(),
-                         min_val = NULL,
-                         max_val = NULL,
-                         transformation = list(),
-                         trans_parameters = list(),
-                         keywords = NULL,
-                         plot_var = NULL,
-                         gate = NULL,
-                         data_range = NULL,
-                         pdata = NULL,
-                         pdata_original = NULL,
-                         df_tot = NULL,
-                         df_meta = NULL,
-                         df_meta_imported = NULL,
-                         df_meta_mapped = NULL,
-                         df_keywords = NULL,
-                         df_sample = NULL,
-                         df_tsne = NULL,
-                         df_cluster = NULL,
-                         df_spill_original = NULL,
-                         df_spill = NULL,
-                         df_spill_imported = NULL,
-                         spill = NULL,
-                         Ncells_tot = 0,
-                         flow_set_names = NULL,
-                         pos_values = list(),
-                         neg_values = list(),
-                         time_step = 1,
-                         dim_red_var = NULL
-  )
+  rval <- reactiveValues()
+  
+  # rval <- reactiveValues(df_files = NULL,
+  #                        datasets = list(),
+  #                        flow_set_imported = NULL,
+  #                        flow_set_filter = NULL,
+  #                        flow_set_sample = NULL,
+  #                        flow_set_tsne = NULL,
+  #                        flow_set_cluster = NULL,
+  #                        flow_set = NULL,
+  #                        gating_set = NULL,
+  #                        idx_ff_gate = NULL,
+  #                        parameters = NULL,
+  #                        gates = list(),
+  #                        gate_focus = NULL,
+  #                        df_gate_focus = NULL,
+  #                        gates_flowCore = list(),
+  #                        min_val = NULL,
+  #                        max_val = NULL,
+  #                        transformation = list(),
+  #                        trans_parameters = list(),
+  #                        keywords = NULL,
+  #                        plot_var = NULL,
+  #                        gate = NULL,
+  #                        data_range = NULL,
+  #                        pdata = NULL,
+  #                        pdata_original = NULL,
+  #                        df_tot = NULL,
+  #                        df_meta = NULL,
+  #                        df_meta_imported = NULL,
+  #                        df_meta_mapped = NULL,
+  #                        df_keywords = NULL,
+  #                        df_sample = NULL,
+  #                        df_tsne = NULL,
+  #                        df_cluster = NULL,
+  #                        df_spill_original = NULL,
+  #                        df_spill = NULL,
+  #                        df_spill_imported = NULL,
+  #                        spill = NULL,
+  #                        Ncells_tot = 0,
+  #                        flow_set_names = NULL,
+  #                        pos_values = list(),
+  #                        neg_values = list(),
+  #                        time_step = 1,
+  #                        dim_red_var = NULL
+  # )
   
   gate <- reactiveValues(x = NULL, y = NULL)
   
   ##########################################################################################################
-  # Select files
+  # Import flowSet, gates from fcs files and workspace
   
-  # datafile <- callModule(csvFile, "datafile", stringsAsFactors = FALSE)
-  # 
-  # output$table <- renderDataTable({
-  #   datafile()
+  rval <- callModule(import, "import_module")
+  
+  #import_val <- callModule(import, "import_files")
+  
+  # observe({
+  #   print(names(rval))
+  #   print(names(import_val))
+  #   for(name in names(rval)[names(rval) %in% names( import_val )]){
+  #     rval[[name]] <- import_val[[name]]
+  #   }
   # })
   
-  observeEvent(input$files, {
-    validate(
-      need(input$files$datapath, "Please select a file to import")
-    )
-    rval$df_files <- input$files
-    
-    file.rename(from = rval$df_files$datapath, to = paste(dirname(rval$df_files$datapath[1]),"/", rval$df_files$name, sep =""))
-    
-    rval$df_files$datapath <- paste(dirname(rval$df_files$datapath[1]),"/", rval$df_files$name, sep ="")
-    
-    #print( list.files( dirname(rval$df_files$datapath[1])) )
-    
-    #print(names(input$files))
-  })
-  
-  ##########################################################################################################
-  # Select group within a workspace
-  observe({
-    validate(
-      need(length(input$files_table_rows_selected)>0, "Please select a file to load")
-    )
-    if(file_ext(rval$df_files$datapath[input$files_table_rows_selected[1]]) %in% c("xml", "wsp") ){
-      ws <- openWorkspace(rval$df_files$datapath[input$files_table_rows_selected[1]])
-      groups <- unique(getSampleGroups(ws)$groupName)
-      updateSelectInput(session, "groups", choices = groups, selected = groups[1])
-    }
-    
-  })
-  
-  ##########################################################################################################
-  # import flow set
-  
-  observeEvent(input$load, {
-    
-    validate(
-      need(length(input$files_table_rows_selected)>0, "Please select a file to load")
-    )
-    
-    # Create a Progress object
-    progress <- shiny::Progress$new(min = 0, max = 1)
-    on.exit(progress$close())
-    progress$set(message = "Loading data", value = 0.5)
-    
-    if(length(rval$df_files$datapath)>0){
-      
-      if(file_ext(rval$df_files$datapath[input$files_table_rows_selected[1]]) %in% c("xml", "wsp")){
-        ws <- openWorkspace(rval$df_files$datapath[input$files_table_rows_selected[1]])
-        #print(getSamples(ws))
-        #show(ws)
-        #print(dirname(rval$df_files$datapath[1]))
-        #print( list.files( dirname(rval$df_files$datapath[1])) )
-        
-        gs <- try(parseWorkspace(ws,
-                                 name = input$groups,
-                                 execute = TRUE,
-                                 isNcdf = TRUE,
-                                 sampNloc = "sampleNode",
-                                 #sampNloc = "keyword",
-                                 #path = "/var/folders/lb"),
-                                 path = dirname(rval$df_files$datapath[1])),
-                  silent = TRUE)
-        
-        if(class(gs) != "GatingSet"){
-          showModal(modalDialog(
-            title = "Error parsing xml workspace",
-            paste("Please try importing FCS files directly", sep=""),
-            easyClose = TRUE,
-            footer = NULL
-          ))
-        }
-        
-        validate(
-          need(class(gs) == "GatingSet", "No gating set imported")
-        )
-        
-        fs <- getData(gs)
-        
-        ###################################################################################
-        #get gates and transfrom gates
-        
-        gates <- get_gates_from_gs(gs)
-        if(file_ext(rval$df_files$datapath[input$files_table_rows_selected[1]]) %in% c("wsp")){
-          gates <- get_gates_from_ws(ws_path = rval$df_files$datapath[input$files_table_rows_selected[1]], 
-                                     group = input$groups)
-        }
-        
-        print(gates)
-        
-        ff <- fs[[1]]
-        
-        # time_step is needed to transform gates containing the parameter "Time"
-        rval$time_step <- as.numeric(description(ff)[["$TIMESTEP"]])
-        
-        # Parameters with a DISPLAY = LOG have been transformed with flowJo_biexp_trans().
-        # We need to apply the inverse transfrom for such parameters
-        
-        display <- unlist(sapply(rownames(parameters(ff)@data), FUN = function(x){
-          kw <- substr(x, start = 2, stop = nchar(x))
-          kw <- paste(kw, "DISPLAY", sep = "")
-          disp <- ff@description[[kw]]
-          if(is.null(disp)){
-            disp <- "NA"
-          }
-          return(disp)
-        }))
-        names(display) <- NULL
-        
-        if(input$apply_biexp_inverse){
-          trans.log <- flowJo_biexp_inverse_trans()
-        }else{
-          trans.log <- identity_trans()
-        }
-        
-        myTrans <- lapply(display, function(x){
-          switch(x,
-                 "LOG" = trans.log,
-                 identity_trans())
-        })
-        
-        params <- parameters(ff)$name
-        print(params)
-        
-        pattern <- NULL
-        if( length( grep("[\\<|\\>]", params) ) >0 ){
-          pattern <- "[\\<|\\>]"
-        }else if(length( grep("Comp-", params) ) >0){
-          pattern <- "Comp-"
-        }
-        #print(pattern)
-        replacement <- ""
-        if(!is.null(pattern)){
-          params <- gsub(pattern = pattern, replacement = replacement, params)
-        }
-        
-        names(myTrans) <- params
-        
-        rval$gates_flowCore <- transform_gates(gates = gates, 
-                                               pattern = pattern,
-                                               replacement = replacement,
-                                               transformation = myTrans, 
-                                               time_step = rval$time_step)
-        
-        ###################################################################################
-        #match fcs file names and import non-compensated, non-transfromed data
-        
-        names_imported <- fsApply(fs, function(x){description(x)[["FILENAME"]]})
-        names_imported <- basename(names_imported)
-        #print(names_imported)
-        #idx_match <- sapply(names_imported, function(x){as.numeric(strsplit(x, split= ".", fixed = TRUE)[[1]][1])})
-        idx_match <- match(names_imported, rval$df_files$name)
-        
-        rval$flow_set <- ncdfFlow::read.ncdfFlowSet( rval$df_files$datapath[idx_match] )
-        phenoData(rval$flow_set)$name <- rval$df_files$name[idx_match]
-        
-        
-      }else{
-        rval$flow_set <- ncdfFlow::read.ncdfFlowSet( rval$df_files$datapath[input$files_table_rows_selected] , emptyValue=FALSE)
-        phenoData(rval$flow_set)$name <- rval$df_files$name[input$files_table_rows_selected]
-      }
-      
-      #Initialization of some reactive variables
-      fs <- rval$flow_set 
-      rval$flow_set_imported <- fs
-      
-      m <- diag( length(parameters(fs[[1]])$name) )
-      colnames(m) <- parameters(fs[[1]])$name
-      rval$df_spill <- as.data.frame(m)
-      row.names(rval$df_spill) <- colnames(rval$df_spill)
-      
-      #rval$df_spill <- NULL
-      
-      for(i in 1:length(fs)){
-        if("SPILL" %in% names(description(fs[[i]]))){
-          df <- as.data.frame(description(fs[[i]])[["SPILL"]])
-          is_identity <- sum(apply(X=df, MARGIN = 1, FUN = function(x){sum(x==0) == (length(x)-1)})) == dim(df)[1]
-          if(!is_identity){
-            rval$df_spill <- df
-            row.names(rval$df_spill) <- colnames(rval$df_spill)
-            break
-          }
-        }
-      }
-      
-      rval$df_spill_original <- rval$df_spill
-      
-      rval$flow_set_names <- unique(c(rval$flow_set_names, "imported"))
-      updateSelectInput(session, "flow_set", choices = rval$flow_set_names, selected = "imported")
-    }
-  })
-  
-  
+
   ##########################################################################################################
   # Create gating set
+  
+  observeEvent(rval$flow_set_imported, {
+    rval$flow_set_names <- "imported"
+    updateSelectInput(session, "flow_set", choices = rval$flow_set_names, selected = "imported")
+  })
+  
   
   observe({
     validate(
@@ -553,6 +377,32 @@ flowR_server <- function(session, input, output) {
   
   ##########################################################################################################
   # Observe functions for compensation
+  
+  observeEvent(rval$flow_set_imported, {
+    fs <- rval$flow_set_imported
+    m <- diag( length(parameters(fs[[1]])$name) )
+    colnames(m) <- parameters(fs[[1]])$name
+    rval$df_spill <- as.data.frame(m)
+    row.names(rval$df_spill) <- colnames(rval$df_spill)
+    
+    #rval$df_spill <- NULL
+    
+    for(i in 1:length(fs)){
+      if("SPILL" %in% names(description(fs[[i]]))){
+        df <- as.data.frame(description(fs[[i]])[["SPILL"]])
+        is_identity <- sum(apply(X=df, MARGIN = 1, FUN = function(x){sum(x==0) == (length(x)-1)})) == dim(df)[1]
+        if(!is_identity){
+          rval$df_spill <- df
+          row.names(rval$df_spill) <- colnames(rval$df_spill)
+          break
+        }
+      }
+    }
+    
+    rval$df_spill_original <- rval$df_spill
+    
+  })
+  
   
   observeEvent(input$add_spill_param, {
     
@@ -1566,15 +1416,15 @@ flowR_server <- function(session, input, output) {
     as.data.frame(rval$df_meta_imported)
   })
   
-  output$files_table <- DT::renderDataTable({
-    validate(
-      need(rval$df_files, "Please select a file to import")
-    )
-    df <- rval$df_files[ ,c("name", "size")]
-    df$new_name <- basename(rval$df_files$datapath)
-    df$dir_name <- dirname(rval$df_files$datapath)
-    df
-  })
+  # output$files_table <- DT::renderDataTable({
+  #   validate(
+  #     need(rval$df_files, "Please select a file to import")
+  #   )
+  #   df <- rval$df_files[ ,c("name", "size")]
+  #   df$new_name <- basename(rval$df_files$datapath)
+  #   df$dir_name <- dirname(rval$df_files$datapath)
+  #   df
+  # })
   
   output$parameters_table <- DT::renderDataTable({
     
@@ -1683,9 +1533,12 @@ flowR_server <- function(session, input, output) {
   })
   
   output$progressBox3 <- renderValueBox({
-    
+    ncells <- 0
+    if(!is.null(rval$Ncells_tot)){
+      ncells <- rval$Ncells_tot
+    }
     valueBox(
-      format(rval$Ncells_tot, digits = 2), "cells", icon = icon("list"),
+      format(ncells, digits = 2), "cells", icon = icon("list"),
       color = "green"
     )
   })
