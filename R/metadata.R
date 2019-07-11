@@ -1,7 +1,7 @@
 #' @title   metadataUI and metadata
 #' @description  A shiny Module that deals with metadata
 #' @param id shiny id
-#' @importFrom shinydashboard box tabPanel
+#' @importFrom shinydashboard box tabBox
 #' @import shiny
 #' @import DT
 metadataUI <- function(id) {
