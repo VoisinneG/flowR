@@ -1266,11 +1266,12 @@ flowR_server <- function(session, input, output) {
   #   }
   # })
   # 
-  # output$files_selection_table <- DT::renderDataTable({
-  #   if(!is.null(rval$flow_set)){
-  #     data.frame("name" = rval$pdata$name, row.names = NULL)
-  #   }
-  # })
+  
+  output$files_selection_table <- DT::renderDataTable({
+    if(!is.null(rval$flow_set)){
+      data.frame("name" = rval$pdata$name, row.names = NULL)
+    }
+  })
   
   output$samples_stat <- DT::renderDataTable({
     if(!is.null(rval$flow_set)){
