@@ -42,7 +42,7 @@ importUI <- function(id) {
 #' @param output shiny output
 #' @param session shiny session
 #' @return a reactivevalues object with values "df_files", "flow_set_imported" and "gates_flowCore"
-#' @importFrom CytoML parseWorkspace, openWorkspace
+#' @importFrom CytoML parseWorkspace openWorkspace
 #' @import flowWorkspace
 #' @import flowCore
 #' @import ncdfFlow
