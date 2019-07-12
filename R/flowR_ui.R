@@ -21,89 +21,90 @@ flowR_ui <- function() {
               metadataUI(id = "metadata_module")       
       ),
       tabItem(tabName = "Trans_tab",
-              fluidRow(
-                
-                column(width = 5,
-                       tabBox(title = "Chanels",
-                              width = NULL, height = NULL,
-                              tabPanel(title = "Table",
-                                       "Select chanels",
-                                       br(),
-                                       br(),
-                                       div(style = 'overflow-x: scroll', DT::dataTableOutput("parameters_table"))
-                                       
-                              ),
-                              tabPanel(title = "Transform",
-                                       selectInput("trans", "transformation", 
-                                                   choices = c("identity", "logicle", "asinh", "flowJo_asinh", "log"), 
-                                                   selected = "identity"),
-                                       conditionalPanel(condition = "input.trans == 'asinh'",
-                                                        h5("Parameters"),
-                                                        numericInput("base_asinh", label = "base", value = 1)
-                                       ),
-                                       conditionalPanel(condition = "input.trans == 'flowJo_asinh'",
-                                                        h5("Parameters"),
-                                                        numericInput("m", label = "m", value = 5),
-                                                        numericInput("t", label = "t", value = 12000),
-                                                        numericInput("a", label = "a", value = 0.7),
-                                                        numericInput("length", label = "length", value = 256)
-                                       ),
-                                       conditionalPanel(condition = "input.trans == 'logicle'",
-                                                        h5("Parameters"),
-                                                        numericInput("w_logicle", label = "w", value = 0.5),
-                                                        numericInput("t_logicle", label = "t", value = 262144),
-                                                        numericInput("m_logicle", label = "m", value = 4.5),
-                                                        numericInput("a_logicle", label = "a", value = 0)
-                                       ),
-                                       conditionalPanel(condition = "input.trans == 'log'",
-                                                        h5("Parameters"),
-                                                        numericInput("base_log", label = "base", value = 10)
-                                       ),
-                                       br(),
-                                       actionButton("apply_transformation", label = "apply to selected chanels"),
-                                       br()
-                              )
-                       )
-                ),
-                column(width = 7,
-                       tabBox(title = "Plot",
-                              width = NULL, height = NULL,
-                              tabPanel("Plot",
-                                       plotOutput("plot_trans")
-                                       
-                              ),
-                              tabPanel("Select",
-                                       selectInput("sample_selected_trans", label = "Sample", choices = NULL, selected = NULL),
-                                       actionButton("previous_frame_trans", "previous"),
-                                       actionButton("next_frame_trans", "next"),
-                                       br(),
-                                       br(),
-                                       selectizeInput("gate_trans", 
-                                                      label = "subset", 
-                                                      choices = "root", 
-                                                      selected = "root",
-                                                      multiple = FALSE),
-                                       selectInput("xvar_trans", label = "x variable", choices = NULL, selected = NULL),
-                                       selectInput("yvar_trans", label = "y variable", choices = NULL, selected = NULL)
-                              ),
-                              tabPanel("Options",
-                                       selectInput("plot_type_trans", label = "plot type",
-                                                   choices = c("hexagonal", "histogram", "dots", "contour"),
-                                                   selected = "histogram"),
-                                       checkboxInput("legend_trans", "show legend", value = FALSE),
-                                       checkboxInput("norm_trans", "normalize (set max to 1)", value = TRUE),
-                                       checkboxInput("smooth_trans", "smooth", value = FALSE),
-                                       selectInput("color_var_trans", "color variable",
-                                                   choices = "none",
-                                                   selected = "none"),
-                                       numericInput("bin_number_trans", label = "number of bins", value = 50),
-                                       numericInput("alpha_trans", label = "alpha", value = 0.5),
-                                       numericInput("size_trans", label = "size", value = 1)
-                                       
-                              )
-                       )
-                )
-              )
+              transformUI(id = "transform_module")
+              # fluidRow(
+              #   
+              #   column(width = 5,
+              #          tabBox(title = "Chanels",
+              #                 width = NULL, height = NULL,
+              #                 tabPanel(title = "Table",
+              #                          "Select chanels",
+              #                          br(),
+              #                          br(),
+              #                          div(style = 'overflow-x: scroll', DT::dataTableOutput("parameters_table"))
+              #                          
+              #                 ),
+              #                 tabPanel(title = "Transform",
+              #                          selectInput("trans", "transformation", 
+              #                                      choices = c("identity", "logicle", "asinh", "flowJo_asinh", "log"), 
+              #                                      selected = "identity"),
+              #                          conditionalPanel(condition = "input.trans == 'asinh'",
+              #                                           h5("Parameters"),
+              #                                           numericInput("base_asinh", label = "base", value = 1)
+              #                          ),
+              #                          conditionalPanel(condition = "input.trans == 'flowJo_asinh'",
+              #                                           h5("Parameters"),
+              #                                           numericInput("m", label = "m", value = 5),
+              #                                           numericInput("t", label = "t", value = 12000),
+              #                                           numericInput("a", label = "a", value = 0.7),
+              #                                           numericInput("length", label = "length", value = 256)
+              #                          ),
+              #                          conditionalPanel(condition = "input.trans == 'logicle'",
+              #                                           h5("Parameters"),
+              #                                           numericInput("w_logicle", label = "w", value = 0.5),
+              #                                           numericInput("t_logicle", label = "t", value = 262144),
+              #                                           numericInput("m_logicle", label = "m", value = 4.5),
+              #                                           numericInput("a_logicle", label = "a", value = 0)
+              #                          ),
+              #                          conditionalPanel(condition = "input.trans == 'log'",
+              #                                           h5("Parameters"),
+              #                                           numericInput("base_log", label = "base", value = 10)
+              #                          ),
+              #                          br(),
+              #                          actionButton("apply_transformation", label = "apply to selected chanels"),
+              #                          br()
+              #                 )
+              #          )
+              #   ),
+              #   column(width = 7,
+              #          tabBox(title = "Plot",
+              #                 width = NULL, height = NULL,
+              #                 tabPanel("Plot",
+              #                          plotOutput("plot_trans")
+              #                          
+              #                 ),
+              #                 tabPanel("Select",
+              #                          selectInput("sample_selected_trans", label = "Sample", choices = NULL, selected = NULL),
+              #                          actionButton("previous_frame_trans", "previous"),
+              #                          actionButton("next_frame_trans", "next"),
+              #                          br(),
+              #                          br(),
+              #                          selectizeInput("gate_trans", 
+              #                                         label = "subset", 
+              #                                         choices = "root", 
+              #                                         selected = "root",
+              #                                         multiple = FALSE),
+              #                          selectInput("xvar_trans", label = "x variable", choices = NULL, selected = NULL),
+              #                          selectInput("yvar_trans", label = "y variable", choices = NULL, selected = NULL)
+              #                 ),
+              #                 tabPanel("Options",
+              #                          selectInput("plot_type_trans", label = "plot type",
+              #                                      choices = c("hexagonal", "histogram", "dots", "contour"),
+              #                                      selected = "histogram"),
+              #                          checkboxInput("legend_trans", "show legend", value = FALSE),
+              #                          checkboxInput("norm_trans", "normalize (set max to 1)", value = TRUE),
+              #                          checkboxInput("smooth_trans", "smooth", value = FALSE),
+              #                          selectInput("color_var_trans", "color variable",
+              #                                      choices = "none",
+              #                                      selected = "none"),
+              #                          numericInput("bin_number_trans", label = "number of bins", value = 50),
+              #                          numericInput("alpha_trans", label = "alpha", value = 0.5),
+              #                          numericInput("size_trans", label = "size", value = 1)
+              #                          
+              #                 )
+              #          )
+              #   )
+              # )
               
       ),
       tabItem(tabName = "Comp_tab",
@@ -204,8 +205,8 @@ flowR_ui <- function() {
                                        br(),
                                        br(),
                                        selectizeInput("gate_comp", 
-                                                      label = "subset", 
-                                                      choices = "root", 
+                                                      label = "subset",
+                                                      choices = "root",
                                                       selected = "root",
                                                       multiple = FALSE)
                               ),

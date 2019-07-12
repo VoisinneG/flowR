@@ -80,6 +80,15 @@ flowR_server <- function(session, input, output) {
   observeEvent(rval$flow_set_selected, {
     updateSelectInput(session, "flow_set", choices = rval$flow_set_names, selected = rval$flow_set_selected)
   })
+  
+  ##########################################################################################################
+  # Deal with transform
+  
+  rval <- callModule(transform, "transform_module", rval)
+  
+  observeEvent(input$apply_trans, {
+    rval$apply_trans <- input$apply_trans
+  })
   ##########################################################################################################
   # Create gating set
   
@@ -245,8 +254,8 @@ flowR_server <- function(session, input, output) {
         }
         
         updateSelectInput(session, "xvar_show", choices = rval$plot_var, selected = xvar_default)
-        updateSelectInput(session, "xvar_trans", choices = rval$plot_var, selected = xvar_default)
-        updateSelectInput(session, "yvar_trans", choices = rval$plot_var, selected = yvar_default)
+        #updateSelectInput(session, "xvar_trans", choices = rval$plot_var, selected = xvar_default)
+        #updateSelectInput(session, "yvar_trans", choices = rval$plot_var, selected = yvar_default)
         updateSelectInput(session, "xvar_gate", choices = rval$plot_var, selected = xvar_default)
         updateSelectInput(session, "yvar_gate", choices = rval$plot_var, selected = yvar_default)
         updateSelectInput(session, "yvar_stat", choices = rval$plot_var, selected = xvar_default)
@@ -267,110 +276,110 @@ flowR_server <- function(session, input, output) {
   # Observe functions for data transformation
   
   # Initialization of transformation for new parameters
-  observe({
-    
-    validate(
-      need(rval$parameters, "No parameters defined")
-    )
-    
-    new_par <- setdiff(rval$parameters$name, names(rval$transformation))
-    idx_new <- match(new_par, rval$parameters$name)
-    
-    if(length(new_par)>0){
-      
-      for(i in 1:length(new_par)){
-        rval$transformation[[new_par[i]]] <- switch(rval$parameters$display[idx_new[i]],
-                                                    "LOG" = logicle_trans(w=input$w_logicle, 
-                                                                          m=input$m_logicle, 
-                                                                          t = input$t_logicle, 
-                                                                          a = input$a_logicle),
-                                                    identity_trans())
-        rval$trans_parameters[[new_par[i]]] <- switch(rval$parameters$display[idx_new[i]],
-                                                      "LOG" = list(w=input$w_logicle, 
-                                                                   m=input$m_logicle, 
-                                                                   t = input$t_logicle, 
-                                                                   a = input$a_logicle),
-                                                      list())
-      }
-      
-    }
-    
-  })
-  
-  
-  observeEvent(input$apply_transformation, {
-    
-    if(length(input$parameters_table_rows_selected)>0){
-      
-      var_name <- rval$parameters$name[input$parameters_table_rows_selected]
-      
-      trans_params <- switch(input$trans,
-                             "identity" = list(),
-                             "asinh" = list(base = input$base_asinh),
-                             "log" = list(base = input$base_log),
-                             "flowJo_asinh" = list(m=input$m,
-                                                   t = input$t,
-                                                   a = input$a,
-                                                   length = input$length),
-                             "logicle" = list(w=input$w_logicle,
-                                              m=input$m_logicle,
-                                              t = input$t_logicle,
-                                              a = input$a_logicle))
-      
-      trans <- switch(input$trans,
-                      "identity" = identity_trans(),
-                      "log" = log_trans(base = input$base_log),
-                      "asinh" = asinh_trans(b = input$base_asinh),
-                      "flowJo_asinh" = flowJo_fasinh_trans(m=input$m,
-                                                           t = input$t,
-                                                           a = input$a,
-                                                           length = input$length),
-                      "logicle" = logicle_trans(w=input$w_logicle,
-                                                m=input$m_logicle,
-                                                t = input$t_logicle,
-                                                a = input$a_logicle))
-      
-      
-      
-      for(i in 1:length(var_name)){
-        rval$transformation[[var_name[i]]] <- trans
-        rval$trans_parameters[[var_name[i]]] <- trans_params
-      }
-      
-    }
-    
-  })
-  
-  observe({
-    
-    validate(
-      need(rval$transformation, "No transformation defined")
-    )
-    
-    validate(
-      need(rval$parameters, "No parameters")
-    )
-    
-    trans_name <- sapply(rval$transformation, function(x){x$name})
-    trans_param <- sapply(rval$trans_parameters, function(x){
-      paste( paste(names(x), as.character(x), sep = ": "), collapse="; ")})
-    
-    idx_match <- match(rval$parameters$name, names(rval$transformation))
-    
-    rval$parameters$transform <- trans_name[idx_match]
-    rval$parameters[["transform parameters"]] <- trans_param[idx_match]
-    
-    
-  })
-  
-  observe({
-    updateSelectInput(session, "xvar_trans", 
-                      selected = rval$parameters$name_long[input$parameters_table_rows_selected[1]])
-    if(length(input$parameters_table_row_selected)>1){
-      updateSelectInput(session, "yvar_trans", 
-                        selected = rval$parameters$name_long[input$parameters_table_rows_selected[2]])
-    }
-  })
+  # observe({
+  #   
+  #   validate(
+  #     need(rval$parameters, "No parameters defined")
+  #   )
+  #   
+  #   new_par <- setdiff(rval$parameters$name, names(rval$transformation))
+  #   idx_new <- match(new_par, rval$parameters$name)
+  #   
+  #   if(length(new_par)>0){
+  #     
+  #     for(i in 1:length(new_par)){
+  #       rval$transformation[[new_par[i]]] <- switch(rval$parameters$display[idx_new[i]],
+  #                                                   "LOG" = logicle_trans(w=input$w_logicle, 
+  #                                                                         m=input$m_logicle, 
+  #                                                                         t = input$t_logicle, 
+  #                                                                         a = input$a_logicle),
+  #                                                   identity_trans())
+  #       rval$trans_parameters[[new_par[i]]] <- switch(rval$parameters$display[idx_new[i]],
+  #                                                     "LOG" = list(w=input$w_logicle, 
+  #                                                                  m=input$m_logicle, 
+  #                                                                  t = input$t_logicle, 
+  #                                                                  a = input$a_logicle),
+  #                                                     list())
+  #     }
+  #     
+  #   }
+  #   
+  # })
+  # 
+  # 
+  # observeEvent(input$apply_transformation, {
+  #   
+  #   if(length(input$parameters_table_rows_selected)>0){
+  #     
+  #     var_name <- rval$parameters$name[input$parameters_table_rows_selected]
+  #     
+  #     trans_params <- switch(input$trans,
+  #                            "identity" = list(),
+  #                            "asinh" = list(base = input$base_asinh),
+  #                            "log" = list(base = input$base_log),
+  #                            "flowJo_asinh" = list(m=input$m,
+  #                                                  t = input$t,
+  #                                                  a = input$a,
+  #                                                  length = input$length),
+  #                            "logicle" = list(w=input$w_logicle,
+  #                                             m=input$m_logicle,
+  #                                             t = input$t_logicle,
+  #                                             a = input$a_logicle))
+  #     
+  #     trans <- switch(input$trans,
+  #                     "identity" = identity_trans(),
+  #                     "log" = log_trans(base = input$base_log),
+  #                     "asinh" = asinh_trans(b = input$base_asinh),
+  #                     "flowJo_asinh" = flowJo_fasinh_trans(m=input$m,
+  #                                                          t = input$t,
+  #                                                          a = input$a,
+  #                                                          length = input$length),
+  #                     "logicle" = logicle_trans(w=input$w_logicle,
+  #                                               m=input$m_logicle,
+  #                                               t = input$t_logicle,
+  #                                               a = input$a_logicle))
+  #     
+  #     
+  #     
+  #     for(i in 1:length(var_name)){
+  #       rval$transformation[[var_name[i]]] <- trans
+  #       rval$trans_parameters[[var_name[i]]] <- trans_params
+  #     }
+  #     
+  #   }
+  #   
+  # })
+  # 
+  # observe({
+  #   
+  #   validate(
+  #     need(rval$transformation, "No transformation defined")
+  #   )
+  #   
+  #   validate(
+  #     need(rval$parameters, "No parameters")
+  #   )
+  #   
+  #   trans_name <- sapply(rval$transformation, function(x){x$name})
+  #   trans_param <- sapply(rval$trans_parameters, function(x){
+  #     paste( paste(names(x), as.character(x), sep = ": "), collapse="; ")})
+  #   
+  #   idx_match <- match(rval$parameters$name, names(rval$transformation))
+  #   
+  #   rval$parameters$transform <- trans_name[idx_match]
+  #   rval$parameters[["transform parameters"]] <- trans_param[idx_match]
+  #   
+  #   
+  # })
+  # 
+  # observe({
+  #   updateSelectInput(session, "xvar_trans", 
+  #                     selected = rval$parameters$name_long[input$parameters_table_rows_selected[1]])
+  #   if(length(input$parameters_table_row_selected)>1){
+  #     updateSelectInput(session, "yvar_trans", 
+  #                       selected = rval$parameters$name_long[input$parameters_table_rows_selected[2]])
+  #   }
+  # })
   
   ##########################################################################################################
   # Observe functions for compensation
@@ -655,9 +664,10 @@ flowR_server <- function(session, input, output) {
                       choices = c("subset", names(rval$pdata)), 
                       selected = color_var_default)
     
-    updateSelectInput(session, "color_var_trans", 
-                      choices = c("subset", names(rval$pdata)), 
-                      selected = color_var_default)
+    # updateSelectInput(session, "color_var_trans", 
+    #                   choices = c("subset", names(rval$pdata)), 
+    #                   selected = color_var_default)
+    
     updateSelectInput(session, "color_var_comp", 
                       choices = c("subset", names(rval$pdata)), 
                       selected = color_var_default)
@@ -673,9 +683,9 @@ flowR_server <- function(session, input, output) {
                       choices = pData(rval$flow_set)$name,
                       selected = pData(rval$flow_set)$name[1])
     
-    updateSelectInput(session, "sample_selected_trans",
-                      choices = pData(rval$flow_set)$name,
-                      selected = pData(rval$flow_set)$name[1])
+    # updateSelectInput(session, "sample_selected_trans",
+    #                   choices = pData(rval$flow_set)$name,
+    #                   selected = pData(rval$flow_set)$name[1])
     
     updateSelectInput(session, "sample_selected_comp",
                       choices = pData(rval$flow_set)$name,
@@ -722,28 +732,28 @@ flowR_server <- function(session, input, output) {
     }
   })
   
-  observeEvent(input$next_frame_trans, {
-    if(!is.null(rval$flow_set)){
-      idx <- which(rval$pdata$name == input$sample_selected_trans)
-      idx <- idx +1
-      if(idx > length(rval$pdata$name)){
-        idx <- 1
-      }
-      updateSelectInput(session, "sample_selected_trans", selected = rval$pdata$name[idx])
-      
-    }
-  })
-  
-  observeEvent(input$previous_frame_trans, {
-    if(!is.null(rval$flow_set)){
-      idx <- which(rval$pdata$name == input$sample_selected_trans)
-      idx <- idx - 1
-      if(idx < 1){
-        idx <- length(rval$pdata$name)
-      }
-      updateSelectInput(session, "sample_selected_trans", selected = rval$pdata$name[idx])
-    }
-  })
+  # observeEvent(input$next_frame_trans, {
+  #   if(!is.null(rval$flow_set)){
+  #     idx <- which(rval$pdata$name == input$sample_selected_trans)
+  #     idx <- idx +1
+  #     if(idx > length(rval$pdata$name)){
+  #       idx <- 1
+  #     }
+  #     updateSelectInput(session, "sample_selected_trans", selected = rval$pdata$name[idx])
+  #     
+  #   }
+  # })
+  # 
+  # observeEvent(input$previous_frame_trans, {
+  #   if(!is.null(rval$flow_set)){
+  #     idx <- which(rval$pdata$name == input$sample_selected_trans)
+  #     idx <- idx - 1
+  #     if(idx < 1){
+  #       idx <- length(rval$pdata$name)
+  #     }
+  #     updateSelectInput(session, "sample_selected_trans", selected = rval$pdata$name[idx])
+  #   }
+  # })
   
   observeEvent(input$next_frame_comp, {
     if(!is.null(rval$flow_set)){
@@ -1216,20 +1226,20 @@ flowR_server <- function(session, input, output) {
   #   df
   # })
   
-  output$parameters_table <- DT::renderDataTable({
-    
-    validate(
-      need(rval$parameters, "No data imported")
-    )
-    df <- rval$parameters
-    df$minRange <- format(df$minRange, digits = 2)
-    df$maxRange <- format(df$maxRange, digits = 2)
-    df[["chanel_name"]] <- df$name_long
-    DT::datatable(
-      df[, c("chanel_name", "transform", "transform parameters", "display", "range", "minRange", "maxRange", "name", "desc")], 
-      rownames = FALSE)
-    
-  })
+  # output$parameters_table <- DT::renderDataTable({
+  #   
+  #   validate(
+  #     need(rval$parameters, "No data imported")
+  #   )
+  #   df <- rval$parameters
+  #   df$minRange <- format(df$minRange, digits = 2)
+  #   df$maxRange <- format(df$maxRange, digits = 2)
+  #   df[["chanel_name"]] <- df$name_long
+  #   DT::datatable(
+  #     df[, c("chanel_name", "transform", "transform parameters", "display", "range", "minRange", "maxRange", "name", "desc")], 
+  #     rownames = FALSE)
+  #   
+  # })
   
   
   output$tSNE_variables_table <- DT::renderDataTable({
@@ -1418,13 +1428,13 @@ flowR_server <- function(session, input, output) {
     print(gate$x)
   })
   
-  output$message_transform <- renderPrint({
-    if(!is.null(rval$parameters)){
-      var_show <- rval$parameters$name[ match(input$xvar_show, rval$parameters$name_long) ]
-      print(rval$transformation[[var_show]])
-    }
-    
-  })
+  # output$message_transform <- renderPrint({
+  #   if(!is.null(rval$parameters)){
+  #     var_show <- rval$parameters$name[ match(input$xvar_show, rval$parameters$name_long) ]
+  #     print(rval$transformation[[var_show]])
+  #   }
+  #   
+  # })
   
   
   ##########################################################################################################

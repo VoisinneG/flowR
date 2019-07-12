@@ -12,8 +12,8 @@ importUI <- function(id) {
     column(width = 6,
            box(title = "Import",
                width = NULL, height = NULL,
-               fileInput(inputId = ns("files"), 
-                         label = "Choose files", 
+               fileInput(inputId = ns("files"),
+                         label = "Choose files",
                          multiple = TRUE)
            )
            # box(title = "Options",
