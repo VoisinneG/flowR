@@ -2,12 +2,24 @@
 % Please edit documentation in R/transform_module.R
 \name{transformUI}
 \alias{transformUI}
+\alias{transform}
 \title{transformUI and transform}
 \usage{
 transformUI(id)
+
+transform(input, output, session, rval)
 }
 \arguments{
 \item{id}{shiny id}
+
+\item{input}{shiny input}
+
+\item{output}{shiny output}
+
+\item{session}{shiny session}
+}
+\value{
+a reactivevalues object with values "flow_set", "parameters" and "gates_flowCore"
 }
 \description{
 A shiny Module that deals with metadata

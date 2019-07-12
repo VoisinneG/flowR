@@ -99,13 +99,13 @@ transformUI <- function(id) {
 #' @param input shiny input
 #' @param output shiny output
 #' @param session shiny session
-#' @return a reactivevalues object with values "df_files", "flow_set_imported" and "gates_flowCore"
+#' @return a reactivevalues object with values "flow_set", "parameters" and "gates_flowCore"
 #' @import flowWorkspace
 #' @import flowCore
 #' @import shiny
 #' @import DT
 #' @export
-#' @rdname importUI
+#' @rdname transformUI
 transform <- function(input, output, session, rval) {
   
   `%then%` <- shiny:::`%OR%`
@@ -148,6 +148,12 @@ transform <- function(input, output, session, rval) {
                                     stringsAsFactors = FALSE)
     }
     
+  })
+  
+  observeEvent(rval$parameters, {
+    validate(need(rval$parameters, "No parameters"))
+    rval$plot_var <- rval$parameters$name_long
+    names(rval$plot_var) <- NULL
   })
   
   #Update available variables

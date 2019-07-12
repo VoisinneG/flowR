@@ -89,6 +89,12 @@ flowR_server <- function(session, input, output) {
   observeEvent(input$apply_trans, {
     rval$apply_trans <- input$apply_trans
   })
+  
+  ##########################################################################################################
+  # Plot tab
+  rval_plot <- reactiveValues()
+  rval_plot <- callModule(plot, "plot_module", rval)
+  
   ##########################################################################################################
   # Create gating set
   
@@ -221,56 +227,56 @@ flowR_server <- function(session, input, output) {
   })
   
   #Update available variables
-  observe({
-    
-    validate(
-      need(rval$parameters, "No parameters defined")
-    )
-    
-    if(! setequal(rval$plot_var, rval$parameters$name_long)){
-      
-      #print("update plot vars")
-      rval$plot_var <- rval$parameters$name_long
-      names(rval$plot_var) <- NULL
-      
-      if(length(rval$plot_var)>1){
-        
-        
-        xvar_default <- rval$plot_var[1]
-        yvar_default <- rval$plot_var[2]
-        
-        if(input$flow_set == "dim-reduction"){
-          xvar_default <- rval$dim_red_var[1]
-          yvar_default <- rval$dim_red_var[2]
-        }
-        
-        if(input$flow_set == "cluster"){
-          if("tSNE1" %in% rval$parameters$name_long){
-            xvar_default <- "tSNE1"
-          }
-          if("tSNE2" %in% rval$parameters$name_long){
-            yvar_default <- "tSNE2"
-          }
-        }
-        
-        updateSelectInput(session, "xvar_show", choices = rval$plot_var, selected = xvar_default)
-        #updateSelectInput(session, "xvar_trans", choices = rval$plot_var, selected = xvar_default)
-        #updateSelectInput(session, "yvar_trans", choices = rval$plot_var, selected = yvar_default)
-        updateSelectInput(session, "xvar_gate", choices = rval$plot_var, selected = xvar_default)
-        updateSelectInput(session, "yvar_gate", choices = rval$plot_var, selected = yvar_default)
-        updateSelectInput(session, "yvar_stat", choices = rval$plot_var, selected = xvar_default)
-        updateSelectInput(session, "xvar", choices = rval$plot_var, selected = xvar_default)
-        updateSelectInput(session, "yvar", choices = rval$plot_var, selected = yvar_default)
-        
-        # updateSelectInput(session, "color_var_gate", choices = c("none", rval$plot_var), selected = "none")
-        # updateSelectInput(session, "color_var", choices = c("none", rval$plot_var), selected = "none")
-        # updateSelectInput(session, "color_var_trans", choices = c("none", rval$plot_var), selected = "none")
-        # updateSelectInput(session, "color_var_comp", choices = c("none", rval$plot_var), selected = "none")
-        
-        
-      }
-    }
-  })
+  # observe({
+  #   
+  #   validate(
+  #     need(rval$parameters, "No parameters defined")
+  #   )
+  #   
+  #   if(! setequal(rval$plot_var, rval$parameters$name_long)){
+  #     
+  #     #print("update plot vars")
+  #     rval$plot_var <- rval$parameters$name_long
+  #     names(rval$plot_var) <- NULL
+  #     
+  #     if(length(rval$plot_var)>1){
+  #       
+  #       
+  #       xvar_default <- rval$plot_var[1]
+  #       yvar_default <- rval$plot_var[2]
+  #       
+  #       if(input$flow_set == "dim-reduction"){
+  #         xvar_default <- rval$dim_red_var[1]
+  #         yvar_default <- rval$dim_red_var[2]
+  #       }
+  #       
+  #       if(input$flow_set == "cluster"){
+  #         if("tSNE1" %in% rval$parameters$name_long){
+  #           xvar_default <- "tSNE1"
+  #         }
+  #         if("tSNE2" %in% rval$parameters$name_long){
+  #           yvar_default <- "tSNE2"
+  #         }
+  #       }
+  #       
+  #       updateSelectInput(session, "xvar_show", choices = rval$plot_var, selected = xvar_default)
+  #       #updateSelectInput(session, "xvar_trans", choices = rval$plot_var, selected = xvar_default)
+  #       #updateSelectInput(session, "yvar_trans", choices = rval$plot_var, selected = yvar_default)
+  #       updateSelectInput(session, "xvar_gate", choices = rval$plot_var, selected = xvar_default)
+  #       updateSelectInput(session, "yvar_gate", choices = rval$plot_var, selected = yvar_default)
+  #       updateSelectInput(session, "yvar_stat", choices = rval$plot_var, selected = xvar_default)
+  #       updateSelectInput(session, "xvar", choices = rval$plot_var, selected = xvar_default)
+  #       updateSelectInput(session, "yvar", choices = rval$plot_var, selected = yvar_default)
+  #       
+  #       # updateSelectInput(session, "color_var_gate", choices = c("none", rval$plot_var), selected = "none")
+  #       # updateSelectInput(session, "color_var", choices = c("none", rval$plot_var), selected = "none")
+  #       # updateSelectInput(session, "color_var_trans", choices = c("none", rval$plot_var), selected = "none")
+  #       # updateSelectInput(session, "color_var_comp", choices = c("none", rval$plot_var), selected = "none")
+  #       
+  #       
+  #     }
+  #   }
+  # })
   
   ##########################################################################################################
   # Observe functions for data transformation
@@ -594,85 +600,85 @@ flowR_server <- function(session, input, output) {
   # Observe functions for metadata
   
   
-  observe({
-    
-    validate(
-      need(rval$pdata, "No metadata available")
-    )
-    
-    validate(
-      need(rval$plot_var, "No plotting variables")
-    )
-    
-    facet_var_default <- "name"
-    group_var_default <- "subset"
-    color_var_default <- "subset"
-    plot_type_default <- "histogram"
-    plot_type_gate_default <- "hexagonal"
-    
-    if(input$flow_set == "t-SNE"){
-      facet_var_default <- NULL
-      group_var_default <- "name"
-      color_var_default <- "name"
-      plot_type_default <- "dots"
-      plot_type_gate_default <- "dots"
-      
-      
-    }
-    
-    if(input$flow_set == "cluster"){
-      facet_var_default <- NULL
-      group_var_default <- NULL
-      color_var_default <- "cluster"
-      plot_type_default <- "dots"
-      plot_type_gate_default <- "dots"
-    }
-    
-    updateSelectInput(session, "plot_type", 
-                      selected = plot_type_default)
-    
-    updateSelectInput(session, "plot_type_gate", 
-                      selected = plot_type_gate_default)
-    
-    updateSelectInput(session, "facet_var", 
-                      choices = c("subset", names(rval$pdata)), 
-                      selected = facet_var_default )
-    updateSelectInput(session, "facet_var_stat", 
-                      choices = c("subset", names(rval$pdata)), 
-                      selected = facet_var_default )
-    
-    updateSelectInput(session, "group_var", 
-                      choices = c("subset", names(rval$pdata)), 
-                      selected = group_var_default)
-    updateSelectInput(session, "group_var_stat", 
-                      choices = c("subset", names(rval$pdata)), 
-                      selected = group_var_default)
-    
-    updateSelectInput(session, "yridges_var", 
-                      choices = c("subset", names(rval$pdata)), 
-                      selected = group_var_default)
-    
-    updateSelectInput(session, "color_var_gate", 
-                      choices = c("subset", names(rval$pdata), rval$plot_var), 
-                      selected = color_var_default)
-    
-    updateSelectInput(session, "color_var", 
-                      choices = c("subset", names(rval$pdata), rval$plot_var), 
-                      selected = color_var_default)
-    
-    updateSelectInput(session, "color_var_stat", 
-                      choices = c("subset", names(rval$pdata)), 
-                      selected = color_var_default)
-    
-    # updateSelectInput(session, "color_var_trans", 
-    #                   choices = c("subset", names(rval$pdata)), 
-    #                   selected = color_var_default)
-    
-    updateSelectInput(session, "color_var_comp", 
-                      choices = c("subset", names(rval$pdata)), 
-                      selected = color_var_default)
-    
-  })
+  # observe({
+  #   
+  #   validate(
+  #     need(rval$pdata, "No metadata available")
+  #   )
+  #   
+  #   validate(
+  #     need(rval$plot_var, "No plotting variables")
+  #   )
+  #   
+  #   facet_var_default <- "name"
+  #   group_var_default <- "subset"
+  #   color_var_default <- "subset"
+  #   plot_type_default <- "histogram"
+  #   plot_type_gate_default <- "hexagonal"
+  #   
+  #   if(input$flow_set == "t-SNE"){
+  #     facet_var_default <- NULL
+  #     group_var_default <- "name"
+  #     color_var_default <- "name"
+  #     plot_type_default <- "dots"
+  #     plot_type_gate_default <- "dots"
+  #     
+  #     
+  #   }
+  #   
+  #   if(input$flow_set == "cluster"){
+  #     facet_var_default <- NULL
+  #     group_var_default <- NULL
+  #     color_var_default <- "cluster"
+  #     plot_type_default <- "dots"
+  #     plot_type_gate_default <- "dots"
+  #   }
+  #   
+  #   updateSelectInput(session, "plot_type", 
+  #                     selected = plot_type_default)
+  #   
+  #   updateSelectInput(session, "plot_type_gate", 
+  #                     selected = plot_type_gate_default)
+  #   
+  #   updateSelectInput(session, "facet_var", 
+  #                     choices = c("subset", names(rval$pdata)), 
+  #                     selected = facet_var_default )
+  #   updateSelectInput(session, "facet_var_stat", 
+  #                     choices = c("subset", names(rval$pdata)), 
+  #                     selected = facet_var_default )
+  #   
+  #   updateSelectInput(session, "group_var", 
+  #                     choices = c("subset", names(rval$pdata)), 
+  #                     selected = group_var_default)
+  #   updateSelectInput(session, "group_var_stat", 
+  #                     choices = c("subset", names(rval$pdata)), 
+  #                     selected = group_var_default)
+  #   
+  #   updateSelectInput(session, "yridges_var", 
+  #                     choices = c("subset", names(rval$pdata)), 
+  #                     selected = group_var_default)
+  #   
+  #   updateSelectInput(session, "color_var_gate", 
+  #                     choices = c("subset", names(rval$pdata), rval$plot_var), 
+  #                     selected = color_var_default)
+  #   
+  #   updateSelectInput(session, "color_var", 
+  #                     choices = c("subset", names(rval$pdata), rval$plot_var), 
+  #                     selected = color_var_default)
+  #   
+  #   updateSelectInput(session, "color_var_stat", 
+  #                     choices = c("subset", names(rval$pdata)), 
+  #                     selected = color_var_default)
+  #   
+  #   # updateSelectInput(session, "color_var_trans", 
+  #   #                   choices = c("subset", names(rval$pdata)), 
+  #   #                   selected = color_var_default)
+  #   
+  #   updateSelectInput(session, "color_var_comp", 
+  #                     choices = c("subset", names(rval$pdata)), 
+  #                     selected = color_var_default)
+  #   
+  # })
   
   observe({
     validate(
@@ -887,7 +893,7 @@ flowR_server <- function(session, input, output) {
       
       updateSelectInput(session, "gate_selected", choices = getNodes(rval$gating_set), selected = "root")
       updateSelectInput(session, "gate_to_delete", choices = setdiff(getNodes(rval$gating_set), "root"))
-      updateSelectInput(session, "gate", choices = getNodes(rval$gating_set), selected = "root")
+      # updateSelectInput(session, "gate", choices = getNodes(rval$gating_set), selected = "root")
       updateSelectInput(session, "gate_stat", choices = getNodes(rval$gating_set), selected = "root")
       updateSelectInput(session, "gate_trans", choices = getNodes(rval$gating_set), selected = "root")
       updateSelectInput(session, "gate_comp", choices = getNodes(rval$gating_set), selected = "root")
@@ -1277,11 +1283,11 @@ flowR_server <- function(session, input, output) {
   # })
   # 
   
-  output$files_selection_table <- DT::renderDataTable({
-    if(!is.null(rval$flow_set)){
-      data.frame("name" = rval$pdata$name, row.names = NULL)
-    }
-  })
+  # output$files_selection_table <- DT::renderDataTable({
+  #   if(!is.null(rval$flow_set)){
+  #     data.frame("name" = rval$pdata$name, row.names = NULL)
+  #   }
+  # })
   
   output$samples_stat <- DT::renderDataTable({
     if(!is.null(rval$flow_set)){
@@ -1530,209 +1536,209 @@ flowR_server <- function(session, input, output) {
     
   })
   
-  output$plot_trans <- renderPlot({
-    
-    validate(
-      need(rval$gating_set, "Empty gating set") %then%
-        need(input$sample_selected_trans, "Please select a sample") %then%
-        need(input$gate_trans, "Please select a subset")
-    )
-    
-    idx_x <- match(input$xvar_trans, rval$parameters$name_long)
-    idx_y <- match(input$yvar_trans, rval$parameters$name_long)
-    xvar <- rval$parameters$name[idx_x]
-    yvar <- rval$parameters$name[idx_y]
-    
-    if(input$color_var_trans %in% rval$parameters$name_long){
-      color_var <- rval$parameters$name[match(input$color_var_trans, rval$parameters$name_long)]
-    }else{
-      color_var <- input$color_var
-    }
-    
-    #color_var <- rval$parameters$name[match(input$color_var_gate, rval$parameters$name_long)]
-    #color_var <- input$color_var
-    
-    axis_labels <- rval$parameters$name_long
-    names(axis_labels) <- rval$parameters$name
-    
-    transformation <- NULL
-    if(input$apply_trans){
-      transformation <- rval$transformation
-    }
-    
-    p <- plot_gs(df = rval$df_tot,
-                 gs = rval$gating_set, 
-                 sample = input$sample_selected_trans,
-                 subset = input$gate_trans, 
-                 spill = rval$spill,
-                 xvar = xvar, 
-                 yvar = yvar, 
-                 color_var = color_var, 
-                 gate = NULL, 
-                 type = input$plot_type_trans, 
-                 bins = input$bin_number_trans,
-                 alpha = input$alpha_trans,
-                 size = input$size_trans,
-                 norm_density = input$norm_trans,
-                 smooth = input$smooth_trans,
-                 transformation =  transformation,
-                 show.legend = input$legend_trans,
-                 axis_labels = axis_labels)
-    
-    if(!is.null(p)){
-      p <- p + xlab(input$xvar_trans) 
-      if(input$plot_type_trans != "histogram"){
-        p <- p + ylab(input$yvar_trans)
-      }
-    }
-    
-    p
-    
-  })
+  # output$plot_trans <- renderPlot({
+  # 
+  #   validate(
+  #     need(rval$gating_set, "Empty gating set") %then%
+  #       need(input$sample_selected_trans, "Please select a sample") %then%
+  #       need(input$gate_trans, "Please select a subset")
+  #   )
+  # 
+  #   idx_x <- match(input$xvar_trans, rval$parameters$name_long)
+  #   idx_y <- match(input$yvar_trans, rval$parameters$name_long)
+  #   xvar <- rval$parameters$name[idx_x]
+  #   yvar <- rval$parameters$name[idx_y]
+  # 
+  #   if(input$color_var_trans %in% rval$parameters$name_long){
+  #     color_var <- rval$parameters$name[match(input$color_var_trans, rval$parameters$name_long)]
+  #   }else{
+  #     color_var <- input$color_var
+  #   }
+  # 
+  #   #color_var <- rval$parameters$name[match(input$color_var_gate, rval$parameters$name_long)]
+  #   #color_var <- input$color_var
+  # 
+  #   axis_labels <- rval$parameters$name_long
+  #   names(axis_labels) <- rval$parameters$name
+  # 
+  #   transformation <- NULL
+  #   if(input$apply_trans){
+  #     transformation <- rval$transformation
+  #   }
+  # 
+  #   p <- plot_gs(df = rval$df_tot,
+  #                gs = rval$gating_set,
+  #                sample = input$sample_selected_trans,
+  #                subset = input$gate_trans,
+  #                spill = rval$spill,
+  #                xvar = xvar,
+  #                yvar = yvar,
+  #                color_var = color_var,
+  #                gate = NULL,
+  #                type = input$plot_type_trans,
+  #                bins = input$bin_number_trans,
+  #                alpha = input$alpha_trans,
+  #                size = input$size_trans,
+  #                norm_density = input$norm_trans,
+  #                smooth = input$smooth_trans,
+  #                transformation =  transformation,
+  #                show.legend = input$legend_trans,
+  #                axis_labels = axis_labels)
+  # 
+  #   if(!is.null(p)){
+  #     p <- p + xlab(input$xvar_trans)
+  #     if(input$plot_type_trans != "histogram"){
+  #       p <- p + ylab(input$yvar_trans)
+  #     }
+  #   }
+  # 
+  #   p
+  # 
+  # })
   
   
-  update_data_plot_focus <- eventReactive(input$update_plot, {
-    data_plot_focus()
-  })
-  
-  data_plot_focus <- reactive({
-    validate(
-      need(rval$gating_set, "Empty gating set") %then%
-        need(input$files_selection_table_rows_selected, "Please select samples") %then%
-        need(input$gate, "Please select subsets")
-    )
-    
-    print("get data plot_focus")
-    df <- get_data_gs(gs = rval$gating_set, 
-                      sample = rval$pdata$name[input$files_selection_table_rows_selected],
-                      subset = input$gate, 
-                      spill = rval$spill)
-    return(df)
-    
-  })
-  
-  
-  
-  output$plot_focus <- renderPlot({
-    plot_focus()
-  })
-  
-  
-  
-  
-  plot_focus <- eventReactive(input$update_plot, {
-    
-    # validate(
-    #   need(rval$gating_set, "Empty gating set") %then%
-    #     need(input$files_selection_table_rows_selected, "Please select samples") %then%
-    #     need(input$gate, "Please select subsets")
-    # )
-    
-    
-    idx_x <- match(input$xvar, rval$parameters$name_long)
-    idx_y <- match(input$yvar, rval$parameters$name_long)
-    xvar <- rval$parameters$name[idx_x]
-    yvar <- rval$parameters$name[idx_y]
-    
-    color_var <- input$color_var
-    if(!is.null(input$color_var)){
-      
-      for(i in 1:length(input$color_var)){
-        if(input$color_var[i] %in% rval$parameters$name_long){
-          color_var[i] <- rval$parameters$name[match(input$color_var[i], rval$parameters$name_long)]
-        }else{
-          color_var[i] <- input$color_var[i]
-        }
-      }
-    }
-    
-    
-    
-    #color_var <- rval$parameters$name[match(input$color_var_gate, rval$parameters$name_long)]
-    #color_var <- input$color_var
-    
-    axis_labels <- rval$parameters$name_long
-    names(axis_labels) <- rval$parameters$name
-    
-    transformation <- NULL
-    if(input$apply_trans){
-      transformation <- rval$transformation
-    }
-    
-    plist <- list()
-    
-    split_var <- switch(input$split_variable, 
-                        "x variable" = "xvar",
-                        "y variable" = "yvar",
-                        "color variable" = "color_var"
-    )
-    
-    for(i in 1:length(input[[split_var]])){
-      
-      color_var_int <- color_var[1]
-      xvar_int <- xvar[1]
-      yvar_int <- yvar[1]
-      
-      if(split_var == "color_var"){
-        color_var_int <- color_var[i]
-      }else if(split_var == "xvar"){
-        xvar_int <- xvar[i]
-      }else if(split_var == "yvar"){
-        yvar_int <- yvar[i]
-      }
-      
-      
-      p <- plot_gs(df = update_data_plot_focus(),
-                   gs = rval$gating_set, 
-                   sample = rval$pdata$name[input$files_selection_table_rows_selected],
-                   subset = input$gate, 
-                   spill = rval$spill,
-                   xvar = xvar_int, 
-                   yvar = yvar_int, 
-                   color_var = color_var_int, 
-                   #gate = NULL, 
-                   type = input$plot_type, 
-                   bins = input$bin_number,
-                   alpha = input$alpha,
-                   size = input$size,
-                   norm_density = input$norm,
-                   smooth = input$smooth,
-                   ridges = input$ridges,
-                   transformation =  transformation,
-                   facet_vars = input$facet_var,
-                   group_var = input$group_var,
-                   yridges_var = input$yridges_var,
-                   show.legend = input$legend,
-                   axis_labels = axis_labels,
-                   legend.position = input$legend_pos)
-      
-      if(!is.null(p)){
-        p <- p + xlab(input$xvar) 
-        if(input$plot_type != "histogram"){
-          p <- p + ylab(input$yvar)
-        }
-      }
-      
-      plist[[i]] <- p
-      
-    }
-    
-    
-    n <- length(plist)
-    
-    nrow <- min(n, input$nrow_split)
-    ncol <- ceiling(n/nrow)
-    g <- marrangeGrob(plist, nrow = nrow, ncol = ncol, top = "")
-    
-    # if(input$split_direction == "horizontal"){
-    #   g <- marrangeGrob(plist, nrow = n, ncol = 1)
-    # }else{
-    #   g <- marrangeGrob(plist, nrow = 1, ncol = n)
-    # }
-    
-    g
-    
-  })
+  # update_data_plot_focus <- eventReactive(input$update_plot, {
+  #   data_plot_focus()
+  # })
+  # 
+  # data_plot_focus <- reactive({
+  #   validate(
+  #     need(rval$gating_set, "Empty gating set") %then%
+  #       need(input$files_selection_table_rows_selected, "Please select samples") %then%
+  #       need(input$gate, "Please select subsets")
+  #   )
+  #   
+  #   print("get data plot_focus")
+  #   df <- get_data_gs(gs = rval$gating_set, 
+  #                     sample = rval$pdata$name[input$files_selection_table_rows_selected],
+  #                     subset = input$gate, 
+  #                     spill = rval$spill)
+  #   return(df)
+  #   
+  # })
+  # 
+  # 
+  # 
+  # output$plot_focus <- renderPlot({
+  #   plot_focus()
+  # })
+  # 
+  # 
+  # 
+  # 
+  # plot_focus <- eventReactive(input$update_plot, {
+  #   
+  #   # validate(
+  #   #   need(rval$gating_set, "Empty gating set") %then%
+  #   #     need(input$files_selection_table_rows_selected, "Please select samples") %then%
+  #   #     need(input$gate, "Please select subsets")
+  #   # )
+  #   
+  #   
+  #   idx_x <- match(input$xvar, rval$parameters$name_long)
+  #   idx_y <- match(input$yvar, rval$parameters$name_long)
+  #   xvar <- rval$parameters$name[idx_x]
+  #   yvar <- rval$parameters$name[idx_y]
+  #   
+  #   color_var <- input$color_var
+  #   if(!is.null(input$color_var)){
+  #     
+  #     for(i in 1:length(input$color_var)){
+  #       if(input$color_var[i] %in% rval$parameters$name_long){
+  #         color_var[i] <- rval$parameters$name[match(input$color_var[i], rval$parameters$name_long)]
+  #       }else{
+  #         color_var[i] <- input$color_var[i]
+  #       }
+  #     }
+  #   }
+  #   
+  #   
+  #   
+  #   #color_var <- rval$parameters$name[match(input$color_var_gate, rval$parameters$name_long)]
+  #   #color_var <- input$color_var
+  #   
+  #   axis_labels <- rval$parameters$name_long
+  #   names(axis_labels) <- rval$parameters$name
+  #   
+  #   transformation <- NULL
+  #   if(input$apply_trans){
+  #     transformation <- rval$transformation
+  #   }
+  #   
+  #   plist <- list()
+  #   
+  #   split_var <- switch(input$split_variable, 
+  #                       "x variable" = "xvar",
+  #                       "y variable" = "yvar",
+  #                       "color variable" = "color_var"
+  #   )
+  #   
+  #   for(i in 1:length(input[[split_var]])){
+  #     
+  #     color_var_int <- color_var[1]
+  #     xvar_int <- xvar[1]
+  #     yvar_int <- yvar[1]
+  #     
+  #     if(split_var == "color_var"){
+  #       color_var_int <- color_var[i]
+  #     }else if(split_var == "xvar"){
+  #       xvar_int <- xvar[i]
+  #     }else if(split_var == "yvar"){
+  #       yvar_int <- yvar[i]
+  #     }
+  #     
+  #     
+  #     p <- plot_gs(df = update_data_plot_focus(),
+  #                  gs = rval$gating_set, 
+  #                  sample = rval$pdata$name[input$files_selection_table_rows_selected],
+  #                  subset = input$gate, 
+  #                  spill = rval$spill,
+  #                  xvar = xvar_int, 
+  #                  yvar = yvar_int, 
+  #                  color_var = color_var_int, 
+  #                  #gate = NULL, 
+  #                  type = input$plot_type, 
+  #                  bins = input$bin_number,
+  #                  alpha = input$alpha,
+  #                  size = input$size,
+  #                  norm_density = input$norm,
+  #                  smooth = input$smooth,
+  #                  ridges = input$ridges,
+  #                  transformation =  transformation,
+  #                  facet_vars = input$facet_var,
+  #                  group_var = input$group_var,
+  #                  yridges_var = input$yridges_var,
+  #                  show.legend = input$legend,
+  #                  axis_labels = axis_labels,
+  #                  legend.position = input$legend_pos)
+  #     
+  #     if(!is.null(p)){
+  #       p <- p + xlab(input$xvar) 
+  #       if(input$plot_type != "histogram"){
+  #         p <- p + ylab(input$yvar)
+  #       }
+  #     }
+  #     
+  #     plist[[i]] <- p
+  #     
+  #   }
+  #   
+  #   
+  #   n <- length(plist)
+  #   
+  #   nrow <- min(n, input$nrow_split)
+  #   ncol <- ceiling(n/nrow)
+  #   g <- marrangeGrob(plist, nrow = nrow, ncol = ncol, top = "")
+  #   
+  #   # if(input$split_direction == "horizontal"){
+  #   #   g <- marrangeGrob(plist, nrow = n, ncol = 1)
+  #   # }else{
+  #   #   g <- marrangeGrob(plist, nrow = 1, ncol = n)
+  #   # }
+  #   
+  #   g
+  #   
+  # })
   
   output$plotGate <- renderPlot({
     plotGate()
@@ -1964,14 +1970,14 @@ flowR_server <- function(session, input, output) {
   ##########################################################################################################
   #Output Download functions
   
-  output$download_plot <- downloadHandler(
-    filename = "plot.pdf",
-    content = function(file) {
-      pdf(file, width = input$width_plot, height = input$height_plot)
-      print(plot_focus())
-      dev.off()
-    }
-  )
+  # output$download_plot <- downloadHandler(
+  #   filename = "plot.pdf",
+  #   content = function(file) {
+  #     pdf(file, width = input$width_plot, height = input$height_plot)
+  #     print(plot_focus())
+  #     dev.off()
+  #   }
+  # )
   
   output$download_plot_stat <- downloadHandler(
     filename = "stat.pdf",
@@ -2104,29 +2110,29 @@ flowR_server <- function(session, input, output) {
   #   
   # })
   
-  plot_height <- eventReactive(input$update_plot,{
-    split_var <- switch(input$split_variable, 
-                        "x variable" = "xvar",
-                        "y variable" = "yvar",
-                        "color variable" = "color_var"
-    )
-    
-    min(input$nrow_split, length(input[[split_var]])) * input$row_size + 50
-    
-  })
-  
-  output$ui_plot <- renderUI({
-    if(input$update_plot){
-      split_var <- switch(input$split_variable, 
-                          "x variable" = "xvar",
-                          "y variable" = "yvar",
-                          "color variable" = "color_var"
-      )
-      plotOutput("plot_focus", height = plot_height())
-    }
-    
-    
-  })
+  # plot_height <- eventReactive(input$update_plot,{
+  #   split_var <- switch(input$split_variable, 
+  #                       "x variable" = "xvar",
+  #                       "y variable" = "yvar",
+  #                       "color variable" = "color_var"
+  #   )
+  #   
+  #   min(input$nrow_split, length(input[[split_var]])) * input$row_size + 50
+  #   
+  # })
+  # 
+  # output$ui_plot <- renderUI({
+  #   if(input$update_plot){
+  #     # split_var <- switch(input$split_variable, 
+  #     #                     "x variable" = "xvar",
+  #     #                     "y variable" = "yvar",
+  #     #                     "color variable" = "color_var"
+  #     # )
+  #     plotOutput("plot_focus", height = plot_height())
+  #   }
+  #   
+  #   
+  # })
   
   plot_height_stat <- eventReactive(input$update_plot_stat,{
     

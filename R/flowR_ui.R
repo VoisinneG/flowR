@@ -321,99 +321,100 @@ flowR_ui <- function() {
               )
       ),
       tabItem(tabName = "Plot_tab",
-              fluidRow(
-                column(width = 4,
-                       tabBox(title = "",
-                              width = NULL, height = NULL,
-                              tabPanel("Samples",
-                                       div(style = 'overflow-x: scroll', DT::dataTableOutput("files_selection_table"))
-                              ),
-                              tabPanel("Subset",
-                                       selectizeInput("gate", 
-                                                      label = "subset", 
-                                                      choices = "root", 
-                                                      selected = "root",
-                                                      multiple = TRUE)
-                              ),
-                              tabPanel("Variables",
-                                       selectizeInput("xvar", 
-                                                      multiple = TRUE,
-                                                      label = "x variable", 
-                                                      choices = NULL, 
-                                                      selected = NULL),
-                                       selectizeInput("yvar", 
-                                                      multiple = TRUE,
-                                                      label = "y variable", 
-                                                      choices = NULL, 
-                                                      selected = NULL),
-                                       selectizeInput("color_var", 
-                                                      multiple = TRUE,
-                                                      label = "color variable",
-                                                      choices = "none",
-                                                      selected = "none"),
-                                       selectInput("split_variable",
-                                                   label = "select variable used to split plots",
-                                                   choices = c("x variable", "y variable", "color variable"),
-                                                   selected = "x variable"
-                                       ),
-                                       numericInput("nrow_split", label = "Number of rows", value = 1)
-                                       
-                                       
-                              )
-                       ) 
-                ),
-                column(width = 8,
-                       tabBox(title = "Plot",
-                              width = NULL, height = NULL,
-                              tabPanel("Plot",
-                                       actionButton("update_plot", "update"),
-                                       br(),
-                                       uiOutput("ui_plot")
-                                       #plotOutput("plot_focus", height = input$nrow_split * 300)
-                                       
-                              ),
-                              tabPanel("Options",
-                                       selectInput("plot_type", label = "plot type",
-                                                   choices = c("hexagonal", "histogram", "dots", "contour"),
-                                                   selected = "histogram"),
-                                       checkboxInput("legend", "show legend", value = TRUE),
-                                       checkboxInput("norm", "normalize (set max to 1)", value = TRUE),
-                                       checkboxInput("smooth", "smooth", value = FALSE),
-                                       checkboxInput("ridges", "ridges", value = FALSE),
-                                       selectizeInput("facet_var", 
-                                                      multiple =TRUE,
-                                                      label = "facet variables", 
-                                                      choices = "name", 
-                                                      selected = "name"),
-                                       selectizeInput("group_var", 
-                                                      multiple =FALSE,
-                                                      label = "group variable", 
-                                                      choices = c("name","subset"), 
-                                                      selected = "subset"),
-                                       selectizeInput("yridges_var", 
-                                                      multiple =FALSE,
-                                                      label = "y ridges variable", 
-                                                      choices = c("name","subset"), 
-                                                      selected = "subset"),
-                                       selectInput("legend_pos", label = "legend position",
-                                                   choices = c("right", "top", "left", "bottom"),
-                                                   selected = "right"),
-                                       numericInput("bin_number", label = "number of bins", value = 50),
-                                       numericInput("alpha", label = "alpha", value = 0.5),
-                                       numericInput("size", label = "size", value = 1),
-                                       numericInput("row_size", label = "row size (px)", value = 400)
-                              ),
-                              tabPanel("Save",
-                                       numericInput("width_plot", label = "width", value = 5),
-                                       numericInput("height_plot", label = "height", value = 5),
-                                       downloadButton("download_plot", "Save plot")
-                              )
-                              
-                       )
-                       
-                )
-                
-              )
+              plotUI(id = "plot_module")
+              # fluidRow(
+              #   column(width = 4,
+              #          tabBox(title = "",
+              #                 width = NULL, height = NULL,
+              #                 tabPanel("Samples",
+              #                          div(style = 'overflow-x: scroll', DT::dataTableOutput("files_selection_table"))
+              #                 ),
+              #                 tabPanel("Subset",
+              #                          selectizeInput("gate", 
+              #                                         label = "subset", 
+              #                                         choices = "root", 
+              #                                         selected = "root",
+              #                                         multiple = TRUE)
+              #                 ),
+              #                 tabPanel("Variables",
+              #                          selectizeInput("xvar", 
+              #                                         multiple = TRUE,
+              #                                         label = "x variable", 
+              #                                         choices = NULL, 
+              #                                         selected = NULL),
+              #                          selectizeInput("yvar", 
+              #                                         multiple = TRUE,
+              #                                         label = "y variable", 
+              #                                         choices = NULL, 
+              #                                         selected = NULL),
+              #                          selectizeInput("color_var", 
+              #                                         multiple = TRUE,
+              #                                         label = "color variable",
+              #                                         choices = "none",
+              #                                         selected = "none"),
+              #                          selectInput("split_variable",
+              #                                      label = "select variable used to split plots",
+              #                                      choices = c("x variable", "y variable", "color variable"),
+              #                                      selected = "x variable"
+              #                          ),
+              #                          numericInput("nrow_split", label = "Number of rows", value = 1)
+              #                          
+              #                          
+              #                 )
+              #          ) 
+              #   ),
+              #   column(width = 8,
+              #          tabBox(title = "Plot",
+              #                 width = NULL, height = NULL,
+              #                 tabPanel("Plot",
+              #                          actionButton("update_plot", "update"),
+              #                          br(),
+              #                          uiOutput("ui_plot")
+              #                          #plotOutput("plot_focus", height = input$nrow_split * 300)
+              #                          
+              #                 ),
+              #                 tabPanel("Options",
+              #                          selectInput("plot_type", label = "plot type",
+              #                                      choices = c("hexagonal", "histogram", "dots", "contour"),
+              #                                      selected = "histogram"),
+              #                          checkboxInput("legend", "show legend", value = TRUE),
+              #                          checkboxInput("norm", "normalize (set max to 1)", value = TRUE),
+              #                          checkboxInput("smooth", "smooth", value = FALSE),
+              #                          checkboxInput("ridges", "ridges", value = FALSE),
+              #                          selectizeInput("facet_var", 
+              #                                         multiple =TRUE,
+              #                                         label = "facet variables", 
+              #                                         choices = "name", 
+              #                                         selected = "name"),
+              #                          selectizeInput("group_var", 
+              #                                         multiple =FALSE,
+              #                                         label = "group variable", 
+              #                                         choices = c("name","subset"), 
+              #                                         selected = "subset"),
+              #                          selectizeInput("yridges_var", 
+              #                                         multiple =FALSE,
+              #                                         label = "y ridges variable", 
+              #                                         choices = c("name","subset"), 
+              #                                         selected = "subset"),
+              #                          selectInput("legend_pos", label = "legend position",
+              #                                      choices = c("right", "top", "left", "bottom"),
+              #                                      selected = "right"),
+              #                          numericInput("bin_number", label = "number of bins", value = 50),
+              #                          numericInput("alpha", label = "alpha", value = 0.5),
+              #                          numericInput("size", label = "size", value = 1),
+              #                          numericInput("row_size", label = "row size (px)", value = 400)
+              #                 ),
+              #                 tabPanel("Save",
+              #                          numericInput("width_plot", label = "width", value = 5),
+              #                          numericInput("height_plot", label = "height", value = 5),
+              #                          downloadButton("download_plot", "Save plot")
+              #                 )
+              #                 
+              #          )
+              #          
+              #   )
+              #   
+              # )
       ),
       tabItem(tabName = "Stat_tab",
               fluidRow(

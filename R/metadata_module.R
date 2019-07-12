@@ -63,6 +63,8 @@ metadataUI <- function(id) {
 #' @rdname importUI
 metadata <- function(input, output, session, rval) {
   
+  rval_mod <- reactiveValues()
+  
   observe({
     validate(
       need(rval$pdata, "No meta data available")
@@ -85,9 +87,9 @@ metadata <- function(input, output, session, rval) {
     )
     
     if(is.null(rval$pdata_original)){
-      rval$pdata_original <- as.data.frame(pData(rval$flow_set))
-    }else if(!setequal(pData(rval$flow_set)$name, rval$pdata_original$name)){
-      rval$pdata_original <- as.data.frame(pData(rval$flow_set))
+      rval_mod$pdata_original <- as.data.frame(pData(rval$flow_set))
+    }else if(!setequal(pData(rval$flow_set)$name, rval_mod$pdata_original$name)){
+      rval_mod$pdata_original <- as.data.frame(pData(rval$flow_set))
     }
     
   })
@@ -101,10 +103,10 @@ metadata <- function(input, output, session, rval) {
     
     ff <- rval$flow_set[[1]]
     
-    rval$keywords <- names( ff@description )
+    rval_mod$keywords <- names( ff@description )
     
     updateSelectInput(session, "keyword",
-                      choices = rval$keywords,
+                      choices = rval_mod$keywords,
                       selected = NULL)  
   })
   
@@ -121,28 +123,28 @@ metadata <- function(input, output, session, rval) {
                   "tab" = "\t",
                   "space" = " ")
     
-    rval$df_meta_imported <- read.csv(input$file_meta$datapath, sep = sep, header = TRUE, quote = "\"", fill = TRUE, stringsAsFactors = FALSE)
+    rval_mod$df_meta_imported <- read.csv(input$file_meta$datapath, sep = sep, header = TRUE, quote = "\"", fill = TRUE, stringsAsFactors = FALSE)
     
   })
   
   observeEvent(input$append_meta, {
-    print(rval$df_meta_imported)
-    rval$df_meta <- rval$df_meta_imported
+    print(rval_mod$df_meta_imported)
+    rval_mod$df_meta <- rval_mod$df_meta_imported
   })
   
   observe({
-    idx_match <- match(rval$pdata_original$name, rval$df_meta[,1])
+    idx_match <- match(rval_mod$pdata_original$name, rval_mod$df_meta[,1])
     #idx_match <- idx_match[!is.na(idx_match)]
     #if(length(idx_match)>0){
-    rval$df_meta_mapped <- rval$df_meta[idx_match, ]
+    rval_mod$df_meta_mapped <- rval_mod$df_meta[idx_match, ]
     #  print(rval$df_meta_mapped)
     #}
     
   })
   
   observeEvent(input$reset_meta, {
-    rval$df_meta <- NULL
-    rval$df_meta_mapped <- NULL
+    rval_mod$df_meta <- NULL
+    rval_mod$df_meta_mapped <- NULL
   })
   
   
@@ -164,34 +166,34 @@ metadata <- function(input, output, session, rval) {
         names(df) <- keys
         row.names(df) <- pData(rval$flow_set)$name
       }
-      rval$df_keywords <- df
+      rval_mod$df_keywords <- df
     }
   })
   
   
   observe({
     
-    print(rval$pdata_original)
+    print(rval_mod$pdata_original)
     
     validate(
-      need(rval$pdata_original, "No metadata")
+      need(rval_mod$pdata_original, "No metadata")
     )
     
-    df <- rval$pdata_original
+    df <- rval_mod$pdata_original
     
-    if(!is.null(rval$df_meta_mapped)){
-      if(dim(df)[1] == dim(rval$df_meta_mapped)[1]){
-        idx_new <- ! names(rval$df_meta_mapped) %in% names(df) 
+    if(!is.null(rval_mod$df_meta_mapped)){
+      if(dim(df)[1] == dim(rval_mod$df_meta_mapped)[1]){
+        idx_new <- ! names(rval_mod$df_meta_mapped) %in% names(df) 
         if(sum(idx_new)>0){
-          df <- cbind(df, rval$df_meta_mapped[idx_new])
+          df <- cbind(df, rval_mod$df_meta_mapped[idx_new])
         }
       }
     } 
-    if(!is.null(rval$df_keywords)){
-      if(dim(df)[1] == dim(rval$df_keywords)[1] ){
-        idx_new <- ! names(rval$df_keywords) %in% names(df)
+    if(!is.null(rval_mod$df_keywords)){
+      if(dim(df)[1] == dim(rval_mod$df_keywords)[1] ){
+        idx_new <- ! names(rval_mod$df_keywords) %in% names(df)
         if(sum(idx_new)>0){
-          df <- cbind(df, rval$df_keywords[idx_new])
+          df <- cbind(df, rval_mod$df_keywords[idx_new])
         }
         
       }
@@ -269,9 +271,9 @@ metadata <- function(input, output, session, rval) {
   
   output$meta <- DT::renderDataTable({
     validate(
-      need(rval$df_meta_imported, "No meta data imported")
+      need(rval_mod$df_meta_imported, "No meta data imported")
     )
-    as.data.frame(rval$df_meta_imported)
+    as.data.frame(rval_mod$df_meta_imported)
   })
   
   
