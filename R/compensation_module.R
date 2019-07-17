@@ -91,7 +91,7 @@ compensationUI <- function(id) {
 }
 
 
-#' transform server function
+#' compensation server function
 #' @param input shiny input
 #' @param output shiny output
 #' @param session shiny session

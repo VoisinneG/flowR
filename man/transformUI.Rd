@@ -4,7 +4,7 @@
 \alias{compensation}
 \alias{transformUI}
 \alias{transform}
-\title{transform server function}
+\title{compensation server function}
 \usage{
 compensation(input, output, session, rval)
 

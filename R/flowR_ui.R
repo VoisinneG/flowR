@@ -196,75 +196,10 @@ flowR_ui <- function() {
               )
       ),
       tabItem(tabName = "Sub_tab",
-              fluidRow(
-                column(width = 6,
-                       tabBox(title = "",
-                              width = NULL, height = NULL,
-                              tabPanel("Samples",
-                                       div(style = 'overflow-x: scroll', DT::dataTableOutput("sub_sample_table"))
-                              ),
-                              tabPanel("Subset",
-                                       selectizeInput("gate_sub_sample", 
-                                                      label = "subset", 
-                                                      choices = "root", 
-                                                      selected = "root",
-                                                      multiple = TRUE)
-                              ),
-                              tabPanel("Compute",
-                                       numericInput("ncells_per_sample", "Number of cells / subset / sample", 1000),
-                                       actionButton("compute_data", "sample"),
-                                       #actionButton("reset_data", "reset"),
-                                       br(),
-                                       br(),
-                                       "Summary",
-                                       br(),
-                                       verbatimTextOutput("summary_sub_sample")
-                              )
-                              
-                       ),
-                       fluidRow(
-                         valueBoxOutput("progressBoxSub", width = 6),
-                         valueBoxOutput("progressBoxSub2", width = 6)
-                       )
-                )
-              )
+              subsampleUI(id = "subsample_module")
       ),
       tabItem(tabName = "TSNE_tab",
-              fluidRow(
-                column(width = 6,
-                       tabBox(title = "",
-                              width = NULL, height = NULL,
-                              tabPanel("Variables",
-                                       div(style = 'overflow-x: scroll', DT::dataTableOutput("tSNE_variables_table"))
-                              ),
-                              tabPanel("Options",
-                                       
-                                       selectInput("y_trans_tsne", 
-                                                   label = "Transform variables:", 
-                                                   choices = c("log10", "asinh", "identity", "default"), 
-                                                   selected = "default"),
-                                       selectInput("dim_red_method", label = "method", choices = c("tSNE" , "umap"), selected = "tSNE"),
-                                       conditionalPanel(condition = "input.dim_red_method == 'tSNE'",
-                                                        numericInput("perplexity", "perplexity", 50)
-                                                        )
-                                       
-                              ),
-                              tabPanel("Compute",
-                                       numericInput("ncells_tsne", "Number of cells", 1000),
-                                       actionButton("compute_tsne", "Perform tSNE"),
-                                       br(),
-                                       br(),
-                                       "Summary",
-                                       br(),
-                                       verbatimTextOutput("summary_tsne")
-                              )
-                       ),
-                       fluidRow(
-                         valueBoxOutput("progressBoxTSNE", width = 6),
-                         valueBoxOutput("progressBoxTSNE2", width = 6)
-                       )
-                )
-              )
+              dimRedUI(id = "dim_reduction_module")
       ),
       tabItem(tabName = "Cluster_tab",
               fluidRow(

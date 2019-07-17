@@ -25,28 +25,7 @@ transformUI <- function(id) {
                            selectInput(ns("trans"), "transformation", 
                                        choices = c("identity", "logicle", "asinh", "flowJo_asinh", "log"), 
                                        selected = "identity"),
-                           conditionalPanel(condition = "input.trans == 'asinh'",
-                                            h5("Parameters"),
-                                            numericInput(ns("base_asinh"), label = "base", value = 1)
-                           ),
-                           conditionalPanel(condition = "input.trans == 'flowJo_asinh'",
-                                            h5("Parameters"),
-                                            numericInput(ns("m"), label = "m", value = 5),
-                                            numericInput(ns("t"), label = "t", value = 12000),
-                                            numericInput(ns("a"), label = "a", value = 0.7),
-                                            numericInput(ns("length"), label = "length", value = 256)
-                           ),
-                           conditionalPanel(condition = "input.trans == 'logicle'",
-                                            h5("Parameters"),
-                                            numericInput(ns("w_logicle"), label = "w", value = 0.5),
-                                            numericInput(ns("t_logicle"), label = "t", value = 262144),
-                                            numericInput(ns("m_logicle"), label = "m", value = 4.5),
-                                            numericInput(ns("a_logicle"), label = "a", value = 0)
-                           ),
-                           conditionalPanel(condition = "input.trans == 'log'",
-                                            h5("Parameters"),
-                                            numericInput(ns("base_log"), label = "base", value = 10)
-                           ),
+                           uiOutput(ns("trans_param_ui")),
                            br(),
                            actionButton(ns("apply_transformation"), label = "apply to selected chanels"),
                            br()
@@ -88,7 +67,33 @@ transformUI <- function(id) {
 transform <- function(input, output, session, rval) {
   
   `%then%` <- shiny:::`%OR%`
-
+  
+  output$trans_param_ui <- renderUI({
+    ns <- session$ns
+    x <- list()
+    if(input$trans == 'asinh'){
+      x[[1]] <- h5("Parameters")
+      x[[2]] <- numericInput(ns("base_asinh"), label = "base", value = 1)
+    } else if(input$trans == 'flowJo_asinh'){
+      x[[1]] <- h5("Parameters")
+      x[[2]] <- numericInput(ns("m"), label = "m", value = 5)
+      x[[3]] <- numericInput(ns("t"), label = "t", value = 12000)
+      x[[4]] <- numericInput(ns("a"), label = "a", value = 0.7)
+      x[[5]] <- numericInput(ns("length"), label = "length", value = 256)
+    } else if(input$trans == 'logicle'){
+      x[[1]] <- h5("Parameters")
+      x[[2]] <- numericInput(ns("w_logicle"), label = "w", value = 0.5)
+      x[[3]] <- numericInput(ns("t_logicle"), label = "t", value = 262144)
+      x[[4]] <- numericInput(ns("m_logicle"), label = "m", value = 4.5)
+      x[[5]] <- numericInput(ns("a_logicle"), label = "a", value = 0)
+    } else if(input$trans == 'log'){
+      x[[1]] <- h5("Parameters")
+      x[[2]] <- numericInput(ns("base_log"), label = "base", value = 10)
+    }
+    
+    tagList(x)
+  })
+  
   plot_params <- reactiveValues()
   
   observe({
@@ -165,19 +170,18 @@ transform <- function(input, output, session, rval) {
     idx_new <- match(new_par, rval$parameters$name)
     
     if(length(new_par)>0){
-      
       for(i in 1:length(new_par)){
         rval$transformation[[new_par[i]]] <- switch(rval$parameters$display[idx_new[i]],
-                                                    "LOG" = logicle_trans(w=input$w_logicle, 
-                                                                          m=input$m_logicle, 
-                                                                          t = input$t_logicle, 
-                                                                          a = input$a_logicle),
+                                                    "LOG" = logicle_trans(w=0.5, 
+                                                                          m=4.5, 
+                                                                          t = 262144, 
+                                                                          a = 0),
                                                     identity_trans())
         rval$trans_parameters[[new_par[i]]] <- switch(rval$parameters$display[idx_new[i]],
-                                                      "LOG" = list(w=input$w_logicle, 
-                                                                   m=input$m_logicle, 
-                                                                   t = input$t_logicle, 
-                                                                   a = input$a_logicle),
+                                                      "LOG" = list(w=0.5, 
+                                                                   m=4.5, 
+                                                                   t = 262144, 
+                                                                   a = 0),
                                                       list())
       }
       
