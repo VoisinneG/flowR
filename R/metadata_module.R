@@ -65,20 +65,20 @@ metadata <- function(input, output, session, rval) {
   
   rval_mod <- reactiveValues()
   
-  observe({
-    validate(
-      need(rval$pdata, "No meta data available")
-    )
-    validate(
-      need(rval$flow_set, "No flow set available")
-    )
-    validate(
-      need(setequal(pData(rval$flow_set)$name, rval$pdata$name), "Meta data does not match with flow set samples")
-    )
-    
-    pData(rval$flow_set) <- rval$pdata
-    
-  })
+  # observe({
+  #   validate(
+  #     need(rval$pdata, "No meta data available")
+  #   )
+  #   validate(
+  #     need(rval$flow_set, "No flow set available")
+  #   )
+  #   validate(
+  #     need(setequal(pData(rval$flow_set)$name, rval$pdata$name), "Meta data does not match with flow set samples")
+  #   )
+  #   
+  #   pData(rval$flow_set) <- rval$pdata
+  #   
+  # })
   
   observe({
     
@@ -173,6 +173,7 @@ metadata <- function(input, output, session, rval) {
   
   observe({
     
+    cat("meta")
     print(rval_mod$pdata_original)
     
     validate(

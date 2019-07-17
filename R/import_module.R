@@ -210,6 +210,8 @@ import <- function(input, output, session) {
       
       rval$flow_set_imported <- fs
       
+      rval$flow_set_names <- unique(c(rval$flow_set_names, "imported"))
+      rval$flow_set_selected <- "imported"
       
     })
     

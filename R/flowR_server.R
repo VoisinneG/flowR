@@ -77,10 +77,6 @@ flowR_server <- function(session, input, output) {
   
   rval <- callModule(metadata, "metadata_module", rval)
 
-  observeEvent(rval$flow_set_selected, {
-    updateSelectInput(session, "flow_set", choices = rval$flow_set_names, selected = rval$flow_set_selected)
-  })
-  
   ##########################################################################################################
   # Deal with transform
   
@@ -91,18 +87,31 @@ flowR_server <- function(session, input, output) {
   })
   
   ##########################################################################################################
-  # Plot tab
-  rval_plot <- reactiveValues()
-  rval_plot <- callModule(plot, "plot_module", rval)
+  # Deal with compensation
   
+  rval <- callModule(compensation, "compensation_module", rval)
+  
+  observeEvent(input$apply_comp, {
+    rval$apply_comp <- input$apply_comp
+  })
+  
+  ##########################################################################################################
+  # Plot tab
+  
+  plot_display <- callModule(display, "display_module", rval)
+  
+
   ##########################################################################################################
   # Create gating set
   
-  observeEvent(rval$flow_set_imported, {
-    rval$flow_set_names <- "imported"
-    updateSelectInput(session, "flow_set", choices = rval$flow_set_names, selected = "imported")
-  })
+  # observeEvent(rval$flow_set_imported, {
+  #   rval$flow_set_names <- "imported"
+  #   updateSelectInput(session, "flow_set", choices = rval$flow_set_names, selected = "imported")
+  # })
   
+  observeEvent(rval$flow_set_selected, {
+    updateSelectInput(session, "flow_set", choices = rval$flow_set_names, selected = rval$flow_set_selected)
+  })
   
   observe({
     validate(
@@ -116,7 +125,6 @@ flowR_server <- function(session, input, output) {
                             "dim-reduction" = rval$flow_set_tsne,
                             "cluster" = rval$flow_set_cluster
     )
-    
     
   })
   
@@ -187,44 +195,44 @@ flowR_server <- function(session, input, output) {
   
   
   #get parameters information from flow set
-  observe({
-    
-    validate(
-      need(rval$flow_set, "No flow set available")
-    )
-    
-    ff <- rval$flow_set[[1]]
-    
-    if(!setequal(rval$parameters$name, parameters(ff)$name)){
-      desc <- parameters(ff)$desc
-      name <- parameters(ff)$name
-      print(parameters(ff)$name)
-      name_long <- name
-      name_long[!is.na(desc)] <- paste(name[!is.na(desc)], " (", desc[!is.na(desc)], ")", sep = "")
-      
-      display <- unlist(sapply(rownames(parameters(ff)@data), FUN = function(x){
-        kw <- substr(x, start = 2, stop = nchar(x))
-        kw <- paste(kw, "DISPLAY", sep = "")
-        disp <- ff@description[[kw]]
-        if(is.null(disp)){
-          disp <- "NA"
-        }
-        return(disp)
-      }))
-      
-      names(display) <- parameters(ff)@data$name
-      
-      rval$parameters <- data.frame(name = name,
-                                    desc = desc,
-                                    name_long = name_long,
-                                    display = display[match(name, names(display))],
-                                    range = parameters(ff)@data$range,
-                                    minRange = parameters(ff)@data$minRange,
-                                    maxRange = parameters(ff)@data$maxRange,
-                                    stringsAsFactors = FALSE)
-    }
-    
-  })
+  # observe({
+  #   
+  #   validate(
+  #     need(rval$flow_set, "No flow set available")
+  #   )
+  #   
+  #   ff <- rval$flow_set[[1]]
+  #   
+  #   if(!setequal(rval$parameters$name, parameters(ff)$name)){
+  #     desc <- parameters(ff)$desc
+  #     name <- parameters(ff)$name
+  #     print(parameters(ff)$name)
+  #     name_long <- name
+  #     name_long[!is.na(desc)] <- paste(name[!is.na(desc)], " (", desc[!is.na(desc)], ")", sep = "")
+  #     
+  #     display <- unlist(sapply(rownames(parameters(ff)@data), FUN = function(x){
+  #       kw <- substr(x, start = 2, stop = nchar(x))
+  #       kw <- paste(kw, "DISPLAY", sep = "")
+  #       disp <- ff@description[[kw]]
+  #       if(is.null(disp)){
+  #         disp <- "NA"
+  #       }
+  #       return(disp)
+  #     }))
+  #     
+  #     names(display) <- parameters(ff)@data$name
+  #     
+  #     rval$parameters <- data.frame(name = name,
+  #                                   desc = desc,
+  #                                   name_long = name_long,
+  #                                   display = display[match(name, names(display))],
+  #                                   range = parameters(ff)@data$range,
+  #                                   minRange = parameters(ff)@data$minRange,
+  #                                   maxRange = parameters(ff)@data$maxRange,
+  #                                   stringsAsFactors = FALSE)
+  #   }
+  #   
+  # })
   
   #Update available variables
   # observe({
@@ -387,213 +395,213 @@ flowR_server <- function(session, input, output) {
   #   }
   # })
   
-  ##########################################################################################################
-  # Observe functions for compensation
-  
-  observeEvent(rval$flow_set_imported, {
-    fs <- rval$flow_set_imported
-    m <- diag( length(parameters(fs[[1]])$name) )
-    colnames(m) <- parameters(fs[[1]])$name
-    rval$df_spill <- as.data.frame(m)
-    row.names(rval$df_spill) <- colnames(rval$df_spill)
-    
-    #rval$df_spill <- NULL
-    
-    for(i in 1:length(fs)){
-      if("SPILL" %in% names(description(fs[[i]]))){
-        df <- as.data.frame(description(fs[[i]])[["SPILL"]])
-        is_identity <- sum(apply(X=df, MARGIN = 1, FUN = function(x){sum(x==0) == (length(x)-1)})) == dim(df)[1]
-        if(!is_identity){
-          rval$df_spill <- df
-          row.names(rval$df_spill) <- colnames(rval$df_spill)
-          break
-        }
-      }
-    }
-    
-    rval$df_spill_original <- rval$df_spill
-    
-  })
-  
-  
-  observeEvent(input$add_spill_param, {
-    
-    validate(
-      need(rval$gating_set, "No gating set available")
-    )
-    
-    
-    df_pos <- get_data_gs(gs = rval$gating_set,
-                          sample = input$sample_pos,
-                          subset = input$gate_pos,
-                          spill = NULL)
-    df_pos <- df_pos[names(df_pos) %in% rval$flow_set@colnames]
-    pos_values <- apply(df_pos, MARGIN = 2, FUN = median,  na.rm = TRUE)
-    pos_values <- pos_values[rval$flow_set@colnames]
-    names(pos_values) <- rval$flow_set@colnames
-    rval$pos_values[[input$fluo]] <- pos_values
-    
-    
-    df_neg <- get_data_gs(gs = rval$gating_set,
-                          sample = input$sample_neg,
-                          subset = input$gate_neg,
-                          spill = NULL)
-    df_neg <- df_neg[names(df_neg) %in% rval$flow_set@colnames]
-    neg_values <- apply(df_neg, MARGIN = 2, FUN = median, na.rm = TRUE)
-    neg_values <- neg_values[rval$flow_set@colnames]
-    names(neg_values) <- rval$flow_set@colnames
-    rval$neg_values[[input$fluo]] <- neg_values
-    
-  })
-  
-  observe({
-    updateSelectInput(session, "spill_params", choices = names(rval$pos_values), selected = names(rval$pos_values))
-  })
-  
-  observeEvent(input$compute_spillover_matrix, {
-    validate(
-      need(length(input$spill_params)>0, "Not enough parameters selected")
-    )
-    
-    df_pos_tot <- data.frame(do.call(rbind, rval$pos_values[input$spill_params]), check.names = FALSE)
-    row.names(df_pos_tot) <- input$spill_params
-    df_pos_tot <- df_pos_tot[input$spill_params]
-    print(df_pos_tot)
-    
-    df_neg_tot <- data.frame(do.call(rbind, rval$neg_values[input$spill_params]), check.names = FALSE)
-    row.names(df_neg_tot) <- input$spill_params
-    df_neg_tot <- df_neg_tot[input$spill_params]
-    print(df_neg_tot)
-    
-    df_spill <- df_pos_tot
-    for(i in 1:length(input$spill_params)){
-      neg <- rval$neg_values[[input$spill_params[i]]][[input$spill_params[i]]]
-      pos <- rval$pos_values[[input$spill_params[i]]][[input$spill_params[i]]]
-      df_spill[input$spill_params[i]] <- (df_pos_tot[input$spill_params[i]] - neg)/(pos - neg)
-    }
-    
-    print(df_spill)
-    rval$df_spill <- df_spill
-    
-  })
-  
-  observe({
-    validate(
-      need(rval$parameters, "No parameters available")
-    )
-    comp_params <- rval$parameters$name_long
-    names(comp_params) <- NULL
-    updateSelectInput(session, "xvar_comp", choices = comp_params, selected = comp_params[1])
-    updateSelectInput(session, "yvar_comp", choices = comp_params, selected = comp_params[2])
-  })
-  
-  observe({
-    validate(
-      need(input$spill_file$datapath, "Please select a file to import")
-    )
-    
-    sep <- switch(input$sep_spill,
-                  "comma" = ",",
-                  "semi-column" = ";",
-                  "tab" = "\t",
-                  "space" = " ")
-    
-    rval$df_spill_imported <- read.table(file = input$spill_file$datapath, 
-                                         sep = sep, 
-                                         fill = TRUE, 
-                                         quote = "\"", 
-                                         header = TRUE, 
-                                         check.names = FALSE)
-    
-  })
-  
-  observeEvent(input$set_spillover_matrix,{
-    df <- as.data.frame(rval$df_spill_imported)
-    row.names(df) <- colnames(df)
-    df <- df[row.names(df) %in% rval$flow_set@colnames, colnames(df) %in% rval$flow_set@colnames]
-    rval$df_spill <- df
-    
-  })
-  
-  
-  observe({
-    
-    validate(
-      need(length(input$file_comp)>0, "Please select a file to load")
-    )
-    
-    sep <- switch(input$sep_comp,
-                  "comma" = ",",
-                  "semi-column" = ";",
-                  "tab" = "\t")
-    
-    rval$df_comp <- read.csv(input$file_comp$datapath, sep = sep, header = TRUE, quote = "\"", fill = TRUE)
-    names(rval$df_comp)[1] <- "name"
-  })
-  
-  observeEvent(input$import_comp, {
-    idx_match_row <- match(rval$pdata$name, rval$df_comp[,1])
-    idx_match_col <- match(rval$pdata$name, names(rval$df_comp))
-    rval$df_spill <- rval$df_comp[idx_match_row, idx_match_col]
-  })
-  
-  observeEvent(input$reset_comp, {
-    rval$df_spill <- rval$df_spill_original
-  })
-  
-  observeEvent(input$set_spill_value, {
-    
-    xvar <- rval$parameters$name[match(input$xvar_comp, rval$parameters$name_long)]
-    yvar <- rval$parameters$name[match(input$yvar_comp, rval$parameters$name_long)]
-    idx_x <- match(xvar, names(rval$df_spill))
-    idx_y <- match(yvar, names(rval$df_spill))
-    rval$df_spill[idx_y, idx_x] <- input$spill_value
-    
-  })
-  
-  observe({
-    if(input$apply_comp){
-      rval$spill <- rval$df_spill
-    }else{
-      rval$spill <- NULL
-    }
-    
-  })
-  
-  observe({
-    df <- rval$df_spill
-    event.data <- event_data("plotly_click", source = "select_heatmap")
-    idx_y <- dim(df)[1] - event.data$pointNumber[[1]][1]
-    idx_x <- event.data$pointNumber[[1]][2] + 1
-    
-    if(length(idx_x)>0){
-      updateSelectInput(session, "xvar_comp", 
-                        selected = rval$parameters$name_long[match(colnames(df)[idx_x], rval$parameters$name)])
-    }
-    if(length(idx_y)>0){
-      updateSelectInput(session, "yvar_comp", 
-                        selected = rval$parameters$name_long[match(row.names(df)[idx_y], rval$parameters$name)])
-      
-    }
-    
-  })
-  
-  observe({
-    df <- rval$df_spill
-    xvar <- rval$parameters$name[match(input$xvar_comp, rval$parameters$name_long)]
-    yvar <- rval$parameters$name[match(input$yvar_comp, rval$parameters$name_long)]
-    idx_x <- match(xvar, colnames(df))
-    idx_y <- match(yvar, row.names(df))
-    #if(length(idx_x)>0 & length(idx_y)>0){
-    updateNumericInput(session, "spill_value", value = df[idx_y, idx_x])
-    
-    #}
-    
-  })
-  
-  observe({
-    updateNumericInput(session, "spill_value", step = input$step_size)
-  })
+  # ##########################################################################################################
+  # # Observe functions for compensation
+  # 
+  # observeEvent(rval$flow_set_imported, {
+  #   fs <- rval$flow_set_imported
+  #   m <- diag( length(parameters(fs[[1]])$name) )
+  #   colnames(m) <- parameters(fs[[1]])$name
+  #   rval$df_spill <- as.data.frame(m)
+  #   row.names(rval$df_spill) <- colnames(rval$df_spill)
+  #   
+  #   #rval$df_spill <- NULL
+  #   
+  #   for(i in 1:length(fs)){
+  #     if("SPILL" %in% names(description(fs[[i]]))){
+  #       df <- as.data.frame(description(fs[[i]])[["SPILL"]])
+  #       is_identity <- sum(apply(X=df, MARGIN = 1, FUN = function(x){sum(x==0) == (length(x)-1)})) == dim(df)[1]
+  #       if(!is_identity){
+  #         rval$df_spill <- df
+  #         row.names(rval$df_spill) <- colnames(rval$df_spill)
+  #         break
+  #       }
+  #     }
+  #   }
+  #   
+  #   rval$df_spill_original <- rval$df_spill
+  #   
+  # })
+  # 
+  # 
+  # observeEvent(input$add_spill_param, {
+  #   
+  #   validate(
+  #     need(rval$gating_set, "No gating set available")
+  #   )
+  #   
+  #   
+  #   df_pos <- get_data_gs(gs = rval$gating_set,
+  #                         sample = input$sample_pos,
+  #                         subset = input$gate_pos,
+  #                         spill = NULL)
+  #   df_pos <- df_pos[names(df_pos) %in% rval$flow_set@colnames]
+  #   pos_values <- apply(df_pos, MARGIN = 2, FUN = median,  na.rm = TRUE)
+  #   pos_values <- pos_values[rval$flow_set@colnames]
+  #   names(pos_values) <- rval$flow_set@colnames
+  #   rval$pos_values[[input$fluo]] <- pos_values
+  #   
+  #   
+  #   df_neg <- get_data_gs(gs = rval$gating_set,
+  #                         sample = input$sample_neg,
+  #                         subset = input$gate_neg,
+  #                         spill = NULL)
+  #   df_neg <- df_neg[names(df_neg) %in% rval$flow_set@colnames]
+  #   neg_values <- apply(df_neg, MARGIN = 2, FUN = median, na.rm = TRUE)
+  #   neg_values <- neg_values[rval$flow_set@colnames]
+  #   names(neg_values) <- rval$flow_set@colnames
+  #   rval$neg_values[[input$fluo]] <- neg_values
+  #   
+  # })
+  # 
+  # observe({
+  #   updateSelectInput(session, "spill_params", choices = names(rval$pos_values), selected = names(rval$pos_values))
+  # })
+  # 
+  # observeEvent(input$compute_spillover_matrix, {
+  #   validate(
+  #     need(length(input$spill_params)>0, "Not enough parameters selected")
+  #   )
+  #   
+  #   df_pos_tot <- data.frame(do.call(rbind, rval$pos_values[input$spill_params]), check.names = FALSE)
+  #   row.names(df_pos_tot) <- input$spill_params
+  #   df_pos_tot <- df_pos_tot[input$spill_params]
+  #   print(df_pos_tot)
+  #   
+  #   df_neg_tot <- data.frame(do.call(rbind, rval$neg_values[input$spill_params]), check.names = FALSE)
+  #   row.names(df_neg_tot) <- input$spill_params
+  #   df_neg_tot <- df_neg_tot[input$spill_params]
+  #   print(df_neg_tot)
+  #   
+  #   df_spill <- df_pos_tot
+  #   for(i in 1:length(input$spill_params)){
+  #     neg <- rval$neg_values[[input$spill_params[i]]][[input$spill_params[i]]]
+  #     pos <- rval$pos_values[[input$spill_params[i]]][[input$spill_params[i]]]
+  #     df_spill[input$spill_params[i]] <- (df_pos_tot[input$spill_params[i]] - neg)/(pos - neg)
+  #   }
+  #   
+  #   print(df_spill)
+  #   rval$df_spill <- df_spill
+  #   
+  # })
+  # 
+  # observe({
+  #   validate(
+  #     need(rval$parameters, "No parameters available")
+  #   )
+  #   comp_params <- rval$parameters$name_long
+  #   names(comp_params) <- NULL
+  #   updateSelectInput(session, "xvar_comp", choices = comp_params, selected = comp_params[1])
+  #   updateSelectInput(session, "yvar_comp", choices = comp_params, selected = comp_params[2])
+  # })
+  # 
+  # observe({
+  #   validate(
+  #     need(input$spill_file$datapath, "Please select a file to import")
+  #   )
+  #   
+  #   sep <- switch(input$sep_spill,
+  #                 "comma" = ",",
+  #                 "semi-column" = ";",
+  #                 "tab" = "\t",
+  #                 "space" = " ")
+  #   
+  #   rval$df_spill_imported <- read.table(file = input$spill_file$datapath, 
+  #                                        sep = sep, 
+  #                                        fill = TRUE, 
+  #                                        quote = "\"", 
+  #                                        header = TRUE, 
+  #                                        check.names = FALSE)
+  #   
+  # })
+  # 
+  # observeEvent(input$set_spillover_matrix,{
+  #   df <- as.data.frame(rval$df_spill_imported)
+  #   row.names(df) <- colnames(df)
+  #   df <- df[row.names(df) %in% rval$flow_set@colnames, colnames(df) %in% rval$flow_set@colnames]
+  #   rval$df_spill <- df
+  #   
+  # })
+  # 
+  # 
+  # observe({
+  #   
+  #   validate(
+  #     need(length(input$file_comp)>0, "Please select a file to load")
+  #   )
+  #   
+  #   sep <- switch(input$sep_comp,
+  #                 "comma" = ",",
+  #                 "semi-column" = ";",
+  #                 "tab" = "\t")
+  #   
+  #   rval$df_comp <- read.csv(input$file_comp$datapath, sep = sep, header = TRUE, quote = "\"", fill = TRUE)
+  #   names(rval$df_comp)[1] <- "name"
+  # })
+  # 
+  # observeEvent(input$import_comp, {
+  #   idx_match_row <- match(rval$pdata$name, rval$df_comp[,1])
+  #   idx_match_col <- match(rval$pdata$name, names(rval$df_comp))
+  #   rval$df_spill <- rval$df_comp[idx_match_row, idx_match_col]
+  # })
+  # 
+  # observeEvent(input$reset_comp, {
+  #   rval$df_spill <- rval$df_spill_original
+  # })
+  # 
+  # observeEvent(input$set_spill_value, {
+  #   
+  #   xvar <- rval$parameters$name[match(input$xvar_comp, rval$parameters$name_long)]
+  #   yvar <- rval$parameters$name[match(input$yvar_comp, rval$parameters$name_long)]
+  #   idx_x <- match(xvar, names(rval$df_spill))
+  #   idx_y <- match(yvar, names(rval$df_spill))
+  #   rval$df_spill[idx_y, idx_x] <- input$spill_value
+  #   
+  # })
+  # 
+  # observe({
+  #   if(input$apply_comp){
+  #     rval$spill <- rval$df_spill
+  #   }else{
+  #     rval$spill <- NULL
+  #   }
+  #   
+  # })
+  # 
+  # observe({
+  #   df <- rval$df_spill
+  #   event.data <- event_data("plotly_click", source = "select_heatmap")
+  #   idx_y <- dim(df)[1] - event.data$pointNumber[[1]][1]
+  #   idx_x <- event.data$pointNumber[[1]][2] + 1
+  #   
+  #   if(length(idx_x)>0){
+  #     updateSelectInput(session, "xvar_comp", 
+  #                       selected = rval$parameters$name_long[match(colnames(df)[idx_x], rval$parameters$name)])
+  #   }
+  #   if(length(idx_y)>0){
+  #     updateSelectInput(session, "yvar_comp", 
+  #                       selected = rval$parameters$name_long[match(row.names(df)[idx_y], rval$parameters$name)])
+  #     
+  #   }
+  #   
+  # })
+  # 
+  # observe({
+  #   df <- rval$df_spill
+  #   xvar <- rval$parameters$name[match(input$xvar_comp, rval$parameters$name_long)]
+  #   yvar <- rval$parameters$name[match(input$yvar_comp, rval$parameters$name_long)]
+  #   idx_x <- match(xvar, colnames(df))
+  #   idx_y <- match(yvar, row.names(df))
+  #   #if(length(idx_x)>0 & length(idx_y)>0){
+  #   updateNumericInput(session, "spill_value", value = df[idx_y, idx_x])
+  #   
+  #   #}
+  #   
+  # })
+  # 
+  # observe({
+  #   updateNumericInput(session, "spill_value", step = input$step_size)
+  # })
   
   
   ##########################################################################################################
@@ -680,24 +688,24 @@ flowR_server <- function(session, input, output) {
   #   
   # })
   
-  observe({
-    validate(
-      need(rval$flow_set, "No flow set available")
-    )
-    
-    updateSelectInput(session, "sample_selected",
-                      choices = pData(rval$flow_set)$name,
-                      selected = pData(rval$flow_set)$name[1])
-    
-    # updateSelectInput(session, "sample_selected_trans",
-    #                   choices = pData(rval$flow_set)$name,
-    #                   selected = pData(rval$flow_set)$name[1])
-    
-    updateSelectInput(session, "sample_selected_comp",
-                      choices = pData(rval$flow_set)$name,
-                      selected = pData(rval$flow_set)$name[1])
-    
-  })
+  # observe({
+  #   validate(
+  #     need(rval$flow_set, "No flow set available")
+  #   )
+  #   
+  #   updateSelectInput(session, "sample_selected",
+  #                     choices = pData(rval$flow_set)$name,
+  #                     selected = pData(rval$flow_set)$name[1])
+  #   
+  #   # updateSelectInput(session, "sample_selected_trans",
+  #   #                   choices = pData(rval$flow_set)$name,
+  #   #                   selected = pData(rval$flow_set)$name[1])
+  #   
+  #   updateSelectInput(session, "sample_selected_comp",
+  #                     choices = pData(rval$flow_set)$name,
+  #                     selected = pData(rval$flow_set)$name[1])
+  #   
+  # })
   
   observe({
     updateSelectInput(session, "gate_stat",
@@ -708,35 +716,35 @@ flowR_server <- function(session, input, output) {
   ##########################################################################################################
   # Observe functions for sample selection
   
-  observeEvent(input$sample_selected, {
-    if(!is.null(rval$flow_set)){
-      rval$idx_ff_gate <- which(rval$pdata$name == input$sample_selected)
-      
-    }
-  })
-  
-  observeEvent(input$next_frame, {
-    if(!is.null(rval$flow_set)){
-      idx <- which(rval$pdata$name == input$sample_selected)
-      idx <- idx +1
-      if(idx > length(rval$pdata$name)){
-        idx <- 1
-      }
-      updateSelectInput(session, "sample_selected", selected = rval$pdata$name[idx])
-      
-    }
-  })
-  
-  observeEvent(input$previous_frame, {
-    if(!is.null(rval$flow_set)){
-      idx <- which(rval$pdata$name == input$sample_selected)
-      idx <- idx - 1
-      if(idx < 1){
-        idx <- length(rval$pdata$name)
-      }
-      updateSelectInput(session, "sample_selected", selected = rval$pdata$name[idx])
-    }
-  })
+  # observeEvent(input$sample_selected, {
+  #   if(!is.null(rval$flow_set)){
+  #     rval$idx_ff_gate <- which(rval$pdata$name == input$sample_selected)
+  #     
+  #   }
+  # })
+  # 
+  # observeEvent(input$next_frame, {
+  #   if(!is.null(rval$flow_set)){
+  #     idx <- which(rval$pdata$name == input$sample_selected)
+  #     idx <- idx +1
+  #     if(idx > length(rval$pdata$name)){
+  #       idx <- 1
+  #     }
+  #     updateSelectInput(session, "sample_selected", selected = rval$pdata$name[idx])
+  #     
+  #   }
+  # })
+  # 
+  # observeEvent(input$previous_frame, {
+  #   if(!is.null(rval$flow_set)){
+  #     idx <- which(rval$pdata$name == input$sample_selected)
+  #     idx <- idx - 1
+  #     if(idx < 1){
+  #       idx <- length(rval$pdata$name)
+  #     }
+  #     updateSelectInput(session, "sample_selected", selected = rval$pdata$name[idx])
+  #   }
+  # })
   
   # observeEvent(input$next_frame_trans, {
   #   if(!is.null(rval$flow_set)){
@@ -761,28 +769,28 @@ flowR_server <- function(session, input, output) {
   #   }
   # })
   
-  observeEvent(input$next_frame_comp, {
-    if(!is.null(rval$flow_set)){
-      idx <- which(rval$pdata$name == input$sample_selected_comp)
-      idx <- idx +1
-      if(idx > length(rval$pdata$name)){
-        idx <- 1
-      }
-      updateSelectInput(session, "sample_selected_comp", selected = rval$pdata$name[idx])
-      
-    }
-  })
-  
-  observeEvent(input$previous_frame_comp, {
-    if(!is.null(rval$flow_set)){
-      idx <- which(rval$pdata$name == input$sample_selected_comp)
-      idx <- idx - 1
-      if(idx < 1){
-        idx <- length(rval$pdata$name)
-      }
-      updateSelectInput(session, "sample_selected_comp", selected = rval$pdata$name[idx])
-    }
-  })
+  # observeEvent(input$next_frame_comp, {
+  #   if(!is.null(rval$flow_set)){
+  #     idx <- which(rval$pdata$name == input$sample_selected_comp)
+  #     idx <- idx +1
+  #     if(idx > length(rval$pdata$name)){
+  #       idx <- 1
+  #     }
+  #     updateSelectInput(session, "sample_selected_comp", selected = rval$pdata$name[idx])
+  #     
+  #   }
+  # })
+  # 
+  # observeEvent(input$previous_frame_comp, {
+  #   if(!is.null(rval$flow_set)){
+  #     idx <- which(rval$pdata$name == input$sample_selected_comp)
+  #     idx <- idx - 1
+  #     if(idx < 1){
+  #       idx <- length(rval$pdata$name)
+  #     }
+  #     updateSelectInput(session, "sample_selected_comp", selected = rval$pdata$name[idx])
+  #   }
+  # })
   
   ##########################################################################################################
   # Observe functions for gating
@@ -980,7 +988,7 @@ flowR_server <- function(session, input, output) {
                                   Ncells = input$ncells_per_sample,
                                   return_comp_data = FALSE,
                                   updateProgress = updateProgress)
-    print(rval$df_sample)
+    #print(rval$df_sample)
     
     if( length(rval$df_sample) == 0 ){
       showModal(modalDialog(
@@ -999,7 +1007,7 @@ flowR_server <- function(session, input, output) {
     print("OK")
     print(dim(rval$df_sample))
     rval$flow_set_names <- unique(c(rval$flow_set_names, "sub-sample"))
-    updateSelectInput(session, "flow_set", choices = rval$flow_set_names, selected = "sub-sample")
+    rval$flow_set_selected <- "sub-sample"
   })
   
   
@@ -1082,7 +1090,9 @@ flowR_server <- function(session, input, output) {
     if(!is.null(rval$df_tsne)){
       rval$flow_set_tsne <- build_flowset_from_df(df = df, fs = rval$flow_set)
       rval$flow_set_names <- unique(c(rval$flow_set_names, "dim-reduction"))
-      updateSelectInput(session, "flow_set", choices = rval$flow_set_names, selected = "dim-reduction")
+      rval$flow_set_selected <- "dim-reduction"
+      
+      #updateSelectInput(session, "flow_set", choices = rval$flow_set_names, selected = "dim-reduction")
     }
     
     
@@ -1194,7 +1204,9 @@ flowR_server <- function(session, input, output) {
     }
     
     rval$flow_set_names <- unique(c(rval$flow_set_names, "cluster"))
-    updateSelectInput(session, "flow_set", choices = rval$flow_set_names, selected = "cluster")
+    rval$flow_set_selected <- "cluster"
+    
+    #updateSelectInput(session, "flow_set", choices = rval$flow_set_names, selected = "cluster")
     
   })
   
@@ -1208,12 +1220,12 @@ flowR_server <- function(session, input, output) {
   ##########################################################################################################
   # Output Tables
   
-  output$spill_imported <- DT::renderDataTable({
-    validate(
-      need(rval$df_spill_imported, "No spillover data imported")
-    )
-    as.data.frame(rval$df_spill_imported)
-  })
+  # output$spill_imported <- DT::renderDataTable({
+  #   validate(
+  #     need(rval$df_spill_imported, "No spillover data imported")
+  #   )
+  #   as.data.frame(rval$df_spill_imported)
+  # })
   
   # output$meta <- DT::renderDataTable({
   #   validate(
@@ -1301,15 +1313,15 @@ flowR_server <- function(session, input, output) {
     }
   })
   
-  output$spill_table <- DT::renderDataTable({
-    
-    validate(
-      need(rval$df_spill, "No spillover matrix")
-    )
-    
-    df <- rval$df_spill
-    format(df, digits =3)
-  })
+  # output$spill_table <- DT::renderDataTable({
+  #   
+  #   validate(
+  #     need(rval$df_spill, "No spillover matrix")
+  #   )
+  #   
+  #   df <- rval$df_spill
+  #   format(df, digits =3)
+  # })
   
   # output$message <- renderText({
   #   paste("You have loaded", length(rval$flow_set), "items")
@@ -1874,98 +1886,98 @@ flowR_server <- function(session, input, output) {
     
   })
   
-  output$plot_comp <- renderPlot({
-    
-    validate(
-      need(rval$gating_set, "Empty gating set") %then%
-        need(input$sample_selected_comp, "Please select a sample") %then%
-        need(input$gate_comp, "Please select a subset")
-      
-    )
-    
-    
-    idx_x <- match(input$xvar_comp, rval$parameters$name_long)
-    idx_y <- match(input$yvar_comp, rval$parameters$name_long)
-    yvar <- rval$parameters$name[idx_x]
-    xvar <- rval$parameters$name[idx_y]
-    
-    
-    if(input$color_var_comp %in% rval$parameters$name_long){
-      color_var <- rval$parameters$name[match(input$color_var_comp, rval$parameters$name_long)]
-    }else{
-      color_var <- input$color_var
-    }
-    
-    #color_var <- rval$parameters$name[match(input$color_var_gate, rval$parameters$name_long)]
-    #color_var <- input$color_var
-    
-    axis_labels <- rval$parameters$name_long
-    names(axis_labels) <- rval$parameters$name
-    axis_labels[[xvar]] <- paste(axis_labels[[xvar]], "(fluo)")
-    axis_labels[[yvar]] <- paste(axis_labels[[yvar]], "(chanel)")
-    
-    transformation <- NULL
-    if(input$apply_trans){
-      transformation <- rval$transformation
-    }
-    
-    print(rval$spill)
-    
-    p <- plot_gs(df = rval$df_tot,
-                 gs = rval$gating_set, 
-                 sample = input$sample_selected_comp,
-                 subset = input$gate_comp, 
-                 spill = rval$spill,
-                 xvar = xvar, 
-                 yvar = yvar, 
-                 color_var = color_var, 
-                 gate = NULL, 
-                 type = input$plot_type_comp, 
-                 bins = input$bin_number_comp,
-                 alpha = input$alpha_comp,
-                 size = input$size_comp,
-                 norm_density = input$norm_comp,
-                 smooth = input$smooth_comp,
-                 transformation =  transformation,
-                 show.legend = input$legend_comp,
-                 axis_labels = axis_labels)
-    
-    #p <- p + xlab(paste(input$yvar_comp, "(fluo)")) + ylab(paste(input$xvar_comp, "(chanel)"))
-    
-    p
-    
-  })
+  # output$plot_comp <- renderPlot({
+  #   
+  #   validate(
+  #     need(rval$gating_set, "Empty gating set") %then%
+  #       need(input$sample_selected_comp, "Please select a sample") %then%
+  #       need(input$gate_comp, "Please select a subset")
+  #     
+  #   )
+  #   
+  #   
+  #   idx_x <- match(input$xvar_comp, rval$parameters$name_long)
+  #   idx_y <- match(input$yvar_comp, rval$parameters$name_long)
+  #   yvar <- rval$parameters$name[idx_x]
+  #   xvar <- rval$parameters$name[idx_y]
+  #   
+  #   
+  #   if(input$color_var_comp %in% rval$parameters$name_long){
+  #     color_var <- rval$parameters$name[match(input$color_var_comp, rval$parameters$name_long)]
+  #   }else{
+  #     color_var <- input$color_var
+  #   }
+  #   
+  #   #color_var <- rval$parameters$name[match(input$color_var_gate, rval$parameters$name_long)]
+  #   #color_var <- input$color_var
+  #   
+  #   axis_labels <- rval$parameters$name_long
+  #   names(axis_labels) <- rval$parameters$name
+  #   axis_labels[[xvar]] <- paste(axis_labels[[xvar]], "(fluo)")
+  #   axis_labels[[yvar]] <- paste(axis_labels[[yvar]], "(chanel)")
+  #   
+  #   transformation <- NULL
+  #   if(input$apply_trans){
+  #     transformation <- rval$transformation
+  #   }
+  #   
+  #   print(rval$spill)
+  #   
+  #   p <- plot_gs(df = rval$df_tot,
+  #                gs = rval$gating_set, 
+  #                sample = input$sample_selected_comp,
+  #                subset = input$gate_comp, 
+  #                spill = rval$spill,
+  #                xvar = xvar, 
+  #                yvar = yvar, 
+  #                color_var = color_var, 
+  #                gate = NULL, 
+  #                type = input$plot_type_comp, 
+  #                bins = input$bin_number_comp,
+  #                alpha = input$alpha_comp,
+  #                size = input$size_comp,
+  #                norm_density = input$norm_comp,
+  #                smooth = input$smooth_comp,
+  #                transformation =  transformation,
+  #                show.legend = input$legend_comp,
+  #                axis_labels = axis_labels)
+  #   
+  #   #p <- p + xlab(paste(input$yvar_comp, "(fluo)")) + ylab(paste(input$xvar_comp, "(chanel)"))
+  #   
+  #   p
+  #   
+  # })
   
   
-  output$heatmap_spill <- renderPlotly({
-    
-    validate(
-      need(rval$df_spill, "No spillover matrix")
-    )
-    
-    df <- rval$df_spill
-    df[df == 0] <- NA
-    df_log <- log10(df)
-    p <- heatmaply(df,
-                   #colors = c(rgb(1,1,1), rgb(1,0,0)),
-                   #colors= viridis,
-                   plot_method="ggplot",
-                   scale_fill_gradient_fun = scale_fill_viridis(trans = log10_trans(), name = "spillover"),
-                   Rowv = NULL,
-                   Colv = NULL,
-                   column_text_angle = 90,
-                   xlab = "detection chanel",
-                   ylab = "emitting fluorophore",
-                   fontsize_row = 6,
-                   fontsize_col = 6,
-                   cellnote_size = 6,
-                   hide_colorbar = TRUE,
-                   main = "spillover matrix",
-                   margins = c(50, 50, 50, 0)
-    )
-    p$x$source <- "select_heatmap"
-    p
-  })
+  # output$heatmap_spill <- renderPlotly({
+  #   
+  #   validate(
+  #     need(rval$df_spill, "No spillover matrix")
+  #   )
+  #   
+  #   df <- rval$df_spill
+  #   df[df == 0] <- NA
+  #   df_log <- log10(df)
+  #   p <- heatmaply(df,
+  #                  #colors = c(rgb(1,1,1), rgb(1,0,0)),
+  #                  #colors= viridis,
+  #                  plot_method="ggplot",
+  #                  scale_fill_gradient_fun = scale_fill_viridis(trans = log10_trans(), name = "spillover"),
+  #                  Rowv = NULL,
+  #                  Colv = NULL,
+  #                  column_text_angle = 90,
+  #                  xlab = "detection chanel",
+  #                  ylab = "emitting fluorophore",
+  #                  fontsize_row = 6,
+  #                  fontsize_col = 6,
+  #                  cellnote_size = 6,
+  #                  hide_colorbar = TRUE,
+  #                  main = "spillover matrix",
+  #                  margins = c(50, 50, 50, 0)
+  #   )
+  #   p$x$source <- "select_heatmap"
+  #   p
+  # })
   
   ##########################################################################################################
   #Output Download functions
@@ -1997,12 +2009,12 @@ flowR_server <- function(session, input, output) {
     }
   )
   
-  output$download_spill <- downloadHandler(
-    filename = "spillover_matrix.txt",
-    content = function(file) {
-      write.table(rval$df_spill, file = file, row.names = FALSE, quote = FALSE, sep = "\t")
-    }
-  )
+  # output$download_spill <- downloadHandler(
+  #   filename = "spillover_matrix.txt",
+  #   content = function(file) {
+  #     write.table(rval$df_spill, file = file, row.names = FALSE, quote = FALSE, sep = "\t")
+  #   }
+  # )
   
   output$export_gating_set <- downloadHandler(
     
@@ -2146,58 +2158,58 @@ flowR_server <- function(session, input, output) {
     
   })
   
-  output$ui_compute_spill <- renderUI({
-    
-    validate(
-      need(rval$flow_set, "No flow set available")
-    )
-    
-    tagList(
-      selectInput("fluo", 
-                  "fluorophore",
-                  choices = rval$flow_set@colnames,
-                  selected = rval$flow_set@colnames[1]),
-      
-      selectInput("sample_pos",
-                  "sample pos",
-                  choices = pData(rval$flow_set)$name,
-                  selected = pData(rval$flow_set)$name[1]),
-      
-      selectInput("gate_pos",
-                  "gate pos",
-                  choices = getNodes(rval$gating_set),
-                  selected = "root"),
-      
-      selectInput("sample_neg", 
-                  "sample neg",
-                  choices = pData(rval$flow_set)$name,
-                  selected = pData(rval$flow_set)$name[1]),
-      
-      selectInput("gate_neg",
-                  "gate neg",
-                  choices = getNodes(rval$gating_set),
-                  selected = "root")
-    )
-    
-    # x <- list()
-    # 
-    # for(meta_var in names(rval$pdata)){
-    #   uvar <- unique(rval$pdata[[meta_var]])
-    #   
-    #   x[[meta_var]] <- selectizeInput(meta_var, meta_var, 
-    #                                   choices = uvar, 
-    #                                   selected = uvar,
-    #                                   multiple = TRUE)
-    #   
-    # }
-    # 
-    # if(length(x)>0){
-    #   x[["apply_filter_meta"]] <- actionButton("apply_filter_meta", "apply filter")
-    # }
-    # 
-    # tagList(x)
-    
-  })
+  # output$ui_compute_spill <- renderUI({
+  #   
+  #   validate(
+  #     need(rval$flow_set, "No flow set available")
+  #   )
+  #   
+  #   tagList(
+  #     selectInput("fluo", 
+  #                 "fluorophore",
+  #                 choices = rval$flow_set@colnames,
+  #                 selected = rval$flow_set@colnames[1]),
+  #     
+  #     selectInput("sample_pos",
+  #                 "sample pos",
+  #                 choices = pData(rval$flow_set)$name,
+  #                 selected = pData(rval$flow_set)$name[1]),
+  #     
+  #     selectInput("gate_pos",
+  #                 "gate pos",
+  #                 choices = getNodes(rval$gating_set),
+  #                 selected = "root"),
+  #     
+  #     selectInput("sample_neg", 
+  #                 "sample neg",
+  #                 choices = pData(rval$flow_set)$name,
+  #                 selected = pData(rval$flow_set)$name[1]),
+  #     
+  #     selectInput("gate_neg",
+  #                 "gate neg",
+  #                 choices = getNodes(rval$gating_set),
+  #                 selected = "root")
+  #   )
+  #   
+  #   # x <- list()
+  #   # 
+  #   # for(meta_var in names(rval$pdata)){
+  #   #   uvar <- unique(rval$pdata[[meta_var]])
+  #   #   
+  #   #   x[[meta_var]] <- selectizeInput(meta_var, meta_var, 
+  #   #                                   choices = uvar, 
+  #   #                                   selected = uvar,
+  #   #                                   multiple = TRUE)
+  #   #   
+  #   # }
+  #   # 
+  #   # if(length(x)>0){
+  #   #   x[["apply_filter_meta"]] <- actionButton("apply_filter_meta", "apply filter")
+  #   # }
+  #   # 
+  #   # tagList(x)
+  #   
+  # })
   
   
 }

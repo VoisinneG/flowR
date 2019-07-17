@@ -8,13 +8,14 @@ transformUI <- function(id) {
   # Create a namespace function using the provided id
   ns <- NS(id)
   
+  
   fluidRow(
     
-    column(width = 5,
-           tabBox(title = "Chanels",
+    column(width = 6,
+           tabBox(title = "Channels",
                   width = NULL, height = NULL,
                   tabPanel(title = "Table",
-                           "Select chanels",
+                           "Select channels",
                            br(),
                            br(),
                            div(style = 'overflow-x: scroll', DT::dataTableOutput(ns("parameters_table")))
@@ -52,43 +53,21 @@ transformUI <- function(id) {
                   )
            )
     ),
-    column(width = 7,
-           tabBox(title = "Plot",
-                  width = NULL, height = NULL,
-                  tabPanel("Plot",
-                           plotOutput(ns("plot_trans"))
-                           
-                  ),
-                  tabPanel("Select",
-                           selectInput(ns("sample_selected_trans"), label = "Sample", choices = NULL, selected = NULL),
-                           actionButton(ns("previous_frame_trans"), "previous"),
-                           actionButton(ns("next_frame_trans"), "next"),
-                           br(),
-                           br(),
-                           selectizeInput(ns("gate_trans"), 
-                                          label = "subset", 
-                                          choices = "root", 
-                                          selected = "root",
-                                          multiple = FALSE),
-                           selectInput(ns("xvar_trans"), label = "x variable", choices = NULL, selected = NULL),
-                           selectInput(ns("yvar_trans"), label = "y variable", choices = NULL, selected = NULL)
-                  ),
-                  tabPanel("Options",
-                           selectInput(ns("plot_type_trans"), label = "plot type",
-                                       choices = c("hexagonal", "histogram", "dots", "contour"),
-                                       selected = "histogram"),
-                           checkboxInput(ns("legend_trans"), "show legend", value = FALSE),
-                           checkboxInput(ns("norm_trans"), "normalize (set max to 1)", value = TRUE),
-                           checkboxInput(ns("smooth_trans"), "smooth", value = FALSE),
-                           selectInput(ns("color_var_trans"), "color variable",
-                                       choices = "none",
-                                       selected = "none"),
-                           numericInput(ns("bin_number_trans"), label = "number of bins", value = 50),
-                           numericInput(ns("alpha_trans"), label = "alpha", value = 0.5),
-                           numericInput(ns("size_trans"), label = "size", value = 1)
-                           
-                  )
+    column(width = 6,
+           box(title = "Plot",
+               width = NULL, 
+               height = NULL,
+               plotOutput(ns("plot_trans")),
+               downloadButton(ns("download_plot"), "Save plot")
+           ),
+           box(title = "Plot parameters",
+               width = NULL, 
+               height = NULL, 
+               collapsible = TRUE, 
+               collapsed = TRUE,
+               plotUI(id = ns("plot_module"), simple_plot = TRUE)
            )
+           
     )
   )
   
@@ -109,7 +88,22 @@ transformUI <- function(id) {
 transform <- function(input, output, session, rval) {
   
   `%then%` <- shiny:::`%OR%`
+
+  plot_params <- reactiveValues()
   
+  observe({
+    plot_params$xvar <- rval$parameters$name_long[input$parameters_table_rows_selected[1]]
+    if(length(input$parameters_table_row_selected)>1){
+      plot_params$yvar <- rval$parameters$name_long[input$parameters_table_rows_selected[2]]
+    }
+  })
+  
+  plot_trans <- callModule(plot, "plot_module", rval, plot_params, simple_plot = TRUE)
+  
+  output$plot_trans <- renderPlot({
+    plot_trans()
+  })
+
   #get parameters information from flow set
   observe({
     
@@ -156,16 +150,6 @@ transform <- function(input, output, session, rval) {
     names(rval$plot_var) <- NULL
   })
   
-  #Update available variables
-  observe({
-    
-    validate(
-      need(rval$parameters, "No parameters defined")
-    )
-    
-    updateSelectInput(session, "xvar_trans", choices = rval$parameters$name_long, selected = rval$parameters$name_long[1])
-    updateSelectInput(session, "yvar_trans", choices = rval$parameters$name_long, selected = rval$parameters$name_long[2])
-  })
   
   ##########################################################################################################
   # Observe functions for data transformation
@@ -267,49 +251,6 @@ transform <- function(input, output, session, rval) {
     
   })
   
-  observe({
-    updateSelectInput(session, "xvar_trans", 
-                      selected = rval$parameters$name_long[input$parameters_table_rows_selected[1]])
-    if(length(input$parameters_table_row_selected)>1){
-      updateSelectInput(session, "yvar_trans", 
-                        selected = rval$parameters$name_long[input$parameters_table_rows_selected[2]])
-    }
-  })
-  
-  observe({
-    validate(
-      need(rval$flow_set, "No flow set available")
-    )
-
-    updateSelectInput(session, "sample_selected_trans",
-                      choices = pData(rval$flow_set)$name,
-                      selected = pData(rval$flow_set)$name[1])
-    
-  })
-  
-  observeEvent(input$next_frame_trans, {
-    if(!is.null(rval$flow_set)){
-      idx <- which(rval$pdata$name == input$sample_selected_trans)
-      idx <- idx +1
-      if(idx > length(rval$pdata$name)){
-        idx <- 1
-      }
-      updateSelectInput(session, "sample_selected_trans", selected = rval$pdata$name[idx])
-      
-    }
-  })
-  
-  observeEvent(input$previous_frame_trans, {
-    if(!is.null(rval$flow_set)){
-      idx <- which(rval$pdata$name == input$sample_selected_trans)
-      idx <- idx - 1
-      if(idx < 1){
-        idx <- length(rval$pdata$name)
-      }
-      updateSelectInput(session, "sample_selected_trans", selected = rval$pdata$name[idx])
-    }
-  })
-  
   output$parameters_table <- DT::renderDataTable({
     
     validate(
@@ -318,72 +259,21 @@ transform <- function(input, output, session, rval) {
     df <- rval$parameters
     df$minRange <- format(df$minRange, digits = 2)
     df$maxRange <- format(df$maxRange, digits = 2)
-    df[["chanel_name"]] <- df$name_long
+    df[["channel_name"]] <- df$name_long
     DT::datatable(
-      df[, c("chanel_name", "transform", "transform parameters", "display", "range", "minRange", "maxRange", "name", "desc")], 
+      df[, c("channel_name", "transform", "transform parameters", "display", "range", "minRange", "maxRange", "name", "desc")], 
       rownames = FALSE)
     
   })
   
-  output$plot_trans <- renderPlot({
-    
-    validate(
-      need(rval$gating_set, "Empty gating set") %then%
-        need(input$sample_selected_trans, "Please select a sample") %then%
-        need(input$gate_trans, "Please select a subset")
-    )
-    
-    idx_x <- match(input$xvar_trans, rval$parameters$name_long)
-    idx_y <- match(input$yvar_trans, rval$parameters$name_long)
-    xvar <- rval$parameters$name[idx_x]
-    yvar <- rval$parameters$name[idx_y]
-    
-    if(input$color_var_trans %in% rval$parameters$name_long){
-      color_var <- rval$parameters$name[match(input$color_var_trans, rval$parameters$name_long)]
-    }else{
-      color_var <- input$color_var
+  output$download_plot <- downloadHandler(
+    filename = "plot.pdf",
+    content = function(file) {
+      pdf(file, width = 5, height = 5)
+      print(plot_trans())
+      dev.off()
     }
-    
-    #color_var <- rval$parameters$name[match(input$color_var_gate, rval$parameters$name_long)]
-    #color_var <- input$color_var
-    
-    axis_labels <- rval$parameters$name_long
-    names(axis_labels) <- rval$parameters$name
-    
-    transformation <- NULL
-    if(rval$apply_trans){
-      transformation <- rval$transformation
-    }
-    
-    p <- plot_gs(df = rval$df_tot,
-                 gs = rval$gating_set, 
-                 sample = input$sample_selected_trans,
-                 subset = input$gate_trans, 
-                 spill = rval$spill,
-                 xvar = xvar, 
-                 yvar = yvar, 
-                 color_var = color_var, 
-                 gate = NULL, 
-                 type = input$plot_type_trans, 
-                 bins = input$bin_number_trans,
-                 alpha = input$alpha_trans,
-                 size = input$size_trans,
-                 norm_density = input$norm_trans,
-                 smooth = input$smooth_trans,
-                 transformation =  transformation,
-                 show.legend = input$legend_trans,
-                 axis_labels = axis_labels)
-    
-    if(!is.null(p)){
-      p <- p + xlab(input$xvar_trans) 
-      if(input$plot_type_trans != "histogram"){
-        p <- p + ylab(input$yvar_trans)
-      }
-    }
-    
-    p
-    
-  })
+  )
   
   return(rval)
   

@@ -4,102 +4,90 @@
 #' @importFrom shinydashboard box tabBox
 #' @import shiny
 #' @import DT
-plotUI <- function(id) {
+plotUI <- function(id, simple_plot = TRUE) {
   # Create a namespace function using the provided id
   ns <- NS(id)
   
-  fluidRow(
-    column(width = 4,
-           tabBox(title = "",
-                  width = NULL, height = NULL,
-                  tabPanel("Samples",
-                           div(style = 'overflow-x: scroll', DT::dataTableOutput(ns("files_selection_table")))
-                  ),
-                  tabPanel("Subset",
-                           selectizeInput(ns("gate"), 
-                                          label = "subset", 
-                                          choices = "root", 
-                                          selected = "root",
-                                          multiple = TRUE)
-                  ),
-                  tabPanel("Variables",
-                           selectizeInput(ns("xvar"), 
-                                          multiple = TRUE,
-                                          label = "x variable", 
-                                          choices = NULL, 
-                                          selected = NULL),
-                           selectizeInput(ns("yvar"), 
-                                          multiple = TRUE,
-                                          label = "y variable", 
-                                          choices = NULL, 
-                                          selected = NULL),
-                           selectizeInput(ns("color_var"), 
-                                          multiple = TRUE,
-                                          label = "color variable",
-                                          choices = "none",
-                                          selected = "none"),
-                           selectInput(ns("split_variable"),
-                                       label = "select variable used to split plots",
-                                       choices = c("x variable", "y variable", "color variable"),
-                                       selected = "x variable"
-                           ),
-                           numericInput(ns("nrow_split"), label = "Number of rows", value = 1)
-                           
-                           
-                  )
-           ) 
-    ),
-    column(width = 8,
-           tabBox(title = "Plot",
-                  width = NULL, height = NULL,
-                  tabPanel("Plot",
-                           actionButton(ns("update_plot"), "update"),
-                           br(),
-                           uiOutput(ns("ui_plot"))
-                           #plotOutput("plot_focus", height = input$nrow_split * 300)
-                           
-                  ),
-                  tabPanel("Options",
-                           selectInput(ns("plot_type"), label = "plot type",
-                                       choices = c("hexagonal", "histogram", "dots", "contour"),
-                                       selected = "histogram"),
-                           checkboxInput(ns("legend"), "show legend", value = TRUE),
-                           checkboxInput(ns("norm"), "normalize (set max to 1)", value = TRUE),
-                           checkboxInput(ns("smooth"), "smooth", value = FALSE),
-                           checkboxInput(ns("ridges"), "ridges", value = FALSE),
-                           selectizeInput(ns("facet_var"), 
-                                          multiple =TRUE,
-                                          label = "facet variables", 
-                                          choices = "name", 
-                                          selected = "name"),
-                           selectizeInput(ns("group_var"), 
-                                          multiple =FALSE,
-                                          label = "group variable", 
-                                          choices = c("name","subset"), 
-                                          selected = "subset"),
-                           selectizeInput(ns("yridges_var"), 
-                                          multiple =FALSE,
-                                          label = "y ridges variable", 
-                                          choices = c("name","subset"), 
-                                          selected = "subset"),
-                           selectInput(ns("legend_pos"), label = "legend position",
-                                       choices = c("right", "top", "left", "bottom"),
-                                       selected = "right"),
-                           numericInput(ns("bin_number"), label = "number of bins", value = 50),
-                           numericInput(ns("alpha"), label = "alpha", value = 0.5),
-                           numericInput(ns("size"), label = "size", value = 1),
-                           numericInput(ns("row_size"), label = "row size (px)", value = 400)
-                  ),
-                  tabPanel("Save",
-                           numericInput(ns("width_plot"), label = "width", value = 5),
-                           numericInput(ns("height_plot"), label = "height", value = 5),
-                           downloadButton(ns("download_plot"), "Save plot")
-                  )
-                  
+  tagList(
+    if(!simple_plot){
+      tagList(
+        actionButton(ns("update_plot"), "update plot"),
+        br(),
+        br()
+      )
+    },
+    tabBox(title = "", 
+           width = NULL, height = NULL,
+           # tabPanel("Samples",
+           #          div(style = 'overflow-x: scroll', DT::dataTableOutput(ns("files_selection_table")))
+           # ),
+           tabPanel("Samples/Subset",
+                    checkboxInput(ns("all_samples"), "Select all samples", FALSE),
+                    selectizeInput(ns("samples"), 
+                                   label = "samples",
+                                   choices = NULL,
+                                   selected = NULL,
+                                   multiple = TRUE),
+                    selectizeInput(ns("gate"), 
+                                   label = "subset",
+                                   choices = "root",
+                                   selected = "root",
+                                   multiple = !simple_plot)
+           ),
+           tabPanel("Variables",
+                    selectizeInput(ns("xvar"), 
+                                   multiple = !simple_plot,
+                                   label = "x variable", 
+                                   choices = NULL, 
+                                   selected = NULL),
+                    selectizeInput(ns("yvar"), 
+                                   multiple = !simple_plot,
+                                   label = "y variable", 
+                                   choices = NULL, 
+                                   selected = NULL),
+                    selectizeInput(ns("color_var"), 
+                                   multiple = !simple_plot,
+                                   label = "color variable",
+                                   choices = "none",
+                                   selected = "none"),
+                    if(!simple_plot){
+                      tagList(
+                        #checkboxInput(ns("norm"), "normalize (set max to 1)", value = TRUE),
+                        selectizeInput(ns("facet_var"), 
+                                       multiple =TRUE,
+                                       label = "facet variables",
+                                       choices = "name",
+                                       selected = "name"
+                        ),
+                        selectInput(ns("split_variable"),
+                                    label = "select variable used to split plots",
+                                    choices = c("x variable", "y variable", "color variable"),
+                                    selected = "x variable"
+                        )
+                      )
+                    }
+                    
+                    
+                    
+           ),
+           tabPanel("Options",
+                    selectInput(ns("plot_type"), label = "plot type",
+                                choices = c("hexagonal", "histogram", "dots", "contour"),
+                                selected = "histogram"),
+                    checkboxInput(ns("legend"), "show legend", value = TRUE),
+                    uiOutput(ns("histo_options")),
+                    selectInput(ns("legend_pos"), label = "legend position",
+                                choices = c("right", "top", "left", "bottom"),
+                                selected = "right"),
+                    numericInput(ns("bin_number"), label = "number of bins", value = 50),
+                    numericInput(ns("alpha"), label = "alpha", value = 0.5),
+                    numericInput(ns("size"), label = "size", value = 1)
            )
-           
     )
-    
+
+                           
+                           
+                 
   )
   
 }
@@ -116,9 +104,29 @@ plotUI <- function(id) {
 #' @import DT
 #' @export
 #' @rdname plotUI
-plot<- function(input, output, session, rval) {
+plot <- function(input, output, session, rval, plot_params, simple_plot = TRUE) {
   
   `%then%` <- shiny:::`%OR%`
+  
+  output$histo_options <- renderUI({
+    
+    ns <- session$ns
+    x <- list()
+    if(input$plot_type == 'histogram'){
+      x[[1]] <- checkboxInput(ns("norm"), "normalize (set max to 1)", value = TRUE)
+      x[[2]] <- checkboxInput(ns("smooth"), "smooth", value = FALSE)
+      
+      x[[3]] <- checkboxInput(ns("ridges"), "ridges", value = FALSE)
+      
+      x[[4]] <- selectizeInput(ns("yridges_var"), 
+                                   multiple =FALSE,
+                                   label = "y ridges variable", 
+                                   choices = c("name","subset"), 
+                                   selected = "subset")
+    }
+    tagList(x)
+  })
+  
   
   observe({
     
@@ -128,47 +136,38 @@ plot<- function(input, output, session, rval) {
     validate(
       need(rval$plot_var, "No plotting variables")
     )
+    
     facet_var_default <- "name"
-    group_var_default <- "subset"
     color_var_default <- "subset"
     plot_type_default <- "hexagonal"
-    plot_type_gate_default <- "hexagonal"
     
-    # if(rval$flow_set_selected == "t-SNE"){
-    #   facet_var_default <- NULL
-    #   group_var_default <- "name"
-    #   color_var_default <- "name"
-    #   plot_type_default <- "dots"
-    #   plot_type_gate_default <- "dots"
-    #   
-    #   
-    # }
-    # 
-    # if(rval$flow_set_selected == "cluster"){
-    #   facet_var_default <- NULL
-    #   group_var_default <- NULL
-    #   color_var_default <- "cluster"
-    #   plot_type_default <- "dots"
-    #   plot_type_gate_default <- "dots"
-    # }
+    if("facet_var" %in% names(plot_params)){
+      facet_var_default <- plot_params$facet_var
+    }
+    if("color_var" %in% names(plot_params)){
+      color_var_default <- plot_params$color_var
+    }
+    if("plot_type" %in% names(plot_params)){
+      plot_type_default <- plot_params$plot_type
+    }
+    
     
     updateSelectInput(session, "plot_type", selected = plot_type_default)
-    
-    updateSelectInput(session, "facet_var", 
-                      choices = c("subset", names(rval$pdata)), 
-                      selected = facet_var_default )
-
-    updateSelectInput(session, "group_var", 
-                      choices = c("subset", names(rval$pdata)), 
-                      selected = group_var_default)
 
     updateSelectInput(session, "yridges_var", 
                       choices = c("subset", names(rval$pdata)), 
-                      selected = group_var_default)
+                      selected = color_var_default)
     
     updateSelectInput(session, "color_var", 
                       choices = c("subset", names(rval$pdata), rval$plot_var), 
                       selected = color_var_default)
+    
+    if(!simple_plot){
+      updateSelectInput(session, "facet_var", 
+                        choices = c("subset", names(rval$pdata)), 
+                        selected = facet_var_default )
+      
+    }
     
   })
   
@@ -185,96 +184,91 @@ plot<- function(input, output, session, rval) {
     xvar_default <- rval$plot_var[1]
     yvar_default <- rval$plot_var[2]
     
+    if("xvar" %in% names(plot_params)){
+      xvar_default <-plot_params$xvar
+    }
+    if("yvar" %in% names(plot_params)){
+      yvar_default <-plot_params$yvar
+    }
+    
     updateSelectInput(session, "xvar", choices = rval$plot_var, selected = xvar_default)
     updateSelectInput(session, "yvar", choices = rval$plot_var, selected = yvar_default)
-    
-    
-    # if(! setequal(rval$plot_var, rval$parameters$name_long)){
-    #   
-    #   #print("update plot vars")
-    #   rval$plot_var <- rval$parameters$name_long
-    #   names(rval$plot_var) <- NULL
-    #   
-    #   if(length(rval$plot_var)>1){
-    #     
-    #     
-    #     xvar_default <- rval$plot_var[1]
-    #     yvar_default <- rval$plot_var[2]
-    #     
-    #     if(input$flow_set == "dim-reduction"){
-    #       xvar_default <- rval$dim_red_var[1]
-    #       yvar_default <- rval$dim_red_var[2]
-    #     }
-    #     
-    #     if(input$flow_set == "cluster"){
-    #       if("tSNE1" %in% rval$parameters$name_long){
-    #         xvar_default <- "tSNE1"
-    #       }
-    #       if("tSNE2" %in% rval$parameters$name_long){
-    #         yvar_default <- "tSNE2"
-    #       }
-    #     }
-    #     
-    #     updateSelectInput(session, "xvar_show", choices = rval$plot_var, selected = xvar_default)
-    #     #updateSelectInput(session, "xvar_trans", choices = rval$plot_var, selected = xvar_default)
-    #     #updateSelectInput(session, "yvar_trans", choices = rval$plot_var, selected = yvar_default)
-    #     updateSelectInput(session, "xvar_gate", choices = rval$plot_var, selected = xvar_default)
-    #     updateSelectInput(session, "yvar_gate", choices = rval$plot_var, selected = yvar_default)
-    #     updateSelectInput(session, "yvar_stat", choices = rval$plot_var, selected = xvar_default)
-    #     updateSelectInput(session, "xvar", choices = rval$plot_var, selected = xvar_default)
-    #     updateSelectInput(session, "yvar", choices = rval$plot_var, selected = yvar_default)
-    #     
-    #     # updateSelectInput(session, "color_var_gate", choices = c("none", rval$plot_var), selected = "none")
-    #     # updateSelectInput(session, "color_var", choices = c("none", rval$plot_var), selected = "none")
-    #     # updateSelectInput(session, "color_var_trans", choices = c("none", rval$plot_var), selected = "none")
-    #     # updateSelectInput(session, "color_var_comp", choices = c("none", rval$plot_var), selected = "none")
-    #     
-    #     
-    #   }
-    # }
   })
   
   observe({
     updateSelectInput(session, "gate", choices = union("root", names(rval$gates_flowCore)), selected = "root")
   })
   
-  update_data_plot_focus <- eventReactive(input$update_plot, {
+  observe({
+    updateSelectInput(session, "samples", choices = rval$pdata$name, selected = rval$pdata$name[1])
+  })
+  
+  observeEvent(input$all_samples, {
+    updateSelectInput(session, "samples", choices = rval$pdata$name, selected = rval$pdata$name)
+  })
+  
+  split_var <- reactive({
+    if(!simple_plot){
+      switch(input$split_variable, 
+             "x variable" = "xvar",
+             "y variable" = "yvar",
+             "color variable" = "color_var"
+      )
+    }else{
+      "xvar"
+    }
+    
+  })
+
+  update <- reactive({
+    if(!simple_plot){
+      input$update_plot
+    }else{
+      c(input$xvar,
+        input$yvar,
+        input$color_var,
+        input$samples,
+        input$gate,
+        input$plot_type,
+        input$legend,
+        input$legend_pos,
+        input$bin_number,
+        input$size,
+        input$alpha,
+        input$norm,
+        input$smooth,
+        input$ridges,
+        input$yridges_var)
+    }
+  })
+  
+  update_data_plot_focus <- eventReactive(update(), {
     data_plot_focus()
   })
   
   data_plot_focus <- reactive({
     validate(
       need(rval$gating_set, "Empty gating set") %then%
-        need(input$files_selection_table_rows_selected, "Please select samples") %then%
+        need(input$samples, "Please select samples") %then%
         need(input$gate, "Please select subsets")
     )
     
     print("get data plot_focus")
-    df <- get_data_gs(gs = rval$gating_set, 
-                      sample = rval$pdata$name[input$files_selection_table_rows_selected],
-                      subset = input$gate, 
+    df <- get_data_gs(gs = rval$gating_set,
+                      sample = input$samples,
+                      subset = input$gate,
                       spill = rval$spill)
     return(df)
     
   })
   
-  output$files_selection_table <- DT::renderDataTable({
-    if(!is.null(rval$pdata)){
-      data.frame("name" = rval$pdata$name, row.names = NULL)
-    }
-  })
-  
-  output$plot_focus <- renderPlot({
-    plot_focus()
-  })
-  
-  plot_focus <- eventReactive(input$update_plot, {
+  plot_focus <- eventReactive(update(), {
     
-    # validate(
-    #   need(rval$gating_set, "Empty gating set") %then%
-    #     need(input$files_selection_table_rows_selected, "Please select samples") %then%
-    #     need(input$gate, "Please select subsets")
-    # )
+    validate(
+        need(rval$gating_set, "Empty gating set") %then%
+        need(input$samples, "Please select samples") %then%
+        need(input$gate, "Please select subsets")
+    )
     
     
     idx_x <- match(input$xvar, rval$parameters$name_long)
@@ -296,9 +290,6 @@ plot<- function(input, output, session, rval) {
     
     
     
-    #color_var <- rval$parameters$name[match(input$color_var_gate, rval$parameters$name_long)]
-    #color_var <- input$color_var
-    
     axis_labels <- rval$parameters$name_long
     names(axis_labels) <- rval$parameters$name
     
@@ -309,30 +300,29 @@ plot<- function(input, output, session, rval) {
     
     plist <- list()
     
-    split_var <- switch(input$split_variable, 
-                        "x variable" = "xvar",
-                        "y variable" = "yvar",
-                        "color variable" = "color_var"
-    )
+    if(!simple_plot){
+      facet_vars <- input$facet_var
+    }else{
+      facet_vars <- NULL
+    }
     
-    for(i in 1:length(input[[split_var]])){
+    for(i in 1:length(input[[split_var()]])){
       
       color_var_int <- color_var[1]
       xvar_int <- xvar[1]
       yvar_int <- yvar[1]
       
-      if(split_var == "color_var"){
+      if(split_var() == "color_var"){
         color_var_int <- color_var[i]
-      }else if(split_var == "xvar"){
+      }else if(split_var() == "xvar"){
         xvar_int <- xvar[i]
-      }else if(split_var == "yvar"){
+      }else if(split_var() == "yvar"){
         yvar_int <- yvar[i]
       }
-      
-      
+
       p <- plot_gs(df = update_data_plot_focus(),
                    gs = rval$gating_set, 
-                   sample = rval$pdata$name[input$files_selection_table_rows_selected],
+                   sample = input$samples,
                    subset = input$gate, 
                    spill = rval$spill,
                    xvar = xvar_int, 
@@ -347,8 +337,8 @@ plot<- function(input, output, session, rval) {
                    smooth = input$smooth,
                    ridges = input$ridges,
                    transformation =  transformation,
-                   facet_vars = input$facet_var,
-                   group_var = input$group_var,
+                   facet_vars = facet_vars,
+                   #group_var = input$group_var,
                    yridges_var = input$yridges_var,
                    show.legend = input$legend,
                    axis_labels = axis_labels,
@@ -365,61 +355,12 @@ plot<- function(input, output, session, rval) {
       
     }
     
-    
-    n <- length(plist)
-    
-    nrow <- min(n, input$nrow_split)
-    ncol <- ceiling(n/nrow)
-    g <- marrangeGrob(plist, nrow = nrow, ncol = ncol, top = "")
-    
-    # if(input$split_direction == "horizontal"){
-    #   g <- marrangeGrob(plist, nrow = n, ncol = 1)
-    # }else{
-    #   g <- marrangeGrob(plist, nrow = 1, ncol = n)
-    # }
-    
-    g
+    plist
     
   })
   
-  plot_height <- eventReactive(input$update_plot,{
-    split_var <- switch(input$split_variable, 
-                        "x variable" = "xvar",
-                        "y variable" = "yvar",
-                        "color variable" = "color_var"
-    )
-    
-    min(input$nrow_split, length(input[[split_var]])) * input$row_size + 50
-    
-  })
-  
-  output$ui_plot <- renderUI({
-    
-    ns <- session$ns
-    
-    if(input$update_plot){
-      # split_var <- switch(input$split_variable, 
-      #                     "x variable" = "xvar",
-      #                     "y variable" = "yvar",
-      #                     "color variable" = "color_var"
-      # )
-      plotOutput(ns("plot_focus"), height = plot_height())
-    }
-    
-    
-  })
-  
-  output$download_plot <- downloadHandler(
-    filename = "plot.pdf",
-    content = function(file) {
-      pdf(file, width = input$width_plot, height = input$height_plot)
-      print(plot_focus())
-      dev.off()
-    }
-  )
   
   
-  return(rval)
-  
+  return( plot_focus )
   
 }

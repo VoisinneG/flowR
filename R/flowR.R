@@ -507,22 +507,29 @@ get_data_gs <- function(gs,
 }
 
 add_columns_from_metadata <- function(df,
-                                      metadata,
-                                      color_var = NULL, 
-                                      facet_vars = "name",
-                                      group_var = "name",
-                                      yridges_var = NULL){
+                                      metadata
+                                      #color_var = NULL, 
+                                      #facet_vars = "name",
+                                      #group_var = "name",
+                                      #yridges_var = NULL
+                                      ){
   
-  if(!is.null(facet_vars)){
-    facet_vars <- facet_vars[facet_vars %in% names(metadata)]
-  }
+  # if(!is.null(facet_vars)){
+  #   facet_vars <- facet_vars[facet_vars %in% names(metadata)]
+  # }
+  # 
+  # if(!is.null(color_var)){
+  #   color_var <- color_var[color_var %in% names(metadata)]
+  # }
+  # 
+  # new_vars <- unique(setdiff( c(yridges_var, 
+  #                               #group_var, 
+  #                               facet_vars, 
+  #                               color_var), 
+  #                             names(df)))
   
-  if(!is.null(color_var)){
-    color_var <- color_var[color_var %in% names(metadata)]
-  }
+  new_vars <- unique(setdiff(names(metadata), names(df)))
   
-  new_vars <- unique(setdiff( c(yridges_var, group_var, facet_vars, color_var), 
-                              names(df)))
   if(length(new_vars)>0){
     for(variable in new_vars){
       df[[variable]] <- metadata[[variable]][match(df[["name"]], metadata$name)]
@@ -550,7 +557,7 @@ plot_gs <- function(df = NULL,
                     xvar = NULL,
                     yvar = NULL,
                     axis_labels = NULL,
-                    color_var = NULL, 
+                    color_var = "name", 
                     data_range = NULL,
                     min_value = NULL,
                     gate=NULL, 
@@ -564,7 +571,7 @@ plot_gs <- function(df = NULL,
                     spill = NULL,
                     metadata = NULL,
                     facet_vars = "name",
-                    group_var = "name",
+                    #group_var = "name",
                     yridges_var = "name",
                     norm_density = TRUE,
                     smooth = FALSE,
@@ -680,11 +687,12 @@ plot_gs <- function(df = NULL,
   
   if(!is.null(metadata)){
     df <- add_columns_from_metadata(df,
-                                    metadata = metadata,
-                                    color_var = color_var,
-                                    facet_vars = facet_vars,
-                                    group_var = group_var,
-                                    yridges_var = yridges_var)
+                                    metadata = metadata
+                                    #color_var = color_var,
+                                    #facet_vars = facet_vars,
+                                    #group_var = group_var,
+                                    #yridges_var = yridges_var
+                                    )
   }
  
   #print(names(df))
@@ -703,9 +711,9 @@ plot_gs <- function(df = NULL,
     }
   }
   
-  if(is.null(color_var)){
-    color_var <- group_var
-  }
+  # if(is.null(color_var)){
+  #   color_var <- group_var
+  # }
   
   ##################################################################################
   # plot density hexagonal
@@ -788,7 +796,8 @@ plot_gs <- function(df = NULL,
       if(!is.null(color_var)){
         
           #idx_col <- match(color_var, names(df))
-          p <- p + geom_point(mapping = aes_( group = as.name(group_var), colour = as.name(color_var)),
+          p <- p + geom_point(mapping = aes_( #group = as.name(group_var), 
+                                              colour = as.name(color_var)),
                               alpha = alpha, 
                               size = size, 
                               show.legend = show.legend)
@@ -1144,10 +1153,11 @@ plot_stat <- function(df = NULL,
   
   if(!is.null(metadata)){
     df_melt2 <- add_columns_from_metadata(df_melt2,
-                                          metadata = metadata,
-                                          color_var = color_var,
-                                          facet_vars = facet_vars,
-                                          group_var = group_var)
+                                          metadata = metadata
+                                          #color_var = color_var,
+                                          #facet_vars = facet_vars,
+                                          #group_var = group_var
+                                          )
   }
   
   
