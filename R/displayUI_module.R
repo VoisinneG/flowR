@@ -4,15 +4,22 @@
 #' @importFrom shinydashboard box tabBox
 #' @import shiny
 #' @import DT
-displayUI <- function(id){
+displayUI <- function(id, module_ui_name, ...){
   # Create a namespace function using the provided id
   ns <- NS(id)
   
+  module_ui_function <- function(...){
+    do.call(module_ui_name, list(...) )
+  }
+  
   fluidRow(
-    column(width = 6,
-           plotUI(id = ns("plot_module"), simple_plot = FALSE)
+    column(width = 4,
+           box(width = NULL, height = NULL, title = "Parameters",
+               module_ui_function(id = ns("plot_module"), ...)
+           )
+           
     ),
-    column(width = 6,
+    column(width = 8,
            tabBox(title = "", 
                   width = NULL, height = NULL,
                   tabPanel("Plot",
@@ -47,37 +54,51 @@ displayUI <- function(id){
 #' @import gridExtra
 #' @import DT
 #' @export
-#' @rdname displayUI
-display <- function(input, output, session, rval) {
+#' @rdname statisticsUI
+display <- function(input, output, session, rval, module_server_name, ...) {
   
   `%then%` <- shiny:::`%OR%`
   
    plot_params <- reactiveValues()
   
-   plist <- callModule(plot, "plot_module", rval, plot_params, simple_plot = FALSE)
+   module_server_function <- function(...){
+     do.call(module_server_name, list(...) )
+   }
+   
+   plist <- callModule(module_server_function, "plot_module", rval, ...)
      
    plot_display <- reactive({
 
-     n <- length(plist())
-     
-     cat("length\n")
-     print(n)
-     
-     nrow <- min(n, input$nrow_split)
-     ncol <- ceiling(n/nrow)
-     g <- gridExtra::marrangeGrob(plist(), nrow = nrow, ncol = ncol, top = "")
+     if(class(plist()) == "list"){
+       n <- length(plist())
 
-     g
+       cat("length\n")
+       print(n)
+
+       nrow <- min(n, input$nrow_split)
+       ncol <- ceiling(n/nrow)
+       g <- gridExtra::marrangeGrob(plist(), nrow = nrow, ncol = ncol, top = "")
+
+       g
+     }else{
+       plist()
+     }
+     #print(typeof(plist()))
+     #plist()
      
    })
 
-  
   output$plot_display  <- renderPlot({
    plot_display()
   })
   
   plot_height <- reactive({
-    min(input$nrow_split, length(plist())) * input$row_size + 50
+    if(class(plist()) == "list"){
+      min(input$nrow_split, length(plist())) * input$row_size + 50
+    }else{
+      input$row_size + 50
+    }
+    #input$row_size
   })
 
   output$ui_plot <- renderUI({

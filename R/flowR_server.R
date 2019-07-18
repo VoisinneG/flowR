@@ -19,54 +19,8 @@ flowR_server <- function(session, input, output) {
   `%then%` <- shiny:::`%OR%`
   
   rval <- reactiveValues()
-  
-  # rval <- reactiveValues(df_files = NULL,
-  #                        datasets = list(),
-  #                        flow_set_imported = NULL,
-  #                        flow_set_filter = NULL,
-  #                        flow_set_sample = NULL,
-  #                        flow_set_tsne = NULL,
-  #                        flow_set_cluster = NULL,
-  #                        flow_set = NULL,
-  #                        gating_set = NULL,
-  #                        idx_ff_gate = NULL,
-  #                        parameters = NULL,
-  #                        gates = list(),
-  #                        gate_focus = NULL,
-  #                        df_gate_focus = NULL,
-  #                        gates_flowCore = list(),
-  #                        min_val = NULL,
-  #                        max_val = NULL,
-  #                        transformation = list(),
-  #                        trans_parameters = list(),
-  #                        keywords = NULL,
-  #                        plot_var = NULL,
-  #                        gate = NULL,
-  #                        data_range = NULL,
-  #                        pdata = NULL,
-  #                        pdata_original = NULL,
-  #                        df_tot = NULL,
-  #                        df_meta = NULL,
-  #                        df_meta_imported = NULL,
-  #                        df_meta_mapped = NULL,
-  #                        df_keywords = NULL,
-  #                        df_sample = NULL,
-  #                        df_tsne = NULL,
-  #                        df_cluster = NULL,
-  #                        df_spill_original = NULL,
-  #                        df_spill = NULL,
-  #                        df_spill_imported = NULL,
-  #                        spill = NULL,
-  #                        Ncells_tot = 0,
-  #                        flow_set_names = NULL,
-  #                        pos_values = list(),
-  #                        neg_values = list(),
-  #                        time_step = 1,
-  #                        dim_red_var = NULL
-  # )
-  
+
   gate <- reactiveValues(x = NULL, y = NULL)
-  
   
   # Import module : import flowSet, gates from fcs files and workspace
   rval <- callModule(import, "import_module")
@@ -86,8 +40,20 @@ flowR_server <- function(session, input, output) {
   # Dimensionality reduction module
   rval <- callModule(dimRed, "dim_reduction_module", rval)
   
+  # Clustering module
+  rval <- callModule(cluster, "cluster_module", rval)
+  
   # Display module
-  plot_display <- callModule(display, "display_module", rval)
+  plot_display <- callModule(display, "plot_module", rval, module_server_name = "plotGatingSet", simple_plot = FALSE)
+  
+  # stat module
+  plot_statistics <- callModule(display, "statistics_module", rval, module_server_name = "plotStat")
+  
+  # save module
+  callModule(saveWorkspace, "save_module", rval)
+    
+  ##########################################################################################################
+  # General controls
   
   observeEvent(input$apply_trans, {
     rval$apply_trans <- input$apply_trans
@@ -328,394 +294,16 @@ flowR_server <- function(session, input, output) {
   })
   
   
-  # ##########################################################################################################
-  # # Observe functions for sub-sampling
-  # 
-  # observeEvent(input$compute_data, {
-  #   
-  #   # Create a Progress object
-  #   progress <- shiny::Progress$new(min = 0, max = 100)
-  #   on.exit(progress$close())
-  #   progress$set(message = "Computing...", value = 0)
-  #   updateProgress <- function(value = NULL, detail = NULL) {
-  #     progress$set(value = value, detail = detail)
-  #   }
-  #   
-  #   
-  #   if( length(input$sub_sample_table_rows_selected)==0){
-  #     showModal(modalDialog(
-  #       title = "No sample selected",
-  #       paste("Please select samples before proceeding", sep=""),
-  #       easyClose = TRUE,
-  #       footer = NULL
-  #     ))
-  #   }
-  #   
-  #   validate(
-  #     need(length(input$sub_sample_table_rows_selected)>0, "No sample selected")
-  #   )
-  #   
-  #   #print(input$gate_sub_sample)
-  #   
-  #   if( nchar(input$gate_sub_sample) == 0 ){
-  #     showModal(modalDialog(
-  #       title = "No subset selected",
-  #       paste("Please select a subset before proceeding", sep=""),
-  #       easyClose = TRUE,
-  #       footer = NULL
-  #     ))
-  #   }
-  #   
-  #   validate(
-  #     need(input$gate_sub_sample, "No subset selected")
-  #   )
-  #   
-  #   sample = rval$pdata$name[input$sub_sample_table_rows_selected]
-  #   
-  #   rval$df_sample <- get_data_gs(gs = rval$gating_set,
-  #                                 sample = sample, 
-  #                                 subset = input$gate_sub_sample,
-  #                                 spill = rval$spill,
-  #                                 Ncells = input$ncells_per_sample,
-  #                                 return_comp_data = FALSE,
-  #                                 updateProgress = updateProgress)
-  #   #print(rval$df_sample)
-  #   
-  #   if( length(rval$df_sample) == 0 ){
-  #     showModal(modalDialog(
-  #       title = "No cells in selection",
-  #       paste("Please modify selection", sep=""),
-  #       easyClose = TRUE,
-  #       footer = NULL
-  #     ))
-  #   }
-  #   
-  #   validate(
-  #     need(length(rval$df_sample)>0, "No cells in selection")
-  #   )
-  #   
-  #   rval$flow_set_sample <- build_flowset_from_df(rval$df_sample, fs = rval$flow_set)
-  #   print("OK")
-  #   print(dim(rval$df_sample))
-  #   rval$flow_set_names <- unique(c(rval$flow_set_names, "sub-sample"))
-  #   rval$flow_set_selected <- "sub-sample"
-  # })
-  
-  
-  # ##########################################################################################################
-  # # Observe functions for t-SNE
-  # 
-  # 
-  # observeEvent(input$compute_tsne, {
-  #   
-  #   validate(
-  #     need(rval$flow_set, "Empty flow set") 
-  #   )
-  #   
-  #   
-  #   if( length(input$tSNE_variables_table_rows_selected)==0){
-  #     showModal(modalDialog(
-  #       title = "No variable selected",
-  #       paste("Please select variables before proceeding", sep=""),
-  #       easyClose = TRUE,
-  #       footer = NULL
-  #     ))
-  #   }
-  #   
-  #   validate(
-  #     need(length(input$tSNE_variables_table_rows_selected) >0, "No variables selected")
-  #   )
-  #   
-  #   # Create a Progress object
-  #   progress <- shiny::Progress$new(min = 0, max = 100)
-  #   on.exit(progress$close())
-  #   
-  #   updateProgress <- function(value = NULL, detail = NULL) {
-  #     progress$set(value = value, detail = detail)
-  #   }
-  #   
-  #   transformation <- NULL
-  #   if(input$apply_trans){
-  #     transformation <- rval$transformation
-  #   }
-  #   
-  #   y_trans <- switch(input$y_trans_tsne,
-  #                     "log10" = log10_trans(),
-  #                     "asinh" = asinh_trans(),
-  #                     "identity" = identity_trans(),
-  #                     NULL)
-  #   
-  #   progress$set(message = "Getting data...", value = 0)
-  #   
-  #   df_raw <- get_data_gs(gs = rval$gating_set,
-  #                         sample = pData(rval$gating_set)$name, 
-  #                         subset = "root",
-  #                         spill = rval$spill,
-  #                         Ncells = NULL,
-  #                         return_comp_data = FALSE,
-  #                         updateProgress = updateProgress)
-  #   
-  #   rval$df_tsne <- get_data_gs(gs = rval$gating_set,
-  #                               sample = pData(rval$gating_set)$name, 
-  #                               subset = "root",
-  #                               spill = rval$spill,
-  #                               Ncells = NULL,
-  #                               return_comp_data = TRUE,
-  #                               updateProgress = updateProgress)
-  #   
-  #   progress$set(message = paste("Performing", input$dim_red_method, "..."), value = 0)
-  #   
-  #   res <- dim_reduction(df = rval$df_tsne,
-  #                        yvar = rval$parameters$name[input$tSNE_variables_table_rows_selected], 
-  #                        Ncells = input$ncells_tsne, 
-  #                        y_trans = y_trans,
-  #                        transformation = transformation,
-  #                        method = input$dim_red_method,
-  #                        perplexity = input$perplexity)
-  #   rval$df_tsne <- res$df
-  #   
-  #   df <- cbind( df_raw[res$keep, ], rval$df_tsne[ , setdiff(names(rval$df_tsne), names(df_raw))])
-  #   
-  #   rval$dim_red_var <- res$vars
-  #   
-  #   if(!is.null(rval$df_tsne)){
-  #     rval$flow_set_tsne <- build_flowset_from_df(df = df, fs = rval$flow_set)
-  #     rval$flow_set_names <- unique(c(rval$flow_set_names, "dim-reduction"))
-  #     rval$flow_set_selected <- "dim-reduction"
-  #     
-  #     #updateSelectInput(session, "flow_set", choices = rval$flow_set_names, selected = "dim-reduction")
-  #   }
-  #   
-  #   
-  # })
-  
-  ##########################################################################################################
-  # Observe functions for Clustering
-  
-  
-  observeEvent(input$start_clustering, {
-    
-    validate(
-      need(rval$flow_set, "Empty flow set")
-    )
-    
-    
-    if( length(input$clustering_variables_table_rows_selected)==0){
-      showModal(modalDialog(
-        title = "No variable selected",
-        paste("Please select variables before proceeding", sep=""),
-        easyClose = TRUE,
-        footer = NULL
-      ))
-    }
-    
-    validate(
-      need(length(input$clustering_variables_table_rows_selected) >0, "No variables selected")
-    )
-    
-    # Create a Progress object
-    progress <- shiny::Progress$new(min = 0, max = 100)
-    on.exit(progress$close())
-    
-    updateProgress <- function(value = NULL, detail = NULL) {
-      progress$set(value = value, detail = detail)
-    }
-    
-    transformation <- NULL
-    if(input$apply_trans){
-      transformation <- rval$transformation
-    }
-    
-    y_trans <- switch(input$y_trans_clustering,
-                      "log10" = log10_trans(),
-                      "asinh" = asinh_trans(),
-                      "identity" = identity_trans(),
-                      NULL)
-    
-    progress$set(message = "Clustering...", value = 0)
-    
-    df_raw <- get_data_gs(gs = rval$gating_set,
-                          sample = pData(rval$gating_set)$name, 
-                          subset = "root",
-                          spill = rval$spill,
-                          return_comp_data = FALSE,
-                          Ncells = NULL,
-                          updateProgress = updateProgress)
-    
-    rval$df_cluster <- get_data_gs(gs = rval$gating_set,
-                                   sample = pData(rval$gating_set)$name, 
-                                   subset = "root",
-                                   spill = rval$spill,
-                                   return_comp_data = TRUE,
-                                   Ncells = NULL,
-                                   updateProgress = updateProgress)
-    
-    
-    
-    #print(summary(rval$df_tsne))
-    
-    progress$set(message = "Clustering...", value = 50)
-    
-    res <- get_cluster(df=rval$df_cluster, 
-                       yvar = rval$parameters$name[input$clustering_variables_table_rows_selected],
-                       y_trans = y_trans,
-                       transformation = transformation,
-                       dc = input$cluster_dc, 
-                       alpha = input$cluster_alpha
-    )
-    rval$df_cluster <- res$df
-    df <- cbind(df_raw[res$keep, ], rval$df_cluster[c("cluster")])
-    
-    rval$flow_set_cluster <- build_flowset_from_df(df, fs = rval$flow_set)
-    
-    # delete previous cluster gates
-    
-    idx_cluster_gates <- grep("^/cluster[0-9]+", names(rval$gates_flowCore))
-    
-    if(length(idx_cluster_gates)>0){
-      rval$gates_flowCore <- rval$gates_flowCore[-idx_cluster_gates]
-    }
-    
-    # create one gate per cluster
-    
-    uclust <- unique(rval$df_cluster$cluster)
-    uclust <- uclust[ order(as.numeric(uclust), decreasing = FALSE) ]
-    
-    for(i in 1:length(uclust)){
-      filterID <- paste("cluster", uclust[i], sep = "")
-      polygon <- matrix(c(as.numeric(uclust[i])-0.25, 
-                          as.numeric(uclust[i])+0.25, 
-                          range(rval$df_cluster[[rval$flow_set_cluster@colnames[1]]])
-      ), 
-      ncol = 2)
-      row.names(polygon) <- c("min", "max")
-      colnames(polygon) <- c("cluster", rval$flow_set_cluster@colnames[1])
-      g <- rectangleGate(.gate = polygon, filterId=filterID)
-      rval$gates_flowCore[[paste("/",filterID, sep="")]] <- list(gate = g, parent = "root")
-    }
-    
-    rval$flow_set_names <- unique(c(rval$flow_set_names, "cluster"))
-    rval$flow_set_selected <- "cluster"
-    
-    #updateSelectInput(session, "flow_set", choices = rval$flow_set_names, selected = "cluster")
-    
-  })
   
   ##########################################################################################################
   ##########################################################################################################
   # Output 
+
   
-  
-  
-  
-  ##########################################################################################################
-  # Output Tables
-  
-  # output$spill_imported <- DT::renderDataTable({
-  #   validate(
-  #     need(rval$df_spill_imported, "No spillover data imported")
-  #   )
-  #   as.data.frame(rval$df_spill_imported)
-  # })
-  
-  # output$meta <- DT::renderDataTable({
-  #   validate(
-  #     need(rval$df_meta_imported, "No meta data imported")
-  #   )
-  #   as.data.frame(rval$df_meta_imported)
-  # })
-  
-  # output$files_table <- DT::renderDataTable({
-  #   validate(
-  #     need(rval$df_files, "Please select a file to import")
-  #   )
-  #   df <- rval$df_files[ ,c("name", "size")]
-  #   df$new_name <- basename(rval$df_files$datapath)
-  #   df$dir_name <- dirname(rval$df_files$datapath)
-  #   df
-  # })
-  
-  # output$parameters_table <- DT::renderDataTable({
-  #   
-  #   validate(
-  #     need(rval$parameters, "No data imported")
-  #   )
-  #   df <- rval$parameters
-  #   df$minRange <- format(df$minRange, digits = 2)
-  #   df$maxRange <- format(df$maxRange, digits = 2)
-  #   df[["chanel_name"]] <- df$name_long
-  #   DT::datatable(
-  #     df[, c("chanel_name", "transform", "transform parameters", "display", "range", "minRange", "maxRange", "name", "desc")], 
-  #     rownames = FALSE)
-  #   
-  # })
-  
-  
-  # output$tSNE_variables_table <- DT::renderDataTable({
-  #   
-  #   validate(
-  #     need(rval$parameters, "No data imported")
-  #   )
-  #   
-  #   df <- rval$parameters
-  #   df[["chanel_name"]] <- df$name_long
-  #   
-  #   DT::datatable(
-  #     df[, c("chanel_name", "transform", "transform parameters")], 
-  #     rownames = FALSE)
-  # })
-  
-  output$clustering_variables_table <- DT::renderDataTable({
-    
-    validate(
-      need(rval$parameters, "No data imported")
-    )
-    
-    df <- rval$parameters
-    df[["chanel_name"]] <- df$name_long
-    
-    DT::datatable(
-      df[, c("chanel_name", "transform", "transform parameters")], 
-      rownames = FALSE)
-  })
-  
-  # output$pData <- DT::renderDataTable({
-  #   if(!is.null(rval$flow_set)){
-  #     DT::datatable(rval$pdata, rownames = FALSE)
-  #   }
-  # })
-  # 
-  
-  # output$files_selection_table <- DT::renderDataTable({
+  # output$samples_stat <- DT::renderDataTable({
   #   if(!is.null(rval$flow_set)){
   #     data.frame("name" = rval$pdata$name, row.names = NULL)
   #   }
-  # })
-  
-  output$samples_stat <- DT::renderDataTable({
-    if(!is.null(rval$flow_set)){
-      data.frame("name" = rval$pdata$name, row.names = NULL)
-    }
-  })
-  
-  # output$sub_sample_table <- DT::renderDataTable({
-  #   if(!is.null(rval$flow_set)){
-  #     data.frame("name" = rval$pdata$name, row.names = NULL)
-  #   }
-  # })
-  
-  # output$spill_table <- DT::renderDataTable({
-  #   
-  #   validate(
-  #     need(rval$df_spill, "No spillover matrix")
-  #   )
-  #   
-  #   df <- rval$df_spill
-  #   format(df, digits =3)
-  # })
-  
-  # output$message <- renderText({
-  #   paste("You have loaded", length(rval$flow_set), "items")
   # })
   
   
@@ -728,7 +316,6 @@ flowR_server <- function(session, input, output) {
       color = "purple"
     )
   })
-  
   
   output$progressBox2 <- renderValueBox({
     ngates <- 0
@@ -765,85 +352,22 @@ flowR_server <- function(session, input, output) {
     )
   })
   
-  # output$progressBoxSub <- renderValueBox({
-  #   valueBox(
-  #     length(rval$flow_set_sample), "samples",icon = icon("list"),
-  #     color = "purple"
-  #   )
-  # })
-  # 
-  # output$progressBoxSub2 <- renderValueBox({
-  #   ncells <- 0
-  #   if(!is.null(rval$flow_set_sample)){
-  #     fs <- rval$flow_set_sample
-  #     ncells <- sum( sapply(1:length(fs), function(x){dim(fs[[x]]@exprs)[1]}) )
-  #   }
-  #   
-  #   valueBox(
-  #     ncells, "cells", icon = icon("list"),
-  #     color = "green"
-  #   )
-  # })
-  
-  # output$progressBoxTSNE <- renderValueBox({
-  #   valueBox(
-  #     length(rval$flow_set_tsne), "samples",icon = icon("list"),
-  #     color = "purple"
-  #   )
-  # })
-  # 
-  # output$progressBoxTSNE2 <- renderValueBox({
-  #   ncells <- 0
-  #   if(!is.null(rval$flow_set_tsne)){
-  #     fs <- rval$flow_set_tsne
-  #     ncells <- sum( sapply(1:length(fs), function(x){dim(fs[[x]]@exprs)[1]}) )
-  #   }
-  #   
-  #   valueBox(
-  #     ncells, "cells", icon = icon("list"),
-  #     color = "green"
-  #   )
-  # })
-  
   
   ##########################################################################################################
   # Output messages
   
-  # output$summary_sub_sample <- renderPrint({
-  #   if(!is.null(rval$df_sample)){
-  #     print(summary(rval$df_sample[, c("name", "subset")]))
+  
+  # output$summary_cluster <- renderPrint({
+  #   if(!is.null(rval$df_cluster)){
+  #     print(paste("Number of unique clusters :", length(unique(rval$df_cluster$cluster))))
   #   }else{
-  #     "No sub-sampling performed yet"
+  #     "No clustering performed yet"
   #   }
   # })
-  
-  # output$summary_tsne <- renderPrint({
-  #   if(!is.null(rval$df_tsne)){
-  #     print(summary(rval$df_tsne[, c("name", "subset")]))
-  #   }else{
-  #     "No t-SNE performed yet"
-  #   }
-  # })
-  
-  output$summary_cluster <- renderPrint({
-    if(!is.null(rval$df_cluster)){
-      print(paste("Number of unique clusters :", length(unique(rval$df_cluster$cluster))))
-    }else{
-      "No clustering performed yet"
-    }
-  })
   
   output$message_gate <- renderPrint({
     print(gate$x)
   })
-  
-  # output$message_transform <- renderPrint({
-  #   if(!is.null(rval$parameters)){
-  #     var_show <- rval$parameters$name[ match(input$xvar_show, rval$parameters$name_long) ]
-  #     print(rval$transformation[[var_show]])
-  #   }
-  #   
-  # })
   
   
   ##########################################################################################################
@@ -939,209 +463,6 @@ flowR_server <- function(session, input, output) {
     
   })
   
-  # output$plot_trans <- renderPlot({
-  # 
-  #   validate(
-  #     need(rval$gating_set, "Empty gating set") %then%
-  #       need(input$sample_selected_trans, "Please select a sample") %then%
-  #       need(input$gate_trans, "Please select a subset")
-  #   )
-  # 
-  #   idx_x <- match(input$xvar_trans, rval$parameters$name_long)
-  #   idx_y <- match(input$yvar_trans, rval$parameters$name_long)
-  #   xvar <- rval$parameters$name[idx_x]
-  #   yvar <- rval$parameters$name[idx_y]
-  # 
-  #   if(input$color_var_trans %in% rval$parameters$name_long){
-  #     color_var <- rval$parameters$name[match(input$color_var_trans, rval$parameters$name_long)]
-  #   }else{
-  #     color_var <- input$color_var
-  #   }
-  # 
-  #   #color_var <- rval$parameters$name[match(input$color_var_gate, rval$parameters$name_long)]
-  #   #color_var <- input$color_var
-  # 
-  #   axis_labels <- rval$parameters$name_long
-  #   names(axis_labels) <- rval$parameters$name
-  # 
-  #   transformation <- NULL
-  #   if(input$apply_trans){
-  #     transformation <- rval$transformation
-  #   }
-  # 
-  #   p <- plot_gs(df = rval$df_tot,
-  #                gs = rval$gating_set,
-  #                sample = input$sample_selected_trans,
-  #                subset = input$gate_trans,
-  #                spill = rval$spill,
-  #                xvar = xvar,
-  #                yvar = yvar,
-  #                color_var = color_var,
-  #                gate = NULL,
-  #                type = input$plot_type_trans,
-  #                bins = input$bin_number_trans,
-  #                alpha = input$alpha_trans,
-  #                size = input$size_trans,
-  #                norm_density = input$norm_trans,
-  #                smooth = input$smooth_trans,
-  #                transformation =  transformation,
-  #                show.legend = input$legend_trans,
-  #                axis_labels = axis_labels)
-  # 
-  #   if(!is.null(p)){
-  #     p <- p + xlab(input$xvar_trans)
-  #     if(input$plot_type_trans != "histogram"){
-  #       p <- p + ylab(input$yvar_trans)
-  #     }
-  #   }
-  # 
-  #   p
-  # 
-  # })
-  
-  
-  # update_data_plot_focus <- eventReactive(input$update_plot, {
-  #   data_plot_focus()
-  # })
-  # 
-  # data_plot_focus <- reactive({
-  #   validate(
-  #     need(rval$gating_set, "Empty gating set") %then%
-  #       need(input$files_selection_table_rows_selected, "Please select samples") %then%
-  #       need(input$gate, "Please select subsets")
-  #   )
-  #   
-  #   print("get data plot_focus")
-  #   df <- get_data_gs(gs = rval$gating_set, 
-  #                     sample = rval$pdata$name[input$files_selection_table_rows_selected],
-  #                     subset = input$gate, 
-  #                     spill = rval$spill)
-  #   return(df)
-  #   
-  # })
-  # 
-  # 
-  # 
-  # output$plot_focus <- renderPlot({
-  #   plot_focus()
-  # })
-  # 
-  # 
-  # 
-  # 
-  # plot_focus <- eventReactive(input$update_plot, {
-  #   
-  #   # validate(
-  #   #   need(rval$gating_set, "Empty gating set") %then%
-  #   #     need(input$files_selection_table_rows_selected, "Please select samples") %then%
-  #   #     need(input$gate, "Please select subsets")
-  #   # )
-  #   
-  #   
-  #   idx_x <- match(input$xvar, rval$parameters$name_long)
-  #   idx_y <- match(input$yvar, rval$parameters$name_long)
-  #   xvar <- rval$parameters$name[idx_x]
-  #   yvar <- rval$parameters$name[idx_y]
-  #   
-  #   color_var <- input$color_var
-  #   if(!is.null(input$color_var)){
-  #     
-  #     for(i in 1:length(input$color_var)){
-  #       if(input$color_var[i] %in% rval$parameters$name_long){
-  #         color_var[i] <- rval$parameters$name[match(input$color_var[i], rval$parameters$name_long)]
-  #       }else{
-  #         color_var[i] <- input$color_var[i]
-  #       }
-  #     }
-  #   }
-  #   
-  #   
-  #   
-  #   #color_var <- rval$parameters$name[match(input$color_var_gate, rval$parameters$name_long)]
-  #   #color_var <- input$color_var
-  #   
-  #   axis_labels <- rval$parameters$name_long
-  #   names(axis_labels) <- rval$parameters$name
-  #   
-  #   transformation <- NULL
-  #   if(input$apply_trans){
-  #     transformation <- rval$transformation
-  #   }
-  #   
-  #   plist <- list()
-  #   
-  #   split_var <- switch(input$split_variable, 
-  #                       "x variable" = "xvar",
-  #                       "y variable" = "yvar",
-  #                       "color variable" = "color_var"
-  #   )
-  #   
-  #   for(i in 1:length(input[[split_var]])){
-  #     
-  #     color_var_int <- color_var[1]
-  #     xvar_int <- xvar[1]
-  #     yvar_int <- yvar[1]
-  #     
-  #     if(split_var == "color_var"){
-  #       color_var_int <- color_var[i]
-  #     }else if(split_var == "xvar"){
-  #       xvar_int <- xvar[i]
-  #     }else if(split_var == "yvar"){
-  #       yvar_int <- yvar[i]
-  #     }
-  #     
-  #     
-  #     p <- plot_gs(df = update_data_plot_focus(),
-  #                  gs = rval$gating_set, 
-  #                  sample = rval$pdata$name[input$files_selection_table_rows_selected],
-  #                  subset = input$gate, 
-  #                  spill = rval$spill,
-  #                  xvar = xvar_int, 
-  #                  yvar = yvar_int, 
-  #                  color_var = color_var_int, 
-  #                  #gate = NULL, 
-  #                  type = input$plot_type, 
-  #                  bins = input$bin_number,
-  #                  alpha = input$alpha,
-  #                  size = input$size,
-  #                  norm_density = input$norm,
-  #                  smooth = input$smooth,
-  #                  ridges = input$ridges,
-  #                  transformation =  transformation,
-  #                  facet_vars = input$facet_var,
-  #                  group_var = input$group_var,
-  #                  yridges_var = input$yridges_var,
-  #                  show.legend = input$legend,
-  #                  axis_labels = axis_labels,
-  #                  legend.position = input$legend_pos)
-  #     
-  #     if(!is.null(p)){
-  #       p <- p + xlab(input$xvar) 
-  #       if(input$plot_type != "histogram"){
-  #         p <- p + ylab(input$yvar)
-  #       }
-  #     }
-  #     
-  #     plist[[i]] <- p
-  #     
-  #   }
-  #   
-  #   
-  #   n <- length(plist)
-  #   
-  #   nrow <- min(n, input$nrow_split)
-  #   ncol <- ceiling(n/nrow)
-  #   g <- marrangeGrob(plist, nrow = nrow, ncol = ncol, top = "")
-  #   
-  #   # if(input$split_direction == "horizontal"){
-  #   #   g <- marrangeGrob(plist, nrow = n, ncol = 1)
-  #   # }else{
-  #   #   g <- marrangeGrob(plist, nrow = 1, ncol = n)
-  #   # }
-  #   
-  #   g
-  #   
-  # })
   
   output$plotGate <- renderPlot({
     plotGate()
@@ -1222,153 +543,61 @@ flowR_server <- function(session, input, output) {
     
   })
   
-  output$plotStat <- renderPlot({
-    plotStat()
-  })
-  
-  plotStat <- eventReactive(input$update_plot_stat, {
-    
-    validate(
-      need(rval$gating_set, "Empty gating set") %then%
-        need(input$samples_stat_rows_selected, "Please select a sample") %then%
-        need(input$gate_stat, "Please select subsets")
-    )
-    
-    idx_y <- match(input$yvar_stat, rval$parameters$name_long)
-    yvar <- rval$parameters$name[idx_y]
-    
-    transformation <- NULL
-    if(input$apply_trans){
-      transformation <- rval$transformation
-    }
-    
-    axis_labels <- rval$parameters$name_long
-    names(axis_labels) <- rval$parameters$name
-    
-    y_trans <- switch(input$y_trans,
-                      "log10" = log10_trans(),
-                      "asinh" = asinh_trans(),
-                      "identity" = identity_trans(),
-                      NULL)
-    
-    p <- plot_stat(df = rval$df_tot,
-                   gs = rval$gating_set,
-                   sample =  rval$pdata$name[input$samples_stat_rows_selected],
-                   subset = input$gate_stat,
-                   spill = rval$spill,
-                   yvar = yvar,
-                   type = input$plot_type_stat,
-                   transformation = transformation,
-                   axis_labels = axis_labels,
-                   default_trans = identity_trans(),
-                   scale_values = input$scale_values,
-                   max_scale = input$max_scale,
-                   free_y_scale = input$free_y_scale,
-                   color_var = input$color_var_stat, 
-                   facet_vars = input$facet_var_stat,
-                   group_var = input$group_var_stat,
-                   expand_factor = input$expand_factor,
-                   stat_function = input$stat_function,
-                   show.legend = input$legend_stat,
-                   y_trans = y_trans,
-                   strip.text.y.angle = input$strip_text_angle)
-    
-    p                          
-    
-  })
-  
-  # output$plot_comp <- renderPlot({
+  # output$plotStat <- renderPlot({
+  #   plotStat()
+  # })
+  # 
+  # plotStat <- eventReactive(input$update_plot_stat, {
   #   
   #   validate(
   #     need(rval$gating_set, "Empty gating set") %then%
-  #       need(input$sample_selected_comp, "Please select a sample") %then%
-  #       need(input$gate_comp, "Please select a subset")
-  #     
+  #       need(input$samples_stat_rows_selected, "Please select a sample") %then%
+  #       need(input$gate_stat, "Please select subsets")
   #   )
   #   
-  #   
-  #   idx_x <- match(input$xvar_comp, rval$parameters$name_long)
-  #   idx_y <- match(input$yvar_comp, rval$parameters$name_long)
-  #   yvar <- rval$parameters$name[idx_x]
-  #   xvar <- rval$parameters$name[idx_y]
-  #   
-  #   
-  #   if(input$color_var_comp %in% rval$parameters$name_long){
-  #     color_var <- rval$parameters$name[match(input$color_var_comp, rval$parameters$name_long)]
-  #   }else{
-  #     color_var <- input$color_var
-  #   }
-  #   
-  #   #color_var <- rval$parameters$name[match(input$color_var_gate, rval$parameters$name_long)]
-  #   #color_var <- input$color_var
-  #   
-  #   axis_labels <- rval$parameters$name_long
-  #   names(axis_labels) <- rval$parameters$name
-  #   axis_labels[[xvar]] <- paste(axis_labels[[xvar]], "(fluo)")
-  #   axis_labels[[yvar]] <- paste(axis_labels[[yvar]], "(chanel)")
+  #   idx_y <- match(input$yvar_stat, rval$parameters$name_long)
+  #   yvar <- rval$parameters$name[idx_y]
   #   
   #   transformation <- NULL
   #   if(input$apply_trans){
   #     transformation <- rval$transformation
   #   }
   #   
-  #   print(rval$spill)
+  #   axis_labels <- rval$parameters$name_long
+  #   names(axis_labels) <- rval$parameters$name
   #   
-  #   p <- plot_gs(df = rval$df_tot,
-  #                gs = rval$gating_set, 
-  #                sample = input$sample_selected_comp,
-  #                subset = input$gate_comp, 
-  #                spill = rval$spill,
-  #                xvar = xvar, 
-  #                yvar = yvar, 
-  #                color_var = color_var, 
-  #                gate = NULL, 
-  #                type = input$plot_type_comp, 
-  #                bins = input$bin_number_comp,
-  #                alpha = input$alpha_comp,
-  #                size = input$size_comp,
-  #                norm_density = input$norm_comp,
-  #                smooth = input$smooth_comp,
-  #                transformation =  transformation,
-  #                show.legend = input$legend_comp,
-  #                axis_labels = axis_labels)
+  #   y_trans <- switch(input$y_trans,
+  #                     "log10" = log10_trans(),
+  #                     "asinh" = asinh_trans(),
+  #                     "identity" = identity_trans(),
+  #                     NULL)
   #   
-  #   #p <- p + xlab(paste(input$yvar_comp, "(fluo)")) + ylab(paste(input$xvar_comp, "(chanel)"))
+  #   p <- plot_stat(df = rval$df_tot,
+  #                  gs = rval$gating_set,
+  #                  sample =  rval$pdata$name[input$samples_stat_rows_selected],
+  #                  subset = input$gate_stat,
+  #                  spill = rval$spill,
+  #                  yvar = yvar,
+  #                  type = input$plot_type_stat,
+  #                  transformation = transformation,
+  #                  axis_labels = axis_labels,
+  #                  default_trans = identity_trans(),
+  #                  scale_values = input$scale_values,
+  #                  max_scale = input$max_scale,
+  #                  free_y_scale = input$free_y_scale,
+  #                  color_var = input$color_var_stat, 
+  #                  facet_vars = input$facet_var_stat,
+  #                  group_var = input$group_var_stat,
+  #                  expand_factor = input$expand_factor,
+  #                  stat_function = input$stat_function,
+  #                  show.legend = input$legend_stat,
+  #                  y_trans = y_trans,
+  #                  strip.text.y.angle = input$strip_text_angle)
   #   
-  #   p
+  #   p                          
   #   
   # })
   
-  
-  # output$heatmap_spill <- renderPlotly({
-  #   
-  #   validate(
-  #     need(rval$df_spill, "No spillover matrix")
-  #   )
-  #   
-  #   df <- rval$df_spill
-  #   df[df == 0] <- NA
-  #   df_log <- log10(df)
-  #   p <- heatmaply(df,
-  #                  #colors = c(rgb(1,1,1), rgb(1,0,0)),
-  #                  #colors= viridis,
-  #                  plot_method="ggplot",
-  #                  scale_fill_gradient_fun = scale_fill_viridis(trans = log10_trans(), name = "spillover"),
-  #                  Rowv = NULL,
-  #                  Colv = NULL,
-  #                  column_text_angle = 90,
-  #                  xlab = "detection chanel",
-  #                  ylab = "emitting fluorophore",
-  #                  fontsize_row = 6,
-  #                  fontsize_col = 6,
-  #                  cellnote_size = 6,
-  #                  hide_colorbar = TRUE,
-  #                  main = "spillover matrix",
-  #                  margins = c(50, 50, 50, 0)
-  #   )
-  #   p$x$source <- "select_heatmap"
-  #   p
-  # })
   
   ##########################################################################################################
   #Output Download functions
@@ -1407,200 +636,89 @@ flowR_server <- function(session, input, output) {
   #   }
   # )
   
-  output$export_gating_set <- downloadHandler(
-    
-    filename = function(){
-      switch(input$export_format,
-             "FlowJo" = "workspace_flowJo.wsp",
-             "Cytobank" = "workspace_cytobank.xml")
-    },
-    
-    content = function(file) {
-      print(input$export_format)
-      gs <- GatingSet(rval$flow_set)
-      
-      ####################################################
-      #transform
-      if(input$export_format == "FlowJo"){
-        trans.def <- trans_new("flowJo_linear", 
-                               transform = function(x){x}, 
-                               inverse = function(x){x})
-      }else if(input$export_format == "Cytobank"){
-        trans.def <- asinhtGml2_trans()
-      }
-      
-      
-      trans_list <- rval$transformation
-      
-      for(i in 1:length(trans_list)){
-        trans_list[[i]] <- trans.def
-      }
-      
-      trans <- transformerList(colnames(gs), trans_list)
-      
-      gs <- transform(gs, trans)
-      print(gs@transformation)
-      
-      ####################################################
-      #compensate
-      
-      if(input$apply_comp & !is.null(rval$df_spill)){
-        comp <- rval$df_spill
-      }else{
-        comp <- diag( length(rval$flow_set@colnames) )
-        colnames(comp) <- rval$flow_set@colnames
-        row.names(comp) <- colnames(comp)
-      }
-      comp <- compensation(comp)
-      gs <- compensate(gs, comp)
-      print(gs@compensation)
-      
-      
-      ####################################################
-      #add gates
-      
-      # print(getNodes(gs))
-      gates <- transform_gates(gates = rval$gates_flowCore, 
-                               transformation = trans_list,
-                               pattern = "", 
-                               replacement = "",
-                               time_step = 1/rval$time_step
-      )
-      
-      gs <- add_gates_flowCore(gs, gates)
-      
-      g <- getGate(gs, "/live")
-      print(g[[1]]@boundaries)
-      
-      #gs <- rval$gating_set
-      
-      
-      if(input$export_format == "FlowJo"){
-        CytoML::GatingSet2flowJo(gs = gs, outFile = file)
-      }else if(input$export_format == "Cytobank"){
-        CytoML::GatingSet2cytobank(gs = gs, outFile = file, cytobank.default.scale = FALSE)
-      }
-      
-    }
-  )
+  # output$export_gating_set <- downloadHandler(
+  #   
+  #   filename = function(){
+  #     switch(input$export_format,
+  #            "FlowJo" = "workspace_flowJo.wsp",
+  #            "Cytobank" = "workspace_cytobank.xml")
+  #   },
+  #   
+  #   content = function(file) {
+  #     print(input$export_format)
+  #     gs <- GatingSet(rval$flow_set)
+  #     
+  #     ####################################################
+  #     #transform
+  #     if(input$export_format == "FlowJo"){
+  #       trans.def <- trans_new("flowJo_linear", 
+  #                              transform = function(x){x}, 
+  #                              inverse = function(x){x})
+  #     }else if(input$export_format == "Cytobank"){
+  #       trans.def <- asinhtGml2_trans()
+  #     }
+  #     
+  #     
+  #     trans_list <- rval$transformation
+  #     
+  #     for(i in 1:length(trans_list)){
+  #       trans_list[[i]] <- trans.def
+  #     }
+  #     
+  #     trans <- transformerList(colnames(gs), trans_list)
+  #     
+  #     gs <- transform(gs, trans)
+  #     print(gs@transformation)
+  #     
+  #     ####################################################
+  #     #compensate
+  #     
+  #     if(input$apply_comp & !is.null(rval$df_spill)){
+  #       comp <- rval$df_spill
+  #     }else{
+  #       comp <- diag( length(rval$flow_set@colnames) )
+  #       colnames(comp) <- rval$flow_set@colnames
+  #       row.names(comp) <- colnames(comp)
+  #     }
+  #     comp <- compensation(comp)
+  #     gs <- compensate(gs, comp)
+  #     print(gs@compensation)
+  #     
+  #     
+  #     ####################################################
+  #     #add gates
+  #     
+  #     # print(getNodes(gs))
+  #     gates <- transform_gates(gates = rval$gates_flowCore, 
+  #                              transformation = trans_list,
+  #                              pattern = "", 
+  #                              replacement = "",
+  #                              time_step = 1/rval$time_step
+  #     )
+  #     
+  #     gs <- add_gates_flowCore(gs, gates)
+  #     
+  #     g <- getGate(gs, "/live")
+  #     print(g[[1]]@boundaries)
+  #     
+  #     #gs <- rval$gating_set
+  #     
+  #     
+  #     if(input$export_format == "FlowJo"){
+  #       CytoML::GatingSet2flowJo(gs = gs, outFile = file)
+  #     }else if(input$export_format == "Cytobank"){
+  #       CytoML::GatingSet2cytobank(gs = gs, outFile = file, cytobank.default.scale = FALSE)
+  #     }
+  #     
+  #   }
+  # )
   
   ##########################################################################################################
   #Dynamic ui output
   
-  # output$filter_meta <- renderUI({
-  #   
-  #   validate(
-  #     need(rval$pdata, "No meta data")
-  #   )
-  #   
-  #   x <- list()
-  #   
-  #   for(meta_var in names(rval$pdata)){
-  #     uvar <- unique(rval$pdata[[meta_var]])
-  #     
-  #     x[[meta_var]] <- selectizeInput(meta_var, meta_var, 
-  #                                     choices = uvar, 
-  #                                     selected = uvar,
-  #                                     multiple = TRUE)
-  #     
-  #   }
-  #   
-  #   if(length(x)>0){
-  #     x[["apply_filter_meta"]] <- actionButton("apply_filter_meta", "apply filter")
-  #   }
-  #   
-  #   tagList(x)
-  #   
-  # })
   
-  # plot_height <- eventReactive(input$update_plot,{
-  #   split_var <- switch(input$split_variable, 
-  #                       "x variable" = "xvar",
-  #                       "y variable" = "yvar",
-  #                       "color variable" = "color_var"
-  #   )
-  #   
-  #   min(input$nrow_split, length(input[[split_var]])) * input$row_size + 50
-  #   
-  # })
-  # 
-  # output$ui_plot <- renderUI({
-  #   if(input$update_plot){
-  #     # split_var <- switch(input$split_variable, 
-  #     #                     "x variable" = "xvar",
-  #     #                     "y variable" = "yvar",
-  #     #                     "color variable" = "color_var"
-  #     # )
-  #     plotOutput("plot_focus", height = plot_height())
-  #   }
-  #   
-  #   
-  # })
   
-  plot_height_stat <- eventReactive(input$update_plot_stat,{
-    
-    length(input$yvar_stat) * input$row_size_stat + 50
-    
-  })
   
-  output$ui_plot_stat <- renderUI({
-    
-    plotOutput("plotStat", height = plot_height_stat())
-    
-  })
-  
-  # output$ui_compute_spill <- renderUI({
-  #   
-  #   validate(
-  #     need(rval$flow_set, "No flow set available")
-  #   )
-  #   
-  #   tagList(
-  #     selectInput("fluo", 
-  #                 "fluorophore",
-  #                 choices = rval$flow_set@colnames,
-  #                 selected = rval$flow_set@colnames[1]),
-  #     
-  #     selectInput("sample_pos",
-  #                 "sample pos",
-  #                 choices = pData(rval$flow_set)$name,
-  #                 selected = pData(rval$flow_set)$name[1]),
-  #     
-  #     selectInput("gate_pos",
-  #                 "gate pos",
-  #                 choices = getNodes(rval$gating_set),
-  #                 selected = "root"),
-  #     
-  #     selectInput("sample_neg", 
-  #                 "sample neg",
-  #                 choices = pData(rval$flow_set)$name,
-  #                 selected = pData(rval$flow_set)$name[1]),
-  #     
-  #     selectInput("gate_neg",
-  #                 "gate neg",
-  #                 choices = getNodes(rval$gating_set),
-  #                 selected = "root")
-  #   )
-  #   
-  #   # x <- list()
-  #   # 
-  #   # for(meta_var in names(rval$pdata)){
-  #   #   uvar <- unique(rval$pdata[[meta_var]])
-  #   #   
-  #   #   x[[meta_var]] <- selectizeInput(meta_var, meta_var, 
-  #   #                                   choices = uvar, 
-  #   #                                   selected = uvar,
-  #   #                                   multiple = TRUE)
-  #   #   
-  #   # }
-  #   # 
-  #   # if(length(x)>0){
-  #   #   x[["apply_filter_meta"]] <- actionButton("apply_filter_meta", "apply filter")
-  #   # }
-  #   # 
-  #   # tagList(x)
-  #   
-  # })
   
   
 }

@@ -116,84 +116,10 @@ flowR_ui <- function() {
               )
       ),
       tabItem(tabName = "Plot_tab",
-              displayUI("display_module")
+              displayUI("plot_module", module_ui_name = "plotGatingSetInput", simple_plot = FALSE)
       ),
       tabItem(tabName = "Stat_tab",
-              fluidRow(
-                column(width = 4,
-                       tabBox(title = "",
-                              width = NULL, height = NULL,
-                              tabPanel("Samples",
-                                       div(style = 'overflow-x: scroll', DT::dataTableOutput("samples_stat"))
-                              ),
-                              tabPanel("Subset",
-                                       selectizeInput("gate_stat", 
-                                                      label = "subset", 
-                                                      choices = "root", 
-                                                      selected = "root",
-                                                      multiple = TRUE)
-                              ),
-                              tabPanel("Variables",
-                                       selectizeInput("yvar_stat", 
-                                                      label = "y variable", 
-                                                      choices = NULL, 
-                                                      selected = NULL, 
-                                                      multiple = TRUE)
-                              )
-                       ) 
-                ),
-                column(width = 8,
-                       tabBox(title = "Plot",
-                              width = NULL, height = NULL,
-                              tabPanel("Plot",
-                                       actionButton("update_plot_stat", "update"),
-                                       br(),
-                                       uiOutput("ui_plot_stat")
-                                       
-                              ),
-                              tabPanel("Options",
-                                       selectInput("plot_type_stat", label = "plot type",
-                                                   choices = c("bar", "tile"),
-                                                   selected = "bar"),
-                                       checkboxInput("legend_stat", "show legend", value = TRUE),
-                                       checkboxInput("free_y_scale", "free y scale", value = TRUE),
-                                       checkboxInput("scale_values", "scale values by row", value = FALSE),
-                                       numericInput("max_scale", label = "scale limit", value = 2),
-                                       numericInput("expand_factor", label = "expand factor", value = 0.1),
-                                       selectInput("stat_function", 
-                                                   label = "statistics", 
-                                                   choices = c("mean", "median", "sd"), 
-                                                   selected = "mean"),
-                                       selectInput("y_trans", 
-                                                   label = "Transform variables:", 
-                                                   choices = c("log10", "asinh", "identity", "default"), 
-                                                   selected = "default"),
-                                       selectizeInput("facet_var_stat", 
-                                                      multiple =TRUE,
-                                                      label = "facet variables", 
-                                                      choices = "name", 
-                                                      selected = NULL),
-                                       selectizeInput("group_var_stat", 
-                                                      multiple =FALSE,
-                                                      label = "group variable", 
-                                                      choices = c("name","subset"), 
-                                                      selected = "subset"),
-                                       selectInput("color_var_stat", "color variable",
-                                                   choices = "none",
-                                                   selected = "none"),
-                                       numericInput("row_size_stat", label = "row size (px)", value = 150),
-                                       numericInput("strip_text_angle", label = "strip text angle", value = 0)
-                              ),
-                              tabPanel("Save",
-                                       numericInput("width_plot_stat", label = "width", value = 5),
-                                       numericInput("height_plot_stat", label = "height", value = 5),
-                                       downloadButton("download_plot_stat", "Save plot")
-                              )
-                       )
-                )
-                
-                
-              )
+              displayUI("statistics_module", module_ui_name = "plotStatInput")
       ),
       tabItem(tabName = "Sub_tab",
               subsampleUI(id = "subsample_module")
@@ -202,49 +128,26 @@ flowR_ui <- function() {
               dimRedUI(id = "dim_reduction_module")
       ),
       tabItem(tabName = "Cluster_tab",
-              fluidRow(
-                column(width = 6,
-                       tabBox(title = "",
-                              width = NULL, height = NULL,
-                              tabPanel("Variables",
-                                       div(style = 'overflow-x: scroll', DT::dataTableOutput("clustering_variables_table"))
-                              ),
-                              tabPanel("Options",
-                                       selectInput("y_trans_clustering",
-                                                   label = "Transform variables:",
-                                                   choices = c("log10", "asinh", "identity", "default"),
-                                                   selected = "default"),
-                                       numericInput("cluster_dc", "dc", 5),
-                                       numericInput("cluster_alpha", "alpha", 0.0001)
-                              ),
-                              tabPanel("Cluster",
-                                       actionButton("start_clustering", "Find clusters"),
-                                       br(),
-                                       br(),
-                                       "Summary",
-                                       br(),
-                                       verbatimTextOutput("summary_cluster")
-                              )
-                       )
-                )
-              )
+              clusterUI(id = "cluster_module")
       ),
       tabItem(tabName = "Save_tab",
-              fluidRow(
-                column(width = 6,
-                       tabBox(title = "",
-                              width = NULL, height = NULL,
-                              tabPanel("Gating set",
-                                       selectInput("export_format",
-                                                   label = "format",
-                                                   choices = c("Cytobank", "FlowJo"),
-                                                   selected = "FlowJo"),
-                                       downloadButton("export_gating_set", "Export")
-                              )
-                       )
-                )
-              )
+              saveWorkspaceUI(id = "save_module")
       )
+      #         fluidRow(
+      #           column(width = 6,
+      #                  tabBox(title = "",
+      #                         width = NULL, height = NULL,
+      #                         tabPanel("Gating set",
+      #                                  selectInput("export_format",
+      #                                              label = "format",
+      #                                              choices = c("Cytobank", "FlowJo"),
+      #                                              selected = "FlowJo"),
+      #                                  downloadButton("export_gating_set", "Export")
+      #                         )
+      #                  )
+      #           )
+      #         )
+      # )
     )
     
   )

@@ -1,99 +1,89 @@
-#' @title   plotUI and plot
+#' @title plotGatingSetInput and plotGatingSet
 #' @description  A shiny Module that deals with metadata
 #' @param id shiny id
 #' @importFrom shinydashboard box tabBox
 #' @import shiny
 #' @import DT
-plotUI <- function(id, simple_plot = TRUE) {
+plotGatingSetInput <- function(id, simple_plot = TRUE) {
   # Create a namespace function using the provided id
   ns <- NS(id)
   
   tagList(
     if(!simple_plot){
       tagList(
-        actionButton(ns("update_plot"), "update plot"),
+        actionButton(ns("update_plot"), "update"),
         br(),
         br()
       )
     },
-    tabBox(title = "", 
-           width = NULL, height = NULL,
-           # tabPanel("Samples",
-           #          div(style = 'overflow-x: scroll', DT::dataTableOutput(ns("files_selection_table")))
-           # ),
-           tabPanel("Samples/Subset",
-                    checkboxInput(ns("all_samples"), "Select all samples", FALSE),
-                    selectizeInput(ns("samples"), 
-                                   label = "samples",
-                                   choices = NULL,
-                                   selected = NULL,
-                                   multiple = TRUE),
-                    selectizeInput(ns("gate"), 
-                                   label = "subset",
-                                   choices = "root",
-                                   selected = "root",
-                                   multiple = !simple_plot)
-           ),
-           tabPanel("Variables",
-                    selectizeInput(ns("xvar"), 
-                                   multiple = !simple_plot,
-                                   label = "x variable", 
-                                   choices = NULL, 
-                                   selected = NULL),
-                    selectizeInput(ns("yvar"), 
-                                   multiple = !simple_plot,
-                                   label = "y variable", 
-                                   choices = NULL, 
-                                   selected = NULL),
-                    selectizeInput(ns("color_var"), 
-                                   multiple = !simple_plot,
-                                   label = "color variable",
-                                   choices = "none",
-                                   selected = "none"),
-                    if(!simple_plot){
-                      tagList(
-                        #checkboxInput(ns("norm"), "normalize (set max to 1)", value = TRUE),
-                        selectizeInput(ns("facet_var"), 
-                                       multiple =TRUE,
-                                       label = "facet variables",
-                                       choices = "name",
-                                       selected = "name"
-                        ),
-                        selectInput(ns("split_variable"),
-                                    label = "select variable used to split plots",
-                                    choices = c("x variable", "y variable", "color variable"),
-                                    selected = "x variable"
-                        )
-                      )
-                    }
-                    
-                    
-                    
-           ),
-           tabPanel("Options",
-                    selectInput(ns("plot_type"), label = "plot type",
-                                choices = c("hexagonal", "histogram", "dots", "contour"),
-                                selected = "histogram"),
-                    checkboxInput(ns("legend"), "show legend", value = TRUE),
-                    uiOutput(ns("histo_options")),
-                    selectInput(ns("legend_pos"), label = "legend position",
-                                choices = c("right", "top", "left", "bottom"),
-                                selected = "right"),
-                    numericInput(ns("bin_number"), label = "number of bins", value = 50),
-                    numericInput(ns("alpha"), label = "alpha", value = 0.5),
-                    numericInput(ns("size"), label = "size", value = 1)
-           )
+    box(collapsible = TRUE, collapsed = TRUE, width = NULL, height = NULL,
+        title = "Sample/Subset",
+        checkboxInput(ns("all_samples"), "Select all samples", FALSE),
+        selectizeInput(ns("samples"), 
+                       label = "samples",
+                       choices = NULL,
+                       selected = NULL,
+                       multiple = TRUE),
+        selectizeInput(ns("gate"), 
+                       label = "subset",
+                       choices = "root",
+                       selected = "root",
+                       multiple = !simple_plot)
+    ),
+    box(collapsible = TRUE, collapsed = FALSE, width = NULL, height = NULL,
+        title ="Variables",
+        selectizeInput(ns("xvar"), 
+                       multiple = !simple_plot,
+                       label = "x variable", 
+                       choices = NULL, 
+                       selected = NULL),
+        selectizeInput(ns("yvar"), 
+                       multiple = !simple_plot,
+                       label = "y variable", 
+                       choices = NULL, 
+                       selected = NULL),
+        selectizeInput(ns("color_var"), 
+                       multiple = !simple_plot,
+                       label = "color variable",
+                       choices = "none",
+                       selected = "none"),
+        if(!simple_plot){
+          tagList(
+            selectizeInput(ns("facet_var"), 
+                           multiple =TRUE,
+                           label = "facet variables",
+                           choices = "name",
+                           selected = "name"
+            ),
+            selectInput(ns("split_variable"),
+                        label = "select variable used to split plots",
+                        choices = c("x variable", "y variable", "color variable"),
+                        selected = "x variable"
+            )
+          )
+        }
+    ),
+    box(collapsible = TRUE, collapsed = TRUE, width = NULL, height = NULL,
+        title ="Options",
+        selectInput(ns("plot_type"), label = "plot type",
+                    choices = c("hexagonal", "histogram", "dots", "contour"),
+                    selected = "histogram"),
+        checkboxInput(ns("legend"), "show legend", value = TRUE),
+        uiOutput(ns("histo_options")),
+        selectInput(ns("legend_pos"), label = "legend position",
+                    choices = c("right", "top", "left", "bottom"),
+                    selected = "right"),
+        numericInput(ns("bin_number"), label = "number of bins", value = 50),
+        numericInput(ns("alpha"), label = "alpha", value = 0.5),
+        numericInput(ns("size"), label = "size", value = 1)
     )
-
-                           
-                           
                  
   )
   
 }
 
 
-#' transform server function
+#'  plotGatingSet server function
 #' @param input shiny input
 #' @param output shiny output
 #' @param session shiny session
@@ -103,8 +93,8 @@ plotUI <- function(id, simple_plot = TRUE) {
 #' @import shiny
 #' @import DT
 #' @export
-#' @rdname plotUI
-plot <- function(input, output, session, rval, plot_params, simple_plot = TRUE) {
+#' @rdname plotGatingSetInput
+plotGatingSet <- function(input, output, session, rval, plot_params = reactiveValues(), simple_plot = TRUE) {
   
   `%then%` <- shiny:::`%OR%`
   
@@ -224,21 +214,30 @@ plot <- function(input, output, session, rval, plot_params, simple_plot = TRUE) 
     if(!simple_plot){
       input$update_plot
     }else{
-      c(input$xvar,
-        input$yvar,
-        input$color_var,
-        input$samples,
-        input$gate,
-        input$plot_type,
-        input$legend,
-        input$legend_pos,
-        input$bin_number,
-        input$size,
-        input$alpha,
-        input$norm,
-        input$smooth,
-        input$ridges,
-        input$yridges_var)
+      update_params <- c(input$xvar,
+                         input$yvar,
+                         input$color_var,
+                         input$samples,
+                         input$gate,
+                         input$plot_type,
+                         input$legend,
+                         input$legend_pos,
+                         input$bin_number,
+                         input$size,
+                         input$alpha,
+                         input$norm,
+                         input$smooth,
+                         input$ridges,
+                         input$yridges_var,
+                         rval$apply_trans,
+                         rval$flow_set,
+                         rval$spill,
+                         rval$parameters,
+                         split_var())
+      if(rval$apply_trans){
+        update_params <- c(update_params, rval$transformation)
+      }
+      
     }
   })
   
@@ -287,8 +286,6 @@ plot <- function(input, output, session, rval, plot_params, simple_plot = TRUE) 
         }
       }
     }
-    
-    
     
     axis_labels <- rval$parameters$name_long
     names(axis_labels) <- rval$parameters$name
@@ -358,8 +355,6 @@ plot <- function(input, output, session, rval, plot_params, simple_plot = TRUE) 
     plist
     
   })
-  
-  
   
   return( plot_focus )
   

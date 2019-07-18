@@ -33,20 +33,20 @@ transformUI <- function(id) {
            )
     ),
     column(width = 6,
-           box(title = "Plot",
-               width = NULL, 
-               height = NULL,
-               plotOutput(ns("plot_trans")),
-               downloadButton(ns("download_plot"), "Save plot")
-           ),
-           box(title = "Plot parameters",
-               width = NULL, 
-               height = NULL, 
-               collapsible = TRUE, 
-               collapsed = TRUE,
-               plotUI(id = ns("plot_module"), simple_plot = TRUE)
+           tabBox(title = "",
+               width = NULL, height = NULL,
+               tabPanel(title = "Plot",
+                 plotOutput(ns("plot_trans"))
+               ),
+               tabPanel(title = "Parameters",
+                 plotGatingSetInput(id = ns("plot_module"), simple_plot = TRUE)
+               ),
+               tabPanel(title = "Save",
+                        numericInput(ns("width_plot"), label = "width", value = 5),
+                        numericInput(ns("height_plot"), label = "height", value = 5),
+                        downloadButton(ns("download_plot"), "Save plot")
+               )
            )
-           
     )
   )
   
@@ -103,7 +103,7 @@ transform <- function(input, output, session, rval) {
     }
   })
   
-  plot_trans <- callModule(plot, "plot_module", rval, plot_params, simple_plot = TRUE)
+  plot_trans <- callModule(plotGatingSet, "plot_module", rval, plot_params, simple_plot = TRUE)
   
   output$plot_trans <- renderPlot({
     plot_trans()
@@ -273,7 +273,7 @@ transform <- function(input, output, session, rval) {
   output$download_plot <- downloadHandler(
     filename = "plot.pdf",
     content = function(file) {
-      pdf(file, width = 5, height = 5)
+      pdf(file, width = input$width_plot, height = input$height_plot)
       print(plot_trans())
       dev.off()
     }
