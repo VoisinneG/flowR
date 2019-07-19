@@ -271,12 +271,12 @@ add_gates_flowCore <- function(gs, gates){
           #print( gs@data@colnames )
           
           if( !is.null(names(g$gate@parameters)) & length( setdiff( names(g$gate@parameters), gs@data@colnames) ) == 0 ){
-
+            print("add before")
             add(gs,
                 g$gate,
                 parent = g$parent,
                 name = g$gate@filterId)
-            
+            print("add after")
           }else{
             warning("Could not find gate parameters in flowData")
           }
@@ -426,7 +426,6 @@ get_data_gs <- function(gs,
     print(colnames(gs_comp))
     print(getNodes(gs_comp))
     print(pData(gs_comp)$name)
-    
   }
   
   df <- list()
@@ -437,17 +436,22 @@ get_data_gs <- function(gs,
     for(k in 1:length(subset)){
       
       print(as.name(subset[k]))
+      print(subset[k])
+      
       idx_subset <- NULL
       if(!is.null(spill)){
         idx_comp <- match(pData(gs)$name[idx[i]], pData(gs_comp)$name)
+        print("idx_comp")
         print(idx_comp)
       }
       
       if(subset[k] != "root"){
         if(!is.null(spill)){
+          print("idx1\n")
           idx_subset <- getIndices(gs_comp[[idx_comp]], as.name(subset[k]))[[1]]
           print("ok idx1\n")
         }else{
+          print("ok idx2\n")
           idx_subset <- getIndices(gs[[idx[i]]], as.name(subset[k]))[[1]]
           print("ok idx2\n")
         }

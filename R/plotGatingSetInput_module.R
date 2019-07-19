@@ -98,6 +98,8 @@ plotGatingSet <- function(input, output, session, rval, plot_params = reactiveVa
   
   `%then%` <- shiny:::`%OR%`
   
+  rval_plot <- reactiveValues()
+  
   output$histo_options <- renderUI({
     
     ns <- session$ns
@@ -161,8 +163,7 @@ plotGatingSet <- function(input, output, session, rval, plot_params = reactiveVa
     
   })
   
-  
-  
+ 
   observe({
     
     validate(
@@ -178,15 +179,24 @@ plotGatingSet <- function(input, output, session, rval, plot_params = reactiveVa
       xvar_default <-plot_params$xvar
     }
     if("yvar" %in% names(plot_params)){
-      yvar_default <-plot_params$yvar
+      yvar_default <- plot_params$yvar
     }
     
     updateSelectInput(session, "xvar", choices = rval$plot_var, selected = xvar_default)
     updateSelectInput(session, "yvar", choices = rval$plot_var, selected = yvar_default)
+    
   })
   
+  # observe({
+  #   rval_plot$xvar <- input$xvar
+  #   rval_plot$yvar <- input$yvar
+  #   rval_plot$gate <- input$gate
+  #   rval_plot$samples <- input$samples
+  # })
+  
   observe({
-    updateSelectInput(session, "gate", choices = union("root", names(rval$gates_flowCore)), selected = "root")
+    validate(need(rval$gating_set, "no gating set"))
+    updateSelectInput(session, "gate", choices = union("root", getNodes(rval$gating_set)), selected = "root")
   })
   
   observe({
@@ -231,6 +241,7 @@ plotGatingSet <- function(input, output, session, rval, plot_params = reactiveVa
                          input$yridges_var,
                          rval$apply_trans,
                          rval$flow_set,
+                         rval$gating_set,
                          rval$spill,
                          rval$parameters,
                          split_var())
@@ -356,6 +367,6 @@ plotGatingSet <- function(input, output, session, rval, plot_params = reactiveVa
     
   })
   
-  return( plot_focus )
+  return( list(plot = plot_focus, params = input) )
   
 }

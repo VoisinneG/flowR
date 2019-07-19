@@ -97,13 +97,15 @@ transform <- function(input, output, session, rval) {
   plot_params <- reactiveValues()
   
   observe({
+    if(length(input$parameters_table_rows_selected)>0){
     plot_params$xvar <- rval$parameters$name_long[input$parameters_table_rows_selected[1]]
-    if(length(input$parameters_table_row_selected)>1){
-      plot_params$yvar <- rval$parameters$name_long[input$parameters_table_rows_selected[2]]
+      if(length(input$parameters_table_rows_selected)>1){
+        plot_params$yvar <- rval$parameters$name_long[input$parameters_table_rows_selected[2]]
+      }
     }
   })
   
-  plot_trans <- callModule(plotGatingSet, "plot_module", rval, plot_params, simple_plot = TRUE)
+  plot_trans <- callModule(plotGatingSet, "plot_module", rval, plot_params, simple_plot = TRUE)$plot
   
   output$plot_trans <- renderPlot({
     plot_trans()
@@ -265,9 +267,8 @@ transform <- function(input, output, session, rval) {
     df$maxRange <- format(df$maxRange, digits = 2)
     df[["channel_name"]] <- df$name_long
     DT::datatable(
-      df[, c("channel_name", "transform", "transform parameters", "display", "range", "minRange", "maxRange", "name", "desc")], 
+      df[, c("channel_name", "transform", "transform parameters", "display", "range", "minRange", "maxRange", "name", "desc")],
       rownames = FALSE)
-    
   })
   
   output$download_plot <- downloadHandler(

@@ -216,6 +216,6 @@ plotStat <- function(input, output, session, rval) {
   
   
   
-  return( plot_statistics )
+  return( list(plot = plot_statistics) )
   
 }

@@ -114,7 +114,7 @@ compensation <- function(input, output, session, rval) {
     plot_params$yvar <- input$yvar_comp
   })
   
-  plot_comp <- callModule(plotGatingSet, "plot_module", rval, plot_params, simple_plot = TRUE)
+  plot_comp <- callModule(plotGatingSet, "plot_module", rval, plot_params, simple_plot = TRUE)$plot
   
   output$plot_comp <- renderPlot({
     plot_comp()

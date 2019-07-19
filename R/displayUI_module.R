@@ -8,6 +8,8 @@ displayUI <- function(id, module_ui_name, ...){
   # Create a namespace function using the provided id
   ns <- NS(id)
   
+  
+  
   module_ui_function <- function(...){
     do.call(module_ui_name, list(...) )
   }
@@ -28,7 +30,8 @@ displayUI <- function(id, module_ui_name, ...){
                   ),
                   tabPanel("Display",
                            numericInput(ns("nrow_split"), label = "Number of rows", value = 1),
-                           numericInput(ns("row_size"), label = "row size (px)", value = 400)
+                           numericInput(ns("row_size"), label = "plot height (px)", value = 400),
+                           numericInput(ns("col_size"), label = "plot width (px)", value = 400)
                            
                   ),
                   tabPanel("Save",
@@ -58,14 +61,15 @@ displayUI <- function(id, module_ui_name, ...){
 display <- function(input, output, session, rval, module_server_name, ...) {
   
   `%then%` <- shiny:::`%OR%`
-  
-   plot_params <- reactiveValues()
+   
+   
+   rval_plot <- reactiveValues(nrow = 1, ncol = 1)
   
    module_server_function <- function(...){
      do.call(module_server_name, list(...) )
    }
    
-   plist <- callModule(module_server_function, "plot_module", rval, ...)
+   plist <- callModule(module_server_function, "plot_module", rval, ...)$plot
      
    plot_display <- reactive({
 
@@ -75,9 +79,9 @@ display <- function(input, output, session, rval, module_server_name, ...) {
        cat("length\n")
        print(n)
 
-       nrow <- min(n, input$nrow_split)
-       ncol <- ceiling(n/nrow)
-       g <- gridExtra::marrangeGrob(plist(), nrow = nrow, ncol = ncol, top = "")
+       rval_plot$nrow <- min(n, input$nrow_split)
+       rval_plot$ncol <- ceiling(n/rval_plot$nrow)
+       g <- gridExtra::marrangeGrob(plist(), nrow = rval_plot$nrow, ncol = rval_plot$ncol, top = "")
 
        g
      }else{
@@ -92,25 +96,28 @@ display <- function(input, output, session, rval, module_server_name, ...) {
    plot_display()
   })
   
-  plot_height <- reactive({
-    if(class(plist()) == "list"){
-      min(input$nrow_split, length(plist())) * input$row_size + 50
-    }else{
-      input$row_size + 50
-    }
-    #input$row_size
-  })
+  # plot_height <- reactive({
+  #   if(class(plist()) == "list"){
+  #     min(input$nrow_split, length(plist())) * input$row_size + 50
+  #   }else{
+  #     input$row_size + 50
+  #   }
+  #   #input$row_size
+  # })
 
   output$ui_plot <- renderUI({
     ns <- session$ns
-    plotOutput(ns("plot_display"), height = plot_height())
+    div( style = 'overflow-x: scroll',
+         plotOutput(ns("plot_display"), height = rval_plot$nrow*input$row_size, width = rval_plot$ncol*input$col_size)
+    )
+    
 
   })
 
   output$download_plot <- downloadHandler(
     filename = "plot.pdf",
     content = function(file) {
-      pdf(file, width = input$width_plot, height = input$height_plot)
+      pdf(file, width = rval_plot$ncol*input$width_plot, height = rval_plot$nrow*input$height_plot)
       print(plot_display())
       dev.off()
     }
