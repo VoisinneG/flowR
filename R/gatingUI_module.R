@@ -11,6 +11,9 @@ gatingUI <- function(id) {
   fluidRow(
     column(width = 4,
            box(width = NULL, height = NULL, title = "Parameters",
+               actionButton(ns("show_gate"), label = "Show gate"),
+               br(),
+               br(),
                plotGatingSetInput(id = ns("plot_module"), simple_plot = TRUE)
            ),
            tabBox(title = "Gates",
@@ -37,10 +40,7 @@ gatingUI <- function(id) {
            tabBox(title = "",
                   width = NULL, height = NULL,
                   tabPanel(title = "Plot",
-                           plotOutput(ns("plot_gate"),
-                                      brush = ns("plot_brush"),
-                                      click = ns("plot_click"),
-                                      dblclick = ns("plot_dblclick"))
+                           simpleDisplayUI(ns("simple_display_module"))
                   ),
                   tabPanel(title = "Save",
                            numericInput(ns("width_plot"), label = "width", value = 5),
@@ -52,16 +52,10 @@ gatingUI <- function(id) {
                   width = NULL, height = NULL,
                   tabPanel("Tree",
                            plotOutput(ns("tree"))
+                  ),
+                  tabPanel(title = "Gates",
+                           simpleDisplayUI(ns("simple_display_module_2"))
                   )
-                  # tabPanel("Plot gates",
-                  #          plotOutput("plot_gh")),
-                  # tabPanel("Options",
-                  #          numericInput("nrow", label = "Number of rows", value = 2)),
-                  # tabPanel("Save",
-                  #          numericInput("width_plot_gh", label = "width", value = 7),
-                  #          numericInput("height_plot_gh", label = "height", value = 7),
-                  #          downloadButton("download_plot_gh", "Save plot")     
-                  # )
                   
            )
     )
@@ -89,12 +83,18 @@ gating <- function(input, output, session, rval) {
   plot_params <- reactiveValues()
   gate <- reactiveValues()
   
+  
   # observe({
   #   plot_params$xvar <- input$xvar_comp
   #   plot_params$yvar <- input$yvar_comp
   # })
   
-  res <- callModule(plotGatingSet, "plot_module", rval, plot_params, simple_plot = TRUE)
+  res <- callModule(plotGatingSet, "plot_module", rval, plot_params, simple_plot = TRUE, show_gates = TRUE, polygon_gate = gate)
+  res_display <- callModule(simpleDisplay, "simple_display_module", res$plot)
+  plot_all_gates <- callModule(plotGatingHierarchy, "plot_hierarchy_module", rval, plot_params = res$params)
+  callModule(simpleDisplay, "simple_display_module_2", plot_all_gates)
+  
+  # callModule(simpleDisplay, "simple_display_module", res$plot())
   
   output$plot_gate <- renderPlot({
     res$plot()[[1]]
@@ -104,18 +104,20 @@ gating <- function(input, output, session, rval) {
   ##########################################################################################################
   # Observe functions for gating
   
-  observeEvent(input$plot_click, {
+
+  
+  observeEvent(res_display$params$plot_click, {
     
     xvar <- rval$parameters$name[match(res$params$xvar, rval$parameters$name_long)]
     yvar <- rval$parameters$name[match(res$params$yvar, rval$parameters$name_long)]
     
-    gate$x <- c(gate$x, rval$transformation[[xvar]]$inverse(input$plot_click$x))
-    gate$y <- c(gate$y, rval$transformation[[yvar]]$inverse(input$plot_click$y))
+    gate$x <- c(gate$x, rval$transformation[[xvar]]$inverse(res_display$params$plot_click$x))
+    gate$y <- c(gate$y, rval$transformation[[yvar]]$inverse(res_display$params$plot_click$y))
     
   })
   
-  observeEvent(input$plot_brush, {
-    brush <- input$plot_brush
+  observeEvent(res_display$params$plot_brush, {
+    brush <- res_display$params$plot_brush
     
     if (!is.null(brush)) {
       
@@ -130,7 +132,7 @@ gating <- function(input, output, session, rval) {
     }
   })
   
-  observeEvent(input$plot_dblclick, {
+  observeEvent(res_display$params$plot_dblclick, {
     gate$x <- NULL
     gate$y <- NULL
     #cat("dblclick")
@@ -142,6 +144,16 @@ gating <- function(input, output, session, rval) {
     gate$y <- NULL
     rval$gate <- NULL
     session$resetBrush("plot_brush")
+  })
+  
+  observeEvent(res$params$xvar, {
+    gate$x <- NULL
+    gate$y <- NULL
+  })
+  
+  observeEvent(res$params$yvar, {
+    gate$x <- NULL
+    gate$y <- NULL
   })
   
   observeEvent(input$create_gate, {
@@ -162,19 +174,29 @@ gating <- function(input, output, session, rval) {
         polygon <- as.matrix(polygon)
         
         var_names <- c(rval$parameters$name[match(res$params$xvar, rval$parameters$name_long)],
-                       rval$parameters$name[match(res$params$xvar, rval$parameters$name_long)])
+                       rval$parameters$name[match(res$params$yvar, rval$parameters$name_long)])
         names(var_names)<-NULL
         colnames(polygon) <- var_names
         
         poly_gate <- polygonGate(.gate = polygon, filterId=input$gate_name)
         rval$gate <- poly_gate
-        rval$gates_flowCore[[input$gate_name]] <- list(gate = poly_gate, parent = res$params$gate)
+        
+        if(res$params$gate != "root"){
+          gate_name <- paste(res$params$gate, "/", input$gate_name, sep = "")
+        }else{
+          gate_name <- paste("/", input$gate_name, sep = "")
+        }
+          
+        rval$gates_flowCore[[gate_name]] <- list(gate = poly_gate, parent = res$params$gate)
         
         print("add1")
         add(rval$gating_set, poly_gate, parent = res$params$gate)
         recompute(rval$gating_set)
+        print(getNodes(rval$gating_set))
+        print(names(rval$gates_flowCore))
+        print(rval$gates_flowCore)
         
-        updateSelectInput(session, "gate_to_delete", choices = setdiff(getNodes(rval$gating_set), "root"))
+        #updateSelectInput(session, "gate_to_delete", choices = setdiff(getNodes(rval$gating_set), "root"))
 
         gate$x <- NULL
         gate$y <- NULL
@@ -184,10 +206,6 @@ gating <- function(input, output, session, rval) {
     
   })
   
-  
-  observeEvent(input$gate_selected, {
-    rval$gate_focus <- input$gate_selected
-  })
   
   observeEvent(input$delete_gate, {
     if(input$gate_to_delete != "root"){
@@ -202,36 +220,50 @@ gating <- function(input, output, session, rval) {
       recompute(rval$gating_set)
       
       plot_params$gate <- "root"
-      updateSelectInput(session, "gate_to_delete", choices = setdiff(getNodes(rval$gating_set), "root"))
+      
       
     }
     
   })
   
+  observeEvent(rval$gates_flowCore, {
+    validate(need(rval$gates_flowCore, "no gating set"))
+    updateSelectInput(session, "gate_to_delete", choices = names(rval$gates_flowCore), selected = "root")
+  })
+  
   observeEvent(input$show_gate, {
-    if(input$gate_selected != "root"){
-      
+    if(res$params$gate != "root"){
+
       rval$gate <- rval$gates_flowCore[[res$params$gate]]$gate
       gate_params <- names(rval$gate@parameters)
-      
+
       params <- rval$parameters$name_long[match(gate_params, rval$parameters$name)]
 
-      
+
       if(length(params) > 0){
         plot_params$xvar <- params[1]
       }
       if(length(params) > 1){
-        plot_params$xvar <- params[2]
+        plot_params$yvar <- params[2]
       }
+      
+      print(plot_params$gate)
       
       gate$x <- NULL
       gate$y <- NULL
-      
+
       plot_params$gate <- rval$gates_flowCore[[res$params$gate]]$parent
-      
+
     }
-    
-    
+
+  })
+  
+  observe({
+    if(res$params$xvar != "") {
+      plot_params$xvar <- res$params$xvar
+      plot_params$yvar <- res$params$yvar
+      plot_params$gate <- res$params$gate
+    }
   })
   
   ##########################################################################################################
@@ -253,8 +285,11 @@ gating <- function(input, output, session, rval) {
   output$tree <- renderPlot({
     
     validate(
-      need(rval$gating_set, "Empty gating set")
+      need(rval$gates_flowCore, "Empty gating set")
     )
+    
+    print("gates tree")
+    print(getNodes(rval$gating_set))
     
     validate(
       need(length(setdiff(getNodes(rval$gating_set), "root"))>0, "No gates in gating set")
@@ -265,156 +300,6 @@ gating <- function(input, output, session, rval) {
     renderGraph(p)
     
   })
-  
-  # output$plot_gh <- renderPlot({
-  #   plot_all_gates()
-  # })
-  # 
-  # plot_all_gates <- reactive({
-  #   
-  #   validate(
-  #     need(rval$gating_set, "Empty gating set") %then%
-  #       need(length(getNodes(rval$gating_set))>1, "No gates to display") %then%
-  #       need(rval$idx_ff_gate, "Please select a sample")
-  #   )
-  #   
-  #   #cat("sample_selected : \n")
-  #   #print(rval$idx_ff_gate)
-  #   
-  #   axis_labels <- rval$parameters$name_long
-  #   names(axis_labels) <- rval$parameters$name
-  #   
-  #   transformation <- NULL
-  #   if(input$apply_trans){
-  #     transformation <- rval$transformation
-  #   }
-  #   
-  #   data_range <- NULL
-  #   if(input$freeze_limits){
-  #     data_range <- rval$data_range
-  #   }
-  #   
-  #   if(input$color_var_gate %in% rval$parameters$name_long){
-  #     color_var <- rval$parameters$name[match(input$color_var_gate, rval$parameters$name_long)]
-  #   }else{
-  #     color_var <- input$color_var_gate
-  #   }
-  #   
-  #   if(input$plot_type_gate != "histogram"){
-  #     type <- input$plot_type_gate
-  #   }
-  #   
-  #   p <- plot_gh(df = NULL,
-  #                gs = rval$gating_set,
-  #                sample = rval$pdata$name[rval$idx_ff_gate],
-  #                spill = rval$spill,
-  #                transformation = transformation,
-  #                bins = input$bin_number_gate,
-  #                color_var = color_var,
-  #                facet_vars = NULL,
-  #                axis_labels = axis_labels,
-  #                data_range = data_range,
-  #                type = type,
-  #                alpha = input$alpha_gate,
-  #                size = input$size_gate,
-  #                show.legend = FALSE)
-  #   
-  #   n <- length(p)
-  #   
-  #   ncol <- ceiling(n/input$nrow)
-  #   g <- marrangeGrob(p, nrow = input$nrow, ncol = ncol, top = input$sample_selected)
-  #   
-  #   # if(n>2){
-  #   #   ncol <- n%/%input$nrow + n%%input$nrow
-  #   #   ncol <- ceiling(n/input$nrow)
-  #   #   g <- marrangeGrob(p, nrow = input$nrow, ncol = ncol, top = input$sample_selected)
-  #   # }else{
-  #   #   g <- marrangeGrob(p, nrow = 1, ncol = n  , top = input$sample_selected)
-  #   # }
-  #   
-  #   g
-  #   
-  # })
-  
-  
-  # output$plotGate <- renderPlot({
-  #   plotGate()
-  # })
-  # 
-  # plotGate <- reactive({
-  #   
-  #   validate(
-  #     need(rval$gating_set, "Empty gating set") %then%
-  #       need(rval$idx_ff_gate, "Please select a sample") %then%
-  #       need(rval$gate_focus, "Please select a subset")
-  #   )
-  #   
-  #   #print(input$xvar_gate)
-  #   
-  #   idx_x <- match(input$xvar_gate, rval$parameters$name_long)
-  #   idx_y <- match(input$yvar_gate, rval$parameters$name_long)
-  #   
-  #   xvar <- rval$parameters$name[idx_x]
-  #   yvar <- rval$parameters$name[idx_y]
-  #   
-  #   
-  #   data_range <- NULL
-  #   if(input$freeze_limits){
-  #     data_range <- rval$data_range
-  #   }
-  #   
-  #   #print(rval$data_range)
-  #   if(input$color_var_gate %in% rval$parameters$name_long){
-  #     color_var <- rval$parameters$name[match(input$color_var_gate, rval$parameters$name_long)]
-  #   }else{
-  #     color_var <- input$color_var_gate
-  #   }
-  #   
-  #   #color_var <- input$color_var_gate
-  #   
-  #   axis_labels <- rval$parameters$name_long
-  #   names(axis_labels) <- rval$parameters$name
-  #   
-  #   polygon_gate <- data.frame(x = gate$x, y=gate$y)
-  #   
-  #   transformation <- NULL
-  #   if(input$apply_trans){
-  #     transformation <- rval$transformation
-  #   }
-  #   
-  #   p <- plot_gs(df = NULL,
-  #                gs = rval$gating_set, 
-  #                sample = res()$params$samples,
-  #                subset = rval$gate_focus, 
-  #                spill = rval$spill,
-  #                xvar = xvar, 
-  #                yvar = yvar, 
-  #                color_var = color_var, 
-  #                data_range = data_range,
-  #                axis_labels = axis_labels,
-  #                gate = rval$gate,
-  #                polygon_gate = polygon_gate,
-  #                type = input$plot_type_gate, 
-  #                bins = input$bin_number_gate,
-  #                alpha = input$alpha_gate,
-  #                size = input$size_gate,
-  #                norm_density = input$norm_gate,
-  #                smooth = input$smooth_gate,
-  #                transformation = transformation,
-  #                show.legend = input$legend_gate)
-  #   
-  #   if(!is.null(p)){
-  #     p <- p + xlab(input$xvar_gate)
-  #     if(input$plot_type_gate != "histogram"){
-  #       p <- p + ylab(input$yvar_gate)
-  #     }
-  #   }
-  #   
-  #   
-  #   
-  #   p
-  #   
-  # })
   
   ##########################################################################################################
   #Output Download functions

@@ -3,6 +3,9 @@
 #' @param id shiny id
 #' @importFrom shinydashboard box tabBox
 #' @import shiny
+#' @import plotly
+#' @import heatmaply
+#' @import scales
 #' @import DT
 compensationUI <- function(id) {
   # Create a namespace function using the provided id
@@ -14,7 +17,7 @@ compensationUI <- function(id) {
              tabBox(title = "",
                     width = NULL, height = NULL,
                     tabPanel(title = "Heatmap",
-                             plotlyOutput(ns("heatmap_spill"))
+                             plotly::plotlyOutput(ns("heatmap_spill"))
                     ),
                     tabPanel("Set",
                              selectInput(ns("xvar_comp"), label = "column (chanel)", choices = NULL, selected = NULL),
@@ -74,15 +77,10 @@ compensationUI <- function(id) {
            tabBox(title = "",
                   width = NULL, height = NULL,
                   tabPanel(title = "Plot",
-                           plotOutput(ns("plot_comp"))
+                           simpleDisplayUI(ns("simple_display_module"))
                   ),
                   tabPanel(title = "Parameters",
                            plotGatingSetInput(id = ns("plot_module"), simple_plot = TRUE)
-                  ),
-                  tabPanel(title = "Save",
-                           numericInput(ns("width_plot"), label = "width", value = 5),
-                           numericInput(ns("height_plot"), label = "height", value = 5),
-                           downloadButton(ns("download_plot"), "Save plot")
                   )
            )
            
@@ -114,10 +112,11 @@ compensation <- function(input, output, session, rval) {
     plot_params$yvar <- input$yvar_comp
   })
   
-  plot_comp <- callModule(plotGatingSet, "plot_module", rval, plot_params, simple_plot = TRUE)$plot
+  res <- callModule(plotGatingSet, "plot_module", rval, plot_params, simple_plot = TRUE)
+  callModule(simpleDisplay, "simple_display_module", res$plot)
   
   output$plot_comp <- renderPlot({
-    plot_comp()
+    res$plot()[[1]]
   })
 
   ##########################################################################################################
@@ -232,10 +231,10 @@ compensation <- function(input, output, session, rval) {
                   "space" = " ")
     
     rval$df_spill_imported <- read.table(file = input$spill_file$datapath, 
-                                         sep = sep, 
-                                         fill = TRUE, 
-                                         quote = "\"", 
-                                         header = TRUE, 
+                                         sep = sep,
+                                         fill = TRUE,
+                                         quote = "\"",
+                                         header = TRUE,
                                          check.names = FALSE)
     
   })
@@ -347,7 +346,7 @@ compensation <- function(input, output, session, rval) {
     format(df, digits =3)
   })
   
-  output$heatmap_spill <- renderPlotly({
+  output$heatmap_spill <- plotly::renderPlotly({
     
     validate(
       need(rval$df_spill, "No spillover matrix")
@@ -356,25 +355,31 @@ compensation <- function(input, output, session, rval) {
     df <- rval$df_spill
     df[df == 0] <- NA
     df_log <- log10(df)
-    p <- heatmaply(df,
+    
+    print(df)
+    
+    p <- heatmaply::heatmaply(df_log,
                    #colors = c(rgb(1,1,1), rgb(1,0,0)),
-                   #colors= viridis,
-                   plot_method="ggplot",
-                   scale_fill_gradient_fun = scale_fill_viridis(trans = log10_trans(), name = "spillover"),
+                   colors= viridis,
+                   plot_method="plotly",
+                   #scale_fill_gradient_fun = scale_fill_viridis(trans = scales::log10_trans(), name = "spillover"),
                    Rowv = NULL,
                    Colv = NULL,
                    column_text_angle = 90,
                    xlab = "detection chanel",
                    ylab = "emitting fluorophore",
-                   fontsize_row = 6,
-                   fontsize_col = 6,
+                   fontsize_row = 10,
+                   fontsize_col = 10,
                    cellnote_size = 6,
                    hide_colorbar = TRUE,
                    main = "spillover matrix",
+                   custom_hovertext = df,
                    margins = c(50, 50, 50, 0)
     )
     p$x$source <- "select_heatmap"
+    
     p
+    
   })
   
   output$download_spill <- downloadHandler(

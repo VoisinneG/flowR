@@ -47,21 +47,6 @@ flowR_ui <- function() {
       tabItem(tabName = "Save_tab",
               saveWorkspaceUI(id = "save_module")
       )
-      #         fluidRow(
-      #           column(width = 6,
-      #                  tabBox(title = "",
-      #                         width = NULL, height = NULL,
-      #                         tabPanel("Gating set",
-      #                                  selectInput("export_format",
-      #                                              label = "format",
-      #                                              choices = c("Cytobank", "FlowJo"),
-      #                                              selected = "FlowJo"),
-      #                                  downloadButton("export_gating_set", "Export")
-      #                         )
-      #                  )
-      #           )
-      #         )
-      # )
     )
     
   )

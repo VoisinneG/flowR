@@ -94,9 +94,16 @@ plotGatingSetInput <- function(id, simple_plot = TRUE) {
 #' @import DT
 #' @export
 #' @rdname plotGatingSetInput
-plotGatingSet <- function(input, output, session, rval, plot_params = reactiveValues(), simple_plot = TRUE) {
+plotGatingSet <- function(input, output, session, 
+                          rval, 
+                          plot_params = reactiveValues(), 
+                          simple_plot = TRUE, 
+                          show_gates = FALSE,
+                          polygon_gate = NULL) {
   
   `%then%` <- shiny:::`%OR%`
+  
+  #ns <- session$ns
   
   rval_plot <- reactiveValues()
   
@@ -176,7 +183,7 @@ plotGatingSet <- function(input, output, session, rval, plot_params = reactiveVa
     yvar_default <- rval$plot_var[2]
     
     if("xvar" %in% names(plot_params)){
-      xvar_default <-plot_params$xvar
+      xvar_default <- plot_params$xvar
     }
     if("yvar" %in% names(plot_params)){
       yvar_default <- plot_params$yvar
@@ -195,8 +202,14 @@ plotGatingSet <- function(input, output, session, rval, plot_params = reactiveVa
   # })
   
   observe({
-    validate(need(rval$gating_set, "no gating set"))
-    updateSelectInput(session, "gate", choices = union("root", getNodes(rval$gating_set)), selected = "root")
+    validate(need(rval$gates_flowCore, "no gating set"))
+    updateSelectInput(session, "gate", choices = union("root", names(rval$gates_flowCore)), selected = "root")
+  })
+  
+  observe({
+    if("gate" %in% names(plot_params)){
+      updateSelectInput(session, "gate", choices = union("root", names(rval$gates_flowCore)), selected = plot_params$gate)
+    }
   })
   
   observe({
@@ -248,7 +261,12 @@ plotGatingSet <- function(input, output, session, rval, plot_params = reactiveVa
       if(rval$apply_trans){
         update_params <- c(update_params, rval$transformation)
       }
-      
+      if(show_gates){
+        update_params <- c(update_params, 
+                           rval$gates_flowCore,
+                           polygon_gate$x)
+      }
+      update_params
     }
   })
   
@@ -277,14 +295,21 @@ plotGatingSet <- function(input, output, session, rval, plot_params = reactiveVa
     validate(
         need(rval$gating_set, "Empty gating set") %then%
         need(input$samples, "Please select samples") %then%
-        need(input$gate, "Please select subsets")
+        need(input$gate, "Please select subsets")  %then%
+        need(input$xvar, "Please select a x-axis variable")  %then%
+        need(input$yvar, "Please select a y-axis variable")
     )
     
+    print("gates print")
+    print(getNodes(rval$gating_set))
+    print(names(rval$gates_flowCore))
     
     idx_x <- match(input$xvar, rval$parameters$name_long)
     idx_y <- match(input$yvar, rval$parameters$name_long)
     xvar <- rval$parameters$name[idx_x]
     yvar <- rval$parameters$name[idx_y]
+    
+    
     
     color_var <- input$color_var
     if(!is.null(input$color_var)){
@@ -328,6 +353,16 @@ plotGatingSet <- function(input, output, session, rval, plot_params = reactiveVa
         yvar_int <- yvar[i]
       }
 
+      gate <- NULL
+      
+      if(show_gates){
+        gate <- setdiff(names(rval$gates_flowCore), "root")
+          # gates_non_root <- setdiff(getNodes(rval$gating_set), "root")
+          # if(length(gates_non_root)>0){
+          #   gate <- gates_non_root
+          # }
+      }
+      
       p <- plot_gs(df = update_data_plot_focus(),
                    gs = rval$gating_set, 
                    sample = input$samples,
@@ -336,7 +371,8 @@ plotGatingSet <- function(input, output, session, rval, plot_params = reactiveVa
                    xvar = xvar_int, 
                    yvar = yvar_int, 
                    color_var = color_var_int, 
-                   #gate = NULL, 
+                   gate = gate, 
+                   polygon_gate = polygon_gate,
                    type = input$plot_type, 
                    bins = input$bin_number,
                    alpha = input$alpha,

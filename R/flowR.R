@@ -556,7 +556,7 @@ add_columns_from_metadata <- function(df,
 #' @import scales
 plot_gs <- function(df = NULL,
                     gs = NULL, 
-                    sample, 
+                    sample,
                     subset,
                     xvar = NULL,
                     yvar = NULL,
@@ -842,9 +842,12 @@ plot_gs <- function(df = NULL,
     for(j in 1:length(gate)){
       
       gate_int <- gate[[j]]
+      print(gate_int)
       
       if(class(gate_int) == "polygonGate" ){
-        polygon <- as.data.frame(gate_int@boundaries)
+        if(length(unique(colnames(gate_int@boundaries)))>1){
+          polygon <- as.data.frame(gate_int@boundaries)
+        }
       }else if(class(gate_int) == "rectangleGate"){
         idx_x <- match(xvar, names(gate_int@min))
         idx_y <- match(yvar, names(gate_int@min))
@@ -924,21 +927,24 @@ plot_gs <- function(df = NULL,
     if(!is.null(polygon_gate$x)){
       polygon <- data.frame(x = polygon_gate$x, y = polygon_gate$y)
       polygon <- rbind(polygon, polygon[1,])
-      names(polygon) <- c(xvar, yvar)
+      if(xvar != yvar){
+        names(polygon) <- c(xvar, yvar)
+        
+        # if(!is.null(data_range)){
+        #   xlim <- range(c(data_range[[xvar]], polygon[,1]))
+        #   ylim <- range(c(data_range[[yvar]], polygon[,2]))
+        # }
+        
+        xlim <- range(c(xlim, polygon[,1]))
+        ylim <- range(c(ylim, polygon[,2]))
+        
+        p <- p +
+          geom_path(data = polygon, color = "red") +
+          geom_polygon(data=polygon,
+                       fill="red",
+                       alpha=0.05) 
+      }
       
-      # if(!is.null(data_range)){
-      #   xlim <- range(c(data_range[[xvar]], polygon[,1]))
-      #   ylim <- range(c(data_range[[yvar]], polygon[,2]))
-      # }
-      
-      xlim <- range(c(xlim, polygon[,1]))
-      ylim <- range(c(ylim, polygon[,2]))
-      
-      p <- p +
-        geom_path(data = polygon, color = "red") +
-        geom_polygon(data=polygon,
-                     fill="red",
-                     alpha=0.05) 
     }
     
     

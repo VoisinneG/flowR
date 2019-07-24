@@ -36,15 +36,10 @@ transformUI <- function(id) {
            tabBox(title = "",
                width = NULL, height = NULL,
                tabPanel(title = "Plot",
-                 plotOutput(ns("plot_trans"))
+                  simpleDisplayUI(ns("simple_display_module"))
                ),
                tabPanel(title = "Parameters",
                  plotGatingSetInput(id = ns("plot_module"), simple_plot = TRUE)
-               ),
-               tabPanel(title = "Save",
-                        numericInput(ns("width_plot"), label = "width", value = 5),
-                        numericInput(ns("height_plot"), label = "height", value = 5),
-                        downloadButton(ns("download_plot"), "Save plot")
                )
            )
     )
@@ -105,11 +100,11 @@ transform <- function(input, output, session, rval) {
     }
   })
   
-  plot_trans <- callModule(plotGatingSet, "plot_module", rval, plot_params, simple_plot = TRUE)$plot
   
-  output$plot_trans <- renderPlot({
-    plot_trans()
-  })
+  
+  res <- callModule(plotGatingSet, "plot_module", rval, plot_params, simple_plot = TRUE)
+  callModule(simpleDisplay, "simple_display_module", res$plot)
+  
 
   #get parameters information from flow set
   observe({
@@ -271,14 +266,14 @@ transform <- function(input, output, session, rval) {
       rownames = FALSE)
   })
   
-  output$download_plot <- downloadHandler(
-    filename = "plot.pdf",
-    content = function(file) {
-      pdf(file, width = input$width_plot, height = input$height_plot)
-      print(plot_trans())
-      dev.off()
-    }
-  )
+  # output$download_plot <- downloadHandler(
+  #   filename = "plot.pdf",
+  #   content = function(file) {
+  #     pdf(file, width = input$width_plot, height = input$height_plot)
+  #     print(plot_trans())
+  #     dev.off()
+  #   }
+  # )
   
   return(rval)
   

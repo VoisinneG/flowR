@@ -8,7 +8,8 @@
 plotGatingSetInput(id, simple_plot = TRUE)
 
 plotGatingSet(input, output, session, rval,
-  plot_params = reactiveValues(), simple_plot = TRUE)
+  plot_params = reactiveValues(), simple_plot = TRUE,
+  show_gates = FALSE, polygon_gate = NULL)
 }
 \arguments{
 \item{id}{shiny id}
