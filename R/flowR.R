@@ -998,9 +998,9 @@ plot_gs <- function(df = NULL,
 #' @import flowWorkspace
 plot_gh <- function(df = NULL, gs, sample, spill = NULL, ...){
   
-  if(length(sample) != 1){
-    stop("length of idx must be equal to 1")
-  }
+  # if(length(sample) != 1){
+  #   stop("length of idx must be equal to 1")
+  # }
   
   if(is.null(df)){
     
@@ -1013,7 +1013,7 @@ plot_gh <- function(df = NULL, gs, sample, spill = NULL, ...){
   
   idx <- match(sample, pData(gs)$name)
   
-  child_nodes <- getChildren(gs[[idx]], "root")
+  child_nodes <- getChildren(gs[[idx[1]]], "root")
   plist <- list()
   count <- 0
   
@@ -1022,7 +1022,7 @@ plot_gh <- function(df = NULL, gs, sample, spill = NULL, ...){
     
     child_nodes_int <- NULL
     nodes_to_plot <- child_nodes
-    all_parents <- sapply(nodes_to_plot, function(x){getParent(gs[[idx]], x)})
+    all_parents <- sapply(nodes_to_plot, function(x){getParent(gs[[idx[1]]], x)})
     names(all_parents) <- NULL
     #print(all_parents)
     
@@ -1040,7 +1040,7 @@ plot_gh <- function(df = NULL, gs, sample, spill = NULL, ...){
           par_nodes <- lapply(nodes_to_plot_parent, function(x){
             
             #print(x)
-            g <- getGate(gs[[idx]], x)
+            g <- getGate(gs[[idx[1]]], x)
             
             if(class(g) %in% c("rectangleGate", "polygonGate")){
               try(colnames(g@boundaries), silent = TRUE)

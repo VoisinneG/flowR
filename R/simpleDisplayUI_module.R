@@ -49,7 +49,7 @@ simpleDisplayUI <- function(id){
 #' @import DT
 #' @export
 #' @rdname simpleDisplayUI
-simpleDisplay <- function(input, output, session, plist) {
+simpleDisplay <- function(input, output, session, plist, gate = reactiveValues()) {
   
   `%then%` <- shiny:::`%OR%`
   
@@ -102,6 +102,14 @@ simpleDisplay <- function(input, output, session, plist) {
 
   })
 
+  observeEvent(gate, {
+    if( is.null(gate$x) & is.null(gate$y) ){
+      session$resetBrush("plot_brush")
+    }
+    
+   
+  })
+  
   output$download_plot <- downloadHandler(
     filename = "plot.pdf",
     content = function(file) {

@@ -90,7 +90,7 @@ gating <- function(input, output, session, rval) {
   # })
   
   res <- callModule(plotGatingSet, "plot_module", rval, plot_params, simple_plot = TRUE, show_gates = TRUE, polygon_gate = gate)
-  res_display <- callModule(simpleDisplay, "simple_display_module", res$plot)
+  res_display <- callModule(simpleDisplay, "simple_display_module", res$plot, gate = gate)
   plot_all_gates <- callModule(plotGatingHierarchy, "plot_hierarchy_module", rval, plot_params = res$params)
   callModule(simpleDisplay, "simple_display_module_2", plot_all_gates)
   
@@ -127,7 +127,7 @@ gating <- function(input, output, session, rval) {
       gate$x <- rval$transformation[[xvar]]$inverse(c(brush$xmin, brush$xmax, brush$xmax, brush$xmin))
       gate$y <- rval$transformation[[yvar]]$inverse(c(brush$ymin, brush$ymin, brush$ymax, brush$ymax))
       
-      session$resetBrush("plot_brush")
+      #session$resetBrush("plot_brush")
       
     }
   })
@@ -136,14 +136,14 @@ gating <- function(input, output, session, rval) {
     gate$x <- NULL
     gate$y <- NULL
     #cat("dblclick")
-    session$resetBrush("plot_brush")
+    #session$resetBrush("plot_brush")
   })
   
   observeEvent(input$reset_gate, {
     gate$x <- NULL
     gate$y <- NULL
     rval$gate <- NULL
-    session$resetBrush("plot_brush")
+    #session$resetBrush("plot_brush")
   })
   
   observeEvent(res$params$xvar, {

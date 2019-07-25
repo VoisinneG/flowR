@@ -12,6 +12,9 @@ dimRedUI <- function(id) {
     column(width = 6,
            tabBox(title = "",
                   width = NULL, height = NULL,
+                  tabPanel("Sample/Subset",
+                           selectionInput(ns("selection_module"), multiple_subset = TRUE)
+                  ),
                   tabPanel("Variables",
                            div(style = 'overflow-x: scroll', DT::dataTableOutput(ns("variables_table")))
                   ),
@@ -58,6 +61,8 @@ dimRed <- function(input, output, session, rval) {
   
   `%then%` <- shiny:::`%OR%`
   
+  selected <- callModule(selection, "selection_module", rval)
+  
   ##########################################################################################################
   # Observe functions for t-SNE
   
@@ -76,6 +81,33 @@ dimRed <- function(input, output, session, rval) {
       need(rval$flow_set, "Empty flow set")
     )
 
+    if( length(selected$samples) ==0 ){
+      showModal(modalDialog(
+        title = "No sample selected",
+        paste("Please select samples before proceeding", sep=""),
+        easyClose = TRUE,
+        footer = NULL
+      ))
+    }
+    
+    validate(
+      need(length(selected$samples)>0, "No sample selected")
+    )
+    
+    #print(input$gate_sub_sample)
+    
+    if( nchar(selected$gate) == 0 ){
+      showModal(modalDialog(
+        title = "No subset selected",
+        paste("Please select a subset before proceeding", sep=""),
+        easyClose = TRUE,
+        footer = NULL
+      ))
+    }
+    
+    validate(
+      need(selected$gate, "No subset selected")
+    )
 
     if( length(input$variables_table_rows_selected)==0){
       showModal(modalDialog(
@@ -112,20 +144,21 @@ dimRed <- function(input, output, session, rval) {
     progress$set(message = "Getting data...", value = 0)
 
     df_raw <- get_data_gs(gs = rval$gating_set,
-                          sample = pData(rval$gating_set)$name,
-                          subset = "root",
+                          sample = selected$samples,
+                          subset = selected$gate,
                           spill = rval$spill,
                           Ncells = NULL,
                           return_comp_data = FALSE,
                           updateProgress = updateProgress)
 
     rval$df_dim_red <- get_data_gs(gs = rval$gating_set,
-                                sample = pData(rval$gating_set)$name,
-                                subset = "root",
-                                spill = rval$spill,
-                                Ncells = NULL,
-                                return_comp_data = TRUE,
-                                updateProgress = updateProgress)
+                                   sample = selected$samples,
+                                   subset = selected$gate,
+                                   spill = rval$spill,
+                                   Ncells = NULL,
+                                   return_comp_data = TRUE,
+                                   updateProgress = updateProgress)
+                                
 
     print(dim(rval$df_dim_red))
 

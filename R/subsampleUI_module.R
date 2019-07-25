@@ -12,15 +12,8 @@ subsampleUI <- function(id) {
     column(width = 6,
            tabBox(title = "",
                   width = NULL, height = NULL,
-                  tabPanel("Samples",
-                           div(style = 'overflow-x: scroll', DT::dataTableOutput(ns("sub_sample_table")))
-                  ),
-                  tabPanel("Subset",
-                           selectizeInput(ns("gate_sub_sample"), 
-                                          label = "subset", 
-                                          choices = "root", 
-                                          selected = "root",
-                                          multiple = TRUE)
+                  tabPanel("Sample/Subset",
+                    selectionInput(ns("selection_module"), multiple_subset = TRUE)
                   ),
                   tabPanel("Compute",
                            numericInput(ns("ncells_per_sample"), "Number of cells / subset / sample", 1000),
@@ -60,10 +53,15 @@ subsample <- function(input, output, session, rval) {
   
   `%then%` <- shiny:::`%OR%`
   
+  selected <- callModule(selection, "selection_module", rval)
+  
   ##########################################################################################################
   # Observe functions for sub-sampling
   
   observeEvent(input$compute_data, {
+    
+    print("selected")
+    print(selected$samples)
     
     # Create a Progress object
     progress <- shiny::Progress$new(min = 0, max = 100)
@@ -74,7 +72,7 @@ subsample <- function(input, output, session, rval) {
     }
     
     
-    if( length(input$sub_sample_table_rows_selected)==0){
+    if( length(selected$samples) ==0 ){
       showModal(modalDialog(
         title = "No sample selected",
         paste("Please select samples before proceeding", sep=""),
@@ -84,12 +82,12 @@ subsample <- function(input, output, session, rval) {
     }
     
     validate(
-      need(length(input$sub_sample_table_rows_selected)>0, "No sample selected")
+      need(length(selected$samples)>0, "No sample selected")
     )
     
     #print(input$gate_sub_sample)
     
-    if( nchar(input$gate_sub_sample) == 0 ){
+    if( nchar(selected$gate) == 0 ){
       showModal(modalDialog(
         title = "No subset selected",
         paste("Please select a subset before proceeding", sep=""),
@@ -99,14 +97,14 @@ subsample <- function(input, output, session, rval) {
     }
     
     validate(
-      need(input$gate_sub_sample, "No subset selected")
+      need(selected$gate, "No subset selected")
     )
     
-    sample = rval$pdata$name[input$sub_sample_table_rows_selected]
+    #sample = rval$pdata$name[input$sub_sample_table_rows_selected]
     
     rval$df_sample <- get_data_gs(gs = rval$gating_set,
-                                  sample = sample, 
-                                  subset = input$gate_sub_sample,
+                                  sample = selected$samples, 
+                                  subset = selected$gate,
                                   spill = rval$spill,
                                   Ncells = input$ncells_per_sample,
                                   return_comp_data = FALSE,

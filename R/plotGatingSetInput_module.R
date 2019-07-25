@@ -18,17 +18,18 @@ plotGatingSetInput <- function(id, simple_plot = TRUE) {
     },
     box(collapsible = TRUE, collapsed = TRUE, width = NULL, height = NULL,
         title = "Sample/Subset",
-        checkboxInput(ns("all_samples"), "Select all samples", FALSE),
-        selectizeInput(ns("samples"), 
-                       label = "samples",
-                       choices = NULL,
-                       selected = NULL,
-                       multiple = TRUE),
-        selectizeInput(ns("gate"), 
-                       label = "subset",
-                       choices = "root",
-                       selected = "root",
-                       multiple = !simple_plot)
+        selectionInput(ns("selection_module"), multiple_subset = !simple_plot)
+        # checkboxInput(ns("all_samples"), "Select all samples", FALSE),
+        # selectizeInput(ns("samples"), 
+        #                label = "samples",
+        #                choices = NULL,
+        #                selected = NULL,
+        #                multiple = TRUE),
+        # selectizeInput(ns("gate"), 
+        #                label = "subset",
+        #                choices = "root",
+        #                selected = "root",
+        #                multiple = !simple_plot)
     ),
     box(collapsible = TRUE, collapsed = FALSE, width = NULL, height = NULL,
         title ="Variables",
@@ -102,10 +103,19 @@ plotGatingSet <- function(input, output, session,
                           polygon_gate = NULL) {
   
   `%then%` <- shiny:::`%OR%`
-  
   #ns <- session$ns
   
   rval_plot <- reactiveValues()
+  
+  selected <- callModule(selection, "selection_module", rval)
+  
+  observe({
+    for(var in names(input)){
+      rval_plot[[var]] <- input[[var]]
+    }
+    rval_plot$gate <- selected$gate
+    rval_plot$samples <- selected$samples
+  })
   
   output$histo_options <- renderUI({
     
@@ -201,24 +211,24 @@ plotGatingSet <- function(input, output, session,
   #   rval_plot$samples <- input$samples
   # })
   
-  observe({
-    validate(need(rval$gates_flowCore, "no gating set"))
-    updateSelectInput(session, "gate", choices = union("root", names(rval$gates_flowCore)), selected = "root")
-  })
-  
-  observe({
-    if("gate" %in% names(plot_params)){
-      updateSelectInput(session, "gate", choices = union("root", names(rval$gates_flowCore)), selected = plot_params$gate)
-    }
-  })
-  
-  observe({
-    updateSelectInput(session, "samples", choices = rval$pdata$name, selected = rval$pdata$name[1])
-  })
-  
-  observeEvent(input$all_samples, {
-    updateSelectInput(session, "samples", choices = rval$pdata$name, selected = rval$pdata$name)
-  })
+  # observe({
+  #   validate(need(rval$gates_flowCore, "no gating set"))
+  #   updateSelectInput(session, "gate", choices = union("root", names(rval$gates_flowCore)), selected = "root")
+  # })
+  # 
+  # observe({
+  #   if("gate" %in% names(plot_params)){
+  #     updateSelectInput(session, "gate", choices = union("root", names(rval$gates_flowCore)), selected = plot_params$gate)
+  #   }
+  # })
+  # 
+  # observe({
+  #   updateSelectInput(session, "samples", choices = rval$pdata$name, selected = rval$pdata$name[1])
+  # })
+  # 
+  # observeEvent(input$all_samples, {
+  #   updateSelectInput(session, "samples", choices = rval$pdata$name, selected = rval$pdata$name)
+  # })
   
   split_var <- reactive({
     if(!simple_plot){
@@ -240,8 +250,8 @@ plotGatingSet <- function(input, output, session,
       update_params <- c(input$xvar,
                          input$yvar,
                          input$color_var,
-                         input$samples,
-                         input$gate,
+                         selected$samples,
+                         selected$gate,
                          input$plot_type,
                          input$legend,
                          input$legend_pos,
@@ -277,14 +287,14 @@ plotGatingSet <- function(input, output, session,
   data_plot_focus <- reactive({
     validate(
       need(rval$gating_set, "Empty gating set") %then%
-        need(input$samples, "Please select samples") %then%
-        need(input$gate, "Please select subsets")
+        need(selected$samples, "Please select samples") %then%
+        need(selected$gate, "Please select subsets")
     )
     
     print("get data plot_focus")
     df <- get_data_gs(gs = rval$gating_set,
-                      sample = input$samples,
-                      subset = input$gate,
+                      sample = selected$samples,
+                      subset = selected$gate,
                       spill = rval$spill)
     return(df)
     
@@ -294,8 +304,8 @@ plotGatingSet <- function(input, output, session,
     
     validate(
         need(rval$gating_set, "Empty gating set") %then%
-        need(input$samples, "Please select samples") %then%
-        need(input$gate, "Please select subsets")  %then%
+        need(selected$samples, "Please select samples") %then%
+        need(selected$gate, "Please select subsets")  %then%
         need(input$xvar, "Please select a x-axis variable")  %then%
         need(input$yvar, "Please select a y-axis variable")
     )
@@ -365,8 +375,8 @@ plotGatingSet <- function(input, output, session,
       
       p <- plot_gs(df = update_data_plot_focus(),
                    gs = rval$gating_set, 
-                   sample = input$samples,
-                   subset = input$gate, 
+                   sample = selected$samples,
+                   subset = selected$gate, 
                    spill = rval$spill,
                    xvar = xvar_int, 
                    yvar = yvar_int, 
@@ -403,6 +413,6 @@ plotGatingSet <- function(input, output, session,
     
   })
   
-  return( list(plot = plot_focus, params = input) )
+  return( list(plot = plot_focus, params = rval_plot) )
   
 }
