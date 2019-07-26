@@ -687,6 +687,7 @@ plot_gs <- function(df = NULL,
   
   if(is.null(metadata) & !is.null(gs)){
     metadata <- pData(gs)
+   
   }
   
   if(!is.null(metadata)){
@@ -698,10 +699,7 @@ plot_gs <- function(df = NULL,
                                     #yridges_var = yridges_var
                                     )
   }
- 
-  #print(names(df))
     
-  
   xlim <- range(df[[xvar]])
   ylim <- range(df[[yvar]])
   if(!is.null(data_range)){

@@ -12,6 +12,9 @@ clusterUI <- function(id) {
       column(width = 6,
              tabBox(title = "",
                     width = NULL, height = NULL,
+                    tabPanel("Sample/Subset",
+                             selectionInput(ns("selection_module"), multiple_subset = TRUE)
+                    ),
                     tabPanel("Variables",
                              div(style = 'overflow-x: scroll', DT::dataTableOutput(ns("clustering_variables_table")))
                     ),
@@ -53,6 +56,8 @@ cluster <- function(input, output, session, rval) {
   
   `%then%` <- shiny:::`%OR%`
   
+  selected <- callModule(selection, "selection_module", rval)
+  
   ##########################################################################################################
   # Observe functions for t-SNE
   
@@ -75,6 +80,33 @@ cluster <- function(input, output, session, rval) {
       need(rval$flow_set, "Empty flow set")
     )
     
+    if( length(selected$samples) ==0 ){
+      showModal(modalDialog(
+        title = "No sample selected",
+        paste("Please select samples before proceeding", sep=""),
+        easyClose = TRUE,
+        footer = NULL
+      ))
+    }
+    
+    validate(
+      need(length(selected$samples)>0, "No sample selected")
+    )
+    
+    #print(input$gate_sub_sample)
+    
+    if( nchar(selected$gate) == 0 ){
+      showModal(modalDialog(
+        title = "No subset selected",
+        paste("Please select a subset before proceeding", sep=""),
+        easyClose = TRUE,
+        footer = NULL
+      ))
+    }
+    
+    validate(
+      need(selected$gate, "No subset selected")
+    )
     
     if( length(input$clustering_variables_table_rows_selected)==0){
       showModal(modalDialog(
@@ -111,16 +143,16 @@ cluster <- function(input, output, session, rval) {
     progress$set(message = "Clustering...", value = 0)
     
     df_raw <- get_data_gs(gs = rval$gating_set,
-                          sample = pData(rval$gating_set)$name, 
-                          subset = "root",
+                          sample = selected$samples,
+                          subset = selected$gate,
                           spill = rval$spill,
                           return_comp_data = FALSE,
                           Ncells = NULL,
                           updateProgress = updateProgress)
     
     rval$df_cluster <- get_data_gs(gs = rval$gating_set,
-                                   sample = pData(rval$gating_set)$name, 
-                                   subset = "root",
+                                   sample = selected$samples,
+                                   subset = selected$gate,
                                    spill = rval$spill,
                                    return_comp_data = TRUE,
                                    Ncells = NULL,

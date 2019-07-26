@@ -70,8 +70,10 @@ selection <- function(input, output, session, rval, params = reactiveValues()) {
     updateSelectInput(session, "samples", choices = rval$pdata$name, selected = rval$pdata$name[1])
   })
   
-  observeEvent(input$all_samples, {
-    updateSelectInput(session, "samples", choices = rval$pdata$name, selected = rval$pdata$name)
+  observe({
+    if(input$all_samples){
+      updateSelectInput(session, "samples", choices = rval$pdata$name, selected = rval$pdata$name)
+    }
   })
   
   

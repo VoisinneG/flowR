@@ -14,7 +14,7 @@
 #' @import sp
 #' @import viridis
 #' @export
-flowR_server <- function(session, input, output) {
+flowR_server <- function(session, input, output, user_module_name = NULL) {
   
   `%then%` <- shiny:::`%OR%`
   
@@ -55,6 +55,17 @@ flowR_server <- function(session, input, output) {
   # save module
   callModule(saveWorkspace, "save_module", rval)
     
+  
+  ##########################################################################################################
+  # Add user-defined module
+  module_server_function <- function(...){
+    do.call(user_module_name, list(...) )
+  }
+  
+  if(!is.null(user_module_name)){
+   rval <- callModule(module_server_function, "user_module", rval)
+  }
+ 
   ##########################################################################################################
   # General controls
   

@@ -3,7 +3,17 @@
 #' @import DT
 #' @import plotly
 #' @export
-flowR_ui <- function() {
+flowR_ui <- function(user_module_name = "cluster") {
+  
+  module_ui_name <- paste(user_module_name, "UI", sep = "")
+  
+  if(!is.null(user_module_name)){
+    module_ui_function <- function(...){
+      do.call(module_ui_name, list(...) )
+    }
+  }
+  
+  
   
   body <- dashboardBody(
     
@@ -38,12 +48,18 @@ flowR_ui <- function() {
       tabItem(tabName = "Sub_tab",
               subsampleUI(id = "subsample_module")
       ),
-      tabItem(tabName = "TSNE_tab",
+      tabItem(tabName = "Dim_red_tab",
               dimRedUI(id = "dim_reduction_module")
       ),
       tabItem(tabName = "Cluster_tab",
               clusterUI(id = "cluster_module")
       ),
+      if(!is.null(user_module_name)){
+        tabItem(tabName = "user_module_tab",
+                module_ui_function(id = "user_module") )
+      }else{
+        tabItem(tabName = "user_module_tab", br())
+      },
       tabItem(tabName = "Save_tab",
               saveWorkspaceUI(id = "save_module")
       )
@@ -85,8 +101,8 @@ flowR_ui <- function() {
                          startExpanded = FALSE,
                          icon = icon("check-circle")
                 ),
-                menuItem("t-SNE",
-                         tabName = "TSNE_tab",
+                menuItem("Dim. reduction",
+                         tabName = "Dim_red_tab",
                          startExpanded = FALSE,
                          icon = icon("check-circle")
                 ),
@@ -105,6 +121,13 @@ flowR_ui <- function() {
                          startExpanded = FALSE,
                          icon = icon("check-circle")
                 ),
+                if(!is.null(user_module_name)){
+                  menuItem(user_module_name,
+                           tabName = "user_module_tab", 
+                           startExpanded = FALSE,
+                           icon = icon("check-circle")
+                  )
+                },
                 menuItem("Save",
                          tabName = "Save_tab", 
                          startExpanded = FALSE,

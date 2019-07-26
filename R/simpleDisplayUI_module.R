@@ -55,12 +55,16 @@ simpleDisplay <- function(input, output, session, plist, gate = reactiveValues()
   
   rval_plot <- reactiveValues(nrow = 1, ncol = 1)
   
+  plot_list <- reactive({
+    plist()
+  })
+    
   plot_display <- reactive({
     
      print("plot_display")
 
-     if(class(plist()) == "list"){
-       n <- length(plist())
+     if(class(plot_list()) == "list"){
+       n <- length(plot_list())
 
        cat("length\n")
        print(n)
@@ -68,14 +72,14 @@ simpleDisplay <- function(input, output, session, plist, gate = reactiveValues()
        if(n > 1){
          rval_plot$nrow <- min(n, input$nrow_split)
          rval_plot$ncol <- ceiling(n/rval_plot$nrow)
-         g <- gridExtra::marrangeGrob(plist(), nrow = rval_plot$nrow, ncol = rval_plot$ncol, top = "")
+         g <- gridExtra::marrangeGrob(plot_list(), nrow = rval_plot$nrow, ncol = rval_plot$ncol, top = "")
          g
        }else{
-         plist()[[1]]
+         plot_list()[[1]]
        }
        
      }else{
-       plist()
+       plot_list()
      }
      
    })
