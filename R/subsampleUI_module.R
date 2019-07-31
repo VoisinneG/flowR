@@ -17,6 +17,7 @@ subsampleUI <- function(id) {
                   ),
                   tabPanel("Compute",
                            numericInput(ns("ncells_per_sample"), "Number of cells / subset / sample", 1000),
+                           textInput(ns("fs_name"), "Flow-set name", "sub-sample"),
                            actionButton(ns("compute_data"), "sample"),
                            #actionButton("reset_data", "reset"),
                            br(),
@@ -55,6 +56,8 @@ subsample <- function(input, output, session, rval) {
   
   selected <- callModule(selection, "selection_module", rval)
   
+  rval_mod <- reactiveValues( flow_set_subsample = NULL )
+  
   ##########################################################################################################
   # Observe functions for sub-sampling
   
@@ -85,6 +88,18 @@ subsample <- function(input, output, session, rval) {
       need(length(selected$samples)>0, "No sample selected")
     )
     
+   
+    if( input$fs_name %in% names(rval$flow_set_list) ){
+      showModal(modalDialog(
+        title = "Name already exists",
+        paste("Please choose another name", sep=""),
+        easyClose = TRUE,
+        footer = NULL
+      ))
+    }
+    
+    validate(need(! input$fs_name %in% names(rval$flow_set_list), "Name already exists" ))
+    
     #print(input$gate_sub_sample)
     
     if( nchar(selected$gate) == 0 ){
@@ -102,7 +117,7 @@ subsample <- function(input, output, session, rval) {
     
     #sample = rval$pdata$name[input$sub_sample_table_rows_selected]
     
-    rval$df_sample <- get_data_gs(gs = rval$gating_set,
+    rval_mod$df_sample <- get_data_gs(gs = rval$gating_set,
                                   sample = selected$samples, 
                                   subset = selected$gate,
                                   spill = rval$spill,
@@ -111,7 +126,7 @@ subsample <- function(input, output, session, rval) {
                                   updateProgress = updateProgress)
     #print(rval$df_sample)
     
-    if( length(rval$df_sample) == 0 ){
+    if( length(rval_mod$df_sample) == 0 ){
       showModal(modalDialog(
         title = "No cells in selection",
         paste("Please modify selection", sep=""),
@@ -121,15 +136,29 @@ subsample <- function(input, output, session, rval) {
     }
     
     validate(
-      need(length(rval$df_sample)>0, "No cells in selection")
+      need(length(rval_mod$df_sample)>0, "No cells in selection")
     )
     
-    rval$flow_set_sample <- build_flowset_from_df(rval$df_sample, fs = rval$flow_set)
     print("OK")
-    print(dim(rval$df_sample))
-    rval$flow_set_names <- unique(c(rval$flow_set_names, "sub-sample"))
-    rval$flow_set_selected <- "sub-sample"
+    print(dim(rval_mod$df_sample))
+    
+    rval_mod$flow_set_subsample <- build_flowset_from_df(rval_mod$df_sample, fs = rval$flow_set)
+    
+    
+    
+    
+    rval$flow_set_list[[input$fs_name]] <- list(flow_set = rval_mod$flow_set_subsample, 
+                                                name = input$fs_name, 
+                                                parent = rval$flow_set_selected)
+    
+    rval$flow_set_selected <- input$fs_name
+    
+    # rval$flow_set_names <- unique(c(rval$flow_set_names, "sub-sample"))
+    # rval$flow_set_selected <- "sub-sample"
   })
+  
+  
+  
   
   output$sub_sample_table <- DT::renderDataTable({
     if(!is.null(rval$flow_set)){
@@ -139,15 +168,15 @@ subsample <- function(input, output, session, rval) {
   
   output$progressBox <- renderValueBox({
     valueBox(
-      length(rval$flow_set_sample), "samples",icon = icon("list"),
+      length(rval_mod$flow_set_subsample), "samples",icon = icon("list"),
       color = "purple"
     )
   })
   
   output$progressBox2 <- renderValueBox({
     ncells <- 0
-    if(!is.null(rval$flow_set_sample)){
-      fs <- rval$flow_set_sample
+    if(!is.null(rval_mod$flow_set_subsample)){
+      fs <- rval_mod$flow_set_subsample
       ncells <- sum( sapply(1:length(fs), function(x){dim(fs[[x]]@exprs)[1]}) )
     }
     
@@ -158,8 +187,8 @@ subsample <- function(input, output, session, rval) {
   })
   
   output$summary_sub_sample <- renderPrint({
-    if(!is.null(rval$df_sample)){
-      print(summary(rval$df_sample[, c("name", "subset")]))
+    if(!is.null(rval_mod$flow_set_subsample)){
+      print(summary(rval_mod$df_sample[, c("name", "subset")]))
     }else{
       "No sub-sampling performed yet"
     }

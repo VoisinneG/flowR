@@ -18,12 +18,15 @@ flowR_server <- function(session, input, output, user_module_name = NULL) {
   
   `%then%` <- shiny:::`%OR%`
   
-  rval <- reactiveValues(gates_flowCore = list())
+  rval <- reactiveValues()
 
   gate <- reactiveValues(x = NULL, y = NULL)
   
   # Import module : import flowSet, gates from fcs files and workspace
   rval <- callModule(import, "import_module")
+  
+  # flow-set module
+  rval <- callModule(flowsets, "flowsets_module", rval)
   
   # Metadata module
   rval <- callModule(metadata, "metadata_module", rval)
@@ -81,43 +84,26 @@ flowR_server <- function(session, input, output, user_module_name = NULL) {
   ##########################################################################################################
   # observe and reactive functions
   
-  observeEvent(rval$flow_set_selected, {
-    updateSelectInput(session, "flow_set", choices = rval$flow_set_names, selected = rval$flow_set_selected)
-  })
-  
-  observe({
-    validate(
-      need(input$flow_set, "No flow set selected")
-    )
-    
-    rval$flow_set <- switch(input$flow_set,
-                            "imported" = rval$flow_set_imported,
-                            "filter" = rval$flow_set_filter,
-                            "sub-sample" = rval$flow_set_sample,
-                            "dim-reduction" = rval$flow_set_dim_red,
-                            "cluster" = rval$flow_set_cluster
-    )
-    
-  })
-  
-  observe({
-    validate(
-      need(rval$flow_set, "No flow set available")
-    )
-    
-    fs <- rval$flow_set
-    rval$Ncells_tot <- sum( sapply(1:length(fs), function(x){dim(fs[[x]]@exprs)[1]}) )
-    
+  observeEvent( c(names(rval$flow_set_list), rval$flow_set_selected), {
+    #print(rval$flow_set_selected)
+    updateSelectInput(session, "flow_set", choices = names(rval$flow_set_list), selected = rval$flow_set_selected)
   })
   
   
   observeEvent(input$flow_set, {
     
     validate(
-      need(rval$flow_set, "No flow set available")
+      need(input$flow_set %in% names(rval$flow_set_list), "No flow set available")
     )
     
+    rval$flow_set_selected <- input$flow_set
+    rval$flow_set <- rval$flow_set_list[[input$flow_set]]$flow_set
+    rval$gating_set <- GatingSet(rval$flow_set)
+    rval$gating_set <- add_gates_flowCore(rval$gating_set, rval$gates_flowCore)
+    
     fs <- rval$flow_set
+    rval$Ncells_tot <- sum( sapply(1:length(fs), function(x){dim(fs[[x]]@exprs)[1]}) )
+    
     params <- parameters(fs[[1]])$name
     
     min_val <- as.data.frame(fsApply(fs, each_col, min, na.rm = TRUE))
@@ -132,21 +118,22 @@ flowR_server <- function(session, input, output, user_module_name = NULL) {
     
   })
   
-  observeEvent(rval$flow_set, {
-    
-    validate(
-      need(rval$flow_set, "No flow set available")
-    )
-    
-    rval$gating_set <- GatingSet(rval$flow_set)
-    
-    # add gates
-    print(names(rval$gates_flowCore))
-    print("add2")
-    rval$gating_set <- add_gates_flowCore(rval$gating_set, rval$gates_flowCore)
-    
-    
-  })
+  
+  # observeEvent(rval$flow_set, {
+  #   
+  #   validate(
+  #     need(rval$flow_set, "No flow set available")
+  #   )
+  #   
+  #   rval$gating_set <- GatingSet(rval$flow_set)
+  #   
+  #   # add gates
+  #   print(names(rval$gates_flowCore))
+  #   print("add2")
+  #   rval$gating_set <- add_gates_flowCore(rval$gating_set, rval$gates_flowCore)
+  #   
+  #   
+  # })
   
   ##########################################################################################################
   ##########################################################################################################
@@ -196,6 +183,14 @@ flowR_server <- function(session, input, output, user_module_name = NULL) {
       nparams, "parameters",icon = icon("list"),
       color = "red"
     )
+  })
+  
+  output$flow_set_name <- renderText({
+    if(nchar(rval$flow_set_selected)>0){
+      paste("Flow-set : ", rval$flow_set_selected)
+    }else{
+      NULL
+    }
   })
 
 }

@@ -107,7 +107,7 @@ plotGatingSet <- function(input, output, session,
   
   rval_plot <- reactiveValues()
   
-  selected <- callModule(selection, "selection_module", rval)
+  selected <- callModule(selection, "selection_module", rval, params = plot_params)
   
   observe({
     for(var in names(input)){
@@ -366,7 +366,12 @@ plotGatingSet <- function(input, output, session,
       gate <- NULL
       
       if(show_gates){
-        gate <- setdiff(names(rval$gates_flowCore), "root")
+        child_gates <- getChildren(rval$gating_set[[1]], selected$gate)
+        if(length(child_gates) > 0){
+          gate <- child_gates
+        }
+        print(gate)
+        #gate <- setdiff(names(rval$gates_flowCore), "root")
           # gates_non_root <- setdiff(getNodes(rval$gating_set), "root")
           # if(length(gates_non_root)>0){
           #   gate <- gates_non_root

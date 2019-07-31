@@ -27,6 +27,7 @@ clusterUI <- function(id) {
                              uiOutput(ns("method_ui"))
                     ),
                     tabPanel("Cluster",
+                             textInput(ns("fs_name"), "Flow-set name", "cluster"),
                              actionButton(ns("start_clustering"), "Start"),
                              br(),
                              br(),
@@ -57,6 +58,8 @@ cluster <- function(input, output, session, rval) {
   `%then%` <- shiny:::`%OR%`
   
   selected <- callModule(selection, "selection_module", rval)
+  
+  rval_mod <- reactiveValues( flow_set_cluster = NULL )
   
   ##########################################################################################################
   # Observe functions for t-SNE
@@ -121,6 +124,17 @@ cluster <- function(input, output, session, rval) {
       need(length(input$clustering_variables_table_rows_selected) >0, "No variables selected")
     )
     
+    if( input$fs_name %in% names(rval$flow_set_list) ){
+      showModal(modalDialog(
+        title = "Name already exists",
+        paste("Please choose another name", sep=""),
+        easyClose = TRUE,
+        footer = NULL
+      ))
+    }
+    
+    validate(need(! input$fs_name %in% names(rval$flow_set_list), "Name already exists" ))
+    
     # Create a Progress object
     progress <- shiny::Progress$new(min = 0, max = 100)
     on.exit(progress$close())
@@ -150,7 +164,7 @@ cluster <- function(input, output, session, rval) {
                           Ncells = NULL,
                           updateProgress = updateProgress)
     
-    rval$df_cluster <- get_data_gs(gs = rval$gating_set,
+    rval_mod$df_cluster <- get_data_gs(gs = rval$gating_set,
                                    sample = selected$samples,
                                    subset = selected$gate,
                                    spill = rval$spill,
@@ -164,17 +178,19 @@ cluster <- function(input, output, session, rval) {
     
     progress$set(message = "Clustering...", value = 50)
     
-    res <- get_cluster(df=rval$df_cluster, 
+    
+    res <- get_cluster(df=rval_mod$df_cluster, 
                        yvar = rval$parameters$name[input$clustering_variables_table_rows_selected],
                        y_trans = y_trans,
                        transformation = transformation,
-                       dc = input$cluster_dc, 
-                       alpha = input$cluster_alpha
+                       dc = ifelse(is.null(input$cluster_dc), 5, input$cluster_dc), 
+                       alpha = ifelse(is.null(input$cluster_alpha), 0.0001, input$cluster_alpha)
     )
-    rval$df_cluster <- res$df
-    df <- cbind(df_raw[res$keep, ], rval$df_cluster[c("cluster")])
     
-    rval$flow_set_cluster <- build_flowset_from_df(df, fs = rval$flow_set)
+    rval_mod$df_cluster <- res$df
+    df <- cbind(df_raw[res$keep, ], rval_mod$df_cluster[c("cluster")])
+    
+    rval_mod$flow_set_cluster <- build_flowset_from_df(df, fs = rval$flow_set)
     
     # delete previous cluster gates
     
@@ -186,24 +202,33 @@ cluster <- function(input, output, session, rval) {
     
     # create one gate per cluster
     
-    uclust <- unique(rval$df_cluster$cluster)
+    uclust <- unique(rval_mod$df_cluster$cluster)
     uclust <- uclust[ order(as.numeric(uclust), decreasing = FALSE) ]
     
     for(i in 1:length(uclust)){
       filterID <- paste("cluster", uclust[i], sep = "")
       polygon <- matrix(c(as.numeric(uclust[i])-0.25, 
                           as.numeric(uclust[i])+0.25, 
-                          range(rval$df_cluster[[rval$flow_set_cluster@colnames[1]]])
+                          range(rval_mod$df_cluster[[rval_mod$flow_set_cluster@colnames[1]]])
       ), 
       ncol = 2)
       row.names(polygon) <- c("min", "max")
-      colnames(polygon) <- c("cluster", rval$flow_set_cluster@colnames[1])
+      colnames(polygon) <- c("cluster", rval_mod$flow_set_cluster@colnames[1])
       g <- rectangleGate(.gate = polygon, filterId=filterID)
       rval$gates_flowCore[[paste("/",filterID, sep="")]] <- list(gate = g, parent = "root")
     }
     
-    rval$flow_set_names <- unique(c(rval$flow_set_names, "cluster"))
-    rval$flow_set_selected <- "cluster"
+    
+    
+    rval$flow_set_list[[input$fs_name]] <- list(flow_set = rval_mod$flow_set_cluster, 
+                                                name = input$fs_name, 
+                                                parent = rval$flow_set_selected)
+    
+    rval$flow_set_selected <- input$fs_name
+    
+    
+    #rval$flow_set_names <- unique(c(rval$flow_set_names, "cluster"))
+    #rval$flow_set_selected <- "cluster"
     
     #updateSelectInput(session, "flow_set", choices = rval$flow_set_names, selected = "cluster")
     
@@ -225,8 +250,8 @@ cluster <- function(input, output, session, rval) {
   })
   
   output$summary_cluster <- renderPrint({
-    if(!is.null(rval$df_cluster)){
-      print(paste("Number of unique clusters :", length(unique(rval$df_cluster$cluster))))
+    if(!is.null(rval_mod$df_cluster)){
+      print(paste("Number of unique clusters :", length(unique(rval_mod$df_cluster$cluster))))
     }else{
       "No clustering performed yet"
     }

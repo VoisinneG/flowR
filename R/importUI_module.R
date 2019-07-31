@@ -22,7 +22,7 @@ importUI <- function(id) {
            # )
     ),
     column(width = 6,
-           box(title = "Input files",
+           box(title = "Flow-set",
                width = NULL, height = NULL,
                div(style = 'overflow-x: scroll', DT::dataTableOutput(ns("files_table"))),
                br(),
@@ -30,6 +30,7 @@ importUI <- function(id) {
                               choices = NULL,
                               selected = NULL,
                               multiple = FALSE),
+               textInput(ns("fs_name"), "Flow-set name", "import"),
                actionButton(ns("load"), label = "Load selected files")
            )
     )
@@ -52,9 +53,11 @@ importUI <- function(id) {
 #' @rdname importUI
 import <- function(input, output, session) {
   
-  rval <- reactiveValues(df_files = NULL,
-                         flow_set_imported = NULL,
-                         gates_flowCore = list()
+  rval_mod <- reactiveValues(df_files = NULL)
+  
+  rval <- reactiveValues(flow_set_list = list(),
+                         gates_flowCore = list(),
+                         count = 0
                          )
   
   observeEvent(input$files, {
@@ -64,7 +67,7 @@ import <- function(input, output, session) {
     df <- input$files
     file.rename(from = df$datapath, to = paste(dirname(df$datapath[1]),"/", df$name, sep =""))
     df$datapath <- paste(dirname(df$datapath[1]),"/", df$name, sep ="")
-    rval$df_files <- df
+    rval_mod$df_files <- df
   })
   
   
@@ -74,8 +77,8 @@ import <- function(input, output, session) {
     validate(
       need(length(input$files_table_rows_selected)>0, "Please select a file to load")
     )
-    if(file_ext(rval$df_files$datapath[input$files_table_rows_selected[1]]) %in% c("xml", "wsp") ){
-      ws <- openWorkspace(rval$df_files$datapath[input$files_table_rows_selected[1]])
+    if(file_ext(rval_mod$df_files$datapath[input$files_table_rows_selected[1]]) %in% c("xml", "wsp") ){
+      ws <- openWorkspace(rval_mod$df_files$datapath[input$files_table_rows_selected[1]])
       groups <- unique(getSampleGroups(ws)$groupName)
       updateSelectInput(session, "groups", choices = groups, selected = groups[1])
     }
@@ -88,6 +91,17 @@ import <- function(input, output, session) {
       need(length(input$files_table_rows_selected)>0, "Please select a file to load")
     )
     
+    if( input$fs_name %in% names(rval$flow_set_list) ){
+      showModal(modalDialog(
+        title = "Name already exists",
+        paste("Please choose another name", sep=""),
+        easyClose = TRUE,
+        footer = NULL
+      ))
+    }
+    
+    validate(need(! input$fs_name %in% names(rval$flow_set_list), "Name already exists" ))
+    
     # Create a Progress object
     progress <- shiny::Progress$new(min = 0, max = 1)
     on.exit(progress$close())
@@ -96,15 +110,15 @@ import <- function(input, output, session) {
     
     
       
-      if(file_ext(rval$df_files$datapath[input$files_table_rows_selected[1]]) %in% c("xml", "wsp")){
-        ws <- openWorkspace(rval$df_files$datapath[input$files_table_rows_selected[1]])
+      if(file_ext(rval_mod$df_files$datapath[input$files_table_rows_selected[1]]) %in% c("xml", "wsp")){
+        ws <- openWorkspace(rval_mod$df_files$datapath[input$files_table_rows_selected[1]])
   
         gs <- try(parseWorkspace(ws,
                                  name = input$groups,
                                  execute = TRUE,
                                  isNcdf = TRUE,
                                  sampNloc = "sampleNode",
-                                 path = dirname(rval$df_files$datapath[1])),
+                                 path = dirname(rval_mod$df_files$datapath[1])),
                   silent = TRUE)
         
         if(class(gs) != "GatingSet"){
@@ -126,8 +140,8 @@ import <- function(input, output, session) {
         #get gates and transfrom gates
         
         gates <- get_gates_from_gs(gs)
-        if(file_ext(rval$df_files$datapath[input$files_table_rows_selected[1]]) %in% c("wsp")){
-          gates <- get_gates_from_ws(ws_path = rval$df_files$datapath[input$files_table_rows_selected[1]], 
+        if(file_ext(rval_mod$df_files$datapath[input$files_table_rows_selected[1]]) %in% c("wsp")){
+          gates <- get_gates_from_ws(ws_path = rval_mod$df_files$datapath[input$files_table_rows_selected[1]], 
                                      group = input$groups)
         }
         
@@ -195,35 +209,58 @@ import <- function(input, output, session) {
         names_imported <- basename(names_imported)
         #print(names_imported)
         #idx_match <- sapply(names_imported, function(x){as.numeric(strsplit(x, split= ".", fixed = TRUE)[[1]][1])})
-        idx_match <- match(names_imported, rval$df_files$name)
+        idx_match <- match(names_imported, rval_mod$df_files$name)
         
-        fs <- ncdfFlow::read.ncdfFlowSet( rval$df_files$datapath[idx_match] )
-        phenoData(fs)$name <- rval$df_files$name[idx_match]
+        fs <- ncdfFlow::read.ncdfFlowSet( rval_mod$df_files$datapath[idx_match] )
+        phenoData(fs)$name <- rval_mod$df_files$name[idx_match]
+        rval$flow_set_list[[input$fs_name]] <- list(flow_set = fs, name = input$fs_name, parent = NULL)
+        rval$flow_set_selected <- input$fs_name
         
+      }else if(file_ext(rval_mod$df_files$datapath[input$files_table_rows_selected[1]]) == "rda"){
+        res_name <- load(rval_mod$df_files$datapath[input$files_table_rows_selected[1]])
+        res <- get(res_name)
+        
+        for(i in 1:length(res)){
+          
+          fs <- build_flowset_from_df(df = res[[i]]$data, fs = res[[i]]$flow_set)
+          pData(fs) <- res[[i]]$metadata
+          
+          if(is.null(res[[i]]$parent)){
+            rval$transformation <- res[[i]]$transformation
+            rval$trans_parameters <- res[[i]]$trans_parameters
+            rval$df_spill <- res[[i]]$spill
+            rval$gates_flowCore <- res[[i]]$gates
+          }
+          rval$flow_set_list[[res[[i]]$name]] <- list(flow_set = fs, name = res[[i]]$name, parent = res[[i]]$parent)
+        }
+        
+        rval$flow_set_selected <- names(rval$flow_set_list)[[1]]
         
       }else{
-        fs <- ncdfFlow::read.ncdfFlowSet( rval$df_files$datapath[input$files_table_rows_selected] , emptyValue=FALSE)
-        phenoData(fs)$name <- rval$df_files$name[input$files_table_rows_selected]
+        
+        fs <- ncdfFlow::read.ncdfFlowSet( rval_mod$df_files$datapath[input$files_table_rows_selected] , emptyValue=FALSE)
+        phenoData(fs)$name <- rval_mod$df_files$name[input$files_table_rows_selected]
+        rval$flow_set_list[[input$fs_name]] <- list(flow_set = fs, name = input$fs_name, parent = NULL)
+        rval$flow_set_selected <- input$fs_name
       }
       
       #Initialization of some reactive variables
+    
       
-      rval$flow_set_imported <- fs
       
-      rval$flow_set_names <- unique(c(rval$flow_set_names, "imported"))
-      rval$flow_set_selected <- "imported"
+      #rval$flow_set_imported <- fs
+      #rval$flow_set_names <- unique(c(rval$flow_set_names, "imported"))
+      #rval$flow_set_selected <- "imported"
       
     })
-    
-    
-  
+
   output$files_table <- DT::renderDataTable({
     validate(
-      need(rval$df_files, "Please select a file to import")
+      need(rval_mod$df_files, "Please select a file to import")
     )
-    df <- rval$df_files[ ,c("name", "size")]
-    df$new_name <- basename(rval$df_files$datapath)
-    df$dir_name <- dirname(rval$df_files$datapath)
+    df <- rval_mod$df_files[ ,c("name", "size")]
+    df$new_name <- basename(rval_mod$df_files$datapath)
+    df$dir_name <- dirname(rval_mod$df_files$datapath)
     df
   })
   

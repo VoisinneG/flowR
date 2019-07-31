@@ -840,7 +840,7 @@ plot_gs <- function(df = NULL,
     for(j in 1:length(gate)){
       
       gate_int <- gate[[j]]
-      print(gate_int)
+      
       
       if(class(gate_int) == "polygonGate" ){
         if(length(unique(colnames(gate_int@boundaries)))>1){
@@ -859,14 +859,10 @@ plot_gs <- function(df = NULL,
         }else{
           range_y <- ylim
         }
-        print(range_x)
-        print(range_y)
-        print(xlim)
-        print(ylim)
+        
         polygon <- data.frame(x = c(range_x[1], range_x[2], range_x[2], range_x[1]),
                                  y = c(range_y[1], range_y[1], range_y[2], range_y[2]))
-        print(c(xvar, yvar))
-        print(names(polygon))
+
         names(polygon) <- c(xvar, yvar)
       }else if(class(gate_int) %in% c("ellipsoidGate")){
         cov <- gate_int@cov
@@ -1521,6 +1517,15 @@ build_flowset_from_df <- function(df,
   
   if(length(ff_list)>0){
     fs_new <- flowSet(ff_list)
+    if(!is.null(fs)){
+      pdata <- data.frame(pData(fs))
+      idx_match <- match(samples, pdata$name)
+      if(length(colnames(pdata))>1){
+        pData(fs_new) <- pdata[idx_match, ]
+      }else{
+        phenoData(fs_new)$name <- pdata[idx_match, ]
+      }
+    }
   }else{
     fs_new <- NULL
   }

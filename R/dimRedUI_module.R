@@ -28,6 +28,7 @@ dimRedUI <- function(id) {
                   ),
                   tabPanel("Compute",
                            numericInput(ns("ncells"), "Number of cells", 1000),
+                           textInput(ns("fs_name"), "Flow-set name", "dim-reduction"),
                            actionButton(ns("compute"), "Start"),
                            br(),
                            br(),
@@ -62,6 +63,8 @@ dimRed <- function(input, output, session, rval) {
   `%then%` <- shiny:::`%OR%`
   
   selected <- callModule(selection, "selection_module", rval)
+  
+  rval_mod <- reactiveValues( flow_set_dim_red = NULL )
   
   ##########################################################################################################
   # Observe functions for t-SNE
@@ -121,7 +124,19 @@ dimRed <- function(input, output, session, rval) {
     validate(
       need(length(input$variables_table_rows_selected) >0, "No variables selected")
     )
-
+    
+    if( input$fs_name %in% names(rval$flow_set_list) ){
+      showModal(modalDialog(
+        title = "Name already exists",
+        paste("Please choose another name", sep=""),
+        easyClose = TRUE,
+        footer = NULL
+      ))
+    }
+    
+    validate(need(! input$fs_name %in% names(rval$flow_set_list), "Name already exists" ))
+    
+    
     # Create a Progress object
     progress <- shiny::Progress$new(min = 0, max = 100)
     on.exit(progress$close())
@@ -151,7 +166,7 @@ dimRed <- function(input, output, session, rval) {
                           return_comp_data = FALSE,
                           updateProgress = updateProgress)
 
-    rval$df_dim_red <- get_data_gs(gs = rval$gating_set,
+    rval_mod$df_dim_red <- get_data_gs(gs = rval$gating_set,
                                    sample = selected$samples,
                                    subset = selected$gate,
                                    spill = rval$spill,
@@ -160,27 +175,36 @@ dimRed <- function(input, output, session, rval) {
                                    updateProgress = updateProgress)
                                 
 
-    print(dim(rval$df_dim_red))
+    print(dim(rval_mod$df_dim_red))
 
     progress$set(message = paste("Performing", input$dim_red_method, "..."), value = 0)
 
-    res <- dim_reduction(df = rval$df_dim_red,
+    res <- dim_reduction(df = rval_mod$df_dim_red,
                          yvar = rval$parameters$name[input$variables_table_rows_selected],
                          Ncells = input$ncells,
                          y_trans = y_trans,
                          transformation = transformation,
                          method = input$dim_red_method,
-                         perplexity = input$perplexity)
-    rval$df_dim_red <- res$df
+                         perplexity = ifelse(is.null(input$perplexity), 50, input$perplexity)
+                         )
+    
+    rval_mod$df_dim_red <- res$df
 
-    df <- cbind( df_raw[res$keep, ], rval$df_dim_red[ , setdiff(names(rval$df_dim_red), names(df_raw))])
+    df <- cbind( df_raw[res$keep, ], rval_mod$df_dim_red[ , setdiff(names(rval_mod$df_dim_red), names(df_raw))])
 
     rval$dim_red_var <- res$vars
 
-    if(!is.null(rval$df_dim_red)){
-      rval$flow_set_dim_red <- build_flowset_from_df(df = df, fs = rval$flow_set)
-      rval$flow_set_names <- unique(c(rval$flow_set_names, "dim-reduction"))
-      rval$flow_set_selected <- "dim-reduction"
+    if(!is.null(rval_mod$df_dim_red)){
+      rval_mod$flow_set_dim_red <- build_flowset_from_df(df = df, fs = rval$flow_set)
+      
+      rval$flow_set_list[[input$fs_name]] <- list(flow_set = rval_mod$flow_set_dim_red, 
+                                                  name = input$fs_name, 
+                                                  parent = rval$flow_set_selected)
+      
+      rval$flow_set_selected <- input$fs_name
+      
+      #rval$flow_set_names <- unique(c(rval$flow_set_names, "dim-reduction"))
+      #rval$flow_set_selected <- "dim-reduction"
 
       #updateSelectInput(session, "flow_set", choices = rval$flow_set_names, selected = "dim-reduction")
     }
@@ -204,15 +228,15 @@ dimRed <- function(input, output, session, rval) {
   
   output$progressBox <- renderValueBox({
     valueBox(
-      length(rval$flow_set_dim_red), "samples",icon = icon("list"),
+      length(rval_mod$flow_set_dim_red), "samples",icon = icon("list"),
       color = "purple"
     )
   })
 
   output$progressBox2 <- renderValueBox({
     ncells <- 0
-    if(!is.null(rval$flow_set_dim_red)){
-      fs <- rval$flow_set_dim_red
+    if(!is.null(rval_mod$flow_set_dim_red)){
+      fs <- rval_mod$flow_set_dim_red
       ncells <- sum( sapply(1:length(fs), function(x){dim(fs[[x]]@exprs)[1]}) )
     }
 
@@ -223,8 +247,8 @@ dimRed <- function(input, output, session, rval) {
   })
   
   output$summary <- renderPrint({
-    validate(need(rval$df_dim_red, "no dim-reduction performed"))
-    print(summary(rval$df_dim_red[, c("name", "subset")]))
+    validate(need(rval_mod$df_dim_red, "no dim-reduction performed"))
+    print(summary(rval_mod$df_dim_red[, c("name", "subset")]))
     
     # if(!is.null(rval$df_dim_red)){
     #   print(summary(rval$df_dim_red[, c("name", "subset")]))

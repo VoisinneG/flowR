@@ -122,29 +122,34 @@ compensation <- function(input, output, session, rval) {
   ##########################################################################################################
   # Observe functions for compensation
   
-  observeEvent(rval$flow_set_imported, {
-    fs <- rval$flow_set_imported
-    m <- diag( length(parameters(fs[[1]])$name) )
-    colnames(m) <- parameters(fs[[1]])$name
-    rval$df_spill <- as.data.frame(m)
-    row.names(rval$df_spill) <- colnames(rval$df_spill)
+  observeEvent(c(rval$flow_set_selected, rval$flow_set), {
     
-    #rval$df_spill <- NULL
+    validate(need(rval$flow_set, "no flow-set available"))
     
-    for(i in 1:length(fs)){
-      if("SPILL" %in% names(description(fs[[i]]))){
-        df <- as.data.frame(description(fs[[i]])[["SPILL"]])
-        is_identity <- sum(apply(X=df, MARGIN = 1, FUN = function(x){sum(x==0) == (length(x)-1)})) == dim(df)[1]
-        if(!is_identity){
-          rval$df_spill <- df
-          row.names(rval$df_spill) <- colnames(rval$df_spill)
-          break
+    if(!"df_spill" %in% names(rval)){
+      fs <- rval$flow_set
+      m <- diag( length(parameters(fs[[1]])$name) )
+      colnames(m) <- parameters(fs[[1]])$name
+      rval$df_spill <- as.data.frame(m)
+      row.names(rval$df_spill) <- colnames(rval$df_spill)
+      
+      #rval$df_spill <- NULL
+      
+      for(i in 1:length(fs)){
+        if("SPILL" %in% names(description(fs[[i]]))){
+          df <- as.data.frame(description(fs[[i]])[["SPILL"]])
+          is_identity <- sum(apply(X=df, MARGIN = 1, FUN = function(x){sum(x==0) == (length(x)-1)})) == dim(df)[1]
+          if(!is_identity){
+            rval$df_spill <- df
+            row.names(rval$df_spill) <- colnames(rval$df_spill)
+            break
+          }
         }
       }
+      
+      rval$df_spill_original <- rval$df_spill
     }
-    
-    rval$df_spill_original <- rval$df_spill
-    
+
   })
   
   

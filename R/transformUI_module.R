@@ -115,12 +115,17 @@ transform <- function(input, output, session, rval) {
     
     ff <- rval$flow_set[[1]]
     
-    if(!setequal(rval$parameters$name, parameters(ff)$name)){
-      desc <- parameters(ff)$desc
-      name <- parameters(ff)$name
-      print(parameters(ff)$name)
+    if(!"parameters" %in% names(rval) | !setequal(rval$parameters$name, parameters(ff)$name)){
+      
+      
+      desc <- as.character(parameters(ff)$desc)
+      name <- as.character(parameters(ff)$name)
       name_long <- name
       name_long[!is.na(desc)] <- paste(name[!is.na(desc)], " (", desc[!is.na(desc)], ")", sep = "")
+      
+      print(name)
+      print(desc)
+      print(name_long)
       
       display <- unlist(sapply(rownames(parameters(ff)@data), FUN = function(x){
         kw <- substr(x, start = 2, stop = nchar(x))
@@ -142,6 +147,8 @@ transform <- function(input, output, session, rval) {
                                     minRange = parameters(ff)@data$minRange,
                                     maxRange = parameters(ff)@data$maxRange,
                                     stringsAsFactors = FALSE)
+      
+      print(rval$parameters)
     }
     
   })

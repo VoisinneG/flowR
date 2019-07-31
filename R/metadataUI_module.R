@@ -13,7 +13,16 @@ metadataUI <- function(id) {
            tabBox(title = "Metadata",
                   width = NULL, height = NULL,
                   tabPanel(title = "Table",
-                           div(style = 'overflow-x: scroll', DT::dataTableOutput(ns("pData")))      
+                           actionButton(ns("add_column"), label = "add column"),
+                           actionButton(ns("delete_column"), label = "delete column"),
+                           br(),
+                           br(),
+                           div(style = 'overflow-x: scroll', DTOutput(ns("pData"))),
+                           br(),
+                           actionButton(ns("apply"), label = "apply"),
+                           downloadButton(ns("download_meta")),
+                           br(),
+                           br()
                   ),
                   tabPanel(title = "Filter",
                            "Filter samples based on metadata",
@@ -38,7 +47,6 @@ metadataUI <- function(id) {
                            div(style = 'overflow-x: scroll', DT::dataTableOutput(ns("meta"))),
                            br(),
                            actionButton(ns("append_meta"), label = "Add metadata"),
-                           actionButton(ns("reset_meta"), label = "Reset"),
                            br()
                            
                   )
@@ -64,21 +72,13 @@ metadataUI <- function(id) {
 metadata <- function(input, output, session, rval) {
   
   rval_mod <- reactiveValues()
+
   
-  # observe({
-  #   validate(
-  #     need(rval$pdata, "No meta data available")
-  #   )
-  #   validate(
-  #     need(rval$flow_set, "No flow set available")
-  #   )
-  #   validate(
-  #     need(setequal(pData(rval$flow_set)$name, rval$pdata$name), "Meta data does not match with flow set samples")
-  #   )
-  #   
-  #   pData(rval$flow_set) <- rval$pdata
-  #   
-  # })
+  observeEvent(input$apply, {
+    validate(need(rval$flow_set, "No flow set available"))
+    pData(rval$flow_set) <- rval$pdata
+    pData(rval$flow_set_list[[rval$flow_set_selected]]$flow_set) <- rval$pdata
+  })
   
   observe({
     
@@ -86,10 +86,10 @@ metadata <- function(input, output, session, rval) {
       need(rval$flow_set, "No flow set available")
     )
     
-    if(is.null(rval$pdata_original)){
-      rval_mod$pdata_original <- as.data.frame(pData(rval$flow_set))
-    }else if(!setequal(pData(rval$flow_set)$name, rval_mod$pdata_original$name)){
-      rval_mod$pdata_original <- as.data.frame(pData(rval$flow_set))
+    if(is.null(rval$pdata)){
+      rval$pdata <- as.data.frame(pData(rval$flow_set))
+    }else if(!setequal(pData(rval$flow_set)$name, rval$pdata$name)){
+      rval$pdata <- as.data.frame(pData(rval$flow_set))
     }
     
   })
@@ -97,9 +97,7 @@ metadata <- function(input, output, session, rval) {
   #Update available keywords
   observe({
     
-    validate(
-      need(rval$flow_set, "No flow set available")
-    )
+    validate(need(rval$flow_set, "No flow set available"))
     
     ff <- rval$flow_set[[1]]
     
@@ -128,83 +126,54 @@ metadata <- function(input, output, session, rval) {
   })
   
   observeEvent(input$append_meta, {
-    print(rval_mod$df_meta_imported)
-    rval_mod$df_meta <- rval_mod$df_meta_imported
-  })
-  
-  observe({
-    idx_match <- match(rval_mod$pdata_original$name, rval_mod$df_meta[,1])
-    #idx_match <- idx_match[!is.na(idx_match)]
-    #if(length(idx_match)>0){
-    rval_mod$df_meta_mapped <- rval_mod$df_meta[idx_match, ]
-    #  print(rval$df_meta_mapped)
-    #}
+    
+    validate(need(rval_mod$df_meta_imported, "no metadata imported"))
+    
+    df_meta <- rval_mod$df_meta_imported
+    idx_match <- match(rval$pdata$name, df_meta[,1])
+    idx_match <- idx_match[!is.na(idx_match)]
+    if(length(idx_match)>0){
+      df_meta_mapped <- df_meta[idx_match, ]
+      idx_new <- ! names(df_meta_mapped) %in% names(rval$pdata) 
+      if(sum(idx_new)>0){
+        rval$pdata <- cbind(rval$pdata, df_meta_mapped[idx_new])
+      }
+    }
     
   })
-  
-  observeEvent(input$reset_meta, {
-    rval_mod$df_meta <- NULL
-    rval_mod$df_meta_mapped <- NULL
-  })
-  
   
   
   observeEvent(input$append_keywords, {
     
-    if(!is.null(rval$flow_set)){
+    validate(need(rval$flow_set, "no flow-set available"))
+    
+    df <- NULL
+    keys <- input$keyword
+    
+    if(length(keys)>0){
+      for(key in keys){
+        df <- cbind(df, fsApply(rval$flow_set, function(x){description(x)[[key]]}))
+      }
+      keys <- gsub(pattern = " ", replacement = "_", keys, fixed = TRUE)
+      keys <- gsub(pattern = "$", replacement = "", keys, fixed = TRUE)
+      df <- data.frame(df)
+      colnames(df) <- keys
+      df$name <- pData(rval$flow_set)$name
       
-      df <- NULL
-      keys <- input$keyword
-      
-      if(length(keys)>0){
-        for(key in keys){
-          df <- cbind(df, fsApply(rval$flow_set, function(x){description(x)[[key]]}))
-        }
-        keys <- gsub(pattern = " ", replacement = "_", keys, fixed = TRUE)
-        keys <- gsub(pattern = "$", replacement = "", keys, fixed = TRUE)
-        df <- as.data.frame(df)
-        names(df) <- keys
-        row.names(df) <- pData(rval$flow_set)$name
-      }
-      rval_mod$df_keywords <- df
     }
-  })
+    
+    idx_match <- match(rval$pdata$name, df$name)
+    idx_match <- idx_match[!is.na(idx_match)]
+    if(length(idx_match)>0){
+      df_keywords <- df[idx_match, ]
+      idx_new <- ! names(df_keywords) %in% names(rval$pdata)
+      if(sum(idx_new)>0){
+        rval$pdata <- cbind(rval$pdata, df_keywords[idx_new])
+      }
+    }
   
-  
-  observe({
-    
-    cat("meta")
-    print(rval_mod$pdata_original)
-    
-    validate(
-      need(rval_mod$pdata_original, "No metadata")
-    )
-    
-    df <- rval_mod$pdata_original
-    
-    if(!is.null(rval_mod$df_meta_mapped)){
-      if(dim(df)[1] == dim(rval_mod$df_meta_mapped)[1]){
-        idx_new <- ! names(rval_mod$df_meta_mapped) %in% names(df) 
-        if(sum(idx_new)>0){
-          df <- cbind(df, rval_mod$df_meta_mapped[idx_new])
-        }
-      }
-    } 
-    if(!is.null(rval_mod$df_keywords)){
-      if(dim(df)[1] == dim(rval_mod$df_keywords)[1] ){
-        idx_new <- ! names(rval_mod$df_keywords) %in% names(df)
-        if(sum(idx_new)>0){
-          df <- cbind(df, rval_mod$df_keywords[idx_new])
-        }
-        
-      }
-    }
-    
-    if(!is.null(df)){
-      rval$pdata <- df
-    }
-    
   })
+
   
   
   observeEvent(input$apply_filter_meta, {
@@ -264,11 +233,66 @@ metadata <- function(input, output, session, rval) {
     
   })
   
-  output$pData <- DT::renderDataTable({
-    if(!is.null(rval$flow_set)){
-      DT::datatable(rval$pdata, rownames = FALSE)
+  
+  observeEvent(input$add_column, {
+    ns <- session$ns
+    showModal(modalDialog(title = "Add column",
+                          textInput(ns("col_name"), "Choose a column name", ""),
+                          footer = tagList(
+                            modalButton("Cancel"),
+                            actionButton(ns("ok"), "OK")
+                          )
+              )
+    )
+
+  })
+  
+  observeEvent(input$ok, {
+    if(nchar(input$col_name)>0){
+      rval$pdata[[input$col_name]] <- rep("", length(rval$pdata$name))
+      removeModal()
     }
   })
+  
+  observeEvent(input$delete_column, {
+    ns <- session$ns
+    showModal(modalDialog(title = "Delete column",
+                          selectInput(ns("col_name_del"), "Choose a column name", choices = names(rval$pdata), selected = NULL),
+                          footer = tagList(
+                            modalButton("Cancel"),
+                            actionButton(ns("ok_delete"), "OK")
+                          )
+    )
+    )
+    
+  })
+  
+  observeEvent(input$ok_delete, {
+    if(nchar(input$col_name_del)>0){
+      rval$pdata <- rval$pdata[-which(names(rval$pdata) == input$col_name_del)]
+      removeModal()
+    }
+  })
+  
+  output$pData <- renderDT( {validate(need(rval$pdata, "No metadata")); rval$pdata},
+                            rownames = FALSE,
+                            selection = 'none',
+                            editable = 'cell',
+                            server = TRUE )
+                            #list(target = 'row', disable = list(columns = c(1))) )
+
+  proxy = dataTableProxy('pData')
+  observeEvent(input$pData_cell_edit, {
+    info = input$pData_cell_edit
+    info$col <- info$col + 1
+    str(info)  # check what info looks like (a data frame of 3 columns)
+    rval$pdata <<- editData(rval$pdata, info)
+    replaceData(proxy, rval$pdata, resetPaging = FALSE)  # important
+    # the above steps can be merged into a single editData() call; see examples below
+  })
+  
+  
+  
   
   output$meta <- DT::renderDataTable({
     validate(
@@ -277,6 +301,12 @@ metadata <- function(input, output, session, rval) {
     as.data.frame(rval_mod$df_meta_imported)
   })
   
+  output$download_meta <- downloadHandler(
+    filename = "metadata.txt",
+    content = function(file) {
+      write.table(rval$pdata, file = file, row.names = FALSE, quote = FALSE, sep = "\t")
+    }
+  )
   
   return(rval)
   
