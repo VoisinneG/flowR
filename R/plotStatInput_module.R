@@ -214,8 +214,15 @@ plotStat <- function(input, output, session, rval) {
     
   })
   
+  plot <- reactive({
+    plot_statistics()$plot
+  })
+  
+  data <- reactive({
+    plot_statistics()$data
+  })
   
   
-  return( list(plot = plot_statistics) )
+  return( list(plot = plot, data = data) )
   
 }

@@ -37,7 +37,13 @@ displayUI <- function(id, module_ui_name, ...){
                   tabPanel("Save",
                            numericInput(ns("width_plot"), label = "width", value = 5),
                            numericInput(ns("height_plot"), label = "height", value = 5),
-                           downloadButton(ns("download_plot"), "Save plot")
+                           uiOutput(ns("ui_save"))
+                           # fluidRow( 
+                           #   column(12,
+                           #    downloadButton(ns("download_plot"), "Save plot"),
+                           #    uiOutput(ns("ui_save_data"))
+                           #   )
+                           # )
                   )
            )
     )
@@ -110,10 +116,26 @@ display <- function(input, output, session, rval, module_server_name, ...) {
     div( style = 'overflow-x: scroll',
          plotOutput(ns("plot_display"), height = rval_plot$nrow*input$row_size, width = rval_plot$ncol*input$col_size)
     )
-    
-
   })
 
+  
+  output$ui_save <- renderUI({
+    ns <- session$ns
+    x <- list()
+    x[[1]] <- downloadButton(ns("download_plot"), "Save plot")
+    if( class(plist()) != "list" & "data" %in% names(plist())){
+      x[[2]] <- downloadButton(ns("download_data"), "Save data")
+    }
+    tagList(x)
+  })
+  
+  output$download_data <- downloadHandler(
+    filename = "data.txt",
+    content = function(file) {
+      write.table(x = plist()$data, file = file, sep = "\t", quote = FALSE, row.names = FALSE)
+    }
+  )
+  
   output$download_plot <- downloadHandler(
     filename = "plot.pdf",
     content = function(file) {

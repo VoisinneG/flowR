@@ -1302,7 +1302,7 @@ plot_stat <- function(df = NULL,
   
   p <- p + ggtitle(paste("statistic : ",stat_function, " / transform : ", trans_name_plot, sep = "")) 
 
-  p
+  return(list(plot = p, data = df_melt2))
   
 }
 
@@ -1487,6 +1487,9 @@ build_flowset_from_df <- function(df,
         if(!is.na(idx)){
           
           par <- parameters(fs[[idx]])
+          par@data$name <- as.character(par@data$name)
+          par@data$desc <- as.character(par@data$desc)
+          
           desc <- description(fs[[idx]])
           new_par <- setdiff(chanel_col, par@data$name)
           npar <- length(par@data$name)
@@ -1494,6 +1497,7 @@ build_flowset_from_df <- function(df,
           for(param in new_par){
             npar <- npar +1
             rg <- range(df_sample[[param]])
+            
             par@data <- rbind(par@data, c(param, NA, diff(rg), rg[1], rg[2]))
             rownames(par@data)[npar] <- paste("$P",npar, sep = "")
             desc[[paste("$P",npar,"DISPLAY",sep="")]] <- NA

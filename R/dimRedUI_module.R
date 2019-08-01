@@ -16,6 +16,8 @@ dimRedUI <- function(id) {
                            selectionInput(ns("selection_module"), multiple_subset = TRUE)
                   ),
                   tabPanel("Variables",
+                           checkboxInput(ns("select_all"), "Select all", value = FALSE),
+                           br(),
                            div(style = 'overflow-x: scroll', DT::dataTableOutput(ns("variables_table")))
                   ),
                   tabPanel("Options",
@@ -179,34 +181,39 @@ dimRed <- function(input, output, session, rval) {
 
     progress$set(message = paste("Performing", input$dim_red_method, "..."), value = 0)
 
-    res <- dim_reduction(df = rval_mod$df_dim_red,
+    res <- try(dim_reduction(df = rval_mod$df_dim_red,
                          yvar = rval$parameters$name[input$variables_table_rows_selected],
                          Ncells = input$ncells,
                          y_trans = y_trans,
                          transformation = transformation,
                          method = input$dim_red_method,
                          perplexity = ifelse(is.null(input$perplexity), 50, input$perplexity)
-                         )
+                         ), silent = TRUE)
+    if(class(res) == "try-error"){
+      showModal(modalDialog(
+        title = "Eroor",
+        print(res),
+        easyClose = TRUE,
+        footer = NULL
+      ))
+    }else{
+      rval_mod$df_dim_red <- res$df
+      
+      df <- cbind( df_raw[res$keep, ], rval_mod$df_dim_red[ , setdiff(names(rval_mod$df_dim_red), names(df_raw))])
+      
+      rval$dim_red_var <- res$vars
+      
+      if(!is.null(rval_mod$df_dim_red)){
+        print(df)
+        
+        rval_mod$flow_set_dim_red <- build_flowset_from_df(df = df, fs = rval$flow_set)
+        
+        rval$flow_set_list[[input$fs_name]] <- list(flow_set = rval_mod$flow_set_dim_red, 
+                                                    name = input$fs_name, 
+                                                    parent = rval$flow_set_selected)
+        rval$flow_set_selected <- input$fs_name
+    }
     
-    rval_mod$df_dim_red <- res$df
-
-    df <- cbind( df_raw[res$keep, ], rval_mod$df_dim_red[ , setdiff(names(rval_mod$df_dim_red), names(df_raw))])
-
-    rval$dim_red_var <- res$vars
-
-    if(!is.null(rval_mod$df_dim_red)){
-      rval_mod$flow_set_dim_red <- build_flowset_from_df(df = df, fs = rval$flow_set)
-      
-      rval$flow_set_list[[input$fs_name]] <- list(flow_set = rval_mod$flow_set_dim_red, 
-                                                  name = input$fs_name, 
-                                                  parent = rval$flow_set_selected)
-      
-      rval$flow_set_selected <- input$fs_name
-      
-      #rval$flow_set_names <- unique(c(rval$flow_set_names, "dim-reduction"))
-      #rval$flow_set_selected <- "dim-reduction"
-
-      #updateSelectInput(session, "flow_set", choices = rval$flow_set_names, selected = "dim-reduction")
     }
 
 
@@ -221,9 +228,15 @@ dimRed <- function(input, output, session, rval) {
     df <- rval$parameters
     df[["channel_name"]] <- df$name_long
     
+    selected <- NULL
+    if(input$select_all){
+      selected <- 1:length(df$name)
+    }
+    
+    
     DT::datatable(
       df[, c("channel_name", "transform", "transform parameters")], 
-      rownames = FALSE)
+      rownames = FALSE, selection = list(target = 'row', selected = selected))
   })
   
   output$progressBox <- renderValueBox({

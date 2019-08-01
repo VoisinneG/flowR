@@ -125,6 +125,7 @@ compensation <- function(input, output, session, rval) {
   observeEvent(c(rval$flow_set_selected, rval$flow_set), {
     
     validate(need(rval$flow_set, "no flow-set available"))
+    validate(need(length(parameters(rval$flow_set[[1]])$name) < 100, "Maximum number of parameters exceeded (100)"))
     
     if(!"df_spill" %in% names(rval)){
       fs <- rval$flow_set

@@ -236,6 +236,15 @@ import <- function(input, output, session) {
         
         rval$flow_set_selected <- names(rval$flow_set_list)[[1]]
         
+      }else if(file_ext(rval_mod$df_files$datapath[input$files_table_rows_selected[1]]) %in% c("csv", "txt")){
+        df <- read.table(rval_mod$df_files$datapath[input$files_table_rows_selected[1]], header = TRUE, sep = "\t", as.is = TRUE)
+        print(df)
+        df$name <- basename(rval_mod$df_files$datapath[input$files_table_rows_selected[1]])
+        df$subset <- "root"
+        fs <- build_flowset_from_df(df)
+        rval$flow_set_list[[input$fs_name]] <- list(flow_set = fs, name = input$fs_name, parent = NULL)
+        rval$flow_set_selected <- input$fs_name
+        
       }else{
         
         fs <- ncdfFlow::read.ncdfFlowSet( rval_mod$df_files$datapath[input$files_table_rows_selected] , emptyValue=FALSE)
