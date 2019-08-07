@@ -5,11 +5,11 @@
 \alias{plotGatingSet}
 \title{plotGatingSetInput and plotGatingSet}
 \usage{
-plotGatingSetInput(id, simple_plot = TRUE)
+plotGatingSetInput(id, simple_plot = TRUE, auto_update = TRUE)
 
 plotGatingSet(input, output, session, rval,
   plot_params = reactiveValues(), simple_plot = TRUE,
-  show_gates = FALSE, polygon_gate = NULL)
+  auto_update = TRUE, show_gates = FALSE, polygon_gate = NULL)
 }
 \arguments{
 \item{id}{shiny id}

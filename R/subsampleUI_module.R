@@ -139,22 +139,23 @@ subsample <- function(input, output, session, rval) {
       need(length(rval_mod$df_sample)>0, "No cells in selection")
     )
     
-    print("OK")
-    print(dim(rval_mod$df_sample))
+    fs <- build_flowset_from_df(rval_mod$df_sample, 
+                                origin = rval$flow_set_list[[rval$flow_set_selected]])
     
-    rval_mod$flow_set_subsample <- build_flowset_from_df(rval_mod$df_sample, fs = rval$flow_set)
+    rval_mod$flow_set_subsample <- fs
     
-    
-    
-    
-    rval$flow_set_list[[input$fs_name]] <- list(flow_set = rval_mod$flow_set_subsample, 
+    rval$flow_set_list[[input$fs_name]] <- list(flow_set = fs, 
+                                                par = lapply(1:length(fs), function(x){parameters(fs[[x]])}),
+                                                desc = lapply(1:length(fs), function(x){description(fs[[x]])}),
                                                 name = input$fs_name, 
-                                                parent = rval$flow_set_selected)
+                                                parent = rval$flow_set_selected,
+                                                gates = rval$gates_flowCore[setdiff(getNodes(rval$gating_set), "root")],
+                                                spill = rval$df_spill,
+                                                transformation = rval$transformation,
+                                                trans_parameters = rval$trans_parameters)
     
     rval$flow_set_selected <- input$fs_name
     
-    # rval$flow_set_names <- unique(c(rval$flow_set_names, "sub-sample"))
-    # rval$flow_set_selected <- "sub-sample"
   })
   
   

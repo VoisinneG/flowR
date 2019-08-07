@@ -78,14 +78,41 @@ import <- function(input, output, session) {
       need(length(input$files_table_rows_selected)>0, "Please select a file to load")
     )
     if(file_ext(rval_mod$df_files$datapath[input$files_table_rows_selected[1]]) %in% c("xml", "wsp") ){
-      ws <- openWorkspace(rval_mod$df_files$datapath[input$files_table_rows_selected[1]])
-      groups <- unique(getSampleGroups(ws)$groupName)
+      ws <- try( openWorkspace(rval_mod$df_files$datapath[input$files_table_rows_selected[1]]),
+                 silent = TRUE)
+      if(class(ws) != "try-error"){
+        groups <- unique(getSampleGroups(ws)$groupName)
+      }
+      else{
+        ws <- try( openDiva(rval_mod$df_files$datapath[input$files_table_rows_selected[1]]),
+                   silent = TRUE)
+        if(class(ws) != "try-error"){
+          groups <- unique(getSampleGroups(ws)$specimen)
+        }
+      }
+      
+      if(class(ws) == "try-error"){
+        showModal(modalDialog(
+          title = "Error parsing xml workspace",
+          print(ws),
+          easyClose = TRUE,
+          footer = NULL
+        ))
+      }
+      
+      #groups <- unique(getSampleGroups(ws)$groupName)
       updateSelectInput(session, "groups", choices = groups, selected = groups[1])
     }
     
   })
   
   observeEvent(input$load, {
+    
+    rval$pdata <- NULL
+    rval$df_spill <- NULL
+    rval$transformation <- NULL
+    rval$trans_parameters <- NULL
+    rval$parameters <- NULL
     
     validate(
       need(length(input$files_table_rows_selected)>0, "Please select a file to load")
@@ -111,7 +138,21 @@ import <- function(input, output, session) {
     
       
       if(file_ext(rval_mod$df_files$datapath[input$files_table_rows_selected[1]]) %in% c("xml", "wsp")){
-        ws <- openWorkspace(rval_mod$df_files$datapath[input$files_table_rows_selected[1]])
+        ws <- try( openWorkspace(rval_mod$df_files$datapath[input$files_table_rows_selected[1]]),
+                   silent = TRUE)
+        if(class(ws) == "try-error"){
+          ws <- try( openDiva(rval_mod$df_files$datapath[input$files_table_rows_selected[1]]),
+                     silent = TRUE)
+        }
+        
+        if(class(ws) == "try-error"){
+          showModal(modalDialog(
+            title = "Error parsing xml workspace",
+            print(ws),
+            easyClose = TRUE,
+            footer = NULL
+          ))
+        }
   
         gs <- try(parseWorkspace(ws,
                                  name = input$groups,
@@ -121,10 +162,10 @@ import <- function(input, output, session) {
                                  path = dirname(rval_mod$df_files$datapath[1])),
                   silent = TRUE)
         
-        if(class(gs) != "GatingSet"){
+        if(class(gs) == "try-error"){
           showModal(modalDialog(
             title = "Error parsing xml workspace",
-            paste("Please try importing FCS files directly", sep=""),
+            print(gs),
             easyClose = TRUE,
             footer = NULL
           ))
@@ -207,31 +248,33 @@ import <- function(input, output, session) {
         
         names_imported <- fsApply(fs, function(x){description(x)[["FILENAME"]]})
         names_imported <- basename(names_imported)
-        #print(names_imported)
-        #idx_match <- sapply(names_imported, function(x){as.numeric(strsplit(x, split= ".", fixed = TRUE)[[1]][1])})
         idx_match <- match(names_imported, rval_mod$df_files$name)
-        
         fs <- ncdfFlow::read.ncdfFlowSet( rval_mod$df_files$datapath[idx_match] )
         phenoData(fs)$name <- rval_mod$df_files$name[idx_match]
-        rval$flow_set_list[[input$fs_name]] <- list(flow_set = fs, name = input$fs_name, parent = NULL)
+
+        rval$flow_set_list[[input$fs_name]] <- list(flow_set = fs,
+                                                    spill = NULL,
+                                                    metadata = pData(fs),
+                                                    par = lapply(1:length(fs), function(x){parameters(fs[[x]])}),
+                                                    desc = lapply(1:length(fs), function(x){description(fs[[x]])}),
+                                                    spill = NULL,
+                                                    parameters = NULL,
+                                                    transformation = NULL,
+                                                    trans_parameters = NULL,
+                                                    gates = rval$gates_flowCore,
+                                                    name = input$fs_name, 
+                                                    parent = NULL)
         rval$flow_set_selected <- input$fs_name
         
       }else if(file_ext(rval_mod$df_files$datapath[input$files_table_rows_selected[1]]) == "rda"){
+        
         res_name <- load(rval_mod$df_files$datapath[input$files_table_rows_selected[1]])
         res <- get(res_name)
+        rval$flow_set_list <- res
         
         for(i in 1:length(res)){
-          
-          fs <- build_flowset_from_df(df = res[[i]]$data, fs = res[[i]]$flow_set)
-          pData(fs) <- res[[i]]$metadata
-          
-          if(is.null(res[[i]]$parent)){
-            rval$transformation <- res[[i]]$transformation
-            rval$trans_parameters <- res[[i]]$trans_parameters
-            rval$df_spill <- res[[i]]$spill
-            rval$gates_flowCore <- res[[i]]$gates
-          }
-          rval$flow_set_list[[res[[i]]$name]] <- list(flow_set = fs, name = res[[i]]$name, parent = res[[i]]$parent)
+          fs <- build_flowset_from_df(df = res[[i]]$data, origin = res[[i]])
+          rval$flow_set_list[[i]]$flow_set <- fs
         }
         
         rval$flow_set_selected <- names(rval$flow_set_list)[[1]]
@@ -242,27 +285,44 @@ import <- function(input, output, session) {
         df$name <- basename(rval_mod$df_files$datapath[input$files_table_rows_selected[1]])
         df$subset <- "root"
         fs <- build_flowset_from_df(df)
-        rval$flow_set_list[[input$fs_name]] <- list(flow_set = fs, name = input$fs_name, parent = NULL)
+
+        rval$flow_set_list[[input$fs_name]] <- list(flow_set = fs,
+                                                    spill = NULL,
+                                                    metadata = pData(fs),
+                                                    par = lapply(1:length(fs), function(x){parameters(fs[[x]])}),
+                                                    desc = lapply(1:length(fs), function(x){description(fs[[x]])}),
+                                                    spill = NULL,
+                                                    parameters = NULL,
+                                                    transformation = NULL,
+                                                    trans_parameters = NULL,
+                                                    gates = list(),
+                                                    name = input$fs_name, 
+                                                    parent = NULL)
         rval$flow_set_selected <- input$fs_name
         
       }else{
         
         fs <- ncdfFlow::read.ncdfFlowSet( rval_mod$df_files$datapath[input$files_table_rows_selected] , emptyValue=FALSE)
         phenoData(fs)$name <- rval_mod$df_files$name[input$files_table_rows_selected]
-        rval$flow_set_list[[input$fs_name]] <- list(flow_set = fs, name = input$fs_name, parent = NULL)
+        
+        rval$flow_set_list[[input$fs_name]] <- list(flow_set = fs,
+                                                    spill = NULL,
+                                                    metadata = pData(fs),
+                                                    par = lapply(1:length(fs), function(x){parameters(fs[[x]])}),
+                                                    desc = lapply(1:length(fs), function(x){description(fs[[x]])}),
+                                                    spill = NULL,
+                                                    parameters = NULL,
+                                                    transformation = NULL,
+                                                    trans_parameters = NULL,
+                                                    gates = list(),
+                                                    name = input$fs_name, 
+                                                    parent = NULL)
         rval$flow_set_selected <- input$fs_name
       }
       
-      #Initialization of some reactive variables
-    
-      
-      
-      #rval$flow_set_imported <- fs
-      #rval$flow_set_names <- unique(c(rval$flow_set_names, "imported"))
-      #rval$flow_set_selected <- "imported"
-      
-    })
+  })
 
+  
   output$files_table <- DT::renderDataTable({
     validate(
       need(rval_mod$df_files, "Please select a file to import")

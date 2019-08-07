@@ -74,8 +74,10 @@ simpleDisplay <- function(input, output, session, plist, gate = reactiveValues()
          rval_plot$ncol <- ceiling(n/rval_plot$nrow)
          g <- gridExtra::marrangeGrob(plot_list(), nrow = rval_plot$nrow, ncol = rval_plot$ncol, top = "")
          g
-       }else{
+       }else if(n == 1){
          plot_list()[[1]]
+       }else{
+         plot_list()
        }
        
      }else{

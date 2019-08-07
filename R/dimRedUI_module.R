@@ -76,6 +76,7 @@ dimRed <- function(input, output, session, rval) {
     x <- list()
     if(input$dim_red_method == 'tSNE'){
       x[[1]] <- numericInput(ns("perplexity"), "perplexity", 50)
+      x[[2]] <- numericInput(ns("dims"), "# dimensions", 2)
     }
     tagList(x)
   })
@@ -187,7 +188,8 @@ dimRed <- function(input, output, session, rval) {
                          y_trans = y_trans,
                          transformation = transformation,
                          method = input$dim_red_method,
-                         perplexity = ifelse(is.null(input$perplexity), 50, input$perplexity)
+                         perplexity = ifelse(is.null(input$perplexity), 50, input$perplexity),
+                         dims = ifelse(is.null(input$dims), 2, input$dims)
                          ), silent = TRUE)
     if(class(res) == "try-error"){
       showModal(modalDialog(
@@ -204,13 +206,22 @@ dimRed <- function(input, output, session, rval) {
       rval$dim_red_var <- res$vars
       
       if(!is.null(rval_mod$df_dim_red)){
-        print(df)
+
+        fs <- build_flowset_from_df(df = df, 
+                                    origin = rval$flow_set_list[[rval$flow_set_selected]])
         
-        rval_mod$flow_set_dim_red <- build_flowset_from_df(df = df, fs = rval$flow_set)
+        rval_mod$flow_set_dim_red <- fs
         
-        rval$flow_set_list[[input$fs_name]] <- list(flow_set = rval_mod$flow_set_dim_red, 
+        rval$flow_set_list[[input$fs_name]] <- list(flow_set = fs, 
+                                                    par = lapply(1:length(fs), function(x){parameters(fs[[x]])}),
+                                                    desc = lapply(1:length(fs), function(x){description(fs[[x]])}),
                                                     name = input$fs_name, 
-                                                    parent = rval$flow_set_selected)
+                                                    parent = rval$flow_set_selected,
+                                                    gates = rval$gates_flowCore[setdiff(getNodes(rval$gating_set), "root")],
+                                                    spill = rval$df_spill,
+                                                    transformation = rval$transformation,
+                                                    trans_parameters = rval$trans_parameters)
+        
         rval$flow_set_selected <- input$fs_name
     }
     

@@ -50,10 +50,13 @@ flowR_server <- function(session, input, output, user_module_name = NULL) {
   rval <- callModule(cluster, "cluster_module", rval)
   
   # Display module
-  plot_display <- callModule(display, "plot_module", rval, module_server_name = "plotGatingSet", simple_plot = FALSE)
+  plot_display <- callModule(display, "plot_module", rval, 
+                             module_server_name = "plotGatingSet", 
+                             simple_plot = FALSE, auto_update = FALSE)
   
   # stat module
-  plot_statistics <- callModule(display, "statistics_module", rval, module_server_name = "plotStat")
+  plot_statistics <- callModule(display, "statistics_module", rval, 
+                                module_server_name = "plotStat")
   
   # save module
   callModule(saveWorkspace, "save_module", rval)
@@ -81,11 +84,9 @@ flowR_server <- function(session, input, output, user_module_name = NULL) {
   })
   
   ##########################################################################################################
-  ##########################################################################################################
   # observe and reactive functions
   
   observeEvent( c(names(rval$flow_set_list), rval$flow_set_selected), {
-    #print(rval$flow_set_selected)
     updateSelectInput(session, "flow_set", choices = names(rval$flow_set_list), selected = rval$flow_set_selected)
   })
   
@@ -98,6 +99,13 @@ flowR_server <- function(session, input, output, user_module_name = NULL) {
     
     rval$flow_set_selected <- input$flow_set
     rval$flow_set <- rval$flow_set_list[[input$flow_set]]$flow_set
+    rval$gates_flowCore <- rval$flow_set_list[[input$flow_set]]$gates
+    rval$df_spill <- rval$flow_set_list[[input$flow_set]]$spill
+    rval$parameters <- rval$flow_set_list[[input$flow_set]]$parameters
+    rval$transformation <- rval$flow_set_list[[input$flow_set]]$transformation
+    rval$trans_parameters <- rval$flow_set_list[[input$flow_set]]$trans_parameters
+    rval$pdata <- rval$flow_set_list[[input$flow_set]]$metadata
+    
     rval$gating_set <- GatingSet(rval$flow_set)
     rval$gating_set <- add_gates_flowCore(rval$gating_set, rval$gates_flowCore)
     
@@ -118,30 +126,16 @@ flowR_server <- function(session, input, output, user_module_name = NULL) {
     
   })
   
-  
-  # observeEvent(rval$flow_set, {
-  #   
-  #   validate(
-  #     need(rval$flow_set, "No flow set available")
-  #   )
-  #   
-  #   rval$gating_set <- GatingSet(rval$flow_set)
-  #   
-  #   # add gates
-  #   print(names(rval$gates_flowCore))
-  #   print("add2")
-  #   rval$gating_set <- add_gates_flowCore(rval$gating_set, rval$gates_flowCore)
-  #   
-  #   
+  # observe({
+  #   rval$flow_set_list[[input$flow_set]]$gates <- rval$gates_flowCore
+  #   rval$flow_set_list[[input$flow_set]]$spill <- rval$df_spill
+  #   rval$flow_set_list[[input$flow_set]]$transformation <- rval$transformation
+  #   rval$flow_set_list[[input$flow_set]]$trans_parameters <- rval$trans_parameters
+  #   rval$flow_set_list[[input$flow_set]]$metadata <- rval$pdata
   # })
   
   ##########################################################################################################
-  ##########################################################################################################
-  # Output 
-  
-  
-  ##########################################################################################################
-  # value boxes
+  # Output value boxes
   
   output$progressBox <- renderValueBox({
     valueBox(

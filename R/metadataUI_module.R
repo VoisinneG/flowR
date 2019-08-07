@@ -26,7 +26,8 @@ metadataUI <- function(id) {
                   ),
                   tabPanel(title = "Filter",
                            "Filter samples based on metadata",
-                           uiOutput(ns("filter_meta"))
+                           uiOutput(ns("filter_meta")),
+                           textInput(ns("fs_name"), "Flow-set name", "filter")
                   )
            )
     ),
@@ -78,6 +79,7 @@ metadata <- function(input, output, session, rval) {
     validate(need(rval$flow_set, "No flow set available"))
     pData(rval$flow_set) <- rval$pdata
     pData(rval$flow_set_list[[rval$flow_set_selected]]$flow_set) <- rval$pdata
+    rval$flow_set_list[[rval$flow_set_selected]]$metadata <- rval$pdata
   })
   
   observe({
@@ -196,11 +198,29 @@ metadata <- function(input, output, session, rval) {
     #print(samples)
     
     if(length(samples)>0){
+      
       idx_match <- match(samples, pData(rval$flow_set)$name)
-      rval$flow_set_filter <- rval$flow_set[idx_match]
-      rval$flow_set_names <- unique(c(rval$flow_set_names, "filter"))
-      rval$flow_set_selected <- "filter"
-      #updateSelectInput(session, ns("flow_set"), choices = rval$flow_set_names, selected = "filter")
+      flow_set_filter <- rval$flow_set[idx_match]
+      pdata <- rval$pdata
+      if(length(colnames(pdata))>1){
+        pData(flow_set_filter) <- pdata[idx_match, ]
+      }else{
+        phenoData(flow_set_filter)$name <- pdata[idx_match, ]
+      }
+      
+      fs <- flow_set_filter
+
+      rval$flow_set_list[[input$fs_name]] <- list(flow_set = fs, 
+                                                  par = lapply(1:length(fs), function(x){parameters(fs[[x]])}),
+                                                  desc = lapply(1:length(fs), function(x){description(fs[[x]])}),
+                                                  name = input$fs_name, 
+                                                  parent = rval$flow_set_selected,
+                                                  gates = rval$gates_flowCore[setdiff(getNodes(rval$gating_set), "root")],
+                                                  spill = rval$df_spill,
+                                                  transformation = rval$transformation,
+                                                  trans_parameters = rval$trans_parameters)
+      
+      rval$flow_set_selected <- input$fs_name
     }
     
   })

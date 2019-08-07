@@ -55,6 +55,12 @@ gatingUI <- function(id) {
                   ),
                   tabPanel(title = "Gates",
                            simpleDisplayUI(ns("simple_display_module_2"))
+                  ),
+                  tabPanel(title = "Stats",
+                           br(),
+                           div(style = 'overflow-x: scroll', DT::dataTableOutput(ns("pop_stats"))),
+                           br()  
+                      
                   )
                   
            )
@@ -83,11 +89,33 @@ gating <- function(input, output, session, rval) {
   plot_params <- reactiveValues()
   gate <- reactiveValues()
   
-  
-  # observe({
-  #   plot_params$xvar <- input$xvar_comp
-  #   plot_params$yvar <- input$yvar_comp
-  # })
+  observe({
+    
+    validate(
+      need(rval$plot_var, "No plotting parameters")
+    )
+    
+    idx_x <- grep("FSC", rval$plot_var)
+    if(length(idx_x)>0){
+      xvar <- rval$plot_var[idx_x[1]]
+    }else{
+      xvar <- rval$plot_var[1]
+    }
+    
+    idx_y <- grep("SSC", rval$plot_var)
+    if(length(idx_y)>0){
+      yvar <- rval$plot_var[idx_y[1]]
+    }else{
+      yvar <- rval$plot_var[2]
+    }
+    
+    plot_params$xvar <- xvar
+    plot_params$yvar <- yvar
+    plot_params$plot_type <- "dots"
+    plot_params$color_var <- NULL
+    plot_params$gate <- "root"
+    
+  })
   
   res <- callModule(plotGatingSet, "plot_module", rval, plot_params, simple_plot = TRUE, show_gates = TRUE, polygon_gate = gate)
   res_display <- callModule(simpleDisplay, "simple_display_module", res$plot, gate = gate)
@@ -96,15 +124,36 @@ gating <- function(input, output, session, rval) {
   
   # callModule(simpleDisplay, "simple_display_module", res$plot())
   
+  observe({
+    
+    for(var in intersect( names(res$params), c("xvar", "yvar", "gate", "samples") )){
+      if(!is.null(res$params[[var]])){
+        print("res$params[[var]] comp")
+        print(res$params[[var]])
+        if(res$params[[var]] != "") {
+          plot_params[[var]] <- res$params[[var]]
+        }
+      }else{
+        plot_params[[var]] <- res$params[[var]]
+      }
+    }
+    
+  })
+  
+  
   output$plot_gate <- renderPlot({
     res$plot()[[1]]
   })
   
-
+  
+  
+  
   ##########################################################################################################
   # Observe functions for gating
   
-
+  
+  
+  
   
   observeEvent(res_display$params$plot_click, {
     
@@ -113,6 +162,11 @@ gating <- function(input, output, session, rval) {
     
     gate$x <- c(gate$x, rval$transformation[[xvar]]$inverse(res_display$params$plot_click$x))
     gate$y <- c(gate$y, rval$transformation[[yvar]]$inverse(res_display$params$plot_click$y))
+    
+    idx <- chull(gate$x, gate$y)
+    
+    gate$x <- gate$x[idx]
+    gate$y <- gate$y[idx]
     
   })
   
@@ -247,8 +301,6 @@ gating <- function(input, output, session, rval) {
         plot_params$yvar <- params[2]
       }
       
-      print(plot_params$gate)
-      
       gate$x <- NULL
       gate$y <- NULL
 
@@ -258,13 +310,7 @@ gating <- function(input, output, session, rval) {
 
   })
   
-  observe({
-    if(res$params$xvar != "") {
-      plot_params$xvar <- res$params$xvar
-      plot_params$yvar <- res$params$yvar
-      plot_params$gate <- res$params$gate
-    }
-  })
+  
   
   ##########################################################################################################
   # Output messages
@@ -277,10 +323,6 @@ gating <- function(input, output, session, rval) {
   
   ##########################################################################################################
   # Output plots
-  
-  output$flow_set_tree <- renderPlot({
-    
-  })
   
   output$tree <- renderPlot({
     
@@ -313,6 +355,15 @@ gating <- function(input, output, session, rval) {
     }
   )
   
+  output$pop_stats <- DT::renderDataTable({
+    validate(need(rval$gating_set, "No gating set available"))
+    df <- getPopStats(rval$gating_set)
+    df <- df[df$name %in% res$params$samples, ]
+    df[['%']] <- format(df$Count / df$ParentCount * 100, digits = 1)
+    DT::datatable(
+      df[, c("name", "Population", "Parent", "%", "Count", "ParentCount")],
+      rownames = FALSE)
+  })
   
   return(rval)
   

@@ -23,6 +23,7 @@ Imports:
   CytoML,
   Rgraphviz,
   graph,
+  igraph,
   scales,
   tools,
   utils,
@@ -30,9 +31,11 @@ Imports:
   viridis,
   Rtsne,
   umap,
-  ClusterX
+  ClusterX,
+  Rphenograph
 Remotes: 
   JinmiaoChenLab/ClusterX,
+  JinmiaoChenLab/Rphenograph
 biocViews:
 LazyData: TRUE
 License: file LICENSE

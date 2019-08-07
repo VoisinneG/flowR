@@ -88,7 +88,8 @@ plotGatingHierarchy <- function(input, output, session, rval, plot_params = reac
                  type = type,
                  alpha = plot_params$alpha,
                  size = plot_params$size,
-                 show.legend = FALSE)
+                 show.legend = FALSE,
+                 theme_name = paste("theme_", plot_params$theme, sep = ""))
     
     p
     

@@ -17,7 +17,8 @@ compensationUI <- function(id) {
              tabBox(title = "",
                     width = NULL, height = NULL,
                     tabPanel(title = "Heatmap",
-                             plotly::plotlyOutput(ns("heatmap_spill"))
+                             plotly::plotlyOutput(ns("heatmap_spill")),
+                             checkboxInput(ns("show_all_channels"), "Show all channels", FALSE)
                     ),
                     tabPanel("Set",
                              selectInput(ns("xvar_comp"), label = "column (chanel)", choices = NULL, selected = NULL),
@@ -80,7 +81,7 @@ compensationUI <- function(id) {
                            simpleDisplayUI(ns("simple_display_module"))
                   ),
                   tabPanel(title = "Parameters",
-                           plotGatingSetInput(id = ns("plot_module"), simple_plot = TRUE)
+                           plotGatingSetInput(id = ns("plot_module"), simple_plot = FALSE)
                   )
            )
            
@@ -108,26 +109,65 @@ compensation <- function(input, output, session, rval) {
   plot_params <- reactiveValues()
   
   observe({
-    plot_params$xvar <- input$xvar_comp
+    
+    validate( need(rval$df_spill, "No plotting parameters"))
+    
+    plot_params$xvar <- colnames(rval$df_spill)[1]
+    plot_params$yvar <- colnames(rval$df_spill)[2]
+    plot_params$plot_type <- "dots"
+    plot_params$color_var <- NULL
+    
+  })
+
+  observe({
+    if(input$show_all_channels){
+      channels <- rval$parameters$name_long[match(colnames(rval$df_spill), rval$parameters$name)]
+      plot_params$xvar <- setdiff(channels, input$yvar_comp)
+      print(plot_params$xvar)
+    }else{
+      plot_params$xvar <- input$xvar_comp
+    }
     plot_params$yvar <- input$yvar_comp
   })
   
-  res <- callModule(plotGatingSet, "plot_module", rval, plot_params, simple_plot = TRUE)
+  res <- callModule(plotGatingSet, "plot_module", rval, plot_params, simple_plot = FALSE)
   callModule(simpleDisplay, "simple_display_module", res$plot)
+  
+  observe({
+    
+    for(var in intersect( names(res$params), c("xvar", "yvar", "color_var", "gate", "samples") )){
+      if(!is.null(res$params[[var]])){
+        print("res$params[[var]] comp")
+        print(res$params[[var]])
+        if(res$params[[var]] != "") {
+          plot_params[[var]] <- res$params[[var]]
+        }
+      }else{
+        plot_params[[var]] <- res$params[[var]]
+      }
+    }
+    
+  })
   
   output$plot_comp <- renderPlot({
     res$plot()[[1]]
   })
-
+  
+  
   ##########################################################################################################
   # Observe functions for compensation
   
-  observeEvent(c(rval$flow_set_selected, rval$flow_set), {
+  
+  observeEvent(rval$flow_set, {
+    
+    print("update spill")
+    print(rval$df_spill)
     
     validate(need(rval$flow_set, "no flow-set available"))
     validate(need(length(parameters(rval$flow_set[[1]])$name) < 100, "Maximum number of parameters exceeded (100)"))
     
-    if(!"df_spill" %in% names(rval)){
+    
+    if(is.null(rval$df_spill)){
       fs <- rval$flow_set
       m <- diag( length(parameters(fs[[1]])$name) )
       colnames(m) <- parameters(fs[[1]])$name
@@ -150,9 +190,32 @@ compensation <- function(input, output, session, rval) {
       
       rval$df_spill_original <- rval$df_spill
     }
-
+    
+    print(rval$df_spill)
+    
   })
   
+  observeEvent(rval$df_spill, {
+    
+    validate(need(rval$flow_set_list, "No flow-sets available"))
+    validate(need(rval$flow_set_selected, "No flow-set selected"))
+    
+    print("flow-sets")
+    print(rval$flow_set_selected)
+    print(get_all_descendants(rval$flow_set_list, rval$flow_set_selected))
+    print(get_all_ancestors(rval$flow_set_list, rval$flow_set_selected))
+    
+    items_to_update <- union(rval$flow_set_selected,
+                                union(get_all_descendants(rval$flow_set_list, rval$flow_set_selected),
+                                      get_all_ancestors(rval$flow_set_list, rval$flow_set_selected)))
+                               
+    print("updating spill")
+                             
+    print(items_to_update)
+    for(i in 1:length(items_to_update)){
+      rval$flow_set_list[[items_to_update[i]]]$spill <- rval$df_spill
+    }
+  })
   
   observeEvent(input$add_spill_param, {
     
@@ -330,6 +393,8 @@ compensation <- function(input, output, session, rval) {
     #}
     
   })
+  
+  
   
   observe({
     updateNumericInput(session, "spill_value", step = input$step_size)

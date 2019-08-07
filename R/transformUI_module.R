@@ -91,6 +91,19 @@ transform <- function(input, output, session, rval) {
   
   plot_params <- reactiveValues()
   
+  
+  
+  observe({
+    
+    validate( need(rval$plot_var, "No plotting parameters"))
+    
+    plot_params$xvar <- rval$plot_var[1]
+    plot_params$yvar <- rval$plot_var[2]
+    plot_params$plot_type <- "histogram"
+    plot_params$color_var <- NULL
+    
+  })
+  
   observe({
     if(length(input$parameters_table_rows_selected)>0){
     plot_params$xvar <- rval$parameters$name_long[input$parameters_table_rows_selected[1]]
@@ -106,17 +119,34 @@ transform <- function(input, output, session, rval) {
   callModule(simpleDisplay, "simple_display_module", res$plot)
   
 
-  #get parameters information from flow set
   observe({
+    
+    for(var in intersect( names(res$params), c("xvar", "yvar", "color_var", "gate", "samples") )){
+      if(!is.null(res$params[[var]])){
+        print("res$params[[var]] comp")
+        print(res$params[[var]])
+        if(res$params[[var]] != "") {
+          plot_params[[var]] <- res$params[[var]]
+        }
+      }else{
+        plot_params[[var]] <- res$params[[var]]
+      }
+    }
+    
+  })
+  
+  #get parameters information from flow set
+  observeEvent(rval$flow_set, {
     
     validate(
       need(rval$flow_set, "No flow set available")
     )
     
     ff <- rval$flow_set[[1]]
-    
-    if(!"parameters" %in% names(rval) | !setequal(rval$parameters$name, parameters(ff)$name)){
-      
+    print("update param")
+    print(rval$parameters)
+    #if(is.null(rval$parameters) | !setequal(rval$parameters$name, parameters(ff)$name)){
+    if(is.null(rval$parameters)){
       
       desc <- as.character(parameters(ff)$desc)
       name <- as.character(parameters(ff)$name)

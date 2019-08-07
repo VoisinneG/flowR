@@ -43,18 +43,6 @@ selection <- function(input, output, session, rval, params = reactiveValues()) {
   
   `%then%` <- shiny:::`%OR%`
   
-  #rval_int <- reactiveValues()
-  
-  # output$sample_table <- DT::renderDataTable({
-  #   if(!is.null(rval$flow_set)){
-  #     data.frame("name" = rval$pdata$name, row.names = NULL)
-  #   }
-  # })
-  # 
-  # observe({
-  #   rval_int$samples <- input$sample_table_rows_selected
-  # })
-  
   observe({
     validate(need(rval$gates_flowCore, "no gating set"))
     updateSelectInput(session, "gate", choices = union("root", names(rval$gates_flowCore)), selected = "root")
@@ -75,8 +63,6 @@ selection <- function(input, output, session, rval, params = reactiveValues()) {
       updateSelectInput(session, "samples", choices = rval$pdata$name, selected = rval$pdata$name)
     }
   })
-  
-  
   
   return(input )
   

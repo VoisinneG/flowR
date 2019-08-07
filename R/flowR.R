@@ -153,6 +153,31 @@ ellipse_path <- function(cov, mean, n = 100){
   return(df)
 }
 
+get_all_descendants <- function(named_list, names){
+  
+  parents <- sapply(named_list, function(x){x$parent}) 
+  children <- names(named_list)[parents %in% names]
+  children_all <- children
+  while(length(children)>0){
+    children <- get_all_descendants(named_list, children)
+    children_all <- unique(c(children_all, children))
+  }
+  return(children_all)
+  
+}
+
+get_all_ancestors <- function(named_list, names){
+  
+  parents <- sapply(named_list, function(x){x$parent}) 
+  parents <- unlist(parents[names(named_list) %in% names])
+  parents_all <- parents
+  while(length(parents)>0){
+    parents <- get_all_ancestors(named_list, parents)
+    parents_all <- unique(c(parents_all, parents))
+  }
+  return(parents_all)
+  
+}
 
 #' @import flowWorkspace
 get_gates_from_gs <- function(gs){
@@ -180,7 +205,7 @@ get_gates_from_ws <- function(ws_path, group = NULL){
   
   # get Groups info
   GroupNodes <- xml_find_all(ws, "//GroupNode")
-  group_info <-  lapply(GroupNodes, parseGroupNodes)
+  group_info <- lapply(GroupNodes, parseGroupNodes)
   group_info <- data.frame( do.call(rbind, group_info ) )
   #print(group_info)
   
@@ -416,6 +441,7 @@ get_data_gs <- function(gs,
   }
   
   if(!is.null(spill)){
+    spill <- spill[row.names(spill) %in% colnames(gs), colnames(spill) %in% colnames(gs)]
     gates <- get_gates_from_gs(gs)
     fs <- getData(gs[idx])
     spill_list <- lapply(1:length(idx), function(x){return(spill)})
@@ -561,20 +587,20 @@ plot_gs <- function(df = NULL,
                     xvar = NULL,
                     yvar = NULL,
                     axis_labels = NULL,
-                    color_var = "name", 
+                    color_var = NULL, 
                     data_range = NULL,
                     min_value = NULL,
                     gate=NULL, 
                     polygon_gate = NULL,
                     type = "hexagonal", 
-                    bins = 30,
-                    alpha = 0.5,
-                    size = 1,
+                    bins = 100,
+                    alpha = 0.25,
+                    size = 0.1,
                     transformation = NULL,
                     default_trans = identity_trans(),
                     spill = NULL,
                     metadata = NULL,
-                    facet_vars = "name",
+                    facet_vars = NULL,
                     #group_var = "name",
                     yridges_var = "name",
                     norm_density = TRUE,
@@ -583,10 +609,19 @@ plot_gs <- function(df = NULL,
                     bw = 0.1,
                     show.legend = TRUE,
                     legend.position = "right",
-                    use_log10_count = TRUE
+                    use_log10_count = TRUE,
+                    theme_name = "theme_gray"
                     ){
+  if(!is.null(color_var)){
+    if(color_var == ""){
+      color_var <- NULL
+    }
+  }
   
   
+  theme_function <- function(...){
+    do.call(theme_name, list(...))
+  }
   
   if(!is.null(gs)){
     idx <- match(sample, pData(gs)$name)
@@ -681,6 +716,8 @@ plot_gs <- function(df = NULL,
   # }
   
   if( !setequal( xvar[xvar %in% names(df)], xvar ) | !setequal( yvar[yvar %in% names(df)], yvar ) ){
+    print(xvar)
+    print(yvar)
     warning("Some variables could not be found in flowData")
     return(NULL)
   }
@@ -796,24 +833,26 @@ plot_gs <- function(df = NULL,
     if(type == "dots"){
 
       if(!is.null(color_var)){
-        
-          #idx_col <- match(color_var, names(df))
-          p <- p + geom_point(mapping = aes_( #group = as.name(group_var), 
-                                              colour = as.name(color_var)),
-                              alpha = alpha, 
-                              size = size, 
-                              show.legend = show.legend)
-          
-          if(color_var %in% gs@data@colnames){
-            if(color_var != "cluster"){
-              p <- p + scale_colour_viridis(trans = transformation[[color_var]], name = color_var)
-            }
+          if(color_var != ""){
+            #idx_col <- match(color_var, names(df))
+            p <- p + geom_point(mapping =  aes_(colour = as.name(color_var)),
+                                alpha = alpha, 
+                                size = size, 
+                                show.legend = show.legend)
             
+            if(color_var %in% gs@data@colnames){
+              if(color_var != "cluster"){
+                p <- p + scale_colour_viridis(trans = transformation[[color_var]], name = color_var)
+              }
+              
+            }
+          }else{
+            p <- p + geom_point(alpha = alpha, 
+                                size = size, 
+                                show.legend = show.legend)
           }
-        
       }else{
-        p <- p + geom_point(mapping = aes_string(colour = color_var), 
-                            alpha = alpha, 
+        p <- p + geom_point(alpha = alpha, 
                             size = size, 
                             show.legend = show.legend)
       }
@@ -821,11 +860,27 @@ plot_gs <- function(df = NULL,
 
     
     if(type == "contour"){
-      p <- p + geom_density_2d(mapping = aes_string(color = color_var), 
-                              alpha = alpha, 
-                              size =size, 
-                              n = bins, 
-                              show.legend = show.legend) 
+      if(!is.null(color_var)){
+        if(color_var != ""){
+          p <- p + geom_density_2d(mapping =  aes_(colour = as.name(color_var)), 
+                                   alpha = alpha, 
+                                   size =size, 
+                                   n = bins, 
+                                   show.legend = show.legend) 
+        }else{
+          p <- p + geom_density_2d(alpha = alpha, 
+                                   size =size, 
+                                   n = bins, 
+                                   show.legend = show.legend) 
+        }
+        
+      }else{
+        p <- p + geom_density_2d(alpha = alpha, 
+                                 size =size, 
+                                 n = bins, 
+                                 show.legend = show.legend) 
+      }
+      
     }
     
   }
@@ -875,8 +930,8 @@ plot_gs <- function(df = NULL,
       
         idx_match <- match(c(xvar, yvar), names(polygon))
         
-        if(sum(is.na(idx_match))==0){
-          
+        #if(sum(is.na(idx_match))==0){
+         if(setequal(c(xvar, yvar), names(polygon))){ 
           df_trans <- polygon
           
           df_trans[,idx_match[1]] <- transformation[[xvar]]$transform(df_trans[,idx_match[1]])
@@ -973,8 +1028,6 @@ plot_gs <- function(df = NULL,
   
   labx <- ifelse(is.null(axis_labels), xvar, axis_labels[[xvar]])
   p <- p + scale_x_continuous(name = labx, trans = transformation[[xvar]], limits = xlim) 
-  p <- p + theme(plot.title = element_text(face = "bold"),
-                 legend.position = legend.position)
   
   if(length(subset)==1){
     p <- p + ggtitle(subset)
@@ -984,6 +1037,9 @@ plot_gs <- function(df = NULL,
     laby <- ifelse(is.null(axis_labels), yvar, axis_labels[[yvar]])
     p <- p + scale_y_continuous(name = laby, trans = transformation[[yvar]], limits = ylim) 
   }
+  
+  p <- p + theme_function() + 
+    theme(plot.title = element_text(face = "bold"), legend.position = legend.position)
   
   p
   
@@ -1088,15 +1144,21 @@ plot_stat <- function(df = NULL,
                       scale_values = FALSE,
                       free_y_scale = TRUE,
                       max_scale = 0,
-                      facet_vars = "name",
+                      facet_vars = NULL,
                       group_var = "subset",
                       expand_factor = 0.2,
                       stat_function = "mean",
                       show.legend = TRUE,
                       y_trans = NULL,
-                      strip.text.y.angle = 0
-                    
+                      strip.text.y.angle = 0,
+                      theme_name = "theme_gray"
 ){
+  
+  theme_function <- function(...){
+    do.call(theme_name, list(...))
+  }
+                    
+
   
   #if(log10_trans){
   #  trans <- log10_trans()
@@ -1264,6 +1326,7 @@ plot_stat <- function(df = NULL,
     
    
     p <- p + coord_cartesian(ylim = ylim, expand = free_y_scale)
+        
     
     
       #geom_boxplot(mapping = aes_string( y = "value", fill = "variable")) +
@@ -1291,9 +1354,11 @@ plot_stat <- function(df = NULL,
   # general plot parameters
   
   
-  p <- p + theme( axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5), 
-                  strip.text.y = element_text(angle = strip.text.y.angle)
-                  )
+  p <- p +
+    theme_function() +
+    theme( axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5), 
+           strip.text.y = element_text(angle = strip.text.y.angle)
+    )
     
   trans_name_plot <- trans_name
   if(length(trans_name)>1){
@@ -1319,6 +1384,7 @@ dim_reduction <- function(df,
                           transformation = NULL,
                           y_trans = log10_trans(),
                           perplexity = 50,
+                          dims = 2,
                           method = "tSNE"){
   
   idx_cells_kept <- 1:dim(df)[1]
@@ -1380,7 +1446,7 @@ dim_reduction <- function(df,
   }
 
   if(method == "tSNE"){
-    tSNE <- Rtsne(df_trans[ idx_cells , yvar], perplexity = perplexity)
+    tSNE <- Rtsne(df_trans[ idx_cells , yvar], perplexity = perplexity, dims = dims)
     df_tSNE <- tSNE$Y
     colnames(df_tSNE) <- c("tSNE1","tSNE2")
     return(list( df = cbind(df_filter[idx_cells, ], df_tSNE), keep = idx_cells_kept, vars = c("tSNE1","tSNE2")))
@@ -1405,6 +1471,8 @@ dim_reduction <- function(df,
 # Clustering
 
 #' @import ClusterX
+#' @import Rphenograph
+#' @import igraph
 #' @import scales
 get_cluster <- function(df,
                         yvar,
@@ -1412,6 +1480,7 @@ get_cluster <- function(df,
                         y_trans = identity_trans(),
                         dc=3, 
                         alpha = 0.001,
+                        k = 100,
                         method = "ClusterX"){
          
   idx_cells_kept <- 1:dim(df)[1]
@@ -1445,11 +1514,17 @@ get_cluster <- function(df,
     idx_cells_kept <- idx_cells_kept[-idx_filter]
   }
   
-  message(paste("Clustering ", dim(df_trans)[1], " cells using 'CluserX' on ",  length(yvar), " parameters", sep = ""))
   
-  DC <- ClusterX(df_trans[ , yvar], dc = dc, alpha = alpha)
-  df_filter$cluster <- DC$cluster
-  
+  if(method == "Rphenograph"){
+    message(paste("Clustering ", dim(df_trans)[1], " cells using 'Rphenograph' on ",  length(yvar), " parameters", sep = ""))
+    Rphenograph_out <- Rphenograph(df_trans[ , yvar], k = k)
+    df_filter$cluster <- igraph::membership(Rphenograph_out[[2]])
+  }else if(method == "ClusterX"){
+    message(paste("Clustering ", dim(df_trans)[1], " cells using 'CluserX' on ",  length(yvar), " parameters", sep = ""))
+    DC <- ClusterX(df_trans[ , yvar], dc = dc, alpha = alpha)
+    df_filter$cluster <- DC$cluster
+  }
+ 
   return(list(df = df_filter, keep = idx_cells_kept))
   
 }
@@ -1460,7 +1535,7 @@ get_cluster <- function(df,
 
 #' @import flowCore
 build_flowset_from_df <- function(df,
-                                  fs = NULL,
+                                  origin = NULL,
                                   chanel_col = setdiff(names(df), c("name", "subset")), 
                                   sample_col = "name"){
   
@@ -1480,17 +1555,20 @@ build_flowset_from_df <- function(df,
       par <- NULL
       desc <- NULL
       
-      if(!is.null(fs)){
+      if(!is.null(origin)){
         
-        idx <- match(sample, pData(fs)$name)
+        idx <- match(sample, pData(origin$flow_set)$name)
         
         if(!is.na(idx)){
           
-          par <- parameters(fs[[idx]])
+          #par <- parameters(fs[[idx]])
+          par <- origin$par[[idx]]
+          
           par@data$name <- as.character(par@data$name)
           par@data$desc <- as.character(par@data$desc)
           
-          desc <- description(fs[[idx]])
+          #desc <- description(fs[[idx]])
+          desc <- origin$desc[[idx]]
           new_par <- setdiff(chanel_col, par@data$name)
           npar <- length(par@data$name)
           
@@ -1521,8 +1599,8 @@ build_flowset_from_df <- function(df,
   
   if(length(ff_list)>0){
     fs_new <- flowSet(ff_list)
-    if(!is.null(fs)){
-      pdata <- data.frame(pData(fs))
+    if(!is.null(origin)){
+      pdata <- data.frame(pData(origin$flow_set))
       idx_match <- match(samples, pdata$name)
       if(length(colnames(pdata))>1){
         pData(fs_new) <- pdata[idx_match, ]

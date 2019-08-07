@@ -23,7 +23,7 @@ clusterUI <- function(id) {
                                          label = "Transform variables:",
                                          choices = c("log10", "asinh", "identity", "default"),
                                          selected = "default"),
-                             selectInput(ns("clustering_method"), label = "method", choices = c("ClusterX"), selected = "ClusterX"),
+                             selectInput(ns("clustering_method"), label = "method", choices = c("ClusterX", "Rphenograph"), selected = "ClusterX"),
                              uiOutput(ns("method_ui"))
                     ),
                     tabPanel("Cluster",
@@ -70,6 +70,8 @@ cluster <- function(input, output, session, rval) {
     if(input$clustering_method == 'ClusterX'){
       x[[1]] <- numericInput(ns("cluster_dc"), "dc", 5)
       x[[2]] <- numericInput(ns("cluster_alpha"), "alpha", 0.0001)
+    }else if(input$clustering_method == 'Rphenograph'){
+      x[[1]] <- numericInput(ns("k_param"), "k", 100)
     }
     tagList(x)
   })
@@ -183,14 +185,17 @@ cluster <- function(input, output, session, rval) {
                        yvar = rval$parameters$name[input$clustering_variables_table_rows_selected],
                        y_trans = y_trans,
                        transformation = transformation,
+                       method = input$clustering_method,
                        dc = ifelse(is.null(input$cluster_dc), 5, input$cluster_dc), 
-                       alpha = ifelse(is.null(input$cluster_alpha), 0.0001, input$cluster_alpha)
+                       alpha = ifelse(is.null(input$cluster_alpha), 0.0001, input$cluster_alpha),
+                       k = ifelse(is.null(input$k_param), 100, input$k_param)
     )
     
     rval_mod$df_cluster <- res$df
     df <- cbind(df_raw[res$keep, ], rval_mod$df_cluster[c("cluster")])
     
-    rval_mod$flow_set_cluster <- build_flowset_from_df(df, fs = rval$flow_set)
+    fs <- build_flowset_from_df(df = df, origin = rval$flow_set_list[[rval$flow_set_selected]])
+    rval_mod$flow_set_cluster <- fs
     
     # delete previous cluster gates
     
@@ -218,19 +223,18 @@ cluster <- function(input, output, session, rval) {
       rval$gates_flowCore[[paste("/",filterID, sep="")]] <- list(gate = g, parent = "root")
     }
     
-    
-    
-    rval$flow_set_list[[input$fs_name]] <- list(flow_set = rval_mod$flow_set_cluster, 
+    rval$flow_set_list[[input$fs_name]] <- list(flow_set = fs, 
+                                                par = lapply(1:length(fs), function(x){parameters(fs[[x]])}),
+                                                desc = lapply(1:length(fs), function(x){description(fs[[x]])}),
                                                 name = input$fs_name, 
-                                                parent = rval$flow_set_selected)
+                                                parent = rval$flow_set_selected,
+                                                gates = rval$gates_flowCore,
+                                                spill = rval$df_spill,
+                                                transformation = rval$transformation,
+                                                trans_parameters = rval$trans_parameters)
     
     rval$flow_set_selected <- input$fs_name
-    
-    
-    #rval$flow_set_names <- unique(c(rval$flow_set_names, "cluster"))
-    #rval$flow_set_selected <- "cluster"
-    
-    #updateSelectInput(session, "flow_set", choices = rval$flow_set_names, selected = "cluster")
+
     
   })
   

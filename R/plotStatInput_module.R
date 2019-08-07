@@ -70,7 +70,11 @@ plotStatInput <- function(id) {
         checkboxInput(ns("scale_values"), "scale values by row", value = FALSE),
         numericInput(ns("max_scale"), label = "scale limit", value = 2),
         numericInput(ns("expand_factor"), label = "expand factor", value = 0.1),
-        numericInput(ns("strip_text_angle"), label = "strip text angle", value = 0)
+        numericInput(ns("strip_text_angle"), label = "strip text angle", value = 0),
+        selectInput(ns("theme"), 
+                    label = "plot theme", 
+                    choices = c("gray", "light", "minimal", "classic", "bw", "dark", "void"), 
+                    selected = "gray")
     )
     
   )
@@ -208,7 +212,9 @@ plotStat <- function(input, output, session, rval) {
                    stat_function = input$stat_function,
                    show.legend = input$legend,
                    y_trans = y_trans,
-                   strip.text.y.angle = input$strip_text_angle)
+                   strip.text.y.angle = input$strip_text_angle,
+                   theme_name = paste("theme_", input$theme, sep = "")
+                   )
     
     p                          
     

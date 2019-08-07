@@ -4,12 +4,12 @@
 #' @importFrom shinydashboard box tabBox
 #' @import shiny
 #' @import DT
-plotGatingSetInput <- function(id, simple_plot = TRUE) {
+plotGatingSetInput <- function(id, simple_plot = TRUE, auto_update = TRUE) {
   # Create a namespace function using the provided id
   ns <- NS(id)
   
   tagList(
-    if(!simple_plot){
+    if(!auto_update){
       tagList(
         actionButton(ns("update_plot"), "update"),
         br(),
@@ -19,50 +19,20 @@ plotGatingSetInput <- function(id, simple_plot = TRUE) {
     box(collapsible = TRUE, collapsed = TRUE, width = NULL, height = NULL,
         title = "Sample/Subset",
         selectionInput(ns("selection_module"), multiple_subset = !simple_plot)
-        # checkboxInput(ns("all_samples"), "Select all samples", FALSE),
-        # selectizeInput(ns("samples"), 
-        #                label = "samples",
-        #                choices = NULL,
-        #                selected = NULL,
-        #                multiple = TRUE),
-        # selectizeInput(ns("gate"), 
-        #                label = "subset",
-        #                choices = "root",
-        #                selected = "root",
-        #                multiple = !simple_plot)
     ),
     box(collapsible = TRUE, collapsed = FALSE, width = NULL, height = NULL,
         title ="Variables",
         selectizeInput(ns("xvar"), 
+                        multiple = !simple_plot,
+                        label = "x variable", 
+                        choices = NULL,
+                        selected = NULL),
+        selectizeInput(ns("yvar"),
                        multiple = !simple_plot,
-                       label = "x variable", 
-                       choices = NULL, 
+                       label = "y variable",
+                       choices = NULL,
                        selected = NULL),
-        selectizeInput(ns("yvar"), 
-                       multiple = !simple_plot,
-                       label = "y variable", 
-                       choices = NULL, 
-                       selected = NULL),
-        selectizeInput(ns("color_var"), 
-                       multiple = !simple_plot,
-                       label = "color variable",
-                       choices = "none",
-                       selected = "none"),
-        if(!simple_plot){
-          tagList(
-            selectizeInput(ns("facet_var"), 
-                           multiple =TRUE,
-                           label = "facet variables",
-                           choices = "name",
-                           selected = "name"
-            ),
-            selectInput(ns("split_variable"),
-                        label = "select variable used to split plots",
-                        choices = c("x variable", "y variable", "color variable"),
-                        selected = "x variable"
-            )
-          )
-        }
+        uiOutput(ns("plot_variables"))
     ),
     box(collapsible = TRUE, collapsed = TRUE, width = NULL, height = NULL,
         title ="Options",
@@ -70,13 +40,14 @@ plotGatingSetInput <- function(id, simple_plot = TRUE) {
                     choices = c("hexagonal", "histogram", "dots", "contour"),
                     selected = "histogram"),
         checkboxInput(ns("legend"), "show legend", value = TRUE),
-        uiOutput(ns("histo_options")),
         selectInput(ns("legend_pos"), label = "legend position",
                     choices = c("right", "top", "left", "bottom"),
                     selected = "right"),
-        numericInput(ns("bin_number"), label = "number of bins", value = 50),
-        numericInput(ns("alpha"), label = "alpha", value = 0.5),
-        numericInput(ns("size"), label = "size", value = 1)
+        selectInput(ns("theme"), 
+                    label = "plot theme", 
+                    choices = c("gray", "light", "minimal", "classic", "bw", "dark", "void"), 
+                    selected = "gray"),
+        uiOutput(ns("plot_options"))
     )
                  
   )
@@ -98,140 +69,166 @@ plotGatingSetInput <- function(id, simple_plot = TRUE) {
 plotGatingSet <- function(input, output, session, 
                           rval, 
                           plot_params = reactiveValues(), 
-                          simple_plot = TRUE, 
+                          simple_plot = TRUE,
+                          auto_update = TRUE,
                           show_gates = FALSE,
                           polygon_gate = NULL) {
   
   `%then%` <- shiny:::`%OR%`
   #ns <- session$ns
   
+  rval_plot_default <- reactiveValues(norm = TRUE,
+                              smooth = FALSE,
+                              ridges = FALSE,
+                              yridges_var = "subset",
+                              bin_number = 100,
+                              alpha = 0.2,
+                              size = 0.1,
+                              xvar = NULL,
+                              yvar = NULL,
+                              color_var = NULL,
+                              facet_var = NULL,
+                              split_variable = "x_variable")
+  
   rval_plot <- reactiveValues()
+  
+  rval_mod <- reactiveValues()
+  
+  #rval_plot <- reactiveValues()                         
   
   selected <- callModule(selection, "selection_module", rval, params = plot_params)
   
   observe({
-    for(var in names(input)){
-      rval_plot[[var]] <- input[[var]]
-    }
-    rval_plot$gate <- selected$gate
-    rval_plot$samples <- selected$samples
-  })
-  
-  output$histo_options <- renderUI({
+    
+    validate(need(rval$pdata, "No metadata available"))
+    validate(need(rval$plot_var, "No plotting variables"))
     
     ns <- session$ns
     x <- list()
-    if(input$plot_type == 'histogram'){
-      x[[1]] <- checkboxInput(ns("norm"), "normalize (set max to 1)", value = TRUE)
-      x[[2]] <- checkboxInput(ns("smooth"), "smooth", value = FALSE)
-      
-      x[[3]] <- checkboxInput(ns("ridges"), "ridges", value = FALSE)
-      
-      x[[4]] <- selectizeInput(ns("yridges_var"), 
-                                   multiple =FALSE,
-                                   label = "y ridges variable", 
-                                   choices = c("name","subset"), 
-                                   selected = "subset")
-    }
-    tagList(x)
+    
+    x[["morm"]] <- checkboxInput(ns("norm"), "normalize (set max to 1)", value = rval_plot_default[["norm"]])
+    x[["smooth"]] <- checkboxInput(ns("smooth"), "smooth", value = rval_plot_default[["smooth"]])
+    
+    x[["ridges"]] <- checkboxInput(ns("ridges"), "ridges", value = rval_plot_default[["ridges"]])
+    
+    x[["yridges_var"]] <- selectizeInput(ns("yridges_var"), 
+                                         multiple =FALSE,
+                                         label = "y ridges variable", 
+                                         choices = c("subset", names(rval$pdata)), 
+                                         selected = rval_plot_default[["yridges_var"]])
+    x[["bin_number"]] <- numericInput(ns("bin_number"), label = "number of bins", value = rval_plot_default[["bin_number"]])
+    x[["alpha"]] <- numericInput(ns("alpha"), label = "alpha", value = rval_plot_default[["alpha"]])
+    x[["size"]] <- numericInput(ns("size"), label = "size", value = rval_plot_default[["size"]])
+    
+    rval_mod$plot_options <- x
+    
   })
   
+  output$plot_options <- renderUI({
+    x <- rval_mod$plot_options
+    if(input$plot_type == 'histogram'){
+      vars <- names(x)
+    }else if (input$plot_type == 'hexagonal'){
+      vars <- "bin_number"
+    }else if (input$plot_type == 'dots'){
+      vars <- c("alpha", "size")
+    }else if (input$plot_type == 'contour'){
+      vars <- c("bin_number", "alpha", "size")
+    }
+    
+    tagList(rval_mod$plot_options[vars])
+    
+  })
   
   observe({
     
-    validate(
-      need(rval$pdata, "No metadata available")
-    )
-    validate(
-      need(rval$plot_var, "No plotting variables")
-    )
+    validate(need(rval$plot_var, "No plotting variables"))
     
-    facet_var_default <- "name"
-    color_var_default <- "subset"
-    plot_type_default <- "hexagonal"
+    updateSelectInput(session, "xvar", choices = rval$plot_var, selected = rval$plot_var[1])
+    updateSelectInput(session, "yvar", choices = rval$plot_var, selected = rval$plot_var[2]) 
     
-    if("facet_var" %in% names(plot_params)){
-      facet_var_default <- plot_params$facet_var
+  })
+  
+  observe({
+    
+    validate(need(rval$pdata, "No metadata available"))
+    validate(need(rval$plot_var, "No plotting variables"))
+    
+    ns <- session$ns
+    x <- list()
+    
+    if(input$plot_type %in% c('histogram', "contour")){
+      x[["color_var"]] <- selectizeInput(ns("color_var"), 
+                                         multiple = !simple_plot,
+                                         label = "color variable",
+                                         choices = c("subset", names(rval$pdata)),
+                                         selected = rval_plot_default[["color_var"]])
+    
+    }else{
+      x[["color_var"]] <- selectizeInput(ns("color_var"), 
+                                         multiple = !simple_plot,
+                                         label = "color variable",
+                                         choices = c("subset", names(rval$pdata), rval$plot_var),
+                                         selected = rval_plot_default[["color_var"]])
     }
-    if("color_var" %in% names(plot_params)){
-      color_var_default <- plot_params$color_var
-    }
-    if("plot_type" %in% names(plot_params)){
-      plot_type_default <- plot_params$plot_type
-    }
-    
-    
-    updateSelectInput(session, "plot_type", selected = plot_type_default)
-
-    updateSelectInput(session, "yridges_var", 
-                      choices = c("subset", names(rval$pdata)), 
-                      selected = color_var_default)
-    
-    updateSelectInput(session, "color_var", 
-                      choices = c("subset", names(rval$pdata), rval$plot_var), 
-                      selected = color_var_default)
     
     if(!simple_plot){
-      updateSelectInput(session, "facet_var", 
-                        choices = c("subset", names(rval$pdata)), 
-                        selected = facet_var_default )
-      
+        x[["facet_var"]] <- selectizeInput(ns("facet_var"), 
+                       multiple =TRUE,
+                       label = "facet variables",
+                       choices = c("subset", names(rval$pdata)),
+                       selected = rval_plot_default[["facet_var"]]
+        )
+        x[["split_variable"]] <- selectInput(ns("split_variable"),
+                    label = "select variable used to split plots",
+                    choices = c("x variable", "y variable", "color variable"),
+                    selected = rval_plot_default[["split_variable"]]
+        )
     }
+
+    rval_mod$plot_variables <- x
     
   })
   
- 
+  output$plot_variables <- renderUI({
+    x <- rval_mod$plot_variables
+    if(input$plot_type == 'histogram'){
+      vars <- names(x)
+    }else if (input$plot_type == 'hexagonal'){
+      vars <- setdiff(names(x), "color_var")
+    }else if (input$plot_type == 'dots'){
+      vars <- names(x)
+    }else if (input$plot_type == 'contour'){
+      vars <- names(x)
+    }
+    tagList(rval_mod$plot_variables[vars])
+  })
+  
+  
   observe({
     
-    validate(
-      need(rval$plot_var, "No plotting parameters")
-    )
-    
-    print(rval$plot_var)
-
-    xvar_default <- rval$plot_var[1]
-    yvar_default <- rval$plot_var[2]
-    
-    if("xvar" %in% names(plot_params)){
-      xvar_default <- plot_params$xvar
+    for(var in names(plot_params)){
+      if(!is.null(plot_params[[var]])){
+        if(plot_params[[var]]!=""){
+          updateSelectInput(session, var, selected = plot_params[[var]])
+        }
+      }else{
+        updateSelectInput(session, var, selected = plot_params[[var]])
+      }
     }
-    if("yvar" %in% names(plot_params)){
-      yvar_default <- plot_params$yvar
-    }
-    
-    updateSelectInput(session, "xvar", choices = rval$plot_var, selected = xvar_default)
-    updateSelectInput(session, "yvar", choices = rval$plot_var, selected = yvar_default)
-    
   })
   
-  # observe({
-  #   rval_plot$xvar <- input$xvar
-  #   rval_plot$yvar <- input$yvar
-  #   rval_plot$gate <- input$gate
-  #   rval_plot$samples <- input$samples
-  # })
-  
-  # observe({
-  #   validate(need(rval$gates_flowCore, "no gating set"))
-  #   updateSelectInput(session, "gate", choices = union("root", names(rval$gates_flowCore)), selected = "root")
-  # })
-  # 
-  # observe({
-  #   if("gate" %in% names(plot_params)){
-  #     updateSelectInput(session, "gate", choices = union("root", names(rval$gates_flowCore)), selected = plot_params$gate)
-  #   }
-  # })
-  # 
-  # observe({
-  #   updateSelectInput(session, "samples", choices = rval$pdata$name, selected = rval$pdata$name[1])
-  # })
-  # 
-  # observeEvent(input$all_samples, {
-  #   updateSelectInput(session, "samples", choices = rval$pdata$name, selected = rval$pdata$name)
-  # })
+  observe({
+    for(var in names(input)){
+        rval_plot[[var]] <- input[[var]]
+    }
+    rval_plot$gate <- selected$gate
+    rval_plot$samples <- selected$samples
+  }) 
+
   
   split_var <- reactive({
-    if(!simple_plot){
+    if("split_variable" %in% names(input)){
       switch(input$split_variable, 
              "x variable" = "xvar",
              "y variable" = "yvar",
@@ -244,33 +241,46 @@ plotGatingSet <- function(input, output, session,
   })
 
   update <- reactive({
-    if(!simple_plot){
+    if(!auto_update){
       input$update_plot
     }else{
-      update_params <- c(input$xvar,
-                         input$yvar,
-                         input$color_var,
+      update_params <- NULL
+      var_update <- c("plot_type",
+                      "xvar",
+                      "yvar",
+                      "color_var",
+                      "facet_var", 
+                      "theme",
+                      "legend",
+                      "legend_pos",
+                      "bin_number",
+                      "size", 
+                      "alpha", 
+                      "norm", 
+                      "smooth", 
+                      "ridges", 
+                      "yridges_var")
+      var_update <- var_update[var_update %in% names(input)]
+      for(var in var_update){
+        update_params <- c(update_params, input[[var]])
+      }
+      
+      update_params <- c(update_params,
                          selected$samples,
                          selected$gate,
-                         input$plot_type,
-                         input$legend,
-                         input$legend_pos,
-                         input$bin_number,
-                         input$size,
-                         input$alpha,
-                         input$norm,
-                         input$smooth,
-                         input$ridges,
-                         input$yridges_var,
                          rval$apply_trans,
                          rval$flow_set,
                          rval$gating_set,
                          rval$spill,
                          rval$parameters,
                          split_var())
-      if(rval$apply_trans){
-        update_params <- c(update_params, rval$transformation)
-      }
+      
+      #if(!is.null(rval$apply_trans)){
+        if(rval$apply_trans){
+          update_params <- c(update_params, rval$transformation)
+        }
+      #}
+      
       if(show_gates){
         update_params <- c(update_params, 
                            rval$gates_flowCore,
@@ -306,20 +316,26 @@ plotGatingSet <- function(input, output, session,
         need(rval$gating_set, "Empty gating set") %then%
         need(selected$samples, "Please select samples") %then%
         need(selected$gate, "Please select subsets")  %then%
-        need(input$xvar, "Please select a x-axis variable")  %then%
-        need(input$yvar, "Please select a y-axis variable")
+        need(input$xvar, "Please select a x-axis variable") 
+        
     )
     
-    print("gates print")
-    print(getNodes(rval$gating_set))
-    print(names(rval$gates_flowCore))
-    
     idx_x <- match(input$xvar, rval$parameters$name_long)
-    idx_y <- match(input$yvar, rval$parameters$name_long)
     xvar <- rval$parameters$name[idx_x]
-    yvar <- rval$parameters$name[idx_y]
-    
-    
+    name_xvar <- input$xvar
+    if(!is.null(input$yvar)){
+      if(input$yvar != ""){
+        idx_y <- match(input$yvar, rval$parameters$name_long)
+        yvar <- rval$parameters$name[idx_y]
+        name_yvar <- input$yvar
+      }else{
+        yvar <- xvar
+        name_yvar <- name_xvar
+      }
+    }else{
+      yvar <- xvar
+      name_yvar <- name_xvar
+    }
     
     color_var <- input$color_var
     if(!is.null(input$color_var)){
@@ -332,7 +348,7 @@ plotGatingSet <- function(input, output, session,
         }
       }
     }
-    
+
     axis_labels <- rval$parameters$name_long
     names(axis_labels) <- rval$parameters$name
     
@@ -386,15 +402,15 @@ plotGatingSet <- function(input, output, session,
                    xvar = xvar_int, 
                    yvar = yvar_int, 
                    color_var = color_var_int, 
-                   gate = gate, 
+                   gate = gate,
                    polygon_gate = polygon_gate,
                    type = input$plot_type, 
-                   bins = input$bin_number,
-                   alpha = input$alpha,
-                   size = input$size,
-                   norm_density = input$norm,
-                   smooth = input$smooth,
-                   ridges = input$ridges,
+                   bins = ifelse(is.null(input$bin_number), 100, input$bin_number),
+                   alpha = ifelse(is.null(input$alpha), 0.2, input$alpha),
+                   size = ifelse(is.null(input$size), 0.1, input$size),
+                   norm_density = ifelse(is.null(input$norm), TRUE, input$norm),
+                   smooth = ifelse(is.null(input$smooth), FALSE, input$smooth),
+                   ridges = ifelse(is.null(input$ridges), FALSE, input$ridges),
                    transformation =  transformation,
                    facet_vars = facet_vars,
                    metadata = rval$pdata,
@@ -402,12 +418,13 @@ plotGatingSet <- function(input, output, session,
                    yridges_var = input$yridges_var,
                    show.legend = input$legend,
                    axis_labels = axis_labels,
-                   legend.position = input$legend_pos)
+                   legend.position = input$legend_pos,
+                   theme_name = paste("theme_", input$theme, sep = ""))
       
       if(!is.null(p)){
-        p <- p + xlab(input$xvar) 
+        p <- p + xlab(xvar) 
         if(input$plot_type != "histogram"){
-          p <- p + ylab(input$yvar)
+          p <- p + ylab(yvar)
         }
       }
       
@@ -418,6 +435,9 @@ plotGatingSet <- function(input, output, session,
     plist
     
   })
+  
+  
+  
   
   return( list(plot = plot_focus, params = rval_plot) )
   
