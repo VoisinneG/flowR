@@ -63,6 +63,8 @@ transform <- function(input, output, session, rval) {
   
   `%then%` <- shiny:::`%OR%`
   
+  rval_mod <- reactiveValues(init = TRUE)
+  
   output$trans_param_ui <- renderUI({
     ns <- session$ns
     x <- list()
@@ -96,11 +98,17 @@ transform <- function(input, output, session, rval) {
   observe({
     
     validate( need(rval$plot_var, "No plotting parameters"))
+    validate(need(rval$pdata, "No metadata available"))
     
-    plot_params$xvar <- rval$plot_var[1]
-    plot_params$yvar <- rval$plot_var[2]
-    plot_params$plot_type <- "histogram"
-    plot_params$color_var <- NULL
+    if(rval_mod$init){
+      plot_params$samples <- rval$pdata$name[1]
+      plot_params$gate <- "root"
+      plot_params$xvar <- rval$plot_var[1]
+      plot_params$yvar <- rval$plot_var[2]
+      plot_params$plot_type <- "histogram"
+      plot_params$color_var <- NULL
+      rval_mod$init <- FALSE
+    }
     
   })
   
@@ -120,19 +128,30 @@ transform <- function(input, output, session, rval) {
   
 
   observe({
-    
-    for(var in intersect( names(res$params), c("xvar", "yvar", "color_var", "gate", "samples") )){
-      if(!is.null(res$params[[var]])){
-        print("res$params[[var]] comp")
-        print(res$params[[var]])
-        if(res$params[[var]] != "") {
-          plot_params[[var]] <- res$params[[var]]
-        }
-      }else{
-        plot_params[[var]] <- res$params[[var]]
-      }
+    #plot_params <- res$params
+    for(var in names(res$params)){
+      plot_params[[var]] <- res$params[[var]]
     }
     
+    # for(var in intersect( names(res$params), c("xvar", "yvar", "color_var", "gate", "samples") )){
+    # 
+    # #print(names(res$params))
+    # 
+    # #for(var in names(res$params)){
+    #   if(!is.null(res$params[[var]])){
+    #     #print(res$params[[var]])
+    #     if(length(res$params[[var]]) == 1){
+    #       if(res$params[[var]] != "") {
+    #         plot_params[[var]] <- res$params[[var]]
+    #       }
+    #     }else{
+    #       plot_params[[var]] <- res$params[[var]]
+    #     }
+    #     
+    #   }else{
+    #     plot_params[[var]] <- res$params[[var]]
+    #   }
+    # }
   })
   
   #get parameters information from flow set
@@ -143,8 +162,7 @@ transform <- function(input, output, session, rval) {
     )
     
     ff <- rval$flow_set[[1]]
-    print("update param")
-    print(rval$parameters)
+
     #if(is.null(rval$parameters) | !setequal(rval$parameters$name, parameters(ff)$name)){
     if(is.null(rval$parameters)){
       
@@ -152,10 +170,6 @@ transform <- function(input, output, session, rval) {
       name <- as.character(parameters(ff)$name)
       name_long <- name
       name_long[!is.na(desc)] <- paste(name[!is.na(desc)], " (", desc[!is.na(desc)], ")", sep = "")
-      
-      print(name)
-      print(desc)
-      print(name_long)
       
       display <- unlist(sapply(rownames(parameters(ff)@data), FUN = function(x){
         kw <- substr(x, start = 2, stop = nchar(x))
@@ -177,8 +191,6 @@ transform <- function(input, output, session, rval) {
                                     minRange = parameters(ff)@data$minRange,
                                     maxRange = parameters(ff)@data$maxRange,
                                     stringsAsFactors = FALSE)
-      
-      print(rval$parameters)
     }
     
   })

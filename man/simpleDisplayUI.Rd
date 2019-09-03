@@ -5,7 +5,7 @@
 \alias{simpleDisplay}
 \title{simpleDisplayUI and simpleDisplay}
 \usage{
-simpleDisplayUI(id)
+simpleDisplayUI(id, nrow = 1, size = 400)
 
 simpleDisplay(input, output, session, plist, gate = reactiveValues())
 }

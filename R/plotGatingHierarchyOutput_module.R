@@ -48,7 +48,8 @@ plotGatingHierarchy <- function(input, output, session, rval, plot_params = reac
     validate(
       need(rval$gating_set, "Empty gating set") %then%
       need(setdiff(names(rval$gates_flowCore), "root"), "No gates to display") %then%
-      need(plot_params$samples, "Please select a sample")
+      need(plot_params$samples, "Please select a sample") %then%
+      need(plot_params$plot_type != "histogram", "Plot type not supported") 
     )
 
     
@@ -65,11 +66,15 @@ plotGatingHierarchy <- function(input, output, session, rval, plot_params = reac
     #   data_range <- rval$data_range
     # }
     
-    if(plot_params$color_var %in% rval$parameters$name_long){
-      color_var <- rval$parameters$name[match(plot_params$color_var, rval$parameters$name_long)]
-    }else{
-      color_var <- plot_params$color_var
+    color_var <- NULL
+    if(!is.null(plot_params$color_var)){
+      if(plot_params$color_var %in% rval$parameters$name_long){
+        color_var <- rval$parameters$name[match(plot_params$color_var, rval$parameters$name_long)]
+      }else{
+        color_var <- plot_params$color_var
+      }
     }
+    
     
     if(plot_params$plot_type != "histogram"){
       type <- plot_params$plot_type

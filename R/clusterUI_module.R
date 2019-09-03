@@ -98,7 +98,6 @@ cluster <- function(input, output, session, rval) {
       need(length(selected$samples)>0, "No sample selected")
     )
     
-    #print(input$gate_sub_sample)
     
     if( nchar(selected$gate) == 0 ){
       showModal(modalDialog(
@@ -173,10 +172,6 @@ cluster <- function(input, output, session, rval) {
                                    return_comp_data = TRUE,
                                    Ncells = NULL,
                                    updateProgress = updateProgress)
-    
-    
-    
-    #print(summary(rval$df_tsne))
     
     progress$set(message = "Clustering...", value = 50)
     

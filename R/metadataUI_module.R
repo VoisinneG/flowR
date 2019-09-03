@@ -195,8 +195,6 @@ metadata <- function(input, output, session, rval) {
     is_selected <- apply(X = df1, MARGIN = 1, FUN = function(x){sum(x) == length(x)})
     samples <- rval$pdata$name[is_selected]
     
-    #print(samples)
-    
     if(length(samples)>0){
       
       idx_match <- match(samples, pData(rval$flow_set)$name)

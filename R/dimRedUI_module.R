@@ -100,7 +100,6 @@ dimRed <- function(input, output, session, rval) {
       need(length(selected$samples)>0, "No sample selected")
     )
     
-    #print(input$gate_sub_sample)
     
     if( nchar(selected$gate) == 0 ){
       showModal(modalDialog(
@@ -176,9 +175,7 @@ dimRed <- function(input, output, session, rval) {
                                    Ncells = NULL,
                                    return_comp_data = TRUE,
                                    updateProgress = updateProgress)
-                                
 
-    print(dim(rval_mod$df_dim_red))
 
     progress$set(message = paste("Performing", input$dim_red_method, "..."), value = 0)
 

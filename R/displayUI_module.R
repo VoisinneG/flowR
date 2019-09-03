@@ -82,9 +82,6 @@ display <- function(input, output, session, rval, module_server_name, ...) {
      if(class(plist()) == "list"){
        n <- length(plist())
 
-       cat("length\n")
-       print(n)
-
        rval_plot$nrow <- min(n, input$nrow_split)
        rval_plot$ncol <- ceiling(n/rval_plot$nrow)
        g <- gridExtra::marrangeGrob(plist(), nrow = rval_plot$nrow, ncol = rval_plot$ncol, top = "")
@@ -93,8 +90,6 @@ display <- function(input, output, session, rval, module_server_name, ...) {
      }else{
        plist()
      }
-     #print(typeof(plist()))
-     #plist()
      
    })
 

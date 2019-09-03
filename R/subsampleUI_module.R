@@ -62,10 +62,7 @@ subsample <- function(input, output, session, rval) {
   # Observe functions for sub-sampling
   
   observeEvent(input$compute_data, {
-    
-    print("selected")
-    print(selected$samples)
-    
+
     # Create a Progress object
     progress <- shiny::Progress$new(min = 0, max = 100)
     on.exit(progress$close())
@@ -99,8 +96,7 @@ subsample <- function(input, output, session, rval) {
     }
     
     validate(need(! input$fs_name %in% names(rval$flow_set_list), "Name already exists" ))
-    
-    #print(input$gate_sub_sample)
+
     
     if( nchar(selected$gate) == 0 ){
       showModal(modalDialog(
@@ -124,7 +120,6 @@ subsample <- function(input, output, session, rval) {
                                   Ncells = input$ncells_per_sample,
                                   return_comp_data = FALSE,
                                   updateProgress = updateProgress)
-    #print(rval$df_sample)
     
     if( length(rval_mod$df_sample) == 0 ){
       showModal(modalDialog(

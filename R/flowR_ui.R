@@ -41,13 +41,15 @@ flowR_ui <- function(user_module_name = NULL) {
               gatingUI(id = "gating_module")
       ),
       tabItem(tabName = "Plot_tab",
-              displayUI("plot_module", 
-                        module_ui_name = "plotGatingSetInput", 
-                        simple_plot = FALSE, auto_update = FALSE)
+              plottingUI(id = "plotting_module")
+              # displayUI("plot_module", 
+              #           module_ui_name = "plotGatingSetInput", 
+              #           simple_plot = FALSE, auto_update = FALSE)
       ),
       tabItem(tabName = "Stat_tab",
-              displayUI("statistics_module", 
-                        module_ui_name = "plotStatInput")
+              statsUI(id = "stats_module")
+              # displayUI("statistics_module", 
+              #           module_ui_name = "plotStatInput")
       ),
       tabItem(tabName = "Sub_tab",
               subsampleUI(id = "subsample_module")

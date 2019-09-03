@@ -186,8 +186,6 @@ import <- function(input, output, session) {
                                      group = input$groups)
         }
         
-        print(gates)
-        
         ff <- fs[[1]]
         
         # time_step is needed to transform gates containing the parameter "Time"
@@ -221,7 +219,7 @@ import <- function(input, output, session) {
         })
         
         params <- parameters(ff)$name
-        print(params)
+        #print(params)
         
         pattern <- NULL
         if( length( grep("[\\<|\\>]", params) ) >0 ){
@@ -281,7 +279,7 @@ import <- function(input, output, session) {
         
       }else if(file_ext(rval_mod$df_files$datapath[input$files_table_rows_selected[1]]) %in% c("csv", "txt")){
         df <- read.table(rval_mod$df_files$datapath[input$files_table_rows_selected[1]], header = TRUE, sep = "\t", as.is = TRUE)
-        print(df)
+        #print(df)
         df$name <- basename(rval_mod$df_files$datapath[input$files_table_rows_selected[1]])
         df$subset <- "root"
         fs <- build_flowset_from_df(df)

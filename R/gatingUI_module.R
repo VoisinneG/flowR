@@ -41,12 +41,12 @@ gatingUI <- function(id) {
                   width = NULL, height = NULL,
                   tabPanel(title = "Plot",
                            simpleDisplayUI(ns("simple_display_module"))
-                  ),
-                  tabPanel(title = "Save",
-                           numericInput(ns("width_plot"), label = "width", value = 5),
-                           numericInput(ns("height_plot"), label = "height", value = 5),
-                           downloadButton(ns("download_plot"), "Save plot")
                   )
+                  # tabPanel(title = "Save",
+                  #          numericInput(ns("width_plot"), label = "width", value = 5),
+                  #          numericInput(ns("height_plot"), label = "height", value = 5),
+                  #          downloadButton(ns("download_plot"), "Save plot")
+                  # )
            ),
            tabBox(title = "Gating hierarchy",
                   width = NULL, height = NULL,
@@ -54,13 +54,12 @@ gatingUI <- function(id) {
                            plotOutput(ns("tree"))
                   ),
                   tabPanel(title = "Gates",
-                           simpleDisplayUI(ns("simple_display_module_2"))
+                           simpleDisplayUI(ns("simple_display_module_2"), nrow = 2, size = 200)
                   ),
                   tabPanel(title = "Stats",
                            br(),
                            div(style = 'overflow-x: scroll', DT::dataTableOutput(ns("pop_stats"))),
-                           br()  
-                      
+                           br() 
                   )
                   
            )
@@ -88,56 +87,63 @@ gating <- function(input, output, session, rval) {
 
   plot_params <- reactiveValues()
   gate <- reactiveValues()
+  rval_mod <- reactiveValues(init = TRUE)
   
   observe({
     
-    validate(
-      need(rval$plot_var, "No plotting parameters")
-    )
+    validate(need(rval$plot_var, "No plotting parameters"))
+    validate(need(rval$pdata, "No metadata available"))
     
-    idx_x <- grep("FSC", rval$plot_var)
-    if(length(idx_x)>0){
-      xvar <- rval$plot_var[idx_x[1]]
-    }else{
-      xvar <- rval$plot_var[1]
+    if(rval_mod$init){
+      idx_x <- grep("FSC", rval$plot_var)
+      if(length(idx_x)>0){
+        xvar <- rval$plot_var[idx_x[1]]
+      }else{
+        xvar <- rval$plot_var[1]
+      }
+      
+      idx_y <- grep("SSC", rval$plot_var)
+      if(length(idx_y)>0){
+        yvar <- rval$plot_var[idx_y[1]]
+      }else{
+        yvar <- rval$plot_var[2]
+      }
+      
+      plot_params$samples <- rval$pdata$name[1]
+      plot_params$gate <- "root"
+      plot_params$xvar <- xvar
+      plot_params$yvar <- yvar
+      plot_params$plot_type <- "dots"
+      plot_params$color_var <- NULL
+      plot_params$gate <- "root"
+      rval_mod$init <- FALSE
+      
     }
-    
-    idx_y <- grep("SSC", rval$plot_var)
-    if(length(idx_y)>0){
-      yvar <- rval$plot_var[idx_y[1]]
-    }else{
-      yvar <- rval$plot_var[2]
-    }
-    
-    plot_params$xvar <- xvar
-    plot_params$yvar <- yvar
-    plot_params$plot_type <- "dots"
-    plot_params$color_var <- NULL
-    plot_params$gate <- "root"
     
   })
   
   res <- callModule(plotGatingSet, "plot_module", rval, plot_params, simple_plot = TRUE, show_gates = TRUE, polygon_gate = gate)
   res_display <- callModule(simpleDisplay, "simple_display_module", res$plot, gate = gate)
-  plot_all_gates <- callModule(plotGatingHierarchy, "plot_hierarchy_module", rval, plot_params = res$params)
+  plot_all_gates <- callModule(plotGatingHierarchy, "plot_hierarchy_module", rval, plot_params = plot_params)
   callModule(simpleDisplay, "simple_display_module_2", plot_all_gates)
   
   # callModule(simpleDisplay, "simple_display_module", res$plot())
   
   observe({
-    
-    for(var in intersect( names(res$params), c("xvar", "yvar", "gate", "samples") )){
-      if(!is.null(res$params[[var]])){
-        print("res$params[[var]] comp")
-        print(res$params[[var]])
-        if(res$params[[var]] != "") {
-          plot_params[[var]] <- res$params[[var]]
-        }
-      }else{
-        plot_params[[var]] <- res$params[[var]]
-      }
+    for(var in names(res$params)){
+      plot_params[[var]] <- res$params[[var]]
     }
     
+    #for(var in intersect( names(res$params), c("xvar", "yvar", "color_var", "gate", "samples") )){
+    # for(var in names(res$params)){
+    #   if(!is.null(res$params[[var]])){
+    #     if(res$params[[var]] != "") {
+    #       plot_params[[var]] <- res$params[[var]]
+    #     }
+    #   }else{
+    #     plot_params[[var]] <- res$params[[var]]
+    #   }
+    # }
   })
   
   
@@ -243,12 +249,9 @@ gating <- function(input, output, session, rval) {
           
         rval$gates_flowCore[[gate_name]] <- list(gate = poly_gate, parent = res$params$gate)
         
-        print("add1")
+        
         add(rval$gating_set, poly_gate, parent = res$params$gate)
         recompute(rval$gating_set)
-        print(getNodes(rval$gating_set))
-        print(names(rval$gates_flowCore))
-        print(rval$gates_flowCore)
         
         #updateSelectInput(session, "gate_to_delete", choices = setdiff(getNodes(rval$gating_set), "root"))
 
@@ -330,9 +333,6 @@ gating <- function(input, output, session, rval) {
       need(rval$gates_flowCore, "Empty gating set")
     )
     
-    print("gates tree")
-    print(getNodes(rval$gating_set))
-    
     validate(
       need(length(setdiff(getNodes(rval$gating_set), "root"))>0, "No gates in gating set")
     )
@@ -346,20 +346,20 @@ gating <- function(input, output, session, rval) {
   ##########################################################################################################
   #Output Download functions
   
-  output$download_plot <- downloadHandler(
-    filename = paste("plot_gate.pdf", sep = ""),
-    content = function(file) {
-      pdf(file, width = input$width_plot, height = input$height_plot)
-      print(plot_gate())
-      dev.off()
-    }
-  )
+  # output$download_plot <- downloadHandler(
+  #   filename = paste("plot_gate.pdf", sep = ""),
+  #   content = function(file) {
+  #     pdf(file, width = input$width_plot, height = input$height_plot)
+  #     print(plot_gate())
+  #     dev.off()
+  #   }
+  # )
   
   output$pop_stats <- DT::renderDataTable({
     validate(need(rval$gating_set, "No gating set available"))
     df <- getPopStats(rval$gating_set)
     df <- df[df$name %in% res$params$samples, ]
-    df[['%']] <- format(df$Count / df$ParentCount * 100, digits = 1)
+    df[['%']] <- sprintf("%.1f", df$Count / df$ParentCount * 100)
     DT::datatable(
       df[, c("name", "Population", "Parent", "%", "Count", "ParentCount")],
       rownames = FALSE)

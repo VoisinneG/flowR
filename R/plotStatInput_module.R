@@ -15,18 +15,22 @@ plotStatInput <- function(id) {
     br(),
     box(collapsible = TRUE, collapsed = TRUE, width = NULL, height = NULL,
         title = "Sample/Subset",
-        checkboxInput(ns("all_samples"), "Select all samples", FALSE),
-        selectizeInput(ns("samples"), 
-                       label = "samples",
-                       choices = NULL,
-                       selected = NULL,
-                       multiple = TRUE),
-        selectizeInput(ns("gate"), 
-                       label = "subset",
-                       choices = "root",
-                       selected = "root",
-                       multiple = TRUE)
+        selectionInput(ns("selection_module"), multiple_subset = TRUE)
     ),
+    # box(collapsible = TRUE, collapsed = TRUE, width = NULL, height = NULL,
+    #     title = "Sample/Subset",
+    #     checkboxInput(ns("all_samples"), "Select all samples", FALSE),
+    #     selectizeInput(ns("samples"), 
+    #                    label = "samples",
+    #                    choices = NULL,
+    #                    selected = NULL,
+    #                    multiple = TRUE),
+    #     selectizeInput(ns("gate"), 
+    #                    label = "subset",
+    #                    choices = "root",
+    #                    selected = "root",
+    #                    multiple = TRUE)
+    # ),
     box(collapsible = TRUE, collapsed = FALSE, width = NULL, height = NULL,
         title ="Stat",
         selectInput(ns("stat_function"), 
@@ -97,6 +101,9 @@ plotStat <- function(input, output, session, rval) {
   
   `%then%` <- shiny:::`%OR%`
   
+  rval_plot <- reactiveValues()
+  selected <- callModule(selection, "selection_module", rval)
+  
   observe({
     
     validate(
@@ -133,18 +140,25 @@ plotStat <- function(input, output, session, rval) {
     
   })
   
-  observe({
-    updateSelectInput(session, "gate", choices = union("root", names(rval$gates_flowCore)), selected = "root")
-  })
-  
-  observe({
-    updateSelectInput(session, "samples", choices = rval$pdata$name, selected = rval$pdata$name[1])
-  })
-  
-  observeEvent(input$all_samples, {
-    updateSelectInput(session, "samples", choices = rval$pdata$name, selected = rval$pdata$name)
-  })
+  # observe({
+  #   updateSelectInput(session, "gate", choices = union("root", names(rval$gates_flowCore)), selected = "root")
+  # })
+  # 
+  # observe({
+  #   updateSelectInput(session, "samples", choices = rval$pdata$name, selected = rval$pdata$name[1])
+  # })
+  # 
+  # observeEvent(input$all_samples, {
+  #   updateSelectInput(session, "samples", choices = rval$pdata$name, selected = rval$pdata$name)
+  # })
 
+  observe({
+    for(var in names(input)){
+      rval_plot[[var]] <- input[[var]]
+    }
+    rval_plot$gate <- selected$gate
+    rval_plot$samples <- selected$samples
+  }) 
   
   update_data_plot_stat <- eventReactive(input$update, {
     data_plot_stat()
@@ -153,14 +167,13 @@ plotStat <- function(input, output, session, rval) {
   data_plot_stat <- reactive({
     validate(
       need(rval$gating_set, "Empty gating set") %then%
-        need(input$samples, "Please select samples") %then%
-        need(input$gate, "Please select subsets")
+        need(selected$samples, "Please select samples") %then%
+        need(selected$gate, "Please select subsets")
     )
 
-    print("get data plot_focus")
     df <- get_data_gs(gs = rval$gating_set,
-                      sample = input$samples,
-                      subset = input$gate,
+                      sample = selected$samples,
+                      subset = selected$gate,
                       spill = rval$spill)
     return(df)
 
@@ -171,8 +184,8 @@ plotStat <- function(input, output, session, rval) {
     
     validate(
       need(rval$gating_set, "Empty gating set") %then%
-        need(input$samples, "Please select a sample") %then%
-        need(input$gate, "Please select subsets")
+        need(selected$samples, "Please select samples") %then%
+        need(selected$gate, "Please select subsets")
     )
     
     idx_y <- match(input$yvar, rval$parameters$name_long)
@@ -194,8 +207,8 @@ plotStat <- function(input, output, session, rval) {
     
     p <- plot_stat(df = update_data_plot_stat(),
                    gs = rval$gating_set,
-                   sample =  input$samples,
-                   subset = input$gate,
+                   sample = selected$samples,
+                   subset = selected$gate, 
                    spill = rval$spill,
                    yvar = yvar,
                    type = input$plot_type,
@@ -229,6 +242,6 @@ plotStat <- function(input, output, session, rval) {
   })
   
   
-  return( list(plot = plot, data = data) )
+  return( list(plot = plot, data = data, params = rval_plot) )
   
 }

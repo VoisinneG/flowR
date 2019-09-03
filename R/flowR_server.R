@@ -49,14 +49,16 @@ flowR_server <- function(session, input, output, user_module_name = NULL) {
   # Clustering module
   rval <- callModule(cluster, "cluster_module", rval)
   
-  # Display module
-  plot_display <- callModule(display, "plot_module", rval, 
-                             module_server_name = "plotGatingSet", 
-                             simple_plot = FALSE, auto_update = FALSE)
+  # Plot module
+  rval <- callModule(plotting, "plotting_module", rval)
+  # plot_display <- callModule(display, "plot_module", rval, 
+  #                            module_server_name = "plotGatingSet", 
+  #                            simple_plot = FALSE, auto_update = FALSE)
   
-  # stat module
-  plot_statistics <- callModule(display, "statistics_module", rval, 
-                                module_server_name = "plotStat")
+  # stats module
+  rval <- callModule(stats, "stats_module", rval)
+  # plot_statistics <- callModule(display, "statistics_module", rval, 
+  #                               module_server_name = "plotStat")
   
   # save module
   callModule(saveWorkspace, "save_module", rval)

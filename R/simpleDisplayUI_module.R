@@ -4,7 +4,7 @@
 #' @importFrom shinydashboard box tabBox
 #' @import shiny
 #' @import DT
-simpleDisplayUI <- function(id){
+simpleDisplayUI <- function(id, nrow = 1, size = 400){
   # Create a namespace function using the provided id
   ns <- NS(id)
 
@@ -19,9 +19,9 @@ simpleDisplayUI <- function(id){
     fluidRow(
       column(12,
         box(title = "Display", width = 6, collapsible = TRUE, collapsed = TRUE,
-            numericInput(ns("nrow_split"), label = "Number of rows", value = 1),
-            numericInput(ns("row_size"), label = "plot height (px)", value = 400),
-            numericInput(ns("col_size"), label = "plot width (px)", value = 400)
+            numericInput(ns("nrow_split"), label = "Number of rows", value = nrow),
+            numericInput(ns("row_size"), label = "plot height (px)", value = size),
+            numericInput(ns("col_size"), label = "plot width (px)", value = size)
             
         ),
         box(title = "Save", width = 6, collapsible = TRUE, collapsed = TRUE,
@@ -60,14 +60,9 @@ simpleDisplay <- function(input, output, session, plist, gate = reactiveValues()
   })
     
   plot_display <- reactive({
-    
-     print("plot_display")
 
      if(class(plot_list()) == "list"){
        n <- length(plot_list())
-
-       cat("length\n")
-       print(n)
        
        if(n > 1){
          rval_plot$nrow <- min(n, input$nrow_split)
@@ -93,8 +88,6 @@ simpleDisplay <- function(input, output, session, plist, gate = reactiveValues()
 
   output$ui_plot <- renderUI({
     ns <- session$ns
-    print(rval_plot$nrow*input$row_size)
-    print(rval_plot$ncol*input$col_size)
     
     div( style = 'overflow-x: scroll',
          plotOutput(ns("plot_display"), 

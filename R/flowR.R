@@ -187,12 +187,11 @@ get_gates_from_gs <- function(gs){
   
   for(node in setdiff(nodes, "root")){
     g <- getGate(gs[[1]], node)
-    print(names(g@parameters))
+    #print(names(g@parameters))
     parent <- getParent(gs[[1]], node)
     gates[[node]] <- list(gate = g, parent = parent)
   } 
   
-  #print(gates)
   return(gates)
   
 }
@@ -285,23 +284,15 @@ add_gates_flowCore <- function(gs, gates){
         
         g <- gates[[idx[i]]]
         
-        #print(g)
-        #print(g$parent)
-        #print(union(getNodes(gs), "root"))
-        
         if(g$parent %in% union(getNodes(gs), "root") ){
           
-          #print(names(gates)[idx[i]])
-          #print( names(g$gate@parameters))
-          #print( gs@data@colnames )
-          
           if( !is.null(names(g$gate@parameters)) & length( setdiff( names(g$gate@parameters), gs@data@colnames) ) == 0 ){
-            print("add before")
+            
             add(gs,
                 g$gate,
                 parent = g$parent,
                 name = g$gate@filterId)
-            print("add after")
+            
           }else{
             warning("Could not find gate parameters in flowData")
           }
@@ -319,8 +310,6 @@ add_gates_flowCore <- function(gs, gates){
     }
     recompute(gs)
   }
-  
-  print("OK")
   
   return(gs)
 }
@@ -434,7 +423,6 @@ get_data_gs <- function(gs,
   
   idx <- match(sample, pData(gs)$name)
   idx <- idx[!is.na(idx)]
-  print(sample)
   
   if(length(idx) == 0){
     stop("sample not found in gating set")
@@ -449,9 +437,6 @@ get_data_gs <- function(gs,
     fs <- compensate(fs, spill_list)
     gs_comp <- GatingSet(fs)
     gs_comp <- add_gates_flowCore(gs_comp, gates)
-    print(colnames(gs_comp))
-    print(getNodes(gs_comp))
-    print(pData(gs_comp)$name)
   }
   
   df <- list()
@@ -461,25 +446,16 @@ get_data_gs <- function(gs,
     
     for(k in 1:length(subset)){
       
-      print(as.name(subset[k]))
-      print(subset[k])
-      
       idx_subset <- NULL
       if(!is.null(spill)){
         idx_comp <- match(pData(gs)$name[idx[i]], pData(gs_comp)$name)
-        print("idx_comp")
-        print(idx_comp)
       }
       
       if(subset[k] != "root"){
         if(!is.null(spill)){
-          print("idx1\n")
           idx_subset <- getIndices(gs_comp[[idx_comp]], as.name(subset[k]))[[1]]
-          print("ok idx1\n")
         }else{
-          print("ok idx2\n")
           idx_subset <- getIndices(gs[[idx[i]]], as.name(subset[k]))[[1]]
-          print("ok idx2\n")
         }
       }
       
@@ -494,8 +470,7 @@ get_data_gs <- function(gs,
       if(!is.null(idx_subset)){
         df_int <- df_int[idx_subset, ]
       }
-      
-      print("ok sub\n")
+
       if(dim(df_int)[1]>0){
         
         df_int[["name"]] <- pData(gs)$name[idx[i]]
@@ -565,9 +540,7 @@ add_columns_from_metadata <- function(df,
       df[[variable]] <- metadata[[variable]][match(df[["name"]], metadata$name)]
     }
   }
-  
-  #print(names(df))
-  
+
   return(df)
 }
 
@@ -594,7 +567,7 @@ plot_gs <- function(df = NULL,
                     polygon_gate = NULL,
                     type = "hexagonal", 
                     bins = 100,
-                    alpha = 0.25,
+                    alpha = 0.1,
                     size = 0.1,
                     transformation = NULL,
                     default_trans = identity_trans(),
@@ -612,10 +585,24 @@ plot_gs <- function(df = NULL,
                     use_log10_count = TRUE,
                     theme_name = "theme_gray"
                     ){
+  
+  
   if(!is.null(color_var)){
-    if(color_var == ""){
+    if(color_var %in% c("", "none")){
       color_var <- NULL
     }
+  }
+  
+  if(!is.numeric(alpha)){
+    alpha = 0.1
+  }
+  
+  if(!is.numeric(size)){
+    size = 0.1
+  }
+  
+  if(!is.numeric(bins)){
+    bins = 100
   }
   
   
@@ -625,7 +612,6 @@ plot_gs <- function(df = NULL,
   
   if(!is.null(gs)){
     idx <- match(sample, pData(gs)$name)
-    #print(idx)
   }
   
   if(!is.null(gate)){
@@ -716,8 +702,6 @@ plot_gs <- function(df = NULL,
   # }
   
   if( !setequal( xvar[xvar %in% names(df)], xvar ) | !setequal( yvar[yvar %in% names(df)], yvar ) ){
-    print(xvar)
-    print(yvar)
     warning("Some variables could not be found in flowData")
     return(NULL)
   }
@@ -787,9 +771,7 @@ plot_gs <- function(df = NULL,
     }else{
       stat_var <- "stat(density)"
     }
-    
-    
-    
+
     if(smooth){
       if(ridges){
         p <- p + geom_density_ridges(mapping = aes_string(fill = color_var, 
@@ -861,24 +843,20 @@ plot_gs <- function(df = NULL,
     
     if(type == "contour"){
       if(!is.null(color_var)){
-        if(color_var != ""){
+        
           p <- p + geom_density_2d(mapping =  aes_(colour = as.name(color_var)), 
                                    alpha = alpha, 
                                    size =size, 
                                    n = bins, 
                                    show.legend = show.legend) 
-        }else{
-          p <- p + geom_density_2d(alpha = alpha, 
-                                   size =size, 
-                                   n = bins, 
-                                   show.legend = show.legend) 
-        }
+        
         
       }else{
         p <- p + geom_density_2d(alpha = alpha, 
                                  size =size, 
                                  n = bins, 
-                                 show.legend = show.legend) 
+                                 show.legend = show.legend,
+                                 colour = "black") 
       }
       
     }
@@ -889,8 +867,6 @@ plot_gs <- function(df = NULL,
   # plot gate
   
   if(type != "histogram" & !is.null(gate)){
-    
-    #print(gate)
     
     for(j in 1:length(gate)){
       
@@ -1074,7 +1050,6 @@ plot_gh <- function(df = NULL, gs, sample, spill = NULL, ...){
     nodes_to_plot <- child_nodes
     all_parents <- sapply(nodes_to_plot, function(x){getParent(gs[[idx[1]]], x)})
     names(all_parents) <- NULL
-    #print(all_parents)
     
     for(parent in unique(all_parents)){
       
@@ -1089,7 +1064,6 @@ plot_gh <- function(df = NULL, gs, sample, spill = NULL, ...){
           
           par_nodes <- lapply(nodes_to_plot_parent, function(x){
             
-            #print(x)
             g <- getGate(gs[[idx[1]]], x)
             
             if(class(g) %in% c("rectangleGate", "polygonGate")){
@@ -1101,10 +1075,7 @@ plot_gh <- function(df = NULL, gs, sample, spill = NULL, ...){
           
           same_par <- sapply(par_nodes, function(x){setequal(x, par_nodes[[1]])})
           
-          #parent <- getParent(gs[[idx]], nodes_to_plot[1])
           count <- count + 1
-          #print(parent)
-          #print(unique(df$subset))
           plist[[count]] <- plot_gs(df = df, gs=gs, sample=sample, subset = parent, gate = nodes_to_plot_parent[same_par], ...)
           
           all_children <- unlist(sapply(nodes_to_plot_parent[same_par], function(x){getChildren(gs[[1]], x)}))
@@ -1226,16 +1197,10 @@ plot_stat <- function(df = NULL,
                                           )
   }
   
-  
-  #print(names(df_melt2))
-  
   df_melt2 <- df_melt2[df_melt2$variable %in% yvar, ]
 
   ylim <- NULL
-  #scale_y <- "fixed"
-  
-  
-  
+
   if(!free_y_scale){
     if(!is.null(y_trans)){
       rg = y_trans$transform(range(df_melt2$value))
@@ -1273,7 +1238,6 @@ plot_stat <- function(df = NULL,
   df_melt2$variable <- as.character(df_melt2$variable)
   
   if(!is.null(axis_labels)){
-    #print(axis_labels)
     for(i in 1:length(yvar)){
       df_melt2$variable[df_melt2$variable == yvar[i]] <- axis_labels[[yvar[i]]]
     }
@@ -1403,15 +1367,8 @@ dim_reduction <- function(df,
   
   trans_name <-  unique(unlist(sapply(transformation[yvar], function(tf){tf$name})))
   
-  #print(yvar)
-  #print(trans_name)
-  
   df_trans <- df
   df_filter <- df
-  
-  #print(yvar)
-  #print(names(df_trans))
-  #print(names(transformation))
   
   for(i in 1:length(yvar)){
     df_trans[[yvar[i]]] <- transformation[[yvar[i]]]$transform(df[[yvar[i]]])
@@ -1437,7 +1394,6 @@ dim_reduction <- function(df,
   }
   
   idx_cells_kept <- idx_cells_kept[idx_cells]
-  print(length(idx_cells_kept))
   
   message(paste("Running ", method, " with ", Ncells_used, " cells and ",  length(yvar), " parameters", sep = ""))
   
@@ -1491,9 +1447,6 @@ get_cluster <- function(df,
   }
   
   trans_name <-  unique(unlist(sapply(transformation[yvar], function(tf){tf$name})))
-  
-  #print(yvar)
-  #print(trans_name)
   
   df_trans <- df
   df_filter <- df

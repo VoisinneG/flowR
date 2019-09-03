@@ -78,7 +78,7 @@ compensationUI <- function(id) {
            tabBox(title = "",
                   width = NULL, height = NULL,
                   tabPanel(title = "Plot",
-                           simpleDisplayUI(ns("simple_display_module"))
+                           simpleDisplayUI(ns("simple_display_module"), nrow = 2, size = 200)
                   ),
                   tabPanel(title = "Parameters",
                            plotGatingSetInput(id = ns("plot_module"), simple_plot = FALSE)
@@ -107,15 +107,22 @@ compensation <- function(input, output, session, rval) {
   `%then%` <- shiny:::`%OR%`
 
   plot_params <- reactiveValues()
+  rval_mod <- reactiveValues(init = TRUE)
   
   observe({
     
     validate( need(rval$df_spill, "No plotting parameters"))
+    validate(need(rval$pdata, "No metadata available"))
     
-    plot_params$xvar <- colnames(rval$df_spill)[1]
-    plot_params$yvar <- colnames(rval$df_spill)[2]
-    plot_params$plot_type <- "dots"
-    plot_params$color_var <- NULL
+    if(rval_mod$init){
+      plot_params$samples <- rval$pdata$name[1]
+      plot_params$gate <- "root"
+      plot_params$xvar <- colnames(rval$df_spill)[1]
+      plot_params$yvar <- colnames(rval$df_spill)[2]
+      plot_params$plot_type <- "dots"
+      plot_params$color_var <- NULL
+      rval_mod$init <- FALSE
+    }
     
   })
 
@@ -123,7 +130,6 @@ compensation <- function(input, output, session, rval) {
     if(input$show_all_channels){
       channels <- rval$parameters$name_long[match(colnames(rval$df_spill), rval$parameters$name)]
       plot_params$xvar <- setdiff(channels, input$yvar_comp)
-      print(plot_params$xvar)
     }else{
       plot_params$xvar <- input$xvar_comp
     }
@@ -134,19 +140,22 @@ compensation <- function(input, output, session, rval) {
   callModule(simpleDisplay, "simple_display_module", res$plot)
   
   observe({
+    #for(var in intersect( names(res$params), c("xvar", "yvar", "color_var", "gate", "samples") )){
     
-    for(var in intersect( names(res$params), c("xvar", "yvar", "color_var", "gate", "samples") )){
-      if(!is.null(res$params[[var]])){
-        print("res$params[[var]] comp")
-        print(res$params[[var]])
-        if(res$params[[var]] != "") {
-          plot_params[[var]] <- res$params[[var]]
-        }
-      }else{
-        plot_params[[var]] <- res$params[[var]]
-      }
+    for(var in names(res$params)){
+      plot_params[[var]] <- res$params[[var]]
     }
     
+    # for(var in names(res$params)){
+    # 
+    #   if(!is.null(res$params[[var]])){
+    #     if(res$params[[var]] != "") {
+    #       plot_params[[var]] <- res$params[[var]]
+    #     }
+    #   }else{
+    #     plot_params[[var]] <- res$params[[var]]
+    #   }
+    # }
   })
   
   output$plot_comp <- renderPlot({
@@ -159,9 +168,6 @@ compensation <- function(input, output, session, rval) {
   
   
   observeEvent(rval$flow_set, {
-    
-    print("update spill")
-    print(rval$df_spill)
     
     validate(need(rval$flow_set, "no flow-set available"))
     validate(need(length(parameters(rval$flow_set[[1]])$name) < 100, "Maximum number of parameters exceeded (100)"))
@@ -191,8 +197,6 @@ compensation <- function(input, output, session, rval) {
       rval$df_spill_original <- rval$df_spill
     }
     
-    print(rval$df_spill)
-    
   })
   
   observeEvent(rval$df_spill, {
@@ -200,18 +204,18 @@ compensation <- function(input, output, session, rval) {
     validate(need(rval$flow_set_list, "No flow-sets available"))
     validate(need(rval$flow_set_selected, "No flow-set selected"))
     
-    print("flow-sets")
-    print(rval$flow_set_selected)
-    print(get_all_descendants(rval$flow_set_list, rval$flow_set_selected))
-    print(get_all_ancestors(rval$flow_set_list, rval$flow_set_selected))
+    # print("flow-sets")
+    # print(rval$flow_set_selected)
+    # print(get_all_descendants(rval$flow_set_list, rval$flow_set_selected))
+    # print(get_all_ancestors(rval$flow_set_list, rval$flow_set_selected))
     
     items_to_update <- union(rval$flow_set_selected,
                                 union(get_all_descendants(rval$flow_set_list, rval$flow_set_selected),
                                       get_all_ancestors(rval$flow_set_list, rval$flow_set_selected)))
                                
-    print("updating spill")
-                             
-    print(items_to_update)
+    #print("updating spill")
+    #print(items_to_update)
+    
     for(i in 1:length(items_to_update)){
       rval$flow_set_list[[items_to_update[i]]]$spill <- rval$df_spill
     }
@@ -259,12 +263,12 @@ compensation <- function(input, output, session, rval) {
     df_pos_tot <- data.frame(do.call(rbind, rval$pos_values[input$spill_params]), check.names = FALSE)
     row.names(df_pos_tot) <- input$spill_params
     df_pos_tot <- df_pos_tot[input$spill_params]
-    print(df_pos_tot)
+    #print(df_pos_tot)
     
     df_neg_tot <- data.frame(do.call(rbind, rval$neg_values[input$spill_params]), check.names = FALSE)
     row.names(df_neg_tot) <- input$spill_params
     df_neg_tot <- df_neg_tot[input$spill_params]
-    print(df_neg_tot)
+    #print(df_neg_tot)
     
     df_spill <- df_pos_tot
     for(i in 1:length(input$spill_params)){
@@ -273,7 +277,7 @@ compensation <- function(input, output, session, rval) {
       df_spill[input$spill_params[i]] <- (df_pos_tot[input$spill_params[i]] - neg)/(pos - neg)
     }
     
-    print(df_spill)
+    #print(df_spill)
     rval$df_spill <- df_spill
     
   })
@@ -427,7 +431,7 @@ compensation <- function(input, output, session, rval) {
     df[df == 0] <- NA
     df_log <- log10(df)
     
-    print(df)
+    #print(df)
     
     p <- heatmaply::heatmaply(df_log,
                    #colors = c(rgb(1,1,1), rgb(1,0,0)),
