@@ -110,6 +110,7 @@ flowR_server <- function(session, input, output, user_module_name = NULL) {
     
     rval$gating_set <- GatingSet(rval$flow_set)
     rval$gating_set <- add_gates_flowCore(rval$gating_set, rval$gates_flowCore)
+
     
     fs <- rval$flow_set
     rval$Ncells_tot <- sum( sapply(1:length(fs), function(x){dim(fs[[x]]@exprs)[1]}) )

@@ -47,9 +47,10 @@ simpleDisplayUI <- function(id, nrow = 1, size = 400){
 #' @import shiny
 #' @import gridExtra
 #' @import DT
+#' @import plotly
 #' @export
 #' @rdname simpleDisplayUI
-simpleDisplay <- function(input, output, session, plist, gate = reactiveValues()) {
+simpleDisplay <- function(input, output, session, plist, gate = reactiveValues(), params = reactiveValues(use_plotly = FALSE)) {
   
   `%then%` <- shiny:::`%OR%`
   
@@ -85,19 +86,34 @@ simpleDisplay <- function(input, output, session, plist, gate = reactiveValues()
    plot_display()
   })
 
+  output$plot_display_ly  <- renderPlotly({
+    plot_display()
+  })
 
   output$ui_plot <- renderUI({
     ns <- session$ns
     
-    div( style = 'overflow-x: scroll',
-         plotOutput(ns("plot_display"), 
-                    height = rval_plot$nrow*input$row_size, 
-                    width = rval_plot$ncol*input$col_size,
-                    brush = ns("plot_brush"),
-                    click = ns("plot_click"),
-                    dblclick = ns("plot_dblclick")
-                    )
-    )
+    print(params$use_plotly)
+    
+    if(params$use_plotly){
+      div( style = 'overflow-x: scroll',
+           plotlyOutput(ns("plot_display_ly"), 
+                      height = rval_plot$nrow*input$row_size, 
+                      width = rval_plot$ncol*input$col_size
+           )
+      )
+    }else{
+      div( style = 'overflow-x: scroll',
+           plotOutput(ns("plot_display"), 
+                      height = rval_plot$nrow*input$row_size, 
+                      width = rval_plot$ncol*input$col_size,
+                      brush = ns("plot_brush"),
+                      click = ns("plot_click"),
+                      dblclick = ns("plot_dblclick")
+           )
+      )
+    }
+    
 
   })
 

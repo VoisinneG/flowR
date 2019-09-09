@@ -82,6 +82,7 @@ plotGatingHierarchy <- function(input, output, session, rval, plot_params = reac
     
     p <- plot_gh(df = NULL,
                  gs = rval$gating_set,
+                 selected_subsets = plot_params$selected_subsets,
                  sample = plot_params$samples,
                  spill = rval$spill,
                  transformation = transformation,

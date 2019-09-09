@@ -394,9 +394,11 @@ plotGatingSet <- function(input, output, session,
       
       if(show_gates){
         child_gates <- getChildren(rval$gating_set[[1]], selected$gate)
+        
         if(length(child_gates) > 0){
           gate <- child_gates
         }
+      
 
         #gate <- setdiff(names(rval$gates_flowCore), "root")
           # gates_non_root <- setdiff(getNodes(rval$gating_set), "root")
@@ -404,6 +406,14 @@ plotGatingSet <- function(input, output, session,
           #   gate <- gates_non_root
           # }
       }
+      
+      color_var_name <- NULL
+      if(!is.null(color_var_int)){
+        if(color_var_int %in% rval$parameters$name){
+          color_var_name <- rval$parameters$name_long[match(color_var_int, rval$parameters$name)]
+        }
+      }
+      
       
       p <- plot_gs(df = update_data_plot_focus(),
                    gs = rval$gating_set, 
@@ -413,6 +423,7 @@ plotGatingSet <- function(input, output, session,
                    xvar = xvar_int, 
                    yvar = yvar_int, 
                    color_var = color_var_int, 
+                   color_var_name = color_var_name,
                    gate = gate,
                    polygon_gate = polygon_gate,
                    type = input$plot_type, 

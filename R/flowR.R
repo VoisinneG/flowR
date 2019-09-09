@@ -424,7 +424,7 @@ get_data_gs <- function(gs,
   idx <- match(sample, pData(gs)$name)
   idx <- idx[!is.na(idx)]
   
-  if(length(idx) == 0){
+  if(length(idx) != length(sample)){
     stop("sample not found in gating set")
   }
   
@@ -533,6 +533,11 @@ add_columns_from_metadata <- function(df,
   #                               color_var), 
   #                             names(df)))
   
+  if(! "name" %in% names(df)){
+    warning("Could not find column 'name' in data.frame. No metadata added.")
+    return(df)
+  }
+  
   new_vars <- unique(setdiff(names(metadata), names(df)))
   
   if(length(new_vars)>0){
@@ -561,6 +566,7 @@ plot_gs <- function(df = NULL,
                     yvar = NULL,
                     axis_labels = NULL,
                     color_var = NULL, 
+                    color_var_name = NULL,
                     data_range = NULL,
                     min_value = NULL,
                     gate=NULL, 
@@ -824,7 +830,12 @@ plot_gs <- function(df = NULL,
             
             if(color_var %in% gs@data@colnames){
               if(color_var != "cluster"){
-                p <- p + scale_colour_viridis(trans = transformation[[color_var]], name = color_var)
+                if(is.null(color_var_name)){
+                  color_var_name <- color_var
+                }
+                p <- p + scale_colour_viridis(trans = transformation[[color_var]], 
+                                              name = color_var_name)
+                  
               }
               
             }
@@ -870,39 +881,44 @@ plot_gs <- function(df = NULL,
     
     for(j in 1:length(gate)){
       
-      gate_int <- gate[[j]]
-      
-      
-      if(class(gate_int) == "polygonGate" ){
-        if(length(unique(colnames(gate_int@boundaries)))>1){
-          polygon <- as.data.frame(gate_int@boundaries)
-        }
-      }else if(class(gate_int) == "rectangleGate"){
-        idx_x <- match(xvar, names(gate_int@min))
-        idx_y <- match(yvar, names(gate_int@min))
-        if(!is.na(idx_x)){
-          range_x <- c(gate_int@min[idx_x], gate_int@max[idx_x])
-        }else{
-          range_x <- xlim
-        }
-        if(!is.na(idx_y)){
-          range_y <- c(gate_int@min[idx_y], gate_int@max[idx_y])
-        }else{
-          range_y <- ylim
-        }
+        gate_int <- gate[[j]]
+        polygon <- NULL
         
-        polygon <- data.frame(x = c(range_x[1], range_x[2], range_x[2], range_x[1]),
-                                 y = c(range_y[1], range_y[1], range_y[2], range_y[2]))
+        if(class(gate_int) == "polygonGate" ){
+          if(length(unique(colnames(gate_int@boundaries)))>1){
+            polygon <- as.data.frame(gate_int@boundaries)
+          }
+        }else if(class(gate_int) == "rectangleGate"){
 
-        names(polygon) <- c(xvar, yvar)
-      }else if(class(gate_int) %in% c("ellipsoidGate")){
-        cov <- gate_int@cov
-        mean <- gate_int@mean
-        polygon <- ellipse_path(cov = cov, mean = mean)
-      }else{
-        warning("gate format not supported")
-        break
-      }
+          idx_x <- match(xvar, names(gate_int@min))
+          idx_y <- match(yvar, names(gate_int@min))
+          
+          if(!is.na(idx_x) & !is.na(idx_y)){
+            if(!is.na(idx_x)){
+              range_x <- c(gate_int@min[idx_x], gate_int@max[idx_x])
+            }else{
+              range_x <- xlim
+            }
+            if(!is.na(idx_y)){
+              range_y <- c(gate_int@min[idx_y], gate_int@max[idx_y])
+            }else{
+              range_y <- ylim
+            }
+            
+            polygon <- data.frame(x = c(range_x[1], range_x[2], range_x[2], range_x[1]),
+                                  y = c(range_y[1], range_y[1], range_y[2], range_y[2]))
+            
+            names(polygon) <- c(xvar, yvar)
+          }
+
+        }else if(class(gate_int) %in% c("ellipsoidGate")){
+          cov <- gate_int@cov
+          mean <- gate_int@mean
+          polygon <- ellipse_path(cov = cov, mean = mean)
+        }else{
+          warning("gate format not supported")
+          break
+        }
       
         idx_match <- match(c(xvar, yvar), names(polygon))
         
@@ -1022,24 +1038,34 @@ plot_gs <- function(df = NULL,
 }
 
 #' @import flowWorkspace
-plot_gh <- function(df = NULL, gs, sample, spill = NULL, ...){
+plot_gh <- function(df = NULL, gs, sample, selected_subsets = NULL, spill = NULL, ...){
   
   # if(length(sample) != 1){
   #   stop("length of idx must be equal to 1")
   # }
   
+  idx <- match(sample, pData(gs)$name)
+  
+  if(is.null(selected_subsets)){
+    subset <- getNodes(gs)
+  }else{
+    subset <- selected_subsets[selected_subsets %in% getNodes(gs)]
+    parent_subsets <- sapply(subset, function(x){getParent(gs[[idx[1]]], x)})
+    subset <- union(subset, parent_subsets)
+  }
+  
   if(is.null(df)){
     
     df <- get_data_gs(gs = gs,
                       sample = sample,
-                      subset = getNodes(gs),
+                      subset = subset,
                       spill = spill)
     
   }
   
-  idx <- match(sample, pData(gs)$name)
-  
   child_nodes <- getChildren(gs[[idx[1]]], "root")
+  child_nodes <- child_nodes[child_nodes %in% selected_subsets]
+  
   plist <- list()
   count <- 0
   
@@ -1066,16 +1092,20 @@ plot_gh <- function(df = NULL, gs, sample, spill = NULL, ...){
             
             g <- getGate(gs[[idx[1]]], x)
             
-            if(class(g) %in% c("rectangleGate", "polygonGate")){
+            if(class(g) %in% c("polygonGate")){
               try(colnames(g@boundaries), silent = TRUE)
             }else if(class(g) %in% c("ellipsoidGate")){
               try(colnames(g@cov), silent = TRUE)
+            }else if(class(g) %in% c("rectangleGate")){
+              try(names(g@min), silent = TRUE)
             }
+            
           })
           
           same_par <- sapply(par_nodes, function(x){setequal(x, par_nodes[[1]])})
           
           count <- count + 1
+          
           plist[[count]] <- plot_gs(df = df, gs=gs, sample=sample, subset = parent, gate = nodes_to_plot_parent[same_par], ...)
           
           all_children <- unlist(sapply(nodes_to_plot_parent[same_par], function(x){getChildren(gs[[1]], x)}))
@@ -1088,7 +1118,7 @@ plot_gh <- function(df = NULL, gs, sample, spill = NULL, ...){
       
     }
     
-    child_nodes <- child_nodes_int
+    child_nodes <- child_nodes_int[child_nodes_int %in% selected_subsets]
 
   }
   return(plist)
@@ -1100,6 +1130,7 @@ plot_gh <- function(df = NULL, gs, sample, spill = NULL, ...){
 #' @import scales
 #' @import ggsignif
 #' @import data.table
+#' @import heatmaply
 plot_stat <- function(df = NULL,
                       gs,
                       sample, 
@@ -1122,7 +1153,9 @@ plot_stat <- function(df = NULL,
                       show.legend = TRUE,
                       y_trans = NULL,
                       strip.text.y.angle = 0,
-                      theme_name = "theme_gray"
+                      theme_name = "theme_gray",
+                      Rowv = TRUE,
+                      Colv = TRUE
 ){
   
   theme_function <- function(...){
@@ -1164,11 +1197,23 @@ plot_stat <- function(df = NULL,
     #df[[yvar[i]]] <- trans$transform(df[[yvar[i]]])
   }
   
-  df_melt <- melt(df, id.vars = c("name", "subset"), measure.vars = yvar)
+  # if(type == "heatmap"){
+  #   id.vars <- group_var
+  # }else{
+  #   id.vars <- c("name", "subset")
+  # }
+  
+  id.vars <- c("name", "subset")
+  
+  df_melt <- melt(df, id.vars = id.vars, measure.vars = yvar)
   df_melt <- df_melt[is.finite(df_melt$value), ]
   
+  
   stat.fun <- function(...){do.call(stat_function, args = list(...))}
-  df_cast <- dcast(df_melt, name + subset ~ variable, stat.fun, na.rm = TRUE)
+  df_cast <- dcast(df_melt, 
+                   formula = as.formula(paste(paste(id.vars, collapse = " + "), " ~ variable", sep ="")), 
+                   fun.aggregate =  stat.fun, 
+                   na.rm = TRUE)
   
   
   for(i in 1:length(yvar)){
@@ -1178,10 +1223,10 @@ plot_stat <- function(df = NULL,
   
   df_scale <- df_cast
   if(scale_values){
-    df_scale[-c(1:2)] <- scale(df_cast[-c(1:2)])
+    df_scale[-which(names(df_cast) %in% id.vars)] <- scale(df_cast[-which(names(df_cast) %in% id.vars)])
   }
-  
-  df_melt2 <- melt(df_scale, id.vars = c("name", "subset") )
+
+  df_melt2 <- melt(df_scale, id.vars = id.vars )
   
   
   if(is.null(metadata) & !is.null(gs)){
@@ -1197,6 +1242,7 @@ plot_stat <- function(df = NULL,
                                           )
   }
   
+  names(df_melt2)
   df_melt2 <- df_melt2[df_melt2$variable %in% yvar, ]
 
   ylim <- NULL
@@ -1245,6 +1291,22 @@ plot_stat <- function(df = NULL,
   
   
   
+  if(type == "heatmap"){
+    
+    df_cast2 <- dcast(df_melt2[, c("variable", group_var, "value")],
+                      as.formula(paste("variable ~", paste(group_var, collapse = " + "))), 
+                      fun.aggregate = mean)
+    row_labels <- df_cast2$variable
+    p <- heatmaply(df_cast2[-1], 
+                   labRow = row_labels,
+                   margins = c(80, 80, 50, 0),
+                   Rowv = Rowv,
+                   Colv = Colv
+                   )
+    return(list(plot = p, data = df_melt2))
+  }
+  
+  
   if(type == "tile"){
     
     p <- ggplot(df_melt2, aes_string( x = group_var ))
@@ -1252,7 +1314,7 @@ plot_stat <- function(df = NULL,
                        show.legend = show.legend)
     
     
-    p <- p + scale_fill_distiller(palette = "Spectral", limits = ylim) +
+    p <- p + scale_fill_viridis(limits = ylim) +
       scale_y_discrete(labels = NULL, name = "")
     
     # if(!is.null(facet_vars)){

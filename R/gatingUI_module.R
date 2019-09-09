@@ -25,11 +25,19 @@ gatingUI <- function(id) {
                   ),
                   tabPanel("Delete",
                            selectInput(ns("gate_to_delete"), 
-                                       label = "Delete gate", 
+                                       label = "Select gate", 
                                        choices = NULL, 
                                        selected = NULL),
                            actionButton(ns("delete_gate"), "Delete")
-                  ) 
+                  ),
+                  tabPanel("Rename",
+                           selectInput(ns("gate_to_rename"), 
+                                       label = "Select gate", 
+                                       choices = NULL, 
+                                       selected = NULL),
+                           textInput(ns("new_name"), label = "Enter new name", value = ""),
+                           actionButton(ns("rename_gate"), "rename gate")
+                  )
            ),
            box(title = "Message_gate",
                width = NULL, height = NULL,
@@ -51,12 +59,16 @@ gatingUI <- function(id) {
            tabBox(title = "Gating hierarchy",
                   width = NULL, height = NULL,
                   tabPanel("Tree",
+                           checkboxInput(ns("show_all_subsets"), "Show all subsets (including clusters and bins)", FALSE),
                            plotOutput(ns("tree"))
                   ),
                   tabPanel(title = "Gates",
                            simpleDisplayUI(ns("simple_display_module_2"), nrow = 2, size = 200)
                   ),
                   tabPanel(title = "Stats",
+                           br(),
+                           downloadButton(ns("download_data")),
+                           br(),
                            br(),
                            div(style = 'overflow-x: scroll', DT::dataTableOutput(ns("pop_stats"))),
                            br() 
@@ -115,7 +127,6 @@ gating <- function(input, output, session, rval) {
       plot_params$yvar <- yvar
       plot_params$plot_type <- "dots"
       plot_params$color_var <- NULL
-      plot_params$gate <- "root"
       rval_mod$init <- FALSE
       
     }
@@ -285,7 +296,37 @@ gating <- function(input, output, session, rval) {
   
   observeEvent(rval$gates_flowCore, {
     validate(need(rval$gates_flowCore, "no gating set"))
-    updateSelectInput(session, "gate_to_delete", choices = names(rval$gates_flowCore), selected = "root")
+    updateSelectInput(session, "gate_to_delete", choices = names(rval$gates_flowCore))
+  })
+  
+  observeEvent(input$rename_gate, {
+    if(input$gate_to_rename != "root"){
+      
+      idx_gh <- which( getNodes(rval$gating_set) == input$gate_to_rename )
+      target_gate <- getNodes(rval$gating_set)[idx_gh]
+      
+      setNode(rval$gating_set, target_gate, input$new_name)
+      
+      
+      idx <- which( names(rval$gates_flowCore) == input$gate_to_rename )
+      names(rval$gates_flowCore)[idx] <- paste(dirname(input$gate_to_rename), input$new_name, sep = "/")
+      rval$gates_flowCore[[idx]]$gate@filterId <- input$new_name
+      
+      child_gates <- get_all_descendants(rval$gates_flowCore, input$gate_to_rename)
+      for(child in child_gates){
+        rval$gates_flowCore[[child]]$parent <- paste(dirname(input$gate_to_rename), input$new_name, sep = "/")
+      }
+      
+      #Rm(target_gate, rval$gating_set)
+      #recompute(rval$gating_set)
+      
+    }
+    
+  })
+
+  observeEvent(rval$gates_flowCore, {
+    validate(need(rval$gates_flowCore, "no gating set"))
+    updateSelectInput(session, "gate_to_rename", choices = names(rval$gates_flowCore))
   })
   
   observeEvent(input$show_gate, {
@@ -327,19 +368,67 @@ gating <- function(input, output, session, rval) {
   ##########################################################################################################
   # Output plots
   
+  # output$tree <- renderPlot({
+  #   
+  #   validate(
+  #     need(rval$gates_flowCore, "Empty gating set")
+  #   )
+  #   
+  #   validate(
+  #     need(length(setdiff(getNodes(rval$gating_set), "root"))>0, "No gates in gating set")
+  #   )
+  #   
+  #   idx_cluster <- grep("^cluster[0-9]", getNodes(rval$gating_set))
+  #   
+  #   p <- plot(rval$gating_set)
+  #   
+  #   renderGraph(p)
+  #   
+  # })
+  
   output$tree <- renderPlot({
     
-    validate(
-      need(rval$gates_flowCore, "Empty gating set")
+    validate(need(rval$gates_flowCore, "Empty gating set"))
+    
+    gates <- rval$gates_flowCore
+
+    if(!input$show_all_subsets){
+      idx_cluster <- grep("^cluster[0-9]+", basename(names(gates)))
+      idx_bins <- grep("^bin[0-9]+", basename(names(gates)))
+      idx_hide <- union(idx_cluster, idx_bins)
+      if(length(idx_hide)>0){
+        gates <- gates[-idx_hide]
+      }
+      
+      
+    }
+    
+    plot_params$selected_subsets <- names(gates)
+    
+
+    gR = new("graphNEL", nodes = union("root", names(gates)), edgemode = "directed")
+
+    for(i in 1:length(gates)){
+      if(!is.null(gates[[i]]$parent)){
+        gR = graph::addEdge(gates[[i]]$parent,  names(gates)[i], gR)
+      }
+    }
+
+    nAttrs <- list()
+    nodeNames <- basename(nodes(gR))
+    names(nodeNames) <- nodes(gR)
+    nAttrs$label <- nodeNames
+    
+    renderGraph(layoutGraph(gR,
+                            nodeAttrs=nAttrs,
+                            attrs=list(graph=list(rankdir="LR", page=c(8.5,11)),
+                                       node=list(fixedsize = FALSE,
+                                                 fillcolor = "gray",
+                                                 fontsize = 12,
+                                                 shape = "ellipse")
+                            )
     )
-    
-    validate(
-      need(length(setdiff(getNodes(rval$gating_set), "root"))>0, "No gates in gating set")
     )
-    
-    p <- plot(rval$gating_set)
-    
-    renderGraph(p)
     
   })
   
@@ -355,15 +444,26 @@ gating <- function(input, output, session, rval) {
   #   }
   # )
   
-  output$pop_stats <- DT::renderDataTable({
+  pop_stats <- reactive({
     validate(need(rval$gating_set, "No gating set available"))
     df <- getPopStats(rval$gating_set)
     df <- df[df$name %in% res$params$samples, ]
     df[['%']] <- sprintf("%.1f", df$Count / df$ParentCount * 100)
-    DT::datatable(
-      df[, c("name", "Population", "Parent", "%", "Count", "ParentCount")],
-      rownames = FALSE)
+    df <- df[, c("name", "Population", "Parent", "%", "Count", "ParentCount")] 
+    df <- df[df$Population %in% plot_params$selected_subsets, ]
+    df
   })
+  
+  output$pop_stats <- DT::renderDataTable({
+    DT::datatable(pop_stats(), rownames = FALSE)
+  })
+  
+  output$download_data <- downloadHandler(
+    filename = "pop_stats.txt",
+    content = function(file) {
+      write.table(pop_stats(), file = file, row.names = FALSE, quote = FALSE, sep = "\t")
+    }
+  )
   
   return(rval)
   

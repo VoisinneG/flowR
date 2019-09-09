@@ -219,6 +219,7 @@ metadata <- function(input, output, session, rval) {
                                                   trans_parameters = rval$trans_parameters)
       
       rval$flow_set_selected <- input$fs_name
+
     }
     
   })

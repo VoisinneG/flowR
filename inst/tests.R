@@ -15,6 +15,10 @@ gs <- parseWorkspace(ws,
                      isNcdf = TRUE,
                      sampNloc = "sampleNode")
 
+setNode(gs, "/live/CD8+/p0", "undivided")
+
+gates <- get_gates_from_gs(gs)
+
 plot_gs(gs = gs, sample = pData(gs)$name[1], subset = "root", type = "dots", facet_vars = NULL, color_var = NULL)
 
 fs <- getData(gs)

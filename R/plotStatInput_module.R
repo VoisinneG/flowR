@@ -67,18 +67,21 @@ plotStatInput <- function(id) {
     box(collapsible = TRUE, collapsed = TRUE, width = NULL, height = NULL,
         title ="Options",
         selectInput(ns("plot_type"), label = "plot type",
-                    choices = c("bar", "tile"),
+                    choices = c("bar", "tile", "heatmap"),
                     selected = "bar"),
-        checkboxInput(ns("legend"), "show legend", value = TRUE),
-        checkboxInput(ns("free_y_scale"), "free y scale", value = TRUE),
-        checkboxInput(ns("scale_values"), "scale values by row", value = FALSE),
-        numericInput(ns("max_scale"), label = "scale limit", value = 2),
-        numericInput(ns("expand_factor"), label = "expand factor", value = 0.1),
-        numericInput(ns("strip_text_angle"), label = "strip text angle", value = 0),
-        selectInput(ns("theme"), 
-                    label = "plot theme", 
-                    choices = c("gray", "light", "minimal", "classic", "bw", "dark", "void"), 
-                    selected = "gray")
+        # checkboxInput(ns("legend"), "show legend", value = TRUE),
+        # selectInput(ns("theme"), 
+        #             label = "plot theme", 
+        #             choices = c("gray", "light", "minimal", "classic", "bw", "dark", "void"), 
+        #             selected = "gray"),
+        uiOutput(ns("plot_options"))
+        
+        # checkboxInput(ns("free_y_scale"), "free y scale", value = TRUE),
+        # checkboxInput(ns("scale_values"), "scale values by row", value = FALSE),
+        # numericInput(ns("max_scale"), label = "scale limit", value = 2),
+        # numericInput(ns("expand_factor"), label = "expand factor", value = 0.1),
+        # numericInput(ns("strip_text_angle"), label = "strip text angle", value = 0)
+        
     )
     
   )
@@ -95,6 +98,7 @@ plotStatInput <- function(id) {
 #' @import flowCore
 #' @import shiny
 #' @import DT
+#' @import plotly
 #' @export
 #' @rdname plotStatUI
 plotStat <- function(input, output, session, rval) {
@@ -102,8 +106,50 @@ plotStat <- function(input, output, session, rval) {
   `%then%` <- shiny:::`%OR%`
   
   rval_plot <- reactiveValues()
+  rval_mod <- reactiveValues()
   selected <- callModule(selection, "selection_module", rval)
   
+  
+  
+  observe({
+    
+    
+    
+    ns <- session$ns
+    x <- list()
+    x[["legend"]] <- checkboxInput(ns("legend"), "show legend", value = TRUE)
+    x[["theme"]] <- selectInput(ns("theme"), 
+                label = "plot theme", 
+                choices = c("gray", "light", "minimal", "classic", "bw", "dark", "void"), 
+                selected = "gray")
+    x[["free_y_scale"]] <- checkboxInput(ns("free_y_scale"), "free y scale", value = TRUE)
+    x[["scale_values"]] <- checkboxInput(ns("scale_values"), "scale values by row", value = FALSE)
+    x[["max_scale"]] <- numericInput(ns("max_scale"), label = "scale limit", value = 2)
+    x[["expand_factor"]] <- numericInput(ns("expand_factor"), label = "expand factor", value = 0.1)
+    x[["strip_text_angle"]] <- numericInput(ns("strip_text_angle"), label = "strip text angle", value = 0)
+    x[["cluster_x"]] <- checkboxInput(ns("cluster_x"), "cluster x variables", value = TRUE)
+    x[["cluster_y"]] <- checkboxInput(ns("cluster_y"), "cluster y variables", value = TRUE)
+
+    rval_mod$plot_options <- x
+    
+  })
+  
+  output$plot_options <- renderUI({
+    x <- rval_mod$plot_options
+    if(input$plot_type == 'bar'){
+      vars <- c("legend", "theme", "free_y_scale", "scale_values", "max_scale", "expand_factor")
+    }else if (input$plot_type == 'tile'){
+      vars <- c("legend", "theme", "scale_values", "max_scale", "strip_text_angle" )
+    }else if (input$plot_type == 'heatmap'){
+      vars <- c("scale_values", "max_scale", "cluster_x", "cluster_y")
+    }
+    tagList(rval_mod$plot_options[vars])
+    
+  })
+  
+  
+  
+
   observe({
     
     validate(
@@ -152,7 +198,7 @@ plotStat <- function(input, output, session, rval) {
   #   updateSelectInput(session, "samples", choices = rval$pdata$name, selected = rval$pdata$name)
   # })
 
-  observe({
+  observeEvent(input$update, {
     for(var in names(input)){
       rval_plot[[var]] <- input[[var]]
     }
@@ -185,8 +231,18 @@ plotStat <- function(input, output, session, rval) {
     validate(
       need(rval$gating_set, "Empty gating set") %then%
         need(selected$samples, "Please select samples") %then%
-        need(selected$gate, "Please select subsets")
+        need(selected$gate, "Please select subsets") %then%
+        need(input$yvar, "Please select y variables")
     )
+    
+    if(input$plot_type == "heatmap"){
+      name_x_var <- switch(input$group_var,
+                           "subset" = "gate",
+                           "name" = "samples")
+      validate(need(length(selected[[name_x_var]])>1,
+                    paste("Please select more vriables on x axis (", name_x_var, ")", sep = "")))
+      validate(need(length(input$yvar)>1, "Please select more variables on y axis"))
+    }
     
     idx_y <- match(input$yvar, rval$parameters$name_long)
     yvar <- rval$parameters$name[idx_y]
@@ -226,7 +282,9 @@ plotStat <- function(input, output, session, rval) {
                    show.legend = input$legend,
                    y_trans = y_trans,
                    strip.text.y.angle = input$strip_text_angle,
-                   theme_name = paste("theme_", input$theme, sep = "")
+                   theme_name = paste("theme_", input$theme, sep = ""),
+                   Rowv = input$cluster_y,
+                   Colv = input$cluster_x
                    )
     
     p                          

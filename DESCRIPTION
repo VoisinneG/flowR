@@ -32,7 +32,8 @@ Imports:
   Rtsne,
   umap,
   ClusterX,
-  Rphenograph
+  Rphenograph,
+  heatmaply
 Remotes: 
   JinmiaoChenLab/ClusterX,
   JinmiaoChenLab/Rphenograph

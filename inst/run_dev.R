@@ -4,4 +4,6 @@ rm(list = ls(all.names = TRUE))# vide l'environneent
 devtools::document('.') # genere NAMESPACE et man
 devtools::load_all('.') # charge le package
 #options(app.prod = FALSE) # TRUE = production mode, FALSE = development mode
-shiny::runApp('./') # lance l'application
+#run_flowR("metabolism") # lance l'application
+#run_flowR()
+runApp("./")

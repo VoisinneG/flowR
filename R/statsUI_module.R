@@ -22,6 +22,9 @@ statsUI <- function(id) {
                   ),
                   tabPanel(title = "Data",
                            br(),
+                           downloadButton(ns("download_data")),
+                           br(),
+                           br(),
                            div(style = 'overflow-x: scroll', DT::dataTableOutput(ns("stats_data"))),
                            br()
                   )
@@ -46,15 +49,37 @@ statsUI <- function(id) {
 #' @rdname statsUI
 stats <- function(input, output, session, rval) {
 
+  rval_mod <- reactiveValues(use_plotly = FALSE)
+  
   res <- callModule(plotStat, "plotStat_module", rval)
-  res_display <- callModule(simpleDisplay, "simple_display_module", res$plot)
+  res_display <- callModule(simpleDisplay, "simple_display_module", res$plot, params =  rval_mod)
 
+  observe({
+    if("plot_type" %in% names(res$params)){
+      rval_mod$use_plotly <- switch(res$params$plot_type,
+                                    "heatmap" = TRUE,
+                                    FALSE)
+    }
+    
+    print(names(res$params))
+    print(res$params$plot_type)
+    print(names(rval_mod))
+    print(rval_mod$use_plotly)
+  })
+  
   output$stats_data <- DT::renderDataTable({
     validate(need(res$data(), "No data available"))
     df <- res$data()
     df[['value']] <- sprintf("%.2f", as.numeric(df[['value']]))
     DT::datatable(df, rownames = FALSE)
   })
+  
+  output$download_data <- downloadHandler(
+    filename = "stats.txt",
+    content = function(file) {
+      write.table(res$data(), file = file, row.names = FALSE, quote = FALSE, sep = "\t")
+    }
+  )
   
   return(rval)
   
