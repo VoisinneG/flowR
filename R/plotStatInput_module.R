@@ -17,38 +17,31 @@ plotStatInput <- function(id) {
         title = "Sample/Subset",
         selectionInput(ns("selection_module"), multiple_subset = TRUE)
     ),
-    # box(collapsible = TRUE, collapsed = TRUE, width = NULL, height = NULL,
-    #     title = "Sample/Subset",
-    #     checkboxInput(ns("all_samples"), "Select all samples", FALSE),
-    #     selectizeInput(ns("samples"), 
-    #                    label = "samples",
-    #                    choices = NULL,
-    #                    selected = NULL,
-    #                    multiple = TRUE),
-    #     selectizeInput(ns("gate"), 
-    #                    label = "subset",
-    #                    choices = "root",
-    #                    selected = "root",
-    #                    multiple = TRUE)
-    # ),
     box(collapsible = TRUE, collapsed = FALSE, width = NULL, height = NULL,
         title ="Stat",
         selectInput(ns("stat_function"), 
                     label = "statistics", 
-                    choices = c("mean", "median", "sd"), 
+                    choices = c("mean", "median", "sd", "cell count", "percentage"), 
                     selected = "mean"),
-        selectInput(ns("y_trans"), 
-                    label = "Transform", 
-                    choices = c("log10", "asinh", "identity", "default"), 
-                    selected = "default")
+        uiOutput(ns("stat_options"))
+        # selectInput(ns("y_trans"),
+        #             label = "Transform",
+        #             choices = c("log10", "asinh", "identity", "default"),
+        #             selected = "default"),
+        # selectizeInput(ns("yvar"),
+        #                multiple = TRUE,
+        #                label = "variable (y-axis)",
+        #                choices = NULL,
+        #                selected = NULL),
+        # box(title = "Select using pattern", width = NULL, height = NULL, collapsible = TRUE, collapsed = TRUE,
+        #     textInput(ns("pattern"), "Pattern"),
+        #     checkboxInput(ns("match_as_is"), "use pattern as regular expression", TRUE),
+        #     actionButton(ns("select_var"), "Select variable (y-axis)")
+        # )
     ),
     box(collapsible = TRUE, collapsed = FALSE, width = NULL, height = NULL,
-        title ="Variables",
-        selectizeInput(ns("yvar"), 
-                       multiple = TRUE,
-                       label = "variable (y-axis)", 
-                       choices = NULL, 
-                       selected = NULL),
+        title ="Plot variables",
+        
         selectizeInput(ns("group_var"), 
                        multiple = FALSE,
                        label = "group variable (x-axis)",
@@ -69,19 +62,7 @@ plotStatInput <- function(id) {
         selectInput(ns("plot_type"), label = "plot type",
                     choices = c("bar", "tile", "heatmap"),
                     selected = "bar"),
-        # checkboxInput(ns("legend"), "show legend", value = TRUE),
-        # selectInput(ns("theme"), 
-        #             label = "plot theme", 
-        #             choices = c("gray", "light", "minimal", "classic", "bw", "dark", "void"), 
-        #             selected = "gray"),
         uiOutput(ns("plot_options"))
-        
-        # checkboxInput(ns("free_y_scale"), "free y scale", value = TRUE),
-        # checkboxInput(ns("scale_values"), "scale values by row", value = FALSE),
-        # numericInput(ns("max_scale"), label = "scale limit", value = 2),
-        # numericInput(ns("expand_factor"), label = "expand factor", value = 0.1),
-        # numericInput(ns("strip_text_angle"), label = "strip text angle", value = 0)
-        
     )
     
   )
@@ -113,8 +94,6 @@ plotStat <- function(input, output, session, rval) {
   
   observe({
     
-    
-    
     ns <- session$ns
     x <- list()
     x[["legend"]] <- checkboxInput(ns("legend"), "show legend", value = TRUE)
@@ -124,9 +103,9 @@ plotStat <- function(input, output, session, rval) {
                 selected = "gray")
     x[["free_y_scale"]] <- checkboxInput(ns("free_y_scale"), "free y scale", value = TRUE)
     x[["scale_values"]] <- checkboxInput(ns("scale_values"), "scale values by row", value = FALSE)
-    x[["max_scale"]] <- numericInput(ns("max_scale"), label = "scale limit", value = 2)
+    x[["max_scale"]] <- numericInput(ns("max_scale"), label = "scale limit", value = 0)
     x[["expand_factor"]] <- numericInput(ns("expand_factor"), label = "expand factor", value = 0.1)
-    x[["strip_text_angle"]] <- numericInput(ns("strip_text_angle"), label = "strip text angle", value = 0)
+    x[["strip_text_angle"]] <- numericInput(ns("strip_text_angle"), label = "y strip text angle", value = 0)
     x[["cluster_x"]] <- checkboxInput(ns("cluster_x"), "cluster x variables", value = TRUE)
     x[["cluster_y"]] <- checkboxInput(ns("cluster_y"), "cluster y variables", value = TRUE)
 
@@ -137,7 +116,7 @@ plotStat <- function(input, output, session, rval) {
   output$plot_options <- renderUI({
     x <- rval_mod$plot_options
     if(input$plot_type == 'bar'){
-      vars <- c("legend", "theme", "free_y_scale", "scale_values", "max_scale", "expand_factor")
+      vars <- c("legend", "theme", "free_y_scale", "scale_values", "max_scale", "expand_factor", "strip_text_angle")
     }else if (input$plot_type == 'tile'){
       vars <- c("legend", "theme", "scale_values", "max_scale", "strip_text_angle" )
     }else if (input$plot_type == 'heatmap'){
@@ -147,7 +126,33 @@ plotStat <- function(input, output, session, rval) {
     
   })
   
-  
+  output$stat_options <- renderUI({
+
+    validate(
+      need(rval$plot_var, "No plotting parameters")
+    )
+
+    if( ! input$stat_function %in% c("cell count", "percentage") ){
+      ns <- session$ns
+      tagList(
+        selectInput(ns("y_trans"),
+                    label = "Transform",
+                    choices = c("log10", "asinh", "identity", "default"),
+                    selected = "default"),
+        selectizeInput(ns("yvar"),
+                       multiple = TRUE,
+                       label = "variable (y-axis)",
+                       choices = rval$plot_var,
+                       selected = rval$plot_var[1]),
+        box(title = "Select using pattern", width = NULL, height = NULL, collapsible = TRUE, collapsed = TRUE,
+            textInput(ns("pattern"), "Pattern"),
+            checkboxInput(ns("match_as_is"), "use pattern as regular expression", TRUE),
+            actionButton(ns("select_var"), "Select variable (y-axis)")
+        )
+      )
+    }
+
+  })
   
 
   observe({
@@ -174,29 +179,42 @@ plotStat <- function(input, output, session, rval) {
     
   })
   
-  observe({
-    
-    validate(
-      need(rval$plot_var, "No plotting parameters")
-    )
-    
-    yvar_default <- rval$plot_var[1]
+  # observe({
+  # 
+  #   validate(
+  #     need(rval$plot_var, "No plotting parameters")
+  #   )
+  # 
+  #   yvar_default <- rval$plot_var[1]
+  # 
+  #   updateSelectInput(session, "yvar", choices = rval$plot_var, selected = yvar_default)
+  # 
+  # })
   
-    updateSelectInput(session, "yvar", choices = rval$plot_var, selected = yvar_default)
+  observeEvent(input$select_var, {
+
+    var_name <- "yvar"
+    choices <- rval$plot_var
+    var_selected <- NULL
+    
+    idx_selected <- try(grep(input$pattern, choices, fixed = input$match_as_is), silent = TRUE)
+    
+    if(class(idx_selected) == "try-error"){
+      showModal(modalDialog(
+        title = "Error",
+        print(idx_selected),
+        easyClose = TRUE,
+        footer = NULL
+      ))
+    }
+    
+    if(length(idx_selected)>0){
+      var_selected <- choices[idx_selected]
+    }
+    updateSelectInput(session, var_name, choices = choices, selected = var_selected)
     
   })
   
-  # observe({
-  #   updateSelectInput(session, "gate", choices = union("root", names(rval$gates_flowCore)), selected = "root")
-  # })
-  # 
-  # observe({
-  #   updateSelectInput(session, "samples", choices = rval$pdata$name, selected = rval$pdata$name[1])
-  # })
-  # 
-  # observeEvent(input$all_samples, {
-  #   updateSelectInput(session, "samples", choices = rval$pdata$name, selected = rval$pdata$name)
-  # })
 
   observeEvent(input$update, {
     for(var in names(input)){
@@ -231,18 +249,13 @@ plotStat <- function(input, output, session, rval) {
     validate(
       need(rval$gating_set, "Empty gating set") %then%
         need(selected$samples, "Please select samples") %then%
-        need(selected$gate, "Please select subsets") %then%
-        need(input$yvar, "Please select y variables")
+        need(selected$gate, "Please select subsets")
     )
     
-    if(input$plot_type == "heatmap"){
-      name_x_var <- switch(input$group_var,
-                           "subset" = "gate",
-                           "name" = "samples")
-      validate(need(length(selected[[name_x_var]])>1,
-                    paste("Please select more vriables on x axis (", name_x_var, ")", sep = "")))
-      validate(need(length(input$yvar)>1, "Please select more variables on y axis"))
+    if(!input$stat_function %in% c("cell count", "percentage")){
+      validate(need(input$yvar, "Please select y variables"))
     }
+
     
     idx_y <- match(input$yvar, rval$parameters$name_long)
     yvar <- rval$parameters$name[idx_y]
@@ -261,6 +274,28 @@ plotStat <- function(input, output, session, rval) {
                       "identity" = identity_trans(),
                       NULL)
     
+    theme <- input$theme
+    if(is.null(theme)){
+      theme <- "gray"
+    }else if(theme == ""){
+      theme <- "gray"
+    }
+    
+    Rowv <- FALSE
+    Colv <- FALSE
+    if(input$plot_type == "heatmap"){
+      if(input$cluster_y & (! input$stat_function %in% c("cell count", "percentage")) & length(input$yvar)>1){
+        Rowv <- TRUE
+      }
+      name_x_var <- switch(input$group_var,
+                           "subset" = "gate",
+                           "name" = "samples")
+      if(input$cluster_x & length(selected[[name_x_var]])>1){
+        Colv <- TRUE
+      }
+    }
+    
+
     p <- plot_stat(df = update_data_plot_stat(),
                    gs = rval$gating_set,
                    sample = selected$samples,
@@ -282,9 +317,9 @@ plotStat <- function(input, output, session, rval) {
                    show.legend = input$legend,
                    y_trans = y_trans,
                    strip.text.y.angle = input$strip_text_angle,
-                   theme_name = paste("theme_", input$theme, sep = ""),
-                   Rowv = input$cluster_y,
-                   Colv = input$cluster_x
+                   theme_name = paste("theme_", theme, sep = ""),
+                   Rowv = Rowv,
+                   Colv = Colv
                    )
     
     p                          

@@ -60,11 +60,7 @@ stats <- function(input, output, session, rval) {
                                     "heatmap" = TRUE,
                                     FALSE)
     }
-    
-    print(names(res$params))
-    print(res$params$plot_type)
-    print(names(rval_mod))
-    print(rval_mod$use_plotly)
+
   })
   
   output$stats_data <- DT::renderDataTable({

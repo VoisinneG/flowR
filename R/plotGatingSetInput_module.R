@@ -32,7 +32,19 @@ plotGatingSetInput <- function(id, simple_plot = TRUE, auto_update = TRUE) {
                        label = "y variable",
                        choices = NULL,
                        selected = NULL),
-        uiOutput(ns("plot_variables"))
+        uiOutput(ns("plot_variables")),
+        if(!simple_plot){
+          box(title = "Select using pattern", width = NULL, height = NULL, collapsible = TRUE, collapsed = TRUE,
+              textInput(ns("pattern"), "Pattern"),
+              checkboxInput(ns("match_as_is"), "use pattern as regular expression", TRUE),
+              selectizeInput(ns("var_name"),
+                             multiple = FALSE,
+                             label = "variable",
+                             choices = c("x variable", "y variable", "color variable"),
+                             selected = "x variable"),
+              actionButton(ns("select_var"), "Select variable")
+          )
+        }
     ),
     box(collapsible = TRUE, collapsed = TRUE, width = NULL, height = NULL,
         title ="Options",
@@ -226,6 +238,38 @@ plotGatingSet <- function(input, output, session,
         updateSelectInput(session, var, selected = plot_params[[var]])
       }
     }
+  })
+  
+  observeEvent(input$select_var, {
+    
+    var_name <- switch(input$"var_name",
+                       "x variable" = "xvar", 
+                       "y variable" = "yvar", 
+                       "color variable" = "color_var")
+    
+    choices <- rval$plot_var
+    if(var_name == "color_variable"){
+      choices <- c("none", "subset", names(rval$pdata), rval$plot_var)
+    }
+    
+    var_selected <- NULL
+    
+    idx_selected <- try(grep(input$pattern, choices, fixed = input$match_as_is), silent = TRUE)
+    
+    if(class(idx_selected) == "try-error"){
+      showModal(modalDialog(
+        title = "Error",
+        print(idx_selected),
+        easyClose = TRUE,
+        footer = NULL
+      ))
+    }
+    
+    if(length(idx_selected)>0){
+      var_selected <- choices[idx_selected]
+    }
+    updateSelectInput(session, var_name, choices = choices, selected = var_selected)
+    
   })
   
   observe({

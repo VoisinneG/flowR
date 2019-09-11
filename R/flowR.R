@@ -410,6 +410,24 @@ transform_gates <- function(gates,
 ####################################################################################################
 # Getting data
 
+getPopStatsPlus <- function(gs){
+  df <- getPopStats(gs)
+  df$name <- sapply(df$name, function(x){strsplit(x, split = "_[0-9]+$")[[1]][1]})
+  df_root <- df
+  df_root <- df_root[df_root$Parent == "root", ]
+  
+  df_root$Population <- df_root$Parent
+  df_root$Count <- df_root$ParentCount
+  df_root$Parent <- NA
+  df_root$ParentCount <- NA
+  
+  name <- unique(df_root$name)
+  idx <- match(name, df_root$name)
+  
+  df_merge <- rbind(df, df_root[idx, ])
+  df_merge
+}
+
 #' @import flowWorkspace
 #' @import flowCore
 get_data_gs <- function(gs,
@@ -1131,6 +1149,7 @@ plot_gh <- function(df = NULL, gs, sample, selected_subsets = NULL, spill = NULL
 #' @import ggsignif
 #' @import data.table
 #' @import heatmaply
+#' @import dplyr
 plot_stat <- function(df = NULL,
                       gs,
                       sample, 
@@ -1138,7 +1157,7 @@ plot_stat <- function(df = NULL,
                       yvar,
                       type = "bar",
                       metadata = NULL,
-                      color_var = NULL, 
+                      color_var = "subset", 
                       axis_labels = NULL,
                       transformation = NULL,
                       spill = NULL,
@@ -1162,7 +1181,17 @@ plot_stat <- function(df = NULL,
     do.call(theme_name, list(...))
   }
                     
-
+  if(!is.logical(scale_values)){
+    scale_values <- FALSE
+  }
+  
+  if(!is.logical(free_y_scale)){
+    free_y_scale <- TRUE
+  }
+  
+  if(!is.numeric(max_scale)){
+    max_scale <- 0
+  }
   
   #if(log10_trans){
   #  trans <- log10_trans()
@@ -1170,64 +1199,102 @@ plot_stat <- function(df = NULL,
   #  trans <- identity_trans()
   #}
   
-  if(!is.null(y_trans)){
-   transformation <- lapply(yvar, function(x){y_trans})
-   names(transformation) <- yvar
-  }
+  if(! stat_function %in% c("cell count", "percentage")){
+    if(!is.null(yvar)){
   
-  trans_name <-  unique(unlist(sapply(transformation[yvar], function(tf){tf$name})))
+      if(!is.null(y_trans)){
+        transformation <- lapply(yvar, function(x){y_trans})
+        names(transformation) <- yvar
+      }
+      
+      trans_name <-  unique(unlist(sapply(transformation[yvar], function(tf){tf$name})))
+      
+      
+      #ylim <- NULL
+      #if(!is.null(data_range)){
+      #  ylim <- data_range[[yvar]]
+      #}
+      if(is.null(df)){
+        df <- get_data_gs(gs = gs,
+                          sample = sample,
+                          subset = subset,
+                          spill = spill)
+      }else{
+        df <- df[df$name %in% sample & df$subset %in% subset, ]
+      } 
+      
+      
+      for(i in 1:length(yvar)){
+        df[[yvar[i]]] <- transformation[[yvar[i]]]$transform(df[[yvar[i]]])
+      }
   
-  
-  #ylim <- NULL
-  #if(!is.null(data_range)){
-  #  ylim <- data_range[[yvar]]
-  #}
-  if(is.null(df)){
-    df <- get_data_gs(gs = gs,
-                      sample = sample,
-                      subset = subset,
-                      spill = spill)
+      id.vars <- c("name", "subset")
+      
+      df_melt <- melt(df, id.vars = id.vars, measure.vars = yvar)
+      df_melt <- df_melt[is.finite(df_melt$value), ]
+      
+      
+      stat.fun <- function(...){do.call(stat_function, args = list(...))}
+      df_cast <- dcast(df_melt, 
+                       formula = as.formula(paste(paste(id.vars, collapse = " + "), " ~ variable", sep ="")), 
+                       fun.aggregate =  stat.fun, 
+                       na.rm = TRUE)
+      
+      
+      for(i in 1:length(yvar)){
+        print(yvar[i])
+        print(transformation[[yvar[i]]])
+        df_cast[[yvar[i]]] <- transformation[[yvar[i]]]$inverse(df_cast[[yvar[i]]])
+        #  #df_cast[[yvar[i]]] <- trans$inverse(df_cast[[yvar[i]]])
+      }
+    }
+    
   }else{
-    df <- df[df$name %in% sample & df$subset %in% subset, ]
-  } 
-  
-  
-  for(i in 1:length(yvar)){
-    df[[yvar[i]]] <- transformation[[yvar[i]]]$transform(df[[yvar[i]]])
-    #df[[yvar[i]]] <- trans$transform(df[[yvar[i]]])
+    
+    df <- getPopStatsPlus(gs)
+    df <- dplyr::rename(df, subset = Population)
+    df[['perc_parent']] <- df$Count / df$ParentCount * 100
+
+    print(df)
+    
+    idx <- which(as.character(df$name) %in% sample & as.character(df$subset) %in% subset)
+    print(idx)
+    if(length(idx)>0){
+      df_cast <- df[idx, ]
+    }else{
+      df_cast <- NULL
+    }
+    
+    
+    # if(length(idx)>0){
+    #   df_cast <- df[idx, ]
+    # }else{
+    #   df_cast <- NULL
+    #   return(NULL)
+    # }
+    
+    trans_name <- NULL
+    yvar <- switch(stat_function,
+                   "cell count" = "Count",
+                   "percentage" = "perc_parent")
+    id.vars <- c("name", "subset")
+    
   }
   
-  # if(type == "heatmap"){
-  #   id.vars <- group_var
-  # }else{
-  #   id.vars <- c("name", "subset")
-  # }
-  
-  id.vars <- c("name", "subset")
-  
-  df_melt <- melt(df, id.vars = id.vars, measure.vars = yvar)
-  df_melt <- df_melt[is.finite(df_melt$value), ]
   
   
-  stat.fun <- function(...){do.call(stat_function, args = list(...))}
-  df_cast <- dcast(df_melt, 
-                   formula = as.formula(paste(paste(id.vars, collapse = " + "), " ~ variable", sep ="")), 
-                   fun.aggregate =  stat.fun, 
-                   na.rm = TRUE)
-  
-  
-  for(i in 1:length(yvar)){
-    df_cast[[yvar[i]]] <- transformation[[yvar[i]]]$inverse(df_cast[[yvar[i]]])
-  #  #df_cast[[yvar[i]]] <- trans$inverse(df_cast[[yvar[i]]])
-  }
   
   df_scale <- df_cast
   if(scale_values){
     df_scale[-which(names(df_cast) %in% id.vars)] <- scale(df_cast[-which(names(df_cast) %in% id.vars)])
   }
 
-  df_melt2 <- melt(df_scale, id.vars = id.vars )
+  print(df_cast)
+  print(df_scale)
+  print(id.vars)
+  print(yvar)
   
+  df_melt2 <- data.table::melt(df_scale, id.vars = id.vars, measure.vars = yvar )
   
   if(is.null(metadata) & !is.null(gs)){
     metadata <- pData(gs)
@@ -1241,8 +1308,7 @@ plot_stat <- function(df = NULL,
                                           #group_var = group_var
                                           )
   }
-  
-  names(df_melt2)
+
   df_melt2 <- df_melt2[df_melt2$variable %in% yvar, ]
 
   ylim <- NULL
@@ -1269,8 +1335,8 @@ plot_stat <- function(df = NULL,
   }
   
   if(scale_values & max_scale > 0){
-    df_melt2$value[df_melt2$value > max_scale] <- max_scale
-    df_melt2$value[df_melt2$value < -max_scale] <- -max_scale
+    #df_melt2$value[df_melt2$value > max_scale] <- max_scale
+    #df_melt2$value[df_melt2$value < -max_scale] <- -max_scale
     ylim <- c(-max_scale - expand_factor*2*max_scale, 
               max_scale + expand_factor*2*max_scale)
     #scale_y <- "free_y"
@@ -1285,7 +1351,9 @@ plot_stat <- function(df = NULL,
   
   if(!is.null(axis_labels)){
     for(i in 1:length(yvar)){
-      df_melt2$variable[df_melt2$variable == yvar[i]] <- axis_labels[[yvar[i]]]
+      if(yvar[i] %in% names(axis_labels)){
+        df_melt2$variable[df_melt2$variable == yvar[i]] <- axis_labels[[yvar[i]]]
+      }
     }
   }
   
@@ -1293,9 +1361,20 @@ plot_stat <- function(df = NULL,
   
   if(type == "heatmap"){
     
-    df_cast2 <- dcast(df_melt2[, c("variable", group_var, "value")],
-                      as.formula(paste("variable ~", paste(group_var, collapse = " + "))), 
-                      fun.aggregate = mean)
+    df <- as.data.frame(df_melt2)
+    # s <- group_var
+    # df <- df[ , c("variable", s, "value")]
+    # print(df)
+    # print(class(df_melt2))
+    
+    df_cast2 <- data.table::dcast(df[, c("variable", group_var, "value")],
+                      formula = as.formula(paste("variable ~", paste(group_var, collapse = " + "))),
+                      fun.aggregate = mean )
+    
+    # df_cast2 <- data.table::dcast(df_melt2[, c("variable", "subset", "value")],
+    #                               formula = as.formula(paste("variable ~", paste("subset", collapse = " + "))), 
+    #                               fun.aggregate = mean )
+    
     row_labels <- df_cast2$variable
     p <- heatmaply(df_cast2[-1], 
                    labRow = row_labels,
@@ -1335,10 +1414,10 @@ plot_stat <- function(df = NULL,
                   position = position_jitter(width = 0.25, height = 0),
                   alpha = 0.5,
                   size = 3,
-                  show.legend = show.legend) +
-      geom_signif(comparisons = list(c(1,2)),
-                  test="t.test",
-                  test.args = list("paired"=FALSE))
+                  show.legend = show.legend) 
+      # geom_signif(comparisons = list(c(1,2)),
+      #             test="t.test",
+      #             test.args = list("paired"=FALSE))
     
     if(!is.null(y_trans)){
       p <- p + scale_y_continuous(trans = y_trans)
@@ -1385,13 +1464,16 @@ plot_stat <- function(df = NULL,
     theme( axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5), 
            strip.text.y = element_text(angle = strip.text.y.angle)
     )
-    
-  trans_name_plot <- trans_name
-  if(length(trans_name)>1){
-    trans_name_plot <- "defined by variable"
+
+  if(!is.null(trans_name)){
+    trans_name_plot <- trans_name
+    if(length(trans_name)>1){
+      trans_name_plot <- "defined by variable"
+    }
+    p <- p + ggtitle(paste("statistic : ", stat_function, " / transform : ", trans_name_plot, sep = ""))
+  }else{
+    p <- p + ggtitle(paste("statistic : ", stat_function))
   }
-  
-  p <- p + ggtitle(paste("statistic : ",stat_function, " / transform : ", trans_name_plot, sep = "")) 
 
   return(list(plot = p, data = df_melt2))
   

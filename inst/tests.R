@@ -1,11 +1,15 @@
 library(flowWorkspace)
 library(CytoML)
 library(openCyto)
-
-library(FlowSOM)
-library(slingshot)
-library(ClusterX)
 library(scales)
+
+#library(FlowSOM)
+#library(slingshot)
+
+library(ClusterX)
+library(dplyr)
+library(data.table)
+library(ggplot2)
 
 ws <- openWorkspace(file = "./data/tetra/workspace.wsp")
 
@@ -14,6 +18,9 @@ gs <- parseWorkspace(ws,
                      execute = TRUE,
                      isNcdf = TRUE,
                      sampNloc = "sampleNode")
+
+
+plot_stat(gs = gs, stat_function = "mean", yvar = "Comp-Time", sample = pData(gs)$name[1], subset = getNodes(gs), y_trans = identity_trans())
 
 setNode(gs, "/live/CD8+/p0", "undivided")
 

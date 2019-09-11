@@ -387,11 +387,9 @@ gating <- function(input, output, session, rval) {
   # })
   
   output$tree <- renderPlot({
-    
-    validate(need(rval$gates_flowCore, "Empty gating set"))
-    
     gates <- rval$gates_flowCore
-
+    validate(need(names(gates), "Empty gating set"))
+    
     if(!input$show_all_subsets){
       idx_cluster <- grep("^cluster[0-9]+", basename(names(gates)))
       idx_bins <- grep("^bin[0-9]+", basename(names(gates)))
@@ -446,11 +444,12 @@ gating <- function(input, output, session, rval) {
   
   pop_stats <- reactive({
     validate(need(rval$gating_set, "No gating set available"))
-    df <- getPopStats(rval$gating_set)
+    df <- getPopStatsPlus(rval$gating_set)
     df <- df[df$name %in% res$params$samples, ]
-    df[['%']] <- sprintf("%.1f", df$Count / df$ParentCount * 100)
-    df <- df[, c("name", "Population", "Parent", "%", "Count", "ParentCount")] 
-    df <- df[df$Population %in% plot_params$selected_subsets, ]
+    df[['% parent']] <- sprintf("%.1f", df$Count / df$ParentCount * 100)
+    df <- df[, c("name", "Population", "Parent", "% parent", "Count", "ParentCount")] 
+    df <- rename(df, subset = Population)
+    df <- df[df$subset %in% plot_params$selected_subsets, ]
     df
   })
   
