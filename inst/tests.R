@@ -20,13 +20,25 @@ gs <- parseWorkspace(ws,
                      sampNloc = "sampleNode")
 
 
-plot_stat(gs = gs, stat_function = "mean", yvar = "Comp-Time", sample = pData(gs)$name[1], subset = getNodes(gs), y_trans = identity_trans())
+p <- plot_stat(gs = gs, stat_function = "mean", yvar = c("Comp-Time", "Comp-FSC-A"), 
+          sample = pData(gs)$name[1], 
+          subset = getNodes(gs), y_trans = identity_trans())$plot
+
+p + theme(strip.background = element_rect(fill = "white"), legend.position = "none")
+
+names(p)
+p$data
+names(p$plot_env)
 
 setNode(gs, "/live/CD8+/p0", "undivided")
 
 gates <- get_gates_from_gs(gs)
 
-plot_gs(gs = gs, sample = pData(gs)$name[1], subset = "root", type = "dots", facet_vars = NULL, color_var = NULL)
+p <- plot_gs(gs = gs, sample = pData(gs)$name[1], subset = "root", type = "dots", facet_vars = NULL, color_var = NULL)
+names(p)
+p$data
+names(p$plot_env)
+
 
 fs <- getData(gs)
 

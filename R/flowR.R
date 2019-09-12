@@ -14,7 +14,7 @@
 # library(xml2)
 
 ####################################################################################################
-# Parse workspace
+# Parse workspace and gates from xml files
 
 #' @import xml2
 parseSampleNodes <- function(x){
@@ -98,6 +98,72 @@ find_all_parent_gates <- function(x){
   return(all_parents)
 }
 
+#' @import xml2
+#' @import flowCore
+get_gates_from_ws <- function(ws_path, group = NULL){
+  
+  ws <- read_xml(ws_path)
+  
+  # get Groups info
+  GroupNodes <- xml_find_all(ws, "//GroupNode")
+  group_info <- lapply(GroupNodes, parseGroupNodes)
+  group_info <- data.frame( do.call(rbind, group_info ) )
+  #print(group_info)
+  
+  # get Samples info
+  SampleNodes <- xml_find_all(ws, "//SampleNode")
+  sample_info <- lapply(SampleNodes , parseSampleNodes)
+  sample_info <- data.frame( do.call(rbind, sample_info ) )
+  #print(sample_info)
+  
+  if(is.null(group)){
+    group_selected <- group_info$name[1]
+  }else{
+    group_selected <- group
+  }
+  
+  # get Gates for first sample in group
+  sampleID <- group_info$sampleID[[which(group_info$name == group_selected)]][1]
+  if(length(sampleID) > 0){
+    SampleNode <- SampleNodes[ which( sample_info$sampleID == sampleID) ]
+  }else{
+    stop("Could not find sample in group")
+  }
+  
+  #print(SampleNode)
+  gates <- lapply(xml_find_all(SampleNode, ".//Gate"), parseGate)
+  
+  #print(gates)
+  
+  gate_list <- list()
+  
+  for(i in 1:length(gates)){
+    
+    parent <- gates[[i]]$parent_long
+    name <- gates[[i]]$name_long
+    
+    parent <- gsub(" ", "_", parent)
+    name <- gsub(" ", "_", name)
+    
+    if(gates[[i]]$type == "RectangleGate"){
+      boundaries <- gates[[i]]$boundaries
+      g <- rectangleGate(.gate = boundaries, filterId = basename(name))
+      gate_list[[name]] <- list(gate = g, parent = parent)
+    }else if(gates[[i]]$type == "PolygonGate"){
+      polygon <- gates[[i]]$polygon
+      g <- polygonGate(.gate = polygon, filterId = basename(name) )
+      gate_list[[name]] <- list(gate = g, parent = parent)
+    }else{
+      warning(paste("gate type", gates[[i]]$type, "not supported"))
+      #g <- NULL
+      #gate_list[[name_long]] <- list(gate = g, parent = parent)
+    }
+    
+    
+  } 
+  return(gate_list)
+  
+}
 
 ####################################################################################################
 # Transformations
@@ -196,72 +262,7 @@ get_gates_from_gs <- function(gs){
   
 }
 
-#' @import xml2
-#' @import flowCore
-get_gates_from_ws <- function(ws_path, group = NULL){
-  
-  ws <- read_xml(ws_path)
-  
-  # get Groups info
-  GroupNodes <- xml_find_all(ws, "//GroupNode")
-  group_info <- lapply(GroupNodes, parseGroupNodes)
-  group_info <- data.frame( do.call(rbind, group_info ) )
-  #print(group_info)
-  
-  # get Samples info
-  SampleNodes <- xml_find_all(ws, "//SampleNode")
-  sample_info <- lapply(SampleNodes , parseSampleNodes)
-  sample_info <- data.frame( do.call(rbind, sample_info ) )
-  #print(sample_info)
-  
-  if(is.null(group)){
-    group_selected <- group_info$name[1]
-  }else{
-    group_selected <- group
-  }
-  
-  # get Gates for first sample in group
-  sampleID <- group_info$sampleID[[which(group_info$name == group_selected)]][1]
-  if(length(sampleID) > 0){
-    SampleNode <- SampleNodes[ which( sample_info$sampleID == sampleID) ]
-  }else{
-    stop("Could not find sample in group")
-  }
-  
-  #print(SampleNode)
-  gates <- lapply(xml_find_all(SampleNode, ".//Gate"), parseGate)
-  
-  #print(gates)
-  
-  gate_list <- list()
-  
-  for(i in 1:length(gates)){
-    
-    parent <- gates[[i]]$parent_long
-    name <- gates[[i]]$name_long
-    
-    parent <- gsub(" ", "_", parent)
-    name <- gsub(" ", "_", name)
-    
-    if(gates[[i]]$type == "RectangleGate"){
-      boundaries <- gates[[i]]$boundaries
-      g <- rectangleGate(.gate = boundaries, filterId = basename(name))
-      gate_list[[name]] <- list(gate = g, parent = parent)
-    }else if(gates[[i]]$type == "PolygonGate"){
-      polygon <- gates[[i]]$polygon
-      g <- polygonGate(.gate = polygon, filterId = basename(name) )
-      gate_list[[name]] <- list(gate = g, parent = parent)
-    }else{
-      warning(paste("gate type", gates[[i]]$type, "not supported"))
-      #g <- NULL
-      #gate_list[[name_long]] <- list(gate = g, parent = parent)
-    }
-    
-    
-  } 
-  return(gate_list)
-  
-}
+
 
 #' @import flowWorkspace
 add_gates_flowCore <- function(gs, gates){
@@ -529,6 +530,12 @@ get_data_gs <- function(gs,
   
 }
 
+#' Add metadata columns
+#' @description  Add metadata columns
+#' @param df data.frame with a column \code{name} used to map metadata.
+#' Metadata should also contain a column \code{name}
+#' @return a data.frame with additional columns
+#' @export
 add_columns_from_metadata <- function(df,
                                       metadata
                                       #color_var = NULL, 
@@ -536,20 +543,7 @@ add_columns_from_metadata <- function(df,
                                       #group_var = "name",
                                       #yridges_var = NULL
                                       ){
-  
-  # if(!is.null(facet_vars)){
-  #   facet_vars <- facet_vars[facet_vars %in% names(metadata)]
-  # }
-  # 
-  # if(!is.null(color_var)){
-  #   color_var <- color_var[color_var %in% names(metadata)]
-  # }
-  # 
-  # new_vars <- unique(setdiff( c(yridges_var, 
-  #                               #group_var, 
-  #                               facet_vars, 
-  #                               color_var), 
-  #                             names(df)))
+
   
   if(! "name" %in% names(df)){
     warning("Could not find column 'name' in data.frame. No metadata added.")
@@ -571,6 +565,47 @@ add_columns_from_metadata <- function(df,
 ####################################################################################################
 # Plotting
 
+#' Plot data and gates from a gating set
+#' @description  Plot data and gates from a gating set
+#' @param df data.frame with columns \code{name} and \code{subset} 
+#' containing sample and subset names respectively and
+#' columns with plot variables. Ignored if \code{NULL}
+#' @param gs a gating set
+#' @param sample sample names
+#' @param subset subset names
+#' @param xvar x variable
+#' @param yvar y variable
+#' @param axis_labels Named vector with axis labels. 
+#' Vector names should correspond to variable names
+#' @param color_var color variable
+#' @param data_range Named list of data ranges. 
+#' List names should correspond to variable names.
+#' @param min_value numeric. Minimal value of x and y axis. Ignored if \code{NULL}.
+#' @param gate A character vector with subset names (i.e elements of \code{getNodes(gs)}) or a list of gates 
+#' (as returned by \code{get_gates_from_gs()}). 
+#' Gates from classes \code{polygonGate}, \code{rectangleGate} and \code{ellipsoidGate} are supported.
+#' If \code{xvar} and \code{yvar} are \code{NULL}, the first gate will be used to set plot variables.
+#' @param polygon_gate a matrix with columns \code{x} and \code{y} containing path coordinates.
+#' @param type plot type : either "hexagonal", "histogram", "dots" or "contour"
+#' @param bins bins parameter
+#' @param alpha alpha parameter
+#' @param size size parameter
+#' @param transformation  Named list of \code{trans} objects. 
+#' List names should correspond to variable names.
+#' @param default_trans default \code{trans} object to be used if \code{transformation} is NULL.
+#' @param spill spillover matrix. If NULL, uncompensated data is used both for gating and plotting.
+#' @param metadata data.frame with metadata.
+#' @param facet_vars variables used to facet plots along the x axis
+#' @param yridges_var y variables used in \code{geom_density_ridges()}. Used only if \code{ridges} is TRUE.
+#' @param norm_density normalize maximum density to 1
+#' @param smooth use \code{geom_density()} instead of \code{geom_histogram()}. Only used if \code{type = "histogram"}.
+#' @param ridges use \code{geom_density_ridges()}. Only used if \code{type = "histogram"} and \code{smooth = TRUE}.
+#' @param bw deprecated
+#' @param show.legend logical. Should plot legend be displayed?
+#' @param legend.position legend position. "right" by default
+#' @param use_log10_count logical. Use log-10 transform for color scale if \code{type = "hexagonal"}
+#' @param theme_name ggplot2 theme name ('theme_gray' by default)
+#' @return a ggplot object
 #' @import flowWorkspace
 #' @import ggplot2
 #' @import ggridges
@@ -1055,6 +1090,18 @@ plot_gs <- function(df = NULL,
   
 }
 
+
+#' Plot all gates for a given sample of a gating set
+#' @description  Plot all gates for a given sample of a gating set
+#' @param df data.frame with columns \code{name} and \code{subset} 
+#' containing sample and subset names respectively and
+#' columns with plot variables. Ignored if \code{NULL}
+#' @param gs a gating set
+#' @param sample sample names
+#' @param selected_subsets subset names
+#' @param spill spillover matrix. If NULL, uncompensated data is used both for gating and plotting.
+#' @param ... parameters passed to \code{plot_gs()}
+#' @return a list of ggplot objects
 #' @import flowWorkspace
 plot_gh <- function(df = NULL, gs, sample, selected_subsets = NULL, spill = NULL, ...){
   
@@ -1142,6 +1189,40 @@ plot_gh <- function(df = NULL, gs, sample, selected_subsets = NULL, spill = NULL
   return(plist)
 }
 
+
+#' Plot summary statistics from a gating set
+#' @description  Plot summary statistics from a gating set
+#' @param df data.frame with columns \code{name} and \code{subset} 
+#' containing sample and subset names respectively and
+#' columns with plot variables. Ignored if \code{NULL}
+#' @param gs a gating set
+#' @param sample sample names
+#' @param subset subset names
+#' @param yvar y variable
+#' @param type plot type : either "bar", "tile" or "heatmap"
+#' @param metadata data.frame with metadata
+#' @param axis_labels Named vector with axis labels. 
+#' Vector names should correspond to variable names
+#' @param color_var color variable
+#' @param type plot type 
+#' @param transformation  Named list of \code{trans} objects. 
+#' List names should correspond to variable names.
+#' @param y_trans default \code{trans} object to be used if \code{transformation} is NULL.
+#' @param spill spillover matrix. If NULL, uncompensated data is used both for gating and plotting.
+#' @param metadata data.frame with metadata.
+#' @param facet_vars variables used to facet plots along the x axis
+#' @param group_var group variable
+#' @param show.legend logical. Should plot legend be displayed?
+#' @param scale_values logical. Scale values for each y variable
+#' @param free_y_scale logical. Free y scale (use a different scale for each y variable)
+#' @param expand_factor numeric value expanding y scale. Used only if \code{free_y_scale = FALSE}
+#' @param max_scale maximum scale for absolute y values. Used only if \code{scale_values = TRUE}
+#' @param stat_function Name of the summary statistics function used
+#' @param strip.text.y.angle angle of y strip labels
+#' @param theme_name ggplot2 theme name ('theme_gray' by default)
+#' @param Rowv Cluster rows using hierarchical clustering?
+#' @param Colv Cluster columns using hierarchical clustering?
+#' @return a ggplot object
 #' @import flowWorkspace
 #' @import ggplot2
 #' @import viridis
@@ -1483,6 +1564,20 @@ plot_stat <- function(df = NULL,
 ####################################################################################################
 # Dimensionality Reduction 
 
+#' Perform dimensionality reduction
+#' @description  Perform dimensionality reduction
+#' @param df a data.frame with only numeric variables.
+#' @param yvar names of df's variables used to perform dimensionality reduction
+#' @param Ncells Maximum number of cells without any NA values sampled from df. 
+#' If NULL, all cells without any NA values are used
+#' @param transformation  Named list of \code{trans} objects. 
+#' List names should correspond to variable names.
+#' @param y_trans default \code{trans} object to be used if \code{transformation} is NULL.
+#' @param perplexity t-SNE perplexity parameter
+#' @param dims Number of dimensions
+#' @param method Name of the method used. Either "tSNE" or "umap"
+#' @return a data.frame with additionnal columns : 
+#' "tSNE1" and "tSNE2" for method 'tSNE', "UMAP1" and "UMAP2" for method 'umap'
 #' @import Rtsne
 #' @import umap
 #' @import scales
@@ -1570,6 +1665,17 @@ dim_reduction <- function(df,
 ####################################################################################################
 # Clustering
 
+#' Identify clusters
+#' @description  Identify clusters
+#' @param df a data.frame with only numeric variables.
+#' @param yvar names of df's variables used to find clusters
+#' @param transformation  Named list of \code{trans} objects. 
+#' List names should correspond to variable names.
+#' @param y_trans default \code{trans} object to be used if \code{transformation} is NULL.
+#' @param dc ClusterX dc parameter
+#' @param alpha ClusterX alpha parameter
+#' @param method Name of the method used. Either "ClusterX" or "Rphenograph".
+#' @return a data.frame with the additionnal column "cluster"
 #' @import ClusterX
 #' @import Rphenograph
 #' @import igraph
@@ -1630,6 +1736,15 @@ get_cluster <- function(df,
 ####################################################################################################
 # Build FlowSet
 
+#' Build a flowSet from a data.frame
+#' @description Build a flowSet from a data.frame
+#' @param df data.frame with a column \code{sample_col} containing sample names and
+#' columns with flow variables.
+#' @param origin flowSet from which to retrieve flowFrames description and parameters slots. 
+#' Ignored if NULL.
+#' @param chanel_col Names of df's columns to be used as flow variables 
+#' @param sample_col Name of df's column containing sample names
+#' @return a flowSet
 #' @import flowCore
 build_flowset_from_df <- function(df,
                                   origin = NULL,

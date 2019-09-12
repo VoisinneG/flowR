@@ -327,7 +327,9 @@ plotStat <- function(input, output, session, rval) {
   })
   
   plot <- reactive({
-    plot_statistics()$plot
+    p <- plot_statistics()$plot
+    print(names(p))
+    p
   })
   
   data <- reactive({
