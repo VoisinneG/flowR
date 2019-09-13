@@ -447,6 +447,8 @@ get_data_gs <- function(gs,
     stop("sample not found in gating set")
   }
   
+  gs_comp <- gs
+  
   if(!is.null(spill)){
     spill <- spill[row.names(spill) %in% colnames(gs), colnames(spill) %in% colnames(gs)]
     gates <- get_gates_from_gs(gs)
@@ -483,9 +485,8 @@ get_data_gs <- function(gs,
       }else{
         ff <- getData(gs[[idx[i]]])
       }
-      
-      
-      df_int <- as.data.frame(exprs(ff))
+
+      df_int <- as.data.frame(flowCore::exprs(ff))
       if(!is.null(idx_subset)){
         df_int <- df_int[idx_subset, ]
       }
@@ -565,531 +566,447 @@ add_columns_from_metadata <- function(df,
 ####################################################################################################
 # Plotting
 
-#' Plot data and gates from a gating set
-#' @description  Plot data and gates from a gating set
-#' @param df data.frame with columns \code{name} and \code{subset} 
-#' containing sample and subset names respectively and
-#' columns with plot variables. Ignored if \code{NULL}
-#' @param gs a gating set
-#' @param sample sample names
-#' @param subset subset names
-#' @param xvar x variable
-#' @param yvar y variable
-#' @param axis_labels Named vector with axis labels. 
-#' Vector names should correspond to variable names
-#' @param color_var color variable
-#' @param data_range Named list of data ranges. 
-#' List names should correspond to variable names.
-#' @param min_value numeric. Minimal value of x and y axis. Ignored if \code{NULL}.
-#' @param gate A character vector with subset names (i.e elements of \code{getNodes(gs)}) or a list of gates 
-#' (as returned by \code{get_gates_from_gs()}). 
-#' Gates from classes \code{polygonGate}, \code{rectangleGate} and \code{ellipsoidGate} are supported.
-#' If \code{xvar} and \code{yvar} are \code{NULL}, the first gate will be used to set plot variables.
-#' @param polygon_gate a matrix with columns \code{x} and \code{y} containing path coordinates.
-#' @param type plot type : either "hexagonal", "histogram", "dots" or "contour"
-#' @param bins bins parameter
-#' @param alpha alpha parameter
-#' @param size size parameter
-#' @param transformation  Named list of \code{trans} objects. 
-#' List names should correspond to variable names.
-#' @param default_trans default \code{trans} object to be used if \code{transformation} is NULL.
-#' @param spill spillover matrix. If NULL, uncompensated data is used both for gating and plotting.
-#' @param metadata data.frame with metadata.
-#' @param facet_vars variables used to facet plots along the x axis
-#' @param yridges_var y variables used in \code{geom_density_ridges()}. Used only if \code{ridges} is TRUE.
-#' @param norm_density normalize maximum density to 1
-#' @param smooth use \code{geom_density()} instead of \code{geom_histogram()}. Only used if \code{type = "histogram"}.
-#' @param ridges use \code{geom_density_ridges()}. Only used if \code{type = "histogram"} and \code{smooth = TRUE}.
-#' @param bw deprecated
-#' @param show.legend logical. Should plot legend be displayed?
-#' @param legend.position legend position. "right" by default
-#' @param use_log10_count logical. Use log-10 transform for color scale if \code{type = "hexagonal"}
-#' @param theme_name ggplot2 theme name ('theme_gray' by default)
-#' @return a ggplot object
-#' @import flowWorkspace
-#' @import ggplot2
-#' @import ggridges
-#' @import viridis
-#' @import scales
-plot_gs <- function(df = NULL,
-                    gs = NULL, 
-                    sample,
-                    subset,
-                    xvar = NULL,
-                    yvar = NULL,
-                    axis_labels = NULL,
-                    color_var = NULL, 
-                    color_var_name = NULL,
-                    data_range = NULL,
-                    min_value = NULL,
-                    gate=NULL, 
-                    polygon_gate = NULL,
-                    type = "hexagonal", 
-                    bins = 100,
-                    alpha = 0.1,
-                    size = 0.1,
-                    transformation = NULL,
-                    default_trans = identity_trans(),
-                    spill = NULL,
-                    metadata = NULL,
-                    facet_vars = NULL,
-                    #group_var = "name",
-                    yridges_var = "name",
-                    norm_density = TRUE,
-                    smooth = FALSE,
-                    ridges = FALSE,
-                    bw = 0.1,
-                    show.legend = TRUE,
-                    legend.position = "right",
-                    use_log10_count = TRUE,
-                    theme_name = "theme_gray"
-                    ){
-  
-  
-  if(!is.null(color_var)){
-    if(color_var %in% c("", "none")){
-      color_var <- NULL
-    }
-  }
-  
-  if(!is.numeric(alpha)){
-    alpha = 0.1
-  }
-  
-  if(!is.numeric(size)){
-    size = 0.1
-  }
-  
-  if(!is.numeric(bins)){
-    bins = 100
-  }
-  
-  
-  theme_function <- function(...){
-    do.call(theme_name, list(...))
-  }
-  
-  if(!is.null(gs)){
-    idx <- match(sample, pData(gs)$name)
-  }
-  
-  if(!is.null(gate)){
-    if(class(gate) == "character"){
-      if(!is.null(gs)){
-        
-        gate_int <- lapply(gate, function(x){
-          if(x!="root"){
-            getGate(gs[[idx[1]]], x)
-          }else{
-            NULL
-          }})
-        names(gate_int) <- gate
-        gate <- gate_int
-      }else{
-        gate <- NULL
-      }
-      
-    }else if(grep("Gate", class(gate)) >0){
-      gate <- list(gate)
-    }
-  }
-
-  
-  if(is.null(xvar)){
-    
-    if(subset[1] != "root"){
-      g <- getGate(gs[[idx[1]]], y= subset[1])
-      if(.hasSlot(g, "boundaries")){
-        xvar <- colnames(g@boundaries)[1]
-        if(dim(g@boundaries)[2]>1){
-          yvar <- colnames(g@boundaries)[2]
-        }
-      }
-    }else{
-      xvar <- gs@data@colnames[1]
-      yvar <- gs@data@colnames[2]
-    }
-    
-    if(!is.null(gate)){
-      for(i in 1:length(gate)){
-        if(class(gate[[i]])== "polygonGate"){
-          xvar <- colnames(gate[[i]]@boundaries)[1]
-          yvar <- try(colnames(gate[[i]]@boundaries)[2], silent = TRUE)
-          break
-        }
-        if(class(gate[[i]]) == "rectangleGate"){
-          xvar <- names(gate[[i]]@min)[1]
-          yvar <- try(names(gate[[i]]@min)[2], silent = TRUE)
-          break
-        }
-        if(class(gate[[i]])=="ellipsoidGate"){
-          xvar <- colnames(gate[[i]]@cov)[1]
-          yvar <- try(colnames(gate[[i]]@cov)[2], silent = TRUE)
-          break
-        }
-      }
-    }
-    
-  }
-
-  
-  
-  
-  if(is.null(transformation)){
-    trans_var <- unique(c(xvar, yvar, color_var))
-    transformation <- lapply(trans_var, function(x){default_trans})
-    names(transformation) <- trans_var
-  }
-  
-  
-  
-  
+get_plot_data <- function(gs,
+                          df=NULL, 
+                          sample,
+                          subset,
+                          spill = NULL,
+                          metadata = NULL){
+                       
+                      
   if(is.null(df)){
-    
     df <- get_data_gs(gs = gs,
                       sample = sample,
                       subset = subset,
                       spill = spill)
-    
   }else{
-    #df <- df[df$name %in% pData(gs)[["name"]][idx],  names(df) %in% c("name", subset, xvar, yvar)]
     df <- df[df$name %in% sample & df$subset %in% subset, ]
-  }
-  
-  # if("cluster" %in% names(df)){
-  #   df[["cluster"]] <- as.factor(df[["cluster"]])
-  # }
-  
-  if( !setequal( xvar[xvar %in% names(df)], xvar ) | !setequal( yvar[yvar %in% names(df)], yvar ) ){
-    warning("Some variables could not be found in flowData")
-    return(NULL)
   }
   
   if(is.null(metadata) & !is.null(gs)){
     metadata <- pData(gs)
-   
   }
   
   if(!is.null(metadata)){
     df <- add_columns_from_metadata(df,
-                                    metadata = metadata
-                                    #color_var = color_var,
-                                    #facet_vars = facet_vars,
-                                    #group_var = group_var,
-                                    #yridges_var = yridges_var
-                                    )
+                                    metadata = metadata)
   }
-    
-  xlim <- range(df[[xvar]])
-  ylim <- range(df[[yvar]])
-  if(!is.null(data_range)){
-    xlim <- data_range[[xvar]]
-    ylim <- data_range[[yvar]]
-  }
-  
-  if(!is.null(color_var)){
-    if(color_var == "cluster"){
-      df[["cluster"]] <- as.factor(df[["cluster"]])
-    }
-  }
-  
-  # if(is.null(color_var)){
-  #   color_var <- group_var
-  # }
-  
-  ##################################################################################
-  # plot density hexagonal
-  if(type == "hexagonal"){
-    
-    
-    p <- ggplot(df,
-                aes_(x = as.name( xvar ), 
-                     y = as.name( yvar ) ) )+
-      geom_hex(bins = bins, show.legend = show.legend)
-    
-    if(use_log10_count){
-      p <- p + scale_fill_viridis(trans = log10_trans())
-    }else{
-      p <- p + scale_fill_viridis()
-    }
-      
-    
-    #p <- as.ggplot(p)
-  }
-  
-  ##################################################################################
-  # plot histogram
-  
-  if(type == "histogram"){
-    
-    p <- ggplot(df,
-                aes_(x = as.name( xvar )))
-    
-    if(norm_density){
-      stat_var <- "stat(ndensity)"
-    }else{
-      stat_var <- "stat(density)"
-    }
-
-    if(smooth){
-      if(ridges){
-        p <- p + geom_density_ridges(mapping = aes_string(fill = color_var, 
-                                                          color = color_var, 
-                                                          y = yridges_var, 
-                                                          height = stat_var), 
-                                     alpha = alpha, 
-                                     #bw = dist(transformation[[xvar]]$transform( range(df[[xvar]]) / bins ))[1], 
-                                     #bw = dist(range(df[[xvar]])/bins)[1], 
-                                     bw = 1/bins, 
-                                     stat = "density",
-                                     show.legend = show.legend)
-      }else{
-        p <- p + geom_density(mapping = aes_string(fill = color_var, color = color_var, y = stat_var), 
-                              alpha = alpha, 
-                              #bw = dist(transformation[[xvar]]$transform( range(df[[xvar]]) / bins ))[1], 
-                              #bw = dist(range(df[[xvar]])/bins)[1], 
-                              bw = 1/bins, 
-                              show.legend = show.legend)
-      }
-    }else{
-      p <- p + geom_histogram(mapping = aes_string(fill = color_var, color = color_var, y = stat_var), 
-                              alpha = alpha,  
-                              bins = bins, 
-                              position = "identity", 
-                              boundary = 0, 
-                              show.legend = show.legend) 
-    }
-    
-  }
-  
-  ##################################################################################
-  # plot dots
-  
-  if(type %in% c("dots", "contour")){
-
-    p <- ggplot(df,
-                aes_string(x = as.name( xvar ), 
-                     y = as.name( yvar )))
-    
-    if(type == "dots"){
-
-      if(!is.null(color_var)){
-          if(color_var != ""){
-            #idx_col <- match(color_var, names(df))
-            p <- p + geom_point(mapping =  aes_(colour = as.name(color_var)),
-                                alpha = alpha, 
-                                size = size, 
-                                show.legend = show.legend)
-            
-            if(color_var %in% gs@data@colnames){
-              if(color_var != "cluster"){
-                if(is.null(color_var_name)){
-                  color_var_name <- color_var
-                }
-                p <- p + scale_colour_viridis(trans = transformation[[color_var]], 
-                                              name = color_var_name)
-                  
-              }
-              
-            }
-          }else{
-            p <- p + geom_point(alpha = alpha, 
-                                size = size, 
-                                show.legend = show.legend)
-          }
-      }else{
-        p <- p + geom_point(alpha = alpha, 
-                            size = size, 
-                            show.legend = show.legend)
-      }
-    }
-
-    
-    if(type == "contour"){
-      if(!is.null(color_var)){
-        
-          p <- p + geom_density_2d(mapping =  aes_(colour = as.name(color_var)), 
-                                   alpha = alpha, 
-                                   size =size, 
-                                   n = bins, 
-                                   show.legend = show.legend) 
-        
-        
-      }else{
-        p <- p + geom_density_2d(alpha = alpha, 
-                                 size =size, 
-                                 n = bins, 
-                                 show.legend = show.legend,
-                                 colour = "black") 
-      }
-      
-    }
-    
-  }
-  
-  ##################################################################################
-  # plot gate
-  
-  if(type != "histogram" & !is.null(gate)){
-    
-    for(j in 1:length(gate)){
-      
-        gate_int <- gate[[j]]
-        polygon <- NULL
-        
-        if(class(gate_int) == "polygonGate" ){
-          if(length(unique(colnames(gate_int@boundaries)))>1){
-            polygon <- as.data.frame(gate_int@boundaries)
-          }
-        }else if(class(gate_int) == "rectangleGate"){
-
-          idx_x <- match(xvar, names(gate_int@min))
-          idx_y <- match(yvar, names(gate_int@min))
-          
-          if(!is.na(idx_x) & !is.na(idx_y)){
-            if(!is.na(idx_x)){
-              range_x <- c(gate_int@min[idx_x], gate_int@max[idx_x])
-            }else{
-              range_x <- xlim
-            }
-            if(!is.na(idx_y)){
-              range_y <- c(gate_int@min[idx_y], gate_int@max[idx_y])
-            }else{
-              range_y <- ylim
-            }
-            
-            polygon <- data.frame(x = c(range_x[1], range_x[2], range_x[2], range_x[1]),
-                                  y = c(range_y[1], range_y[1], range_y[2], range_y[2]))
-            
-            names(polygon) <- c(xvar, yvar)
-          }
-
-        }else if(class(gate_int) %in% c("ellipsoidGate")){
-          cov <- gate_int@cov
-          mean <- gate_int@mean
-          polygon <- ellipse_path(cov = cov, mean = mean)
-        }else{
-          warning("gate format not supported")
-          break
-        }
-      
-        idx_match <- match(c(xvar, yvar), names(polygon))
-        
-        #if(sum(is.na(idx_match))==0){
-         if(setequal(c(xvar, yvar), names(polygon))){ 
-          df_trans <- polygon
-          
-          df_trans[,idx_match[1]] <- transformation[[xvar]]$transform(df_trans[,idx_match[1]])
-          df_trans[,idx_match[2]] <- transformation[[yvar]]$transform(df_trans[,idx_match[2]])
-          
-          
-          center <- c(mean(df_trans[,idx_match[1]]), mean(df_trans[,idx_match[2]]))
-          
-          polygon <- rbind(polygon, polygon[1,])
-
-          xlim <- range(c(xlim, polygon[,idx_match[1]]))
-          ylim <- range(c(ylim, polygon[,idx_match[2]]))
-          
-          #trueCentroids = gCentroid(sids,byid=TRUE)
-          
-          
-          df_label <- data.frame(x = transformation[[xvar]]$inverse(center[idx_match[1]]), 
-                                 y = transformation[[yvar]]$inverse(center[idx_match[2]]),
-                                 label = gate_int@filterId)
-
-          p <- p +
-            geom_path(data = polygon, color = "red") +
-            geom_polygon(data=polygon,
-                         fill="red",
-                         alpha=0.05) +
-            geom_label(data = df_label, aes(x=x, y=y, label = label),
-                       fill = rgb(1,1,1,0.5), color = "red", hjust = "middle", vjust = "center")
-            # annotate("text", 
-            #          x=transformation[[xvar]]$inverse(center[idx_match[1]]), 
-            #          y=transformation[[yvar]]$inverse(center[idx_match[2]]),
-            #          label = gate_int@filterId,
-            #          color = "red", fill = "white")
-        
-      }
-    }
-    
-  }
-  
-  ##################################################################################
-  # plot polygon gate
-  if(type != "histogram" & setequal(names(polygon_gate), c("x", "y"))){
-    if(!is.null(polygon_gate$x)){
-      polygon <- data.frame(x = polygon_gate$x, y = polygon_gate$y)
-      polygon <- rbind(polygon, polygon[1,])
-      if(xvar != yvar){
-        names(polygon) <- c(xvar, yvar)
-        
-        # if(!is.null(data_range)){
-        #   xlim <- range(c(data_range[[xvar]], polygon[,1]))
-        #   ylim <- range(c(data_range[[yvar]], polygon[,2]))
-        # }
-        
-        xlim <- range(c(xlim, polygon[,1]))
-        ylim <- range(c(ylim, polygon[,2]))
-        
-        p <- p +
-          geom_path(data = polygon, color = "red") +
-          geom_polygon(data=polygon,
-                       fill="red",
-                       alpha=0.05) 
-      }
-      
-    }
-    
-    
-  }
-  
-  
-  ##################################################################################
-  # general plot parameters
- 
-  if(!is.null(min_value)){
-    xlim[1] <- min_value
-    ylim[1] <- min_value
-  }
-  
-  
-  if(!is.null(facet_vars)){
-    formula_facet <- as.formula(paste(" ~", paste(facet_vars, collapse = " + ")))
-    p <- p + facet_grid(formula_facet,
-                        labeller = label_both, 
-                        #scales = scale_y,
-                        scales = "free")
-  }else{
-    p <- p + facet_null()
-  }
-  
-
-  # if(!is.null(facet_vars)){
-  #   p <- p + facet_wrap(facets = sapply(facet_vars, as.name), labeller = label_both)
-  # }else{
-  #   p <- p + facet_null()
-  # }
-  
-  labx <- ifelse(is.null(axis_labels), xvar, axis_labels[[xvar]])
-  p <- p + scale_x_continuous(name = labx, trans = transformation[[xvar]], limits = xlim) 
-  
-  if(length(subset)==1){
-    p <- p + ggtitle(subset)
-  }
-  
-  if(type != "histogram"){
-    laby <- ifelse(is.null(axis_labels), yvar, axis_labels[[yvar]])
-    p <- p + scale_y_continuous(name = laby, trans = transformation[[yvar]], limits = ylim) 
-  }
-  
-  p <- p + theme_function() + 
-    theme(plot.title = element_text(face = "bold"), legend.position = legend.position)
-  
-  p
+  return(df)
   
 }
 
+plot_gs_data <- function(df,
+                         plot_type,
+                         plot_args = list()
+                         ){
+  
+  p <- do.call(paste("plot", plot_type, sep="_"), 
+               list(args = c(list(df=df), plot_args)))
+
+  return(p)
+}
+
+#' @import ggplot2
+#' @import viridis
+#' @import flowWorkspace
+#' @import rlang
+format_plot <- function(p,
+                        options = list(default_trans = logicle_trans(),
+                                       show.legend = FALSE)){
+  
+  xvar <- NULL
+  yvar <- NULL
+  if("x" %in% names(p$mapping)){
+    xvar <- as.character(quo_get_expr(p$mapping$x))
+  }
+  if("y" %in% names(p$mapping)){
+    yvar <- as.character(quo_get_expr(p$mapping$y))
+  }
+  
+  xlim <- NULL
+  ylim <- NULL
+  color_var <- p$plot_env$color_var
+  
+  # if(!is_null(color_var)){
+  #   if(color_var == "none"){
+  #     color_var <- NULL
+  #   }
+  # }
+  
+  ############################################################################33
+  #default parameters
+  default_trans <- logicle_trans()
+  show.legend <- FALSE
+  
+  for(var in names(options)){
+    assign(var, options[[var]])
+  }
+  
+  ############################################################################33
+  #transformations
+  
+  #transformation <- options$transformation
+  #if(is.null(transformation)){
+    trans_var <- unique(c(xvar, yvar, color_var))
+    transformation <- lapply(trans_var, function(x){default_trans})
+    names(transformation) <- trans_var
+  #}
+    
+    for(var in names(options$transformation)){
+      transformation[[var]] <- options$transformation[[var]]
+    }
+    
+  
+  if(!is.null(xvar)){
+    if(xvar %in% names(transformation)){
+      labx <- ifelse(is.null(options$axis_labels), xvar, options$axis_labels[[xvar]])
+      p <- p + scale_x_continuous(name = labx, trans = transformation[[xvar]], limits = xlim) 
+    }
+  }
+  
+  if(!is.null(yvar)){
+    if(yvar %in% names(transformation)){
+      laby <- ifelse(is.null(options$axis_labels), yvar, options$axis_labels[[yvar]])
+      p <- p + scale_y_continuous(name = laby, trans = transformation[[yvar]], limits = ylim) 
+    }
+  }
+
+  if(p$plot_env$plot_type == "dots"){
+    
+    if(!is.null(color_var)){
+      color_var_name <- options$color_var_name
+      print(as.character(color_var))
+      if(! as.character(color_var) %in% c("cluster", "subset", "name")){
+        if(is.null(color_var_name)){
+          color_var_name <- color_var
+        }
+        p <- p + scale_colour_viridis(trans = transformation[[color_var]],
+                                      name = color_var_name)
+        
+      }
+    }
+  }
+
+  ############################################################################33
+  #theme
+  
+  if(length(unique(p$data$subset))==1){
+    p <- p + ggtitle(unique(p$data$subset))
+  }
+  
+  if(!is.null(options$theme_name)){
+    theme_function <- function(...){
+      do.call(options$theme_name, list(...))
+    }
+    p <- p + theme_function()
+  }
+  
+  if(!is.null(options$legend.position)){
+    p <- p + theme(legend.position = options$legend.position)
+  }
+  
+  p <- p + theme(plot.title = element_text(face = "bold"))
+  
+  return(p)
+  
+}
+
+plot_hexagonal <- function(args = list()){
+  
+  plot_type <- "hexagonal"
+  bins <- 100
+  use_log10_count <- TRUE
+  
+  for(var in names(args)){
+    assign(var, args[[var]])
+  }
+  
+  p <- ggplot(df,
+              aes_(x = as.name( xvar ), 
+                   y = as.name( yvar ) ) ) +
+    geom_hex(bins = bins)
+  
+  if(use_log10_count){
+    p <- p + scale_fill_viridis(trans = log10_trans())
+  }else{
+    p <- p + scale_fill_viridis()
+  }
+  
+  p
+}
+
+plot_histogram <- function(args = list()){
+  
+  plot_type <- "histogram"
+  
+  color_var <- NULL
+  smooth <- FALSE
+  ridges <- FALSE
+  yridges_var <- "name"
+  norm_density <- TRUE
+  bins <- 100
+  alpha <- 0.1
+  
+  for(var in names(args)){
+    assign(var, args[[var]])
+  }
+  
+  p <- ggplot(df,
+              aes_(x = as.name( xvar )))
+  
+  if(norm_density){
+    stat_var <- "stat(ndensity)"
+  }else{
+    stat_var <- "stat(density)"
+  }
+  
+  if(!is.null(color_var)){
+    if(color_var == "none"){
+      color_var <- NULL
+    }
+  }
+  
+  if(!is.null(color_var)){
+    color_var <- as.name(color_var)
+  }
+  
+  if(!is.null(yridges_var)){
+    yridges_var <- as.name(yridges_var)
+  }
+
+  if(smooth){
+    if(ridges){
+      p <- p + geom_density_ridges(mapping = aes_string(fill = color_var, 
+                                                        color = color_var, 
+                                                        y = yridges_var, 
+                                                        height = stat_var), 
+                                   alpha = alpha, 
+                                   bw = 1/bins, 
+                                   stat = "density")
+    }else{
+      p <- p + geom_density(mapping = aes_string(fill = color_var, 
+                                                 color = color_var, 
+                                                 y = stat_var), 
+                            alpha = alpha,
+                            bw = 1/bins)
+    }
+  }else{
+    p <- p + geom_histogram(mapping = aes_string(fill = color_var, 
+                                                 color = color_var, 
+                                                 y = stat_var), 
+                            alpha = alpha,  
+                            bins = bins, 
+                            position = "identity", 
+                            boundary = 0) 
+  }
+  
+  return(p)
+  
+}
+
+plot_dots <-function(args = list()){
+  
+  plot_type <- "dots"
+  
+  color_var <- NULL
+  bins <- 100
+  alpha <- 0.1
+  size <- 0.1
+  
+  for(var in names(args)){
+    assign(var, args[[var]])
+  }
+  
+  if(!is.null(color_var)){
+    if(color_var == "none"){
+      color_var <- NULL
+    }
+  }
+  
+  if(!is.null(color_var)){
+    color_var <- as.name(color_var)
+  }
+  
+  p <- ggplot(df,
+              aes_string(x = as.name( xvar ), 
+                         y = as.name( yvar )))
+  
+  #if(!is.null(color_var)){
+      p <- p + geom_point(mapping =  aes_string(colour = color_var),
+                          alpha = alpha, 
+                          size = size)
+  # }else{
+  #   p <- p + geom_point(alpha = alpha, 
+  #                       size = size)
+  # }
+  
+  return(p)
+  
+}
+
+plot_contour <-function(args = list()){
+  
+  plot_type <- "contour"
+  
+  color_var <- NULL
+  bins <- 30
+  alpha <- 0.5
+  size <- 0.25
+  show_outliers <- TRUE
+  
+  for(var in names(args)){
+    assign(var, args[[var]])
+  }
+  
+  p <- ggplot(df,
+              aes_string(x = as.name( xvar ), 
+                         y = as.name( yvar )))
+
+
+  if(show_outliers){
+    
+    p <- p + geom_point(size = 0.1)
+    alpha <- 1
+  }
+  
+  if(!is.null(color_var)){
+    if(! color_var %in% c("subset", "name")) color_var <- NULL
+  }
+  
+  if(!is.null(color_var)){
+    #p <- p + stat_density2d(aes_string(alpha='..level..', fill='..level..'), 
+    p <- p + stat_density2d(aes_string(colour = as.name(color_var)),
+                            fill = "white",
+                            size=size, 
+                            alpha= alpha,
+                            geom="polygon", 
+                            bins=bins)
+    
+    #scale_fill_gradient(low = "yellow", high = "red") 
+  }else{
+    p <- p + stat_density2d(fill = "white",
+                            size=size, 
+                            alpha= alpha,
+                            color = "black",
+                            geom="polygon", 
+                            bins=bins)
+  }
+
+  return(p)
+}
+
+add_polygon_layer <-function(p,
+                             polygon = NULL,
+                             label = NULL){
+  
+  if(p$plot_env$plot_type != "histogram" & setequal(names(polygon), c("x", "y"))){
+    if(!is.null(polygon$x)){
+      
+      polygon <- data.frame(x = polygon$x, y = polygon$y)
+      polygon <- rbind(polygon, polygon[1,])
+      
+      p <- p +
+        geom_path(data = polygon, mapping = aes(x=x, y=y), color = "red") +
+        geom_polygon(data=polygon, mapping = aes(x=x, y=y),
+                     fill="red",
+                     alpha=0.05)
+      if(!is.null(label)){
+        df_label <- data.frame(x=mean(polygon$x), y= mean(polygon$y))
+        p <- p +  geom_label(data = df_label, 
+                             mapping = aes(x=x, y=y), 
+                             label = label, 
+                             fill = rgb(1,1,1,0.85), color = "red", hjust = "middle", vjust = "center")
+      }
+
+    }
+    
+  }
+  
+  return(p)
+  
+}
+
+#' @importFrom sp over
+#' @import rlang
+add_gate <- function(p, gate){
+  
+  if(is.null(gate) | p$plot_env$plot_type == "histogram"){
+    return(p)
+  }
+  
+  polygon <- polygon <- get_gate_coordinates(gate)
+  
+  xvar <- as.character(quo_get_expr(p$mapping$x))
+  yvar <- as.character(quo_get_expr(p$mapping$y))
+  
+  
+  if(setequal(c(xvar, yvar), names(polygon))){ 
+    
+    in_poly <- point.in.polygon(p$data[[xvar]], 
+                                p$data[[yvar]], 
+                                polygon[[xvar]],
+                                polygon[[yvar]], 
+                                mode.checked=FALSE)
+    
+    perc_in_poly <- sprintf("%.1f", sum(in_poly)/length(in_poly)*100)
+    
+    idx_match <- match(c(xvar, yvar), names(polygon))
+    names(polygon)[idx_match] <- c("x", "y")
+    
+    label <- paste(gate@filterId, " (", perc_in_poly, "%)", sep="")
+    p <- add_polygon_layer(p, polygon = polygon, label = label)
+  }
+  
+  return(p)
+
+}
+
+
+plot_gs <- function(gs,
+                     df = NULL,
+                     sample = NULL,
+                     subset = NULL,
+                     spill = NULL,
+                     metadata = NULL,
+                     plot_type = "contour",
+                     plot_args = list(),
+                     options = list(),
+                     gate = NULL){
+                     
+  
+  if(! "xvar" %in% names(plot_args)){
+    plot_args[["xvar"]] <- gs@data@colnames[1]
+  }
+  if(! "yvar" %in% names(plot_args)){
+    plot_args[["yvar"]] <- gs@data@colnames[2]
+  }
+  
+  if(is.null(sample)) sample <-  pData(gs)$name[1]
+  if(is.null(subset)) subset <- getNodes(gs)[1]
+       
+  df <- get_plot_data(df = df,
+                      gs = gs, 
+                      sample = sample,
+                      subset = subset,
+                      spill = spill, 
+                      metadata = metadata)
+  
+  p <- plot_gs_data(df = df,
+                    plot_type = plot_type,
+                    plot_args = plot_args)
+  
+  p <- format_plot(p, options = options)
+  
+  if(!is.null(gate)){
+    for(gate_name in setdiff(gate, "root")){
+      g <- getGate(gs[[1]], gate_name)
+      p <- add_gate(p, g)
+    }
+  }
+  
+  
+  return(p)
+}
 
 #' Plot all gates for a given sample of a gating set
 #' @description  Plot all gates for a given sample of a gating set
@@ -1103,15 +1020,23 @@ plot_gs <- function(df = NULL,
 #' @param ... parameters passed to \code{plot_gs()}
 #' @return a list of ggplot objects
 #' @import flowWorkspace
-plot_gh <- function(df = NULL, gs, sample, selected_subsets = NULL, spill = NULL, ...){
+plot_gh <- function( gs, 
+                      df = NULL, 
+                      sample = NULL, 
+                      selected_subsets = NULL, 
+                      spill = NULL, 
+                      plot_args = list(), 
+                      options = list()){
   
   # if(length(sample) != 1){
   #   stop("length of idx must be equal to 1")
   # }
+  if(is.null(sample)){sample = pData(gs)$name[1]}
   
   idx <- match(sample, pData(gs)$name)
   
   if(is.null(selected_subsets)){
+    selected_subsets <- setdiff(getNodes(gs), "root")
     subset <- getNodes(gs)
   }else{
     subset <- selected_subsets[selected_subsets %in% getNodes(gs)]
@@ -1148,46 +1073,751 @@ plot_gh <- function(df = NULL, gs, sample, selected_subsets = NULL, spill = NULL
       
       nodes_to_plot_parent <- nodes_to_plot[idx_parent]
       
-    #plot together gates that share the same set of parameters
+      #plot together gates that share the same set of parameters
       
       while(length(nodes_to_plot_parent) > 0){
         
+        
+        par_nodes <- lapply(nodes_to_plot_parent, function(x){
           
-          par_nodes <- lapply(nodes_to_plot_parent, function(x){
-            
-            g <- getGate(gs[[idx[1]]], x)
-            
-            if(class(g) %in% c("polygonGate")){
-              try(colnames(g@boundaries), silent = TRUE)
-            }else if(class(g) %in% c("ellipsoidGate")){
-              try(colnames(g@cov), silent = TRUE)
-            }else if(class(g) %in% c("rectangleGate")){
-              try(names(g@min), silent = TRUE)
-            }
-            
-          })
+          g <- getGate(gs[[idx[1]]], x)
           
-          same_par <- sapply(par_nodes, function(x){setequal(x, par_nodes[[1]])})
+          if(class(g) %in% c("polygonGate")){
+            try(colnames(g@boundaries), silent = TRUE)
+          }else if(class(g) %in% c("ellipsoidGate")){
+            try(colnames(g@cov), silent = TRUE)
+          }else if(class(g) %in% c("rectangleGate")){
+            try(names(g@min), silent = TRUE)
+          }
           
-          count <- count + 1
-          
-          plist[[count]] <- plot_gs(df = df, gs=gs, sample=sample, subset = parent, gate = nodes_to_plot_parent[same_par], ...)
-          
-          all_children <- unlist(sapply(nodes_to_plot_parent[same_par], function(x){getChildren(gs[[1]], x)}))
-          names(all_children) <- NULL
-          
-          child_nodes_int <- c(child_nodes_int, all_children)
-          nodes_to_plot_parent <- setdiff(nodes_to_plot_parent, nodes_to_plot_parent[same_par])
-          
+        })
+        
+        same_par <- sapply(par_nodes, function(x){setequal(x, par_nodes[[1]])})
+        
+        count <- count + 1
+        
+        
+        
+        plot_args$xvar <- par_nodes[[1]][1]
+        plot_args$yvar <- par_nodes[[1]][2]
+        
+        print(par_nodes)
+        print(nodes_to_plot_parent[same_par])
+        
+        plist[[count]] <- plot_gs2(df = df, 
+                                   gs=gs, 
+                                   sample=sample, 
+                                   subset = parent, 
+                                   gate = nodes_to_plot_parent[same_par], 
+                                   plot_args = plot_args,
+                                   options = options)
+        
+        all_children <- unlist(sapply(nodes_to_plot_parent[same_par], function(x){getChildren(gs[[1]], x)}))
+        names(all_children) <- NULL
+        
+        child_nodes_int <- c(child_nodes_int, all_children)
+        nodes_to_plot_parent <- setdiff(nodes_to_plot_parent, nodes_to_plot_parent[same_par])
+        
       }
       
     }
     
     child_nodes <- child_nodes_int[child_nodes_int %in% selected_subsets]
-
+    
   }
   return(plist)
 }
+
+
+plot_gate <- function(gate,
+                     df = NULL,
+                     gs,
+                     sample = NULL,
+                     spill = NULL,
+                     metadata = NULL,
+                     plot_type = "contour",
+                     plot_args = list(),
+                     options = list()){
+  
+  gate <- getGate(gs[[1]], gate)
+  
+  polygon <- get_gate_coordinates(gate)
+  subset <- getParent(gs,  gate_name)
+  plot_args[["xvar"]] <- names(polygon)[1]
+  
+  if(length(names(polygon))>1){plot_args$yvar <- names(polygon)[2]}
+  
+  if(is.null(sample)) sample <-  pData(gs)$name[1]
+
+  df <- get_plot_data(df = df,
+                      gs = gs, 
+                      sample = sample,
+                      subset = subset,
+                      spill = spill, 
+                      metadata = metadata)
+  
+  p <- plot_gs_data(df = df,
+                    plot_type = plot_type,
+                    plot_args = plot_args)
+  
+  p <- format_plot(p, options = options)
+  
+  p <- add_gate(p, gate)
+  
+  return(p)
+}
+
+get_gate_coordinates <- function(gate){
+  
+  polygon <- NULL
+  
+  if(class(gate) == "polygonGate" ){
+    if(length(unique(colnames(gate@boundaries)))>1){
+      polygon <- as.data.frame(gate@boundaries)
+    }
+  }else if(class(gate) == "rectangleGate"){
+    
+    polygon <- data.frame(x = c(gate@min[1], gate@max[1], gate@max[1], gate@min[1]),
+                          y = c(gate@min[2], gate@min[2], gate@max[2], gate@max[2]))
+    
+    colnames(polygon) <- names(gate@min)
+    
+  }else if(class(gate) == "ellipsoidGate"){
+    cov <- gate_int@cov
+    mean <- gate_int@mean
+    polygon <- ellipse_path(cov = cov, mean = mean)
+  }else{
+    warning("gate format not supported")
+    break
+  }
+  
+  return(polygon)
+  
+}
+
+
+#' #' Plot data and gates from a gating set
+#' #' @description  Plot data and gates from a gating set
+#' #' @param df data.frame with columns \code{name} and \code{subset} 
+#' #' containing sample and subset names respectively and
+#' #' columns with plot variables. Ignored if \code{NULL}
+#' #' @param gs a gating set
+#' #' @param sample sample names
+#' #' @param subset subset names
+#' #' @param xvar x variable
+#' #' @param yvar y variable
+#' #' @param axis_labels Named vector with axis labels. 
+#' #' Vector names should correspond to variable names
+#' #' @param color_var color variable
+#' #' @param data_range Named list of data ranges. 
+#' #' List names should correspond to variable names.
+#' #' @param min_value numeric. Minimal value of x and y axis. Ignored if \code{NULL}.
+#' #' @param gate A character vector with subset names (i.e elements of \code{getNodes(gs)}) or a list of gates 
+#' #' (as returned by \code{get_gates_from_gs()}). 
+#' #' Gates from classes \code{polygonGate}, \code{rectangleGate} and \code{ellipsoidGate} are supported.
+#' #' If \code{xvar} and \code{yvar} are \code{NULL}, the first gate will be used to set plot variables.
+#' #' @param polygon_gate a matrix with columns \code{x} and \code{y} containing path coordinates.
+#' #' @param type plot type : either "hexagonal", "histogram", "dots" or "contour"
+#' #' @param bins bins parameter
+#' #' @param alpha alpha parameter
+#' #' @param size size parameter
+#' #' @param transformation  Named list of \code{trans} objects. 
+#' #' List names should correspond to variable names.
+#' #' @param default_trans default \code{trans} object to be used if \code{transformation} is NULL.
+#' #' @param spill spillover matrix. If NULL, uncompensated data is used both for gating and plotting.
+#' #' @param metadata data.frame with metadata.
+#' #' @param facet_vars variables used to facet plots along the x axis
+#' #' @param yridges_var y variables used in \code{geom_density_ridges()}. Used only if \code{ridges} is TRUE.
+#' #' @param norm_density normalize maximum density to 1
+#' #' @param smooth use \code{geom_density()} instead of \code{geom_histogram()}. Only used if \code{type = "histogram"}.
+#' #' @param ridges use \code{geom_density_ridges()}. Only used if \code{type = "histogram"} and \code{smooth = TRUE}.
+#' #' @param bw deprecated
+#' #' @param show.legend logical. Should plot legend be displayed?
+#' #' @param legend.position legend position. "right" by default
+#' #' @param use_log10_count logical. Use log-10 transform for color scale if \code{type = "hexagonal"}
+#' #' @param theme_name ggplot2 theme name ('theme_gray' by default)
+#' #' @return a ggplot object
+#' #' @import flowWorkspace
+#' #' @import ggplot2
+#' #' @import ggridges
+#' #' @import viridis
+#' #' @import scales
+#' plot_gs <- function(df = NULL,
+#'                     gs = NULL, 
+#'                     sample,
+#'                     subset,
+#'                     xvar = NULL,
+#'                     yvar = NULL,
+#'                     axis_labels = NULL,
+#'                     color_var = NULL, 
+#'                     color_var_name = NULL,
+#'                     data_range = NULL,
+#'                     min_value = NULL,
+#'                     gate=NULL, 
+#'                     polygon_gate = NULL,
+#'                     type = "hexagonal", 
+#'                     bins = 100,
+#'                     alpha = 0.1,
+#'                     size = 0.1,
+#'                     transformation = NULL,
+#'                     default_trans = identity_trans(),
+#'                     spill = NULL,
+#'                     metadata = NULL,
+#'                     facet_vars = NULL,
+#'                     #group_var = "name",
+#'                     yridges_var = "name",
+#'                     norm_density = TRUE,
+#'                     smooth = FALSE,
+#'                     ridges = FALSE,
+#'                     bw = 0.1,
+#'                     show.legend = TRUE,
+#'                     legend.position = "right",
+#'                     use_log10_count = TRUE,
+#'                     theme_name = "theme_gray"
+#'                     ){
+#'   
+#'   
+#'   if(!is.null(color_var)){
+#'     if(color_var %in% c("", "none")){
+#'       color_var <- NULL
+#'     }
+#'   }
+#'   
+#'   if(!is.numeric(alpha)){
+#'     alpha = 0.1
+#'   }
+#'   
+#'   if(!is.numeric(size)){
+#'     size = 0.1
+#'   }
+#'   
+#'   if(!is.numeric(bins)){
+#'     bins = 100
+#'   }
+#'   
+#'   
+#'   theme_function <- function(...){
+#'     do.call(theme_name, list(...))
+#'   }
+#'   
+#'   if(!is.null(gs)){
+#'     idx <- match(sample, pData(gs)$name)
+#'   }
+#'   
+#'   if(!is.null(gate)){
+#'     if(class(gate) == "character"){
+#'       if(!is.null(gs)){
+#'         
+#'         gate_int <- lapply(gate, function(x){
+#'           if(x!="root"){
+#'             getGate(gs[[idx[1]]], x)
+#'           }else{
+#'             NULL
+#'           }})
+#'         names(gate_int) <- gate
+#'         gate <- gate_int
+#'       }else{
+#'         gate <- NULL
+#'       }
+#'       
+#'     }else if(grep("Gate", class(gate)) >0){
+#'       gate <- list(gate)
+#'     }
+#'   }
+#' 
+#'   
+#'   if(is.null(xvar)){
+#'     
+#'     if(subset[1] != "root"){
+#'       g <- getGate(gs[[idx[1]]], y= subset[1])
+#'       if(.hasSlot(g, "boundaries")){
+#'         xvar <- colnames(g@boundaries)[1]
+#'         if(dim(g@boundaries)[2]>1){
+#'           yvar <- colnames(g@boundaries)[2]
+#'         }
+#'       }
+#'     }else{
+#'       xvar <- gs@data@colnames[1]
+#'       yvar <- gs@data@colnames[2]
+#'     }
+#'     
+#'     if(!is.null(gate)){
+#'       for(i in 1:length(gate)){
+#'         if(class(gate[[i]])== "polygonGate"){
+#'           xvar <- colnames(gate[[i]]@boundaries)[1]
+#'           yvar <- try(colnames(gate[[i]]@boundaries)[2], silent = TRUE)
+#'           break
+#'         }
+#'         if(class(gate[[i]]) == "rectangleGate"){
+#'           xvar <- names(gate[[i]]@min)[1]
+#'           yvar <- try(names(gate[[i]]@min)[2], silent = TRUE)
+#'           break
+#'         }
+#'         if(class(gate[[i]])=="ellipsoidGate"){
+#'           xvar <- colnames(gate[[i]]@cov)[1]
+#'           yvar <- try(colnames(gate[[i]]@cov)[2], silent = TRUE)
+#'           break
+#'         }
+#'       }
+#'     }
+#'     
+#'   }
+#' 
+#'   
+#'   
+#'   
+#'   if(is.null(transformation)){
+#'     trans_var <- unique(c(xvar, yvar, color_var))
+#'     transformation <- lapply(trans_var, function(x){default_trans})
+#'     names(transformation) <- trans_var
+#'   }
+#'   
+#'   
+#'   
+#'   
+#'   if(is.null(df)){
+#'     
+#'     df <- get_data_gs(gs = gs,
+#'                       sample = sample,
+#'                       subset = subset,
+#'                       spill = spill)
+#'     
+#'   }else{
+#'     #df <- df[df$name %in% pData(gs)[["name"]][idx],  names(df) %in% c("name", subset, xvar, yvar)]
+#'     df <- df[df$name %in% sample & df$subset %in% subset, ]
+#'   }
+#'   
+#'   # if("cluster" %in% names(df)){
+#'   #   df[["cluster"]] <- as.factor(df[["cluster"]])
+#'   # }
+#'   
+#'   if( !setequal( xvar[xvar %in% names(df)], xvar ) | !setequal( yvar[yvar %in% names(df)], yvar ) ){
+#'     warning("Some variables could not be found in flowData")
+#'     return(NULL)
+#'   }
+#'   
+#'   if(is.null(metadata) & !is.null(gs)){
+#'     metadata <- pData(gs)
+#'   }
+#'   
+#'   if(!is.null(metadata)){
+#'     df <- add_columns_from_metadata(df,
+#'                                     metadata = metadata
+#'                                     #color_var = color_var,
+#'                                     #facet_vars = facet_vars,
+#'                                     #group_var = group_var,
+#'                                     #yridges_var = yridges_var
+#'                                     )
+#'   }
+#'     
+#'   xlim <- range(df[[xvar]])
+#'   ylim <- range(df[[yvar]])
+#'   if(!is.null(data_range)){
+#'     xlim <- data_range[[xvar]]
+#'     ylim <- data_range[[yvar]]
+#'   }
+#'   
+#'   if(!is.null(color_var)){
+#'     if(color_var == "cluster"){
+#'       df[["cluster"]] <- as.factor(df[["cluster"]])
+#'     }
+#'   }
+#'   
+#'   # if(is.null(color_var)){
+#'   #   color_var <- group_var
+#'   # }
+#'   
+#'   ##################################################################################
+#'   # plot density hexagonal
+#'   if(type == "hexagonal"){
+#'     
+#'     
+#'     p <- ggplot(df,
+#'                 aes_(x = as.name( xvar ), 
+#'                      y = as.name( yvar ) ) )+
+#'       geom_hex(bins = bins, show.legend = show.legend)
+#'     
+#'     if(use_log10_count){
+#'       p <- p + scale_fill_viridis(trans = log10_trans())
+#'     }else{
+#'       p <- p + scale_fill_viridis()
+#'     }
+#'       
+#'     
+#'     #p <- as.ggplot(p)
+#'   }
+#'   
+#'   ##################################################################################
+#'   # plot histogram
+#'   
+#'   if(type == "histogram"){
+#'     
+#'     p <- ggplot(df,
+#'                 aes_(x = as.name( xvar )))
+#'     
+#'     if(norm_density){
+#'       stat_var <- "stat(ndensity)"
+#'     }else{
+#'       stat_var <- "stat(density)"
+#'     }
+#' 
+#'     if(smooth){
+#'       if(ridges){
+#'         p <- p + geom_density_ridges(mapping = aes_string(fill = color_var, 
+#'                                                           color = color_var, 
+#'                                                           y = yridges_var, 
+#'                                                           height = stat_var), 
+#'                                      alpha = alpha, 
+#'                                      #bw = dist(transformation[[xvar]]$transform( range(df[[xvar]]) / bins ))[1], 
+#'                                      #bw = dist(range(df[[xvar]])/bins)[1], 
+#'                                      bw = 1/bins, 
+#'                                      stat = "density",
+#'                                      show.legend = show.legend)
+#'       }else{
+#'         p <- p + geom_density(mapping = aes_string(fill = color_var, color = color_var, y = stat_var), 
+#'                               alpha = alpha, 
+#'                               #bw = dist(transformation[[xvar]]$transform( range(df[[xvar]]) / bins ))[1], 
+#'                               #bw = dist(range(df[[xvar]])/bins)[1], 
+#'                               bw = 1/bins, 
+#'                               show.legend = show.legend)
+#'       }
+#'     }else{
+#'       p <- p + geom_histogram(mapping = aes_string(fill = color_var, color = color_var, y = stat_var), 
+#'                               alpha = alpha,  
+#'                               bins = bins, 
+#'                               position = "identity", 
+#'                               boundary = 0, 
+#'                               show.legend = show.legend) 
+#'     }
+#'     
+#'   }
+#'   
+#'   ##################################################################################
+#'   # plot dots
+#'   
+#'   if(type %in% c("dots", "contour")){
+#' 
+#'     p <- ggplot(df,
+#'                 aes_string(x = as.name( xvar ), 
+#'                      y = as.name( yvar )))
+#'     
+#'     if(type == "dots"){
+#' 
+#'       if(!is.null(color_var)){
+#'           if(color_var != ""){
+#'             #idx_col <- match(color_var, names(df))
+#'             p <- p + geom_point(mapping =  aes_(colour = as.name(color_var)),
+#'                                 alpha = alpha, 
+#'                                 size = size, 
+#'                                 show.legend = show.legend)
+#'             
+#'             if(color_var %in% gs@data@colnames){
+#'               if(color_var != "cluster"){
+#'                 if(is.null(color_var_name)){
+#'                   color_var_name <- color_var
+#'                 }
+#'                 p <- p + scale_colour_viridis(trans = transformation[[color_var]], 
+#'                                               name = color_var_name)
+#'                   
+#'               }
+#'               
+#'             }
+#'           }else{
+#'             p <- p + geom_point(alpha = alpha, 
+#'                                 size = size, 
+#'                                 show.legend = show.legend)
+#'           }
+#'       }else{
+#'         p <- p + geom_point(alpha = alpha, 
+#'                             size = size, 
+#'                             show.legend = show.legend)
+#'       }
+#'     }
+#' 
+#'     
+#'     if(type == "contour"){
+#'       if(!is.null(color_var)){
+#'         
+#'           p <- p + geom_density_2d(mapping =  aes_(colour = as.name(color_var)), 
+#'                                    alpha = alpha, 
+#'                                    size =size, 
+#'                                    n = bins, 
+#'                                    show.legend = show.legend) 
+#'         
+#'         
+#'       }else{
+#'         p <- p + geom_density_2d(alpha = alpha, 
+#'                                  size =size, 
+#'                                  n = bins, 
+#'                                  show.legend = show.legend,
+#'                                  colour = "black") 
+#'       }
+#'       
+#'     }
+#'     
+#'   }
+#'   
+#'   ##################################################################################
+#'   # plot gate
+#'   
+#'   if(type != "histogram" & !is.null(gate)){
+#'     
+#'     for(j in 1:length(gate)){
+#'       
+#'         gate_int <- gate[[j]]
+#'         polygon <- NULL
+#'         
+#'         if(class(gate_int) == "polygonGate" ){
+#'           if(length(unique(colnames(gate_int@boundaries)))>1){
+#'             polygon <- as.data.frame(gate_int@boundaries)
+#'           }
+#'         }else if(class(gate_int) == "rectangleGate"){
+#' 
+#'           idx_x <- match(xvar, names(gate_int@min))
+#'           idx_y <- match(yvar, names(gate_int@min))
+#'           
+#'           if(!is.na(idx_x) & !is.na(idx_y)){
+#'             if(!is.na(idx_x)){
+#'               range_x <- c(gate_int@min[idx_x], gate_int@max[idx_x])
+#'             }else{
+#'               range_x <- xlim
+#'             }
+#'             if(!is.na(idx_y)){
+#'               range_y <- c(gate_int@min[idx_y], gate_int@max[idx_y])
+#'             }else{
+#'               range_y <- ylim
+#'             }
+#'             
+#'             polygon <- data.frame(x = c(range_x[1], range_x[2], range_x[2], range_x[1]),
+#'                                   y = c(range_y[1], range_y[1], range_y[2], range_y[2]))
+#'             
+#'             names(polygon) <- c(xvar, yvar)
+#'           }
+#' 
+#'         }else if(class(gate_int) %in% c("ellipsoidGate")){
+#'           cov <- gate_int@cov
+#'           mean <- gate_int@mean
+#'           polygon <- ellipse_path(cov = cov, mean = mean)
+#'         }else{
+#'           warning("gate format not supported")
+#'           break
+#'         }
+#'       
+#'         idx_match <- match(c(xvar, yvar), names(polygon))
+#'         
+#'         #if(sum(is.na(idx_match))==0){
+#'          if(setequal(c(xvar, yvar), names(polygon))){ 
+#'           df_trans <- polygon
+#'           
+#'           df_trans[,idx_match[1]] <- transformation[[xvar]]$transform(df_trans[,idx_match[1]])
+#'           df_trans[,idx_match[2]] <- transformation[[yvar]]$transform(df_trans[,idx_match[2]])
+#'           
+#'           
+#'           center <- c(mean(df_trans[,idx_match[1]]), mean(df_trans[,idx_match[2]]))
+#'           
+#'           polygon <- rbind(polygon, polygon[1,])
+#' 
+#'           xlim <- range(c(xlim, polygon[,idx_match[1]]))
+#'           ylim <- range(c(ylim, polygon[,idx_match[2]]))
+#'           
+#'           #trueCentroids = gCentroid(sids,byid=TRUE)
+#'           
+#'           
+#'           df_label <- data.frame(x = transformation[[xvar]]$inverse(center[idx_match[1]]), 
+#'                                  y = transformation[[yvar]]$inverse(center[idx_match[2]]),
+#'                                  label = gate_int@filterId)
+#' 
+#'           p <- p +
+#'             geom_path(data = polygon, color = "red") +
+#'             geom_polygon(data=polygon,
+#'                          fill="red",
+#'                          alpha=0.05) +
+#'             geom_label(data = df_label, aes(x=x, y=y, label = label),
+#'                        fill = rgb(1,1,1,0.5), color = "red", hjust = "middle", vjust = "center")
+#'             # annotate("text", 
+#'             #          x=transformation[[xvar]]$inverse(center[idx_match[1]]), 
+#'             #          y=transformation[[yvar]]$inverse(center[idx_match[2]]),
+#'             #          label = gate_int@filterId,
+#'             #          color = "red", fill = "white")
+#'         
+#'       }
+#'     }
+#'     
+#'   }
+#'   
+#'   ##################################################################################
+#'   # plot polygon gate
+#'   if(type != "histogram" & setequal(names(polygon_gate), c("x", "y"))){
+#'     if(!is.null(polygon_gate$x)){
+#'       polygon <- data.frame(x = polygon_gate$x, y = polygon_gate$y)
+#'       polygon <- rbind(polygon, polygon[1,])
+#'       if(xvar != yvar){
+#'         names(polygon) <- c(xvar, yvar)
+#'         
+#'         # if(!is.null(data_range)){
+#'         #   xlim <- range(c(data_range[[xvar]], polygon[,1]))
+#'         #   ylim <- range(c(data_range[[yvar]], polygon[,2]))
+#'         # }
+#'         
+#'         xlim <- range(c(xlim, polygon[,1]))
+#'         ylim <- range(c(ylim, polygon[,2]))
+#'         
+#'         p <- p +
+#'           geom_path(data = polygon, color = "red") +
+#'           geom_polygon(data=polygon,
+#'                        fill="red",
+#'                        alpha=0.05) 
+#'       }
+#'       
+#'     }
+#'     
+#'     
+#'   }
+#'   
+#'   
+#'   ##################################################################################
+#'   # general plot parameters
+#'  
+#'   if(!is.null(min_value)){
+#'     xlim[1] <- min_value
+#'     ylim[1] <- min_value
+#'   }
+#'   
+#'   
+#'   if(!is.null(facet_vars)){
+#'     formula_facet <- as.formula(paste(" ~", paste(facet_vars, collapse = " + ")))
+#'     p <- p + facet_grid(formula_facet,
+#'                         labeller = label_both, 
+#'                         #scales = scale_y,
+#'                         scales = "free")
+#'   }else{
+#'     p <- p + facet_null()
+#'   }
+#'   
+#' 
+#'   # if(!is.null(facet_vars)){
+#'   #   p <- p + facet_wrap(facets = sapply(facet_vars, as.name), labeller = label_both)
+#'   # }else{
+#'   #   p <- p + facet_null()
+#'   # }
+#'   
+#'   labx <- ifelse(is.null(axis_labels), xvar, axis_labels[[xvar]])
+#'   p <- p + scale_x_continuous(name = labx, trans = transformation[[xvar]], limits = xlim) 
+#'   
+#'   if(length(subset)==1){
+#'     p <- p + ggtitle(subset)
+#'   }
+#'   
+#'   if(type != "histogram"){
+#'     laby <- ifelse(is.null(axis_labels), yvar, axis_labels[[yvar]])
+#'     p <- p + scale_y_continuous(name = laby, trans = transformation[[yvar]], limits = ylim) 
+#'   }
+#'   
+#'   p <- p + theme_function() + 
+#'     theme(plot.title = element_text(face = "bold"), legend.position = legend.position)
+#'   
+#'   p
+#'   
+#' }
+#' 
+#' 
+#' #' Plot all gates for a given sample of a gating set
+#' #' @description  Plot all gates for a given sample of a gating set
+#' #' @param df data.frame with columns \code{name} and \code{subset} 
+#' #' containing sample and subset names respectively and
+#' #' columns with plot variables. Ignored if \code{NULL}
+#' #' @param gs a gating set
+#' #' @param sample sample names
+#' #' @param selected_subsets subset names
+#' #' @param spill spillover matrix. If NULL, uncompensated data is used both for gating and plotting.
+#' #' @param ... parameters passed to \code{plot_gs()}
+#' #' @return a list of ggplot objects
+#' #' @import flowWorkspace
+#' plot_gh <- function(df = NULL, gs, sample, selected_subsets = NULL, spill = NULL, ...){
+#'   
+#'   # if(length(sample) != 1){
+#'   #   stop("length of idx must be equal to 1")
+#'   # }
+#'   
+#'   idx <- match(sample, pData(gs)$name)
+#'   
+#'   if(is.null(selected_subsets)){
+#'     subset <- getNodes(gs)
+#'   }else{
+#'     subset <- selected_subsets[selected_subsets %in% getNodes(gs)]
+#'     parent_subsets <- sapply(subset, function(x){getParent(gs[[idx[1]]], x)})
+#'     subset <- union(subset, parent_subsets)
+#'   }
+#'   
+#'   if(is.null(df)){
+#'     
+#'     df <- get_data_gs(gs = gs,
+#'                       sample = sample,
+#'                       subset = subset,
+#'                       spill = spill)
+#'     
+#'   }
+#'   
+#'   child_nodes <- getChildren(gs[[idx[1]]], "root")
+#'   child_nodes <- child_nodes[child_nodes %in% selected_subsets]
+#'   
+#'   plist <- list()
+#'   count <- 0
+#'   
+#'   #plot gates descending the gh until there are no more children gates
+#'   while(length(child_nodes)>0){
+#'     
+#'     child_nodes_int <- NULL
+#'     nodes_to_plot <- child_nodes
+#'     all_parents <- sapply(nodes_to_plot, function(x){getParent(gs[[idx[1]]], x)})
+#'     names(all_parents) <- NULL
+#'     
+#'     for(parent in unique(all_parents)){
+#'       
+#'       idx_parent <- which(all_parents == parent)
+#'       
+#'       nodes_to_plot_parent <- nodes_to_plot[idx_parent]
+#'       
+#'     #plot together gates that share the same set of parameters
+#'       
+#'       while(length(nodes_to_plot_parent) > 0){
+#'         
+#'           
+#'           par_nodes <- lapply(nodes_to_plot_parent, function(x){
+#'             
+#'             g <- getGate(gs[[idx[1]]], x)
+#'             
+#'             if(class(g) %in% c("polygonGate")){
+#'               try(colnames(g@boundaries), silent = TRUE)
+#'             }else if(class(g) %in% c("ellipsoidGate")){
+#'               try(colnames(g@cov), silent = TRUE)
+#'             }else if(class(g) %in% c("rectangleGate")){
+#'               try(names(g@min), silent = TRUE)
+#'             }
+#'             
+#'           })
+#'           
+#'           same_par <- sapply(par_nodes, function(x){setequal(x, par_nodes[[1]])})
+#'           
+#'           count <- count + 1
+#'           
+#'           plist[[count]] <- plot_gs(df = df, gs=gs, sample=sample, subset = parent, gate = nodes_to_plot_parent[same_par], ...)
+#'           
+#'           all_children <- unlist(sapply(nodes_to_plot_parent[same_par], function(x){getChildren(gs[[1]], x)}))
+#'           names(all_children) <- NULL
+#'           
+#'           child_nodes_int <- c(child_nodes_int, all_children)
+#'           nodes_to_plot_parent <- setdiff(nodes_to_plot_parent, nodes_to_plot_parent[same_par])
+#'           
+#'       }
+#'       
+#'     }
+#'     
+#'     child_nodes <- child_nodes_int[child_nodes_int %in% selected_subsets]
+#' 
+#'   }
+#'   return(plist)
+#' }
 
 
 #' Plot summary statistics from a gating set

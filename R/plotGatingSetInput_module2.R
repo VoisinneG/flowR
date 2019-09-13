@@ -295,7 +295,21 @@ plotGatingSet <- function(input, output, session,
     
   })
 
-  update <- reactive({
+  params_update_data <- reactive({
+    if(!auto_update){
+      input$update_plot
+    }else{
+      update_params <- c(selected$samples,
+                         selected$gate,
+                         rval$spill,
+                         rval$flow_set,
+                         rval$gating_set,
+                         rval$parameters
+      )
+    }
+  })
+  
+  params_update_plot_raw <- reactive({
     if(!auto_update){
       input$update_plot
     }else{
@@ -304,10 +318,6 @@ plotGatingSet <- function(input, output, session,
                       "xvar",
                       "yvar",
                       "color_var",
-                      "facet_var", 
-                      "theme",
-                      "legend",
-                      "legend_pos",
                       "bin_number",
                       "size", 
                       "alpha", 
@@ -319,82 +329,77 @@ plotGatingSet <- function(input, output, session,
       for(var in var_update){
         update_params <- c(update_params, input[[var]])
       }
+      update_params
+    }
+  })
+  
+  params_update_plot_formatted <- reactive({
+    if(!auto_update){
+      input$update_plot
+    }else{
+      update_params <- NULL
+      var_update <- c("facet_var", 
+                      "theme",
+                      "legend",
+                      "legend_pos")
+      var_update <- var_update[var_update %in% names(input)]
+      for(var in var_update){
+        update_params <- c(update_params, input[[var]])
+      }
       
       update_params <- c(update_params,
-                         selected$samples,
-                         selected$gate,
-                         rval$apply_trans,
-                         rval$flow_set,
-                         rval$gating_set,
-                         rval$spill,
-                         rval$parameters,
-                         split_var())
+                         rval$apply_trans)
       
       #if(!is.null(rval$apply_trans)){
-        if(rval$apply_trans){
-          update_params <- c(update_params, rval$transformation)
-        }
+      if(rval$apply_trans){
+        update_params <- c(update_params, rval$transformation)
+      }
       #}
       
       if(show_gates){
         update_params <- c(update_params, 
-                           rval$gates_flowCore,
-                           polygon_gate$x)
+                           rval$gates_flowCore)
+        #polygon_gate$x)
       }
       update_params
     }
   })
   
-  update_data_plot_focus <- eventReactive(update(), {
-    data_plot_focus()
-  })
+  # update_data_plot_focus <- eventReactive(params_update_data(), {
+  #   data_plot_focus()
+  # })
   
-  data_plot_focus <- reactive({
+  data_plot_focus <- eventReactive(params_update_data(), {
+    print("data")
     validate(
       need(rval$gating_set, "Empty gating set") %then%
         need(selected$samples, "Please select samples") %then%
         need(selected$gate, "Please select subsets")
     )
     
-    df <- get_data_gs(gs = rval$gating_set,
+    df <- get_plot_data(gs = rval$gating_set,
                       sample = selected$samples,
                       subset = selected$gate,
-                      spill = rval$spill)
+                      spill = rval$spill,
+                      metadata = rval$pdata)
     return(df)
     
   })
   
-  plot_focus <- eventReactive(update(), {
-    
-    validate(
-        need(rval$gating_set, "Empty gating set") %then%
-        need(selected$samples, "Please select samples") %then%
-        need(selected$gate, "Please select subsets")  %then%
-        need(input$xvar, "Please select a x-axis variable") 
-        
-    )
-    
+  plot_raw <- eventReactive(c(params_update_plot_raw(), 
+                              data_plot_focus()), {
+    print("raw")
+    df <- data_plot_focus()
+
     idx_x <- match(input$xvar, rval$parameters$name_long)
     xvar <- rval$parameters$name[idx_x]
-    name_xvar <- input$xvar
-    if(!is.null(input$yvar)){
-      if(input$yvar != ""){
-        idx_y <- match(input$yvar, rval$parameters$name_long)
-        yvar <- rval$parameters$name[idx_y]
-        name_yvar <- input$yvar
-      }else{
-        yvar <- xvar
-        name_yvar <- name_xvar
-      }
-    }else{
-      yvar <- xvar
-      name_yvar <- name_xvar
-    }
+    
+    idx_y <- match(input$yvar, rval$parameters$name_long)
+    yvar <- rval$parameters$name[idx_y]
     
     color_var <- input$color_var
-   
+    
     if(!is.null(input$color_var)){
-      
       for(i in 1:length(input$color_var)){
         if(input$color_var[i] %in% rval$parameters$name_long){
           color_var[i] <- rval$parameters$name[match(input$color_var[i], rval$parameters$name_long)]
@@ -403,108 +408,197 @@ plotGatingSet <- function(input, output, session,
         }
       }
     }
-
-    axis_labels <- rval$parameters$name_long
-    names(axis_labels) <- rval$parameters$name
     
-    transformation <- NULL
-    if(rval$apply_trans){
-      transformation <- rval$transformation
-    }
-    
-    plist <- list()
-    
-    if(!simple_plot){
-      facet_vars <- input$facet_var
-    }else{
-      facet_vars <- NULL
-    }
-    
-    for(i in 1:length(input[[split_var()]])){
-      
-      color_var_int <- color_var[1]
-      xvar_int <- xvar[1]
-      yvar_int <- yvar[1]
-      
-      if(split_var() == "color_var"){
-        color_var_int <- color_var[i]
-      }else if(split_var() == "xvar"){
-        xvar_int <- xvar[i]
-      }else if(split_var() == "yvar"){
-        yvar_int <- yvar[i]
-      }
-      
-      gate <- NULL
-      
-      if(show_gates){
-        child_gates <- getChildren(rval$gating_set[[1]], selected$gate)
-        
-        if(length(child_gates) > 0){
-          gate <- child_gates
-        }
-      
-
-        #gate <- setdiff(names(rval$gates_flowCore), "root")
-          # gates_non_root <- setdiff(getNodes(rval$gating_set), "root")
-          # if(length(gates_non_root)>0){
-          #   gate <- gates_non_root
-          # }
-      }
-      
-      color_var_name <- NULL
-      if(!is.null(color_var_int)){
-        if(color_var_int %in% rval$parameters$name){
-          color_var_name <- rval$parameters$name_long[match(color_var_int, rval$parameters$name)]
-        }
-      }
-      
-      
-      p <- plot_gs(df = update_data_plot_focus(),
-                   gs = rval$gating_set, 
-                   sample = selected$samples,
-                   subset = selected$gate, 
-                   spill = rval$spill,
-                   xvar = xvar_int, 
-                   yvar = yvar_int, 
-                   color_var = color_var_int, 
-                   color_var_name = color_var_name,
-                   gate = gate,
-                   polygon_gate = polygon_gate,
-                   type = input$plot_type, 
-                   bins = ifelse(is.null(input$bin_number), rval_plot_default$bin_number, input$bin_number),
-                   alpha = ifelse(is.null(input$alpha), rval_plot_default$alpha, input$alpha),
-                   size = ifelse(is.null(input$size), rval_plot_default$size, input$size),
-                   norm_density = ifelse(is.null(input$norm), TRUE, input$norm),
-                   smooth = ifelse(is.null(input$smooth), FALSE, input$smooth),
-                   ridges = ifelse(is.null(input$ridges), FALSE, input$ridges),
-                   transformation =  transformation,
-                   facet_vars = facet_vars,
-                   metadata = rval$pdata,
-                   #group_var = input$group_var,
-                   yridges_var = input$yridges_var,
-                   show.legend = input$legend,
-                   axis_labels = axis_labels,
-                   legend.position = input$legend_pos,
-                   theme_name = paste("theme_", input$theme, sep = ""))
-      
-      if(!is.null(p)){
-        p <- p + xlab(xvar) 
-        if(input$plot_type != "histogram"){
-          p <- p + ylab(yvar)
-        }
-      }
-      
-      plist[[i]] <- p
-      
-    }
-    
-    plist
+    p <- plot_gs_data(df=df,
+                      plot_type = input$plot_type,
+                      plot_args = list(xvar = xvar,
+                                       yvar = yvar,
+                                       color_var = color_var))
     
   })
   
+  plot_formatted <- eventReactive(c(params_update_plot_formatted(), 
+                                    plot_raw()), {
+    print("format")
+    p <- format_plot(plot_raw(),
+                     options = list(theme_name = paste("theme_", input$theme, sep = ""),
+                                    transformation = rval$transformation
+                     )
+    )
+    p
+  })
+  
+  plot_gate <- reactive({
+    print("gate")
+    gate <- NULL
+    
+    if(show_gates){
+      child_gates <- getChildren(rval$gating_set[[1]], selected$gate)
+      if(length(child_gates) > 0){
+        gate <- child_gates
+      }
+    }
+    
+    p <- plot_formatted()
+    if(!is.null(gate)){
+      for(gate_name in setdiff(gate, "root")){
+        gate_int <- getGate(rval$gating_set[[1]], gate_name)
+        p <- add_gate(p = p, gate = gate_int)
+      }
+    }
+    p
+  })
+  
+  plot_draw <- reactive({
+    print("draw")
+    p <- plot_gate()
+    if(!is.null(polygon_gate$x)){
+      p <- add_polygon_layer(p, polygon = polygon_gate)
+    }
+    p
+  })
+  
+  # plot_focus <- eventReactive(update(), {
+  #   
+  #   validate(
+  #       need(rval$gating_set, "Empty gating set") %then%
+  #       need(selected$samples, "Please select samples") %then%
+  #       need(selected$gate, "Please select subsets")  %then%
+  #       need(input$xvar, "Please select a x-axis variable") 
+  #       
+  #   )
+  #   
+  #   idx_x <- match(input$xvar, rval$parameters$name_long)
+  #   xvar <- rval$parameters$name[idx_x]
+  #   name_xvar <- input$xvar
+  #   if(!is.null(input$yvar)){
+  #     if(input$yvar != ""){
+  #       idx_y <- match(input$yvar, rval$parameters$name_long)
+  #       yvar <- rval$parameters$name[idx_y]
+  #       name_yvar <- input$yvar
+  #     }else{
+  #       yvar <- xvar
+  #       name_yvar <- name_xvar
+  #     }
+  #   }else{
+  #     yvar <- xvar
+  #     name_yvar <- name_xvar
+  #   }
+  #   
+  #   color_var <- input$color_var
+  #  
+  #   if(!is.null(input$color_var)){
+  #     
+  #     for(i in 1:length(input$color_var)){
+  #       if(input$color_var[i] %in% rval$parameters$name_long){
+  #         color_var[i] <- rval$parameters$name[match(input$color_var[i], rval$parameters$name_long)]
+  #       }else{
+  #         color_var[i] <- input$color_var[i]
+  #       }
+  #     }
+  #   }
+  # 
+  #   axis_labels <- rval$parameters$name_long
+  #   names(axis_labels) <- rval$parameters$name
+  #   
+  #   transformation <- NULL
+  #   if(rval$apply_trans){
+  #     transformation <- rval$transformation
+  #   }
+  #   
+  #   plist <- list()
+  #   
+  #   if(!simple_plot){
+  #     facet_vars <- input$facet_var
+  #   }else{
+  #     facet_vars <- NULL
+  #   }
+  #   
+  #   for(i in 1:length(input[[split_var()]])){
+  #     
+  #     color_var_int <- color_var[1]
+  #     xvar_int <- xvar[1]
+  #     yvar_int <- yvar[1]
+  #     
+  #     if(split_var() == "color_var"){
+  #       color_var_int <- color_var[i]
+  #     }else if(split_var() == "xvar"){
+  #       xvar_int <- xvar[i]
+  #     }else if(split_var() == "yvar"){
+  #       yvar_int <- yvar[i]
+  #     }
+  #     
+  #     gate <- NULL
+  #     
+  #     if(show_gates){
+  #       child_gates <- getChildren(rval$gating_set[[1]], selected$gate)
+  #       
+  #       if(length(child_gates) > 0){
+  #         gate <- child_gates
+  #       }
+  #     
+  # 
+  #       #gate <- setdiff(names(rval$gates_flowCore), "root")
+  #         # gates_non_root <- setdiff(getNodes(rval$gating_set), "root")
+  #         # if(length(gates_non_root)>0){
+  #         #   gate <- gates_non_root
+  #         # }
+  #     }
+  #     
+  #     color_var_name <- NULL
+  #     if(!is.null(color_var_int)){
+  #       if(color_var_int %in% rval$parameters$name){
+  #         color_var_name <- rval$parameters$name_long[match(color_var_int, rval$parameters$name)]
+  #       }
+  #     }
+  #     
+  #     
+  #     p <- plot_gs(df = update_data_plot_focus(),
+  #                  gs = rval$gating_set, 
+  #                  sample = selected$samples,
+  #                  subset = selected$gate, 
+  #                  spill = rval$spill,
+  #                  xvar = xvar_int, 
+  #                  yvar = yvar_int, 
+  #                  color_var = color_var_int, 
+  #                  color_var_name = color_var_name,
+  #                  gate = gate,
+  #                  polygon_gate = polygon_gate,
+  #                  type = input$plot_type, 
+  #                  bins = ifelse(is.null(input$bin_number), rval_plot_default$bin_number, input$bin_number),
+  #                  alpha = ifelse(is.null(input$alpha), rval_plot_default$alpha, input$alpha),
+  #                  size = ifelse(is.null(input$size), rval_plot_default$size, input$size),
+  #                  norm_density = ifelse(is.null(input$norm), TRUE, input$norm),
+  #                  smooth = ifelse(is.null(input$smooth), FALSE, input$smooth),
+  #                  ridges = ifelse(is.null(input$ridges), FALSE, input$ridges),
+  #                  transformation =  transformation,
+  #                  facet_vars = facet_vars,
+  #                  metadata = rval$pdata,
+  #                  #group_var = input$group_var,
+  #                  yridges_var = input$yridges_var,
+  #                  show.legend = input$legend,
+  #                  axis_labels = axis_labels,
+  #                  legend.position = input$legend_pos,
+  #                  theme_name = paste("theme_", input$theme, sep = ""))
+  #     
+  #     if(!is.null(p)){
+  #       p <- p + xlab(xvar) 
+  #       if(input$plot_type != "histogram"){
+  #         p <- p + ylab(yvar)
+  #       }
+  #     }
+  #     
+  #     plist[[i]] <- p
+  #     
+  #   }
+  #   
+  #   plist
+  #   
+  # })
   
   
   
-  return( list(plot = plot_focus, params = rval_plot) )
+  
+  return( list(plot = plot_draw, params = rval_plot) )
   
 }

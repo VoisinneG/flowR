@@ -4,15 +4,15 @@
 \alias{plot_gh}
 \title{Plot all gates for a given sample of a gating set}
 \usage{
-plot_gh(df = NULL, gs, sample, selected_subsets = NULL, spill = NULL,
-  ...)
+plot_gh(gs, df = NULL, sample = NULL, selected_subsets = NULL,
+  spill = NULL, plot_args = list(), options = list())
 }
 \arguments{
+\item{gs}{a gating set}
+
 \item{df}{data.frame with columns \code{name} and \code{subset} 
 containing sample and subset names respectively and
 columns with plot variables. Ignored if \code{NULL}}
-
-\item{gs}{a gating set}
 
 \item{sample}{sample names}
 

@@ -33,7 +33,8 @@ Imports:
   umap,
   ClusterX,
   Rphenograph,
-  heatmaply
+  heatmaply,
+  rlang
 Remotes: 
   JinmiaoChenLab/ClusterX,
   JinmiaoChenLab/Rphenograph

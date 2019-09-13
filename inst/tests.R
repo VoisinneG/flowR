@@ -10,6 +10,9 @@ library(ClusterX)
 library(dplyr)
 library(data.table)
 library(ggplot2)
+library(rlang)
+library(viridis)
+library(sp)
 
 ws <- openWorkspace(file = "./data/tetra/workspace.wsp")
 
@@ -19,6 +22,40 @@ gs <- parseWorkspace(ws,
                      isNcdf = TRUE,
                      sampNloc = "sampleNode")
 
+####################################################################################
+
+sample <-  pData(gs)$name[1]
+subset <- getNodes(gs)[1]
+
+df <- get_plot_data(gs = gs, sample = sample, subset = subset)
+plot_var <- names(df)
+
+p <- plot_gs_data(df=df, 
+             plot_type = "contour",
+             plot_args = list(xvar = "Comp-FSC-A",
+                              yvar = "Comp-R-APC-A")
+             )
+
+p <- format_plot(p,
+                 options = list(default_trans = logicle_trans(), color_var_name = "ok", show.legend = FALSE))
+  
+p2 <- add_polygon_layer(p, polygon_gate = data.frame(x=c(50000, 1000000, 1000000), y = c(0,0,1e5)))
+
+gates <- get_gates_from_gs(gs)
+p3 <- add_gate(p, gate = gates[[1]]$gate)
+
+
+plot_gate(gs = gs, sample = sample, gate =  getNodes(gs)[6])
+
+
+transformation[["Comp-Time"]] <- identity_trans()
+plot_gs2(gs = gs, 
+         gates = NULL,
+         plot_type = "hexagonal", 
+         plot_args = list(bins = 50), 
+         options=list(transformation = transformation))
+
+####################################################################################
 
 p <- plot_stat(gs = gs, stat_function = "mean", yvar = c("Comp-Time", "Comp-FSC-A"), 
           sample = pData(gs)$name[1], 
