@@ -25,8 +25,8 @@ simpleDisplayUI <- function(id, nrow = 1, size = 400){
             
         ),
         box(title = "Save", width = 6, collapsible = TRUE, collapsed = TRUE,
-            numericInput(ns("width_plot"), label = "width", value = 5),
-            numericInput(ns("height_plot"), label = "height", value = 5),
+            #numericInput(ns("width_plot"), label = "width", value = 5),
+            #numericInput(ns("height_plot"), label = "height", value = 5),
             downloadButton(ns("download_plot"), "Save plot")
         )
       )
@@ -54,16 +54,30 @@ simpleDisplay <- function(input, output, session, plist, gate = reactiveValues()
   
   `%then%` <- shiny:::`%OR%`
   
-  rval_plot <- reactiveValues(nrow = 1, ncol = 1)
+  rval_plot <- reactiveValues(nrow = 1, ncol = 1, facet_layout = NULL, ncol_facet = 1, nrow_facet =1)
   
   plot_list <- reactive({
     plist()
   })
     
   plot_display <- reactive({
-
+    
+    
+    
      if(class(plot_list()) == "list"){
+       
        n <- length(plot_list())
+       
+       if(n > 0){
+         p <- plot_list()[[1]]
+         facet_layout <- p$facet$compute_layout(p, p$facet$params)
+         if(!is.null(facet_layout)){
+           rval_plot$ncol_facet <- max(facet_layout$COL)
+           rval_plot$nrow_facet <- max(facet_layout$ROW)
+         }
+       }
+       
+       
        
        if(n > 1){
          rval_plot$nrow <- min(n, input$nrow_split)
@@ -77,6 +91,12 @@ simpleDisplay <- function(input, output, session, plist, gate = reactiveValues()
        }
        
      }else{
+       p <- plot_list()
+       facet_layout <- p$facet$compute_layout(p, p$facet$params)
+       if(!is.null(facet_layout)){
+         rval_plot$ncol_facet <- max(facet_layout$COL)
+         rval_plot$nrow_facet <- max(facet_layout$ROW)
+       }
        plot_list()
      }
      
@@ -98,15 +118,15 @@ simpleDisplay <- function(input, output, session, plist, gate = reactiveValues()
     if(params$use_plotly){
       div( style = 'overflow-x: scroll',
            plotlyOutput(ns("plot_display_ly"), 
-                      height = rval_plot$nrow*input$row_size, 
-                      width = rval_plot$ncol*input$col_size
+                      height = rval_plot$nrow * rval_plot$nrow_facet * input$row_size, 
+                      width = rval_plot$ncol * rval_plot$ncol_facet * input$col_size
            )
       )
     }else{
       div( style = 'overflow-x: scroll',
            plotOutput(ns("plot_display"), 
-                      height = rval_plot$nrow*input$row_size, 
-                      width = rval_plot$ncol*input$col_size,
+                      height = rval_plot$nrow * rval_plot$nrow_facet * input$row_size, 
+                      width = rval_plot$ncol * rval_plot$ncol_facet * input$col_size,
                       brush = ns("plot_brush"),
                       click = ns("plot_click"),
                       dblclick = ns("plot_dblclick")
@@ -128,7 +148,10 @@ simpleDisplay <- function(input, output, session, plist, gate = reactiveValues()
   output$download_plot <- downloadHandler(
     filename = "plot.pdf",
     content = function(file) {
-      pdf(file, width = rval_plot$ncol*input$width_plot, height = rval_plot$nrow*input$height_plot)
+      #pdf(file, width = rval_plot$ncol*input$width_plot, height = rval_plot$nrow*input$height_plot)
+      pdf(file, 
+          width = rval_plot$ncol * rval_plot$ncol_facet * input$col_size * 5/400, 
+          height = rval_plot$nrow * rval_plot$nrow_facet * input$row_size * 5/400)
       print(plot_display())
       dev.off()
     }
