@@ -25,10 +25,12 @@ gs <- parseWorkspace(ws,
 ####################################################################################
 
 sample <-  pData(gs)$name[1]
-subset <- getNodes(gs)[1]
+subset <- getNodes(gs)[1:3]
 
 df <- get_plot_data(gs = gs, sample = sample, subset = subset)
 plot_var <- names(df)
+axis_labels <- paste(plot_var, "c")
+names(axis_labels) <- plot_var
 
 p <- plot_gs_data(df=df, 
              plot_type = "contour",
@@ -37,7 +39,11 @@ p <- plot_gs_data(df=df,
              )
 
 p <- format_plot(p,
-                 options = list(default_trans = logicle_trans(), color_var_name = "ok", show.legend = FALSE))
+                 options = list(default_trans = logicle_trans(), 
+                                color_var_name = "ok", 
+                                show.legend = FALSE, 
+                                facet_vars = c("name", "subset"),
+                                axis_labels = axis_labels))
   
 p2 <- add_polygon_layer(p, polygon_gate = data.frame(x=c(50000, 1000000, 1000000), y = c(0,0,1e5)))
 

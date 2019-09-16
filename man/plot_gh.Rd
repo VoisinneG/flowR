@@ -5,7 +5,8 @@
 \title{Plot all gates for a given sample of a gating set}
 \usage{
 plot_gh(gs, df = NULL, sample = NULL, selected_subsets = NULL,
-  spill = NULL, plot_args = list(), options = list())
+  spill = NULL, plot_type = "contour", plot_args = list(),
+  options = list())
 }
 \arguments{
 \item{gs}{a gating set}

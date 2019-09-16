@@ -49,9 +49,11 @@ plotGatingHierarchy <- function(input, output, session, rval, plot_params = reac
       need(rval$gating_set, "Empty gating set") %then%
       need(setdiff(names(rval$gates_flowCore), "root"), "No gates to display") %then%
       need(plot_params$samples, "Please select a sample") %then%
-      need(plot_params$plot_type != "histogram", "Plot type not supported") 
+      need(plot_params$xvar, "Please select a x variable") %then%
+      need(plot_params$yvar, "Please select a y variable")
     )
 
+    if(plot_params$plot_type == "histogram") plot_params$plot_type <- "dots"
     
     axis_labels <- rval$parameters$name_long
     names(axis_labels) <- rval$parameters$name
@@ -66,36 +68,60 @@ plotGatingHierarchy <- function(input, output, session, rval, plot_params = reac
     #   data_range <- rval$data_range
     # }
     
-    color_var <- NULL
-    if(!is.null(plot_params$color_var)){
-      if(plot_params$color_var %in% rval$parameters$name_long){
-        color_var <- rval$parameters$name[match(plot_params$color_var, rval$parameters$name_long)]
-      }else{
-        color_var <- plot_params$color_var
-      }
-    }
+    # color_var <- NULL
+    # if(!is.null(plot_params$color_var)){
+    #   if(plot_params$color_var %in% rval$parameters$name_long){
+    #     color_var <- rval$parameters$name[match(plot_params$color_var, rval$parameters$name_long)]
+    #   }else{
+    #     color_var <- plot_params$color_var
+    #   }
+    # }
     
     
     if(plot_params$plot_type != "histogram"){
       type <- plot_params$plot_type
     }
     
-    p <- plot_gh(df = NULL,
-                 gs = rval$gating_set,
-                 selected_subsets = plot_params$selected_subsets,
-                 sample = plot_params$samples,
-                 spill = rval$spill,
-                 transformation = transformation,
-                 bins = plot_params$bin_number,
-                 color_var = color_var,
-                 facet_vars = NULL,
-                 axis_labels = axis_labels,
-                 #data_range = data_range,
-                 type = type,
-                 alpha = plot_params$alpha,
-                 size = plot_params$size,
-                 show.legend = FALSE,
-                 theme_name = paste("theme_", plot_params$theme, sep = ""))
+    axis_labels <- rval$parameters$name_long
+    names(axis_labels) <- rval$parameters$name
+    
+    transformation <- NULL
+    if(rval$apply_trans){
+      transformation <- rval$transformation
+    }
+    
+    options <- list(theme_name = paste("theme_", plot_params[["theme"]], sep = ""),
+                    transformation = transformation,
+                    axis_labels = axis_labels,
+                    legend.position = plot_params[["legend.position"]])
+    
+
+    p <- plot_gh( gs = rval$gating_set,
+                  df = NULL,
+                  sample = plot_params$samples,
+                  selected_subsets = plot_params$selected_subsets, 
+                  spill = rval$spill, 
+                  plot_type = plot_params$plot_type,
+                  plot_args = reactiveValuesToList(plot_params), 
+                  options = options)
+                         
+    
+    # p <- plot_gh(df = NULL,
+    #              gs = rval$gating_set,
+    #              selected_subsets = plot_params$selected_subsets,
+    #              sample = plot_params$samples,
+    #              spill = rval$spill,
+    #              transformation = transformation,
+    #              bins = plot_params$bin_number,
+    #              color_var = color_var,
+    #              facet_vars = NULL,
+    #              axis_labels = axis_labels,
+    #              #data_range = data_range,
+    #              type = type,
+    #              alpha = plot_params$alpha,
+    #              size = plot_params$size,
+    #              show.legend = FALSE,
+    #              theme_name = paste("theme_", plot_params$theme, sep = ""))
     
     p
     

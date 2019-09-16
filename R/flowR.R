@@ -591,6 +591,11 @@ get_plot_data <- function(gs,
     df <- add_columns_from_metadata(df,
                                     metadata = metadata)
   }
+  
+  if("cluster" %in% names(df)){
+    df[["cluster"]] <- as.factor(df[["cluster"]])  
+  }
+  
   return(df)
   
 }
@@ -674,19 +679,31 @@ format_plot <- function(p,
   if(p$plot_env$plot_type == "dots"){
     
     if(!is.null(color_var)){
+      
       color_var_name <- options$color_var_name
-      print(as.character(color_var))
+
       if(! as.character(color_var) %in% c("cluster", "subset", "name")){
         if(is.null(color_var_name)){
           color_var_name <- color_var
+          
         }
         p <- p + scale_colour_viridis(trans = transformation[[color_var]],
                                       name = color_var_name)
-        
       }
     }
   }
 
+    ############################################################################33
+    #facet
+    
+    if(!is.null(options$facet_vars)){
+           formula_facet <- as.formula(paste(" ~", paste(options$facet_vars, collapse = " + ")))
+           p <- p + facet_grid(formula_facet,
+                               labeller = label_both, 
+                               #scales = scale_y,
+                               scales = "free")
+    }
+    
   ############################################################################33
   #theme
   
@@ -735,6 +752,7 @@ plot_hexagonal <- function(args = list()){
   p
 }
 
+#'@import ggridges
 plot_histogram <- function(args = list()){
   
   plot_type <- "histogram"
@@ -991,6 +1009,8 @@ plot_gs <- function(gs,
                       spill = spill, 
                       metadata = metadata)
   
+  print(names(plot_args))
+  
   p <- plot_gs_data(df = df,
                     plot_type = plot_type,
                     plot_args = plot_args)
@@ -1025,6 +1045,7 @@ plot_gh <- function( gs,
                       sample = NULL, 
                       selected_subsets = NULL, 
                       spill = NULL, 
+                      plot_type = "contour",
                       plot_args = list(), 
                       options = list()){
   
@@ -1095,20 +1116,16 @@ plot_gh <- function( gs,
         same_par <- sapply(par_nodes, function(x){setequal(x, par_nodes[[1]])})
         
         count <- count + 1
-        
-        
-        
+
         plot_args$xvar <- par_nodes[[1]][1]
         plot_args$yvar <- par_nodes[[1]][2]
-        
-        print(par_nodes)
-        print(nodes_to_plot_parent[same_par])
-        
-        plist[[count]] <- plot_gs2(df = df, 
+
+        plist[[count]] <- plot_gs(df = df, 
                                    gs=gs, 
                                    sample=sample, 
                                    subset = parent, 
                                    gate = nodes_to_plot_parent[same_par], 
+                                   plot_type = plot_type,
                                    plot_args = plot_args,
                                    options = options)
         

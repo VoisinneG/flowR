@@ -10,7 +10,7 @@ gatingUI <- function(id) {
   
   fluidRow(
     column(width = 4,
-           box(width = NULL, height = NULL, title = "Parameters",
+           box(width = NULL, height = NULL, title = "Parameters", collapsible = TRUE, collapsed = FALSE,
                actionButton(ns("show_gate"), label = "Show gate"),
                br(),
                br(),
@@ -368,24 +368,6 @@ gating <- function(input, output, session, rval) {
   ##########################################################################################################
   # Output plots
   
-  # output$tree <- renderPlot({
-  #   
-  #   validate(
-  #     need(rval$gates_flowCore, "Empty gating set")
-  #   )
-  #   
-  #   validate(
-  #     need(length(setdiff(getNodes(rval$gating_set), "root"))>0, "No gates in gating set")
-  #   )
-  #   
-  #   idx_cluster <- grep("^cluster[0-9]", getNodes(rval$gating_set))
-  #   
-  #   p <- plot(rval$gating_set)
-  #   
-  #   renderGraph(p)
-  #   
-  # })
-  
   output$tree <- renderPlot({
     gates <- rval$gates_flowCore
     validate(need(names(gates), "Empty gating set"))
@@ -432,15 +414,6 @@ gating <- function(input, output, session, rval) {
   
   ##########################################################################################################
   #Output Download functions
-  
-  # output$download_plot <- downloadHandler(
-  #   filename = paste("plot_gate.pdf", sep = ""),
-  #   content = function(file) {
-  #     pdf(file, width = input$width_plot, height = input$height_plot)
-  #     print(plot_gate())
-  #     dev.off()
-  #   }
-  # )
   
   pop_stats <- reactive({
     validate(need(rval$gating_set, "No gating set available"))
