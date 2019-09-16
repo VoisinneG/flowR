@@ -63,33 +63,6 @@ plotGatingHierarchy <- function(input, output, session, rval, plot_params = reac
       transformation <- rval$transformation
     }
     
-    #data_range <- NULL
-    # if(plot_params$freeze_limits){
-    #   data_range <- rval$data_range
-    # }
-    
-    # color_var <- NULL
-    # if(!is.null(plot_params$color_var)){
-    #   if(plot_params$color_var %in% rval$parameters$name_long){
-    #     color_var <- rval$parameters$name[match(plot_params$color_var, rval$parameters$name_long)]
-    #   }else{
-    #     color_var <- plot_params$color_var
-    #   }
-    # }
-    
-    
-    if(plot_params$plot_type != "histogram"){
-      type <- plot_params$plot_type
-    }
-    
-    axis_labels <- rval$parameters$name_long
-    names(axis_labels) <- rval$parameters$name
-    
-    transformation <- NULL
-    if(rval$apply_trans){
-      transformation <- rval$transformation
-    }
-    
     options <- list(theme_name = paste("theme_", plot_params[["theme"]], sep = ""),
                     transformation = transformation,
                     axis_labels = axis_labels,
@@ -104,24 +77,6 @@ plotGatingHierarchy <- function(input, output, session, rval, plot_params = reac
                   plot_type = plot_params$plot_type,
                   plot_args = reactiveValuesToList(plot_params), 
                   options = options)
-                         
-    
-    # p <- plot_gh(df = NULL,
-    #              gs = rval$gating_set,
-    #              selected_subsets = plot_params$selected_subsets,
-    #              sample = plot_params$samples,
-    #              spill = rval$spill,
-    #              transformation = transformation,
-    #              bins = plot_params$bin_number,
-    #              color_var = color_var,
-    #              facet_vars = NULL,
-    #              axis_labels = axis_labels,
-    #              #data_range = data_range,
-    #              type = type,
-    #              alpha = plot_params$alpha,
-    #              size = plot_params$size,
-    #              show.legend = FALSE,
-    #              theme_name = paste("theme_", plot_params$theme, sep = ""))
     
     p
     
