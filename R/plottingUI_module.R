@@ -73,6 +73,7 @@ plotting <- function(input, output, session, rval) {
       plot_params$yvar <- yvar
       plot_params$plot_type <- "dots"
       plot_params$color_var <- NULL
+      plot_params$group_var <- NULL
       plot_params$gate <- "root"
       rval_mod$init <- FALSE
       

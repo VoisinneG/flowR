@@ -65,6 +65,7 @@ metadataUI <- function(id) {
 #' @param session shiny session
 #' @return a reactivevalues object with values "df_files", "flow_set_imported" and "gates_flowCore"
 #' @import flowWorkspace
+#' @import readxl
 #' @import flowCore
 #' @import shiny
 #' @import DT
@@ -123,7 +124,12 @@ metadata <- function(input, output, session, rval) {
                   "tab" = "\t",
                   "space" = " ")
     
-    rval_mod$df_meta_imported <- read.csv(input$file_meta$datapath, sep = sep, header = TRUE, quote = "\"", fill = TRUE, stringsAsFactors = FALSE)
+    if(file_ext(input$file_meta$datapath) %in% c("txt", "csv")){
+      rval_mod$df_meta_imported <- read.csv(input$file_meta$datapath, sep = sep, header = TRUE, quote = "\"", fill = TRUE, stringsAsFactors = FALSE)
+    }else if(file_ext(input$file_meta$datapath) %in% c("xls", "xlsx")){
+      rval_mod$df_meta_imported <- read_excel(input$file_meta$datapath)
+    }
+    
     
   })
   
@@ -131,8 +137,9 @@ metadata <- function(input, output, session, rval) {
     
     validate(need(rval_mod$df_meta_imported, "no metadata imported"))
     
-    df_meta <- rval_mod$df_meta_imported
+    df_meta <- as.data.frame(rval_mod$df_meta_imported)
     idx_match <- match(rval$pdata$name, df_meta[,1])
+    
     idx_match <- idx_match[!is.na(idx_match)]
     if(length(idx_match)>0){
       df_meta_mapped <- df_meta[idx_match, ]
@@ -209,7 +216,8 @@ metadata <- function(input, output, session, rval) {
       fs <- flow_set_filter
 
       rval$flow_set_list[[input$fs_name]] <- list(flow_set = fs, 
-                                                  par = lapply(1:length(fs), function(x){parameters(fs[[x]])}),
+                                                  metadata = pData(fs),
+                                                  parameters = lapply(1:length(fs), function(x){parameters(fs[[x]])}),
                                                   desc = lapply(1:length(fs), function(x){description(fs[[x]])}),
                                                   name = input$fs_name, 
                                                   parent = rval$flow_set_selected,
@@ -318,6 +326,7 @@ metadata <- function(input, output, session, rval) {
       need(rval_mod$df_meta_imported, "No meta data imported")
     )
     as.data.frame(rval_mod$df_meta_imported)
+    #rval_mod$df_meta_imported
   })
   
   output$download_meta <- downloadHandler(

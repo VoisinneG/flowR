@@ -103,7 +103,7 @@ flowR_server <- function(session, input, output, user_module_name = NULL) {
     rval$flow_set <- rval$flow_set_list[[input$flow_set]]$flow_set
     rval$gates_flowCore <- rval$flow_set_list[[input$flow_set]]$gates
     rval$df_spill <- rval$flow_set_list[[input$flow_set]]$spill
-    rval$parameters <- rval$flow_set_list[[input$flow_set]]$parameters
+    rval$parameters <- rval$flow_set_list[[input$flow_set]]$parameters[[1]]
     rval$transformation <- rval$flow_set_list[[input$flow_set]]$transformation
     rval$trans_parameters <- rval$flow_set_list[[input$flow_set]]$trans_parameters
     rval$pdata <- rval$flow_set_list[[input$flow_set]]$metadata

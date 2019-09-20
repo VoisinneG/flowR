@@ -414,18 +414,29 @@ transform_gates <- function(gates,
 getPopStatsPlus <- function(gs){
   df <- getPopStats(gs)
   df$name <- sapply(df$name, function(x){strsplit(x, split = "_[0-9]+$")[[1]][1]})
-  df_root <- df
-  df_root <- df_root[df_root$Parent == "root", ]
+  fs <- getData(gs)
   
-  df_root$Population <- df_root$Parent
-  df_root$Count <- df_root$ParentCount
+  df_root <- data.frame(name = pData(fs)$name)
+  df_root$name <- pData(fs)$name
+  df_root$Population <- "root"
+  df_root$Count <- sapply(1:length(fs), function(x){dim(fs[[x]]@exprs)[1]})
   df_root$Parent <- NA
   df_root$ParentCount <- NA
   
-  name <- unique(df_root$name)
-  idx <- match(name, df_root$name)
+  # df_root <- df
+  # df_root <- df_root[df_root$Parent == "root", ]
+  # 
+  # df_root$Population <- df_root$Parent
+  # df_root$Count <- df_root$ParentCount
+  # df_root$Parent <- NA
+  # df_root$ParentCount <- NA
+  # 
+  # name <- unique(df_root$name)
+  # idx <- match(name, df_root$name)
+  # 
+  # df_merge <- rbind(df, df_root[idx, ])
   
-  df_merge <- rbind(df, df_root[idx, ])
+  df_merge <- rbind(df, df_root)
   df_merge
 }
 
@@ -600,6 +611,7 @@ get_plot_data <- function(gs,
   
 }
 
+
 plot_gs_data <- function(df,
                          plot_type,
                          plot_args = list()
@@ -611,13 +623,13 @@ plot_gs_data <- function(df,
   return(p)
 }
 
+
 #' @import ggplot2
 #' @import viridis
 #' @import flowWorkspace
 #' @import rlang
 format_plot <- function(p,
-                        options = list(default_trans = logicle_trans(),
-                                       show.legend = FALSE)){
+                        options = list()){
   
   xvar <- NULL
   yvar <- NULL
@@ -640,8 +652,7 @@ format_plot <- function(p,
   
   ############################################################################33
   #default parameters
-  default_trans <- logicle_trans()
-  show.legend <- FALSE
+  default_trans <- identity_trans()
   
   for(var in names(options)){
     assign(var, options[[var]])
@@ -652,27 +663,30 @@ format_plot <- function(p,
   
   #transformation <- options$transformation
   #if(is.null(transformation)){
-    trans_var <- unique(c(xvar, yvar, color_var))
-    transformation <- lapply(trans_var, function(x){default_trans})
-    names(transformation) <- trans_var
+    
   #}
-    
-    for(var in names(options$transformation)){
-      transformation[[var]] <- options$transformation[[var]]
-    }
-    
+  transformation <- list()
+  
+  for(var in names(options$transformation)){
+    transformation[[var]] <- options$transformation[[var]]
+  }
+  
   
   if(!is.null(xvar)){
+    labx <- ifelse(is.null(options$axis_labels[[xvar]]), xvar, options$axis_labels[[xvar]])
     if(xvar %in% names(transformation)){
-      labx <- ifelse(is.null(options$axis_labels), xvar, options$axis_labels[[xvar]])
       p <- p + scale_x_continuous(name = labx, trans = transformation[[xvar]], limits = xlim) 
+    }else{
+      p <- p + scale_x_continuous(name = labx, trans = default_trans, limits = xlim)
     }
   }
   
   if(!is.null(yvar)){
+    laby <- ifelse(is.null(options$axis_labels[[yvar]]), yvar, options$axis_labels[[yvar]])
     if(yvar %in% names(transformation)){
-      laby <- ifelse(is.null(options$axis_labels), yvar, options$axis_labels[[yvar]])
       p <- p + scale_y_continuous(name = laby, trans = transformation[[yvar]], limits = ylim) 
+    }else{
+      p <- p + scale_y_continuous(name = laby, trans = default_trans, limits = ylim) 
     }
   }
 
@@ -682,10 +696,9 @@ format_plot <- function(p,
       
       color_var_name <- options$color_var_name
 
-      if(! as.character(color_var) %in% c("cluster", "subset", "name")){
+      if( as.character(color_var) %in% setdiff(names(transformation), "cluster")){
         if(is.null(color_var_name)){
           color_var_name <- color_var
-          
         }
         p <- p + scale_colour_viridis(trans = transformation[[color_var]],
                                       name = color_var_name)
@@ -704,7 +717,7 @@ format_plot <- function(p,
                                scales = "free")
     }
     
-  ############################################################################33
+  ############################################################################
   #theme
   
   if(length(unique(p$data$subset))==1){
@@ -758,6 +771,7 @@ plot_histogram <- function(args = list()){
   plot_type <- "histogram"
   
   color_var <- NULL
+  group_var <- NULL
   smooth <- FALSE
   ridges <- FALSE
   yridges_var <- "name"
@@ -788,6 +802,16 @@ plot_histogram <- function(args = list()){
     color_var <- as.name(color_var)
   }
   
+  if(!is.null(group_var)){
+    if(group_var == "none"){
+      group_var <- NULL
+    }
+  }
+  
+  if(!is.null(group_var)){
+    group_var <- as.name(group_var)
+  }
+  
   if(!is.null(yridges_var)){
     yridges_var <- as.name(yridges_var)
   }
@@ -796,6 +820,7 @@ plot_histogram <- function(args = list()){
     if(ridges){
       p <- p + geom_density_ridges(mapping = aes_string(fill = color_var, 
                                                         color = color_var, 
+                                                        group = group_var,
                                                         y = yridges_var, 
                                                         height = stat_var), 
                                    alpha = alpha, 
@@ -804,6 +829,7 @@ plot_histogram <- function(args = list()){
     }else{
       p <- p + geom_density(mapping = aes_string(fill = color_var, 
                                                  color = color_var, 
+                                                 group = group_var,
                                                  y = stat_var), 
                             alpha = alpha,
                             bw = 1/bins)
@@ -811,6 +837,7 @@ plot_histogram <- function(args = list()){
   }else{
     p <- p + geom_histogram(mapping = aes_string(fill = color_var, 
                                                  color = color_var, 
+                                                 group = group_var,
                                                  y = stat_var), 
                             alpha = alpha,  
                             bins = bins, 
@@ -827,6 +854,7 @@ plot_dots <-function(args = list()){
   plot_type <- "dots"
   
   color_var <- NULL
+  group_var <- NULL
   bins <- 100
   alpha <- 0.1
   size <- 0.1
@@ -845,14 +873,29 @@ plot_dots <-function(args = list()){
     color_var <- as.name(color_var)
   }
   
+  if(!is.null(group_var)){
+    if(group_var == "none"){
+      group_var <- NULL
+    }
+  }
+  
+  if(!is.null(group_var)){
+    group_var <- as.name(group_var)
+  }
+  
   p <- ggplot(df,
               aes_string(x = as.name( xvar ), 
-                         y = as.name( yvar )))
+                         y = as.name( yvar ),
+                         colour = color_var,
+                         group = group_var)) + 
+    geom_point(alpha = alpha, 
+               size = size)
+   
   
   #if(!is.null(color_var)){
-      p <- p + geom_point(mapping =  aes_string(colour = color_var),
-                          alpha = alpha, 
-                          size = size)
+      # p <- p + geom_point(mapping =  aes_string(colour = color_var),
+      #                     alpha = alpha, 
+      #                     size = size)
   # }else{
   #   p <- p + geom_point(alpha = alpha, 
   #                       size = size)
@@ -862,11 +905,14 @@ plot_dots <-function(args = list()){
   
 }
 
+
 plot_contour <-function(args = list()){
   
   plot_type <- "contour"
-  
+
   color_var <- NULL
+  group_var <- NULL
+  fill <- NULL
   bins <- 30
   alpha <- 0.5
   size <- 0.25
@@ -876,42 +922,193 @@ plot_contour <-function(args = list()){
     assign(var, args[[var]])
   }
   
+  if(!is.null(color_var)){
+    if(color_var == "none" ){
+      color_var <- NULL
+    }
+  }
+  
+  # if(!is.null(color_var)){
+  #   if(! color_var %in% c("subset", "name")) color_var <- NULL
+  # }
+  
+  if(!is.null(color_var)){
+    color_var <- as.name(color_var)
+  }
+  
+  if(!is.null(group_var)){
+    if(group_var == "none"){
+      group_var <- NULL
+    }
+  }
+  
+  if(!is.null(group_var)){
+    group_var <- as.name(group_var)
+  }
+  
+  
   p <- ggplot(df,
               aes_string(x = as.name( xvar ), 
                          y = as.name( yvar )))
+
 
 
   if(show_outliers){
     
     p <- p + geom_point(size = 0.1)
     alpha <- 1
+    fill <- "white"
   }
   
-  if(!is.null(color_var)){
-    if(! color_var %in% c("subset", "name")) color_var <- NULL
-  }
   
-  if(!is.null(color_var)){
+  
+   if(!is.null(color_var)){
     #p <- p + stat_density2d(aes_string(alpha='..level..', fill='..level..'), 
-    p <- p + stat_density2d(aes_string(colour = as.name(color_var)),
-                            fill = "white",
+    p <- p + stat_density2d(aes_string(colour = color_var, group = group_var),
+                            fill = fill,
                             size=size, 
                             alpha= alpha,
-                            geom="polygon", 
-                            bins=bins)
+                            geom="polygon",
+                            bins=bins
+                            )
     
     #scale_fill_gradient(low = "yellow", high = "red") 
-  }else{
-    p <- p + stat_density2d(fill = "white",
-                            size=size, 
+   }else{
+    p <- p + stat_density2d(aes_string(group = group_var),
+                            fill = fill,
+                            size=size,
                             alpha= alpha,
                             color = "black",
-                            geom="polygon", 
-                            bins=bins)
+                            geom="polygon",
+                            bins=bins
+                            )
   }
 
   return(p)
 }
+
+
+#' @import pheatmap
+#' @import dplyr
+#' @import forcats
+plot_stat_heatmap <-function(args = list()){
+  
+  plot_type <- "stat_heatmap"
+  stat_var <- NULL
+  annotation_vars <- NULL
+  group_var <- NULL
+  cluster_rows <- FALSE
+  cluster_cols <- FALSE
+  scale = "none"
+  legend <- TRUE
+  
+  for(var in names(args)){
+    assign(var, args[[var]])
+  }
+  
+  df <- as.data.frame(df)
+
+  labels_col <- 1:dim(df)[1]
+  
+  if(!is.null(group_var)){
+    df <- df[order(df[[group_var[1]]]), ]
+    #labels_col <- df$group_var
+  }
+  
+  
+  row.names(df) <- 1:dim(df)[1]
+  print(df)
+  
+  idx <- which(names(df) %in% c("name", "subset", annotation_vars))
+  #idx_annot <- which(names(df) %in% annotation_vars)
+  idx_annot <- idx
+  print(idx)
+  
+  df_stat <- df[-idx]
+  if(!is.null(stat_var)){
+    df_stat <- df_stat[which(names(df_stat) %in% stat_var)]
+  }
+  annotation <- df[idx_annot]
+
+  df_plot <- t(df_stat)
+  colnames(df_plot) <- 1:dim(df_plot)[2]
+  
+  if(dim(df_plot)[1]<2){
+    cluster_rows <- FALSE
+  }
+  if(dim(df_plot)[2]<2){
+    cluster_cols <- FALSE
+  }
+  p <- pheatmap(df_plot, show_colnames = FALSE,
+                labels_col = labels_col,
+                scale = scale,
+                annotation_col = annotation,
+                cluster_rows = cluster_rows,
+                cluster_cols = cluster_cols,
+                legend = legend
+
+  )
+  
+  return(p)
+}
+
+#' @import ggplot2
+#' @import dplyr
+#' @import ggrepel
+plot_stat_pca <-function(args = list()){
+  
+  plot_type <- "stat_pca"
+  PCx <- "PC1"
+  PCy <- "PC2"
+  stat_var <- NULL
+  annotation_vars <- NULL
+  color_var <- NULL
+  label_var <- "name"
+  scale <- TRUE
+
+  for(var in names(args)){
+    assign(var, args[[var]])
+  }
+  
+  df <- as.data.frame(df)
+  
+  idx <- which(names(df) %in% c("name", "subset", annotation_vars))
+  idx_annot <- idx
+  
+  df_stat <- df[-idx]
+  if(!is.null(stat_var)){
+    df_stat <- df_stat[which(names(df_stat) %in% stat_var)]
+  }
+  df_stat <- df_stat[ , which(sapply(df_stat, is.numeric)) ] 
+  
+  
+  rownames(df_stat) <- 1:dim(df_stat)[1]
+  
+  annotation <- df[idx_annot]
+  rownames(annotation) <- 1:dim(annotation)[1]
+  
+  pca_res <- prcomp( df_stat, center = scale, scale. = scale)
+  
+  df_pca <- as.data.frame(pca_res$x)
+  df_pca <- cbind(df_pca, annotation[match(row.names(annotation), row.names(df_pca)), ])
+  
+  if(!is.null(color_var)){
+    color_var <- as.name(color_var)
+  }
+  if(!is.null(label_var)){
+    label_var <- as.name(label_var)
+  }
+  
+  p <- ggplot(df_pca, aes_string(x=as.name(PCx), 
+                                        y=as.name(PCy),
+                                        color = color_var, 
+                                        label = label_var)) +
+    geom_point() +
+    geom_text_repel(show.legend = FALSE)
+  
+  return(p)
+}
+
 
 add_polygon_layer <-function(p,
                              polygon = NULL,
@@ -1041,10 +1238,10 @@ plot_gs <- function(gs,
 #' @return a list of ggplot objects
 #' @import flowWorkspace
 plot_gh <- function( gs, 
-                      df = NULL, 
-                      sample = NULL, 
-                      selected_subsets = NULL, 
-                      spill = NULL, 
+                      df = NULL,
+                      sample = NULL,
+                      selected_subsets = NULL,
+                      spill = NULL,
                       plot_type = "contour",
                       plot_args = list(), 
                       options = list()){
@@ -1212,672 +1409,129 @@ get_gate_coordinates <- function(gate){
   
 }
 
-
-#' #' Plot data and gates from a gating set
-#' #' @description  Plot data and gates from a gating set
-#' #' @param df data.frame with columns \code{name} and \code{subset} 
-#' #' containing sample and subset names respectively and
-#' #' columns with plot variables. Ignored if \code{NULL}
-#' #' @param gs a gating set
-#' #' @param sample sample names
-#' #' @param subset subset names
-#' #' @param xvar x variable
-#' #' @param yvar y variable
-#' #' @param axis_labels Named vector with axis labels. 
-#' #' Vector names should correspond to variable names
-#' #' @param color_var color variable
-#' #' @param data_range Named list of data ranges. 
-#' #' List names should correspond to variable names.
-#' #' @param min_value numeric. Minimal value of x and y axis. Ignored if \code{NULL}.
-#' #' @param gate A character vector with subset names (i.e elements of \code{getNodes(gs)}) or a list of gates 
-#' #' (as returned by \code{get_gates_from_gs()}). 
-#' #' Gates from classes \code{polygonGate}, \code{rectangleGate} and \code{ellipsoidGate} are supported.
-#' #' If \code{xvar} and \code{yvar} are \code{NULL}, the first gate will be used to set plot variables.
-#' #' @param polygon_gate a matrix with columns \code{x} and \code{y} containing path coordinates.
-#' #' @param type plot type : either "hexagonal", "histogram", "dots" or "contour"
-#' #' @param bins bins parameter
-#' #' @param alpha alpha parameter
-#' #' @param size size parameter
-#' #' @param transformation  Named list of \code{trans} objects. 
-#' #' List names should correspond to variable names.
-#' #' @param default_trans default \code{trans} object to be used if \code{transformation} is NULL.
-#' #' @param spill spillover matrix. If NULL, uncompensated data is used both for gating and plotting.
-#' #' @param metadata data.frame with metadata.
-#' #' @param facet_vars variables used to facet plots along the x axis
-#' #' @param yridges_var y variables used in \code{geom_density_ridges()}. Used only if \code{ridges} is TRUE.
-#' #' @param norm_density normalize maximum density to 1
-#' #' @param smooth use \code{geom_density()} instead of \code{geom_histogram()}. Only used if \code{type = "histogram"}.
-#' #' @param ridges use \code{geom_density_ridges()}. Only used if \code{type = "histogram"} and \code{smooth = TRUE}.
-#' #' @param bw deprecated
-#' #' @param show.legend logical. Should plot legend be displayed?
-#' #' @param legend.position legend position. "right" by default
-#' #' @param use_log10_count logical. Use log-10 transform for color scale if \code{type = "hexagonal"}
-#' #' @param theme_name ggplot2 theme name ('theme_gray' by default)
-#' #' @return a ggplot object
-#' #' @import flowWorkspace
-#' #' @import ggplot2
-#' #' @import ggridges
-#' #' @import viridis
-#' #' @import scales
-#' plot_gs <- function(df = NULL,
-#'                     gs = NULL, 
-#'                     sample,
-#'                     subset,
-#'                     xvar = NULL,
-#'                     yvar = NULL,
-#'                     axis_labels = NULL,
-#'                     color_var = NULL, 
-#'                     color_var_name = NULL,
-#'                     data_range = NULL,
-#'                     min_value = NULL,
-#'                     gate=NULL, 
-#'                     polygon_gate = NULL,
-#'                     type = "hexagonal", 
-#'                     bins = 100,
-#'                     alpha = 0.1,
-#'                     size = 0.1,
-#'                     transformation = NULL,
-#'                     default_trans = identity_trans(),
-#'                     spill = NULL,
-#'                     metadata = NULL,
-#'                     facet_vars = NULL,
-#'                     #group_var = "name",
-#'                     yridges_var = "name",
-#'                     norm_density = TRUE,
-#'                     smooth = FALSE,
-#'                     ridges = FALSE,
-#'                     bw = 0.1,
-#'                     show.legend = TRUE,
-#'                     legend.position = "right",
-#'                     use_log10_count = TRUE,
-#'                     theme_name = "theme_gray"
-#'                     ){
-#'   
-#'   
-#'   if(!is.null(color_var)){
-#'     if(color_var %in% c("", "none")){
-#'       color_var <- NULL
-#'     }
-#'   }
-#'   
-#'   if(!is.numeric(alpha)){
-#'     alpha = 0.1
-#'   }
-#'   
-#'   if(!is.numeric(size)){
-#'     size = 0.1
-#'   }
-#'   
-#'   if(!is.numeric(bins)){
-#'     bins = 100
-#'   }
-#'   
-#'   
-#'   theme_function <- function(...){
-#'     do.call(theme_name, list(...))
-#'   }
-#'   
-#'   if(!is.null(gs)){
-#'     idx <- match(sample, pData(gs)$name)
-#'   }
-#'   
-#'   if(!is.null(gate)){
-#'     if(class(gate) == "character"){
-#'       if(!is.null(gs)){
-#'         
-#'         gate_int <- lapply(gate, function(x){
-#'           if(x!="root"){
-#'             getGate(gs[[idx[1]]], x)
-#'           }else{
-#'             NULL
-#'           }})
-#'         names(gate_int) <- gate
-#'         gate <- gate_int
-#'       }else{
-#'         gate <- NULL
-#'       }
-#'       
-#'     }else if(grep("Gate", class(gate)) >0){
-#'       gate <- list(gate)
-#'     }
-#'   }
-#' 
-#'   
-#'   if(is.null(xvar)){
-#'     
-#'     if(subset[1] != "root"){
-#'       g <- getGate(gs[[idx[1]]], y= subset[1])
-#'       if(.hasSlot(g, "boundaries")){
-#'         xvar <- colnames(g@boundaries)[1]
-#'         if(dim(g@boundaries)[2]>1){
-#'           yvar <- colnames(g@boundaries)[2]
-#'         }
-#'       }
-#'     }else{
-#'       xvar <- gs@data@colnames[1]
-#'       yvar <- gs@data@colnames[2]
-#'     }
-#'     
-#'     if(!is.null(gate)){
-#'       for(i in 1:length(gate)){
-#'         if(class(gate[[i]])== "polygonGate"){
-#'           xvar <- colnames(gate[[i]]@boundaries)[1]
-#'           yvar <- try(colnames(gate[[i]]@boundaries)[2], silent = TRUE)
-#'           break
-#'         }
-#'         if(class(gate[[i]]) == "rectangleGate"){
-#'           xvar <- names(gate[[i]]@min)[1]
-#'           yvar <- try(names(gate[[i]]@min)[2], silent = TRUE)
-#'           break
-#'         }
-#'         if(class(gate[[i]])=="ellipsoidGate"){
-#'           xvar <- colnames(gate[[i]]@cov)[1]
-#'           yvar <- try(colnames(gate[[i]]@cov)[2], silent = TRUE)
-#'           break
-#'         }
-#'       }
-#'     }
-#'     
-#'   }
-#' 
-#'   
-#'   
-#'   
-#'   if(is.null(transformation)){
-#'     trans_var <- unique(c(xvar, yvar, color_var))
-#'     transformation <- lapply(trans_var, function(x){default_trans})
-#'     names(transformation) <- trans_var
-#'   }
-#'   
-#'   
-#'   
-#'   
-#'   if(is.null(df)){
-#'     
-#'     df <- get_data_gs(gs = gs,
-#'                       sample = sample,
-#'                       subset = subset,
-#'                       spill = spill)
-#'     
-#'   }else{
-#'     #df <- df[df$name %in% pData(gs)[["name"]][idx],  names(df) %in% c("name", subset, xvar, yvar)]
-#'     df <- df[df$name %in% sample & df$subset %in% subset, ]
-#'   }
-#'   
-#'   # if("cluster" %in% names(df)){
-#'   #   df[["cluster"]] <- as.factor(df[["cluster"]])
-#'   # }
-#'   
-#'   if( !setequal( xvar[xvar %in% names(df)], xvar ) | !setequal( yvar[yvar %in% names(df)], yvar ) ){
-#'     warning("Some variables could not be found in flowData")
-#'     return(NULL)
-#'   }
-#'   
-#'   if(is.null(metadata) & !is.null(gs)){
-#'     metadata <- pData(gs)
-#'   }
-#'   
-#'   if(!is.null(metadata)){
-#'     df <- add_columns_from_metadata(df,
-#'                                     metadata = metadata
-#'                                     #color_var = color_var,
-#'                                     #facet_vars = facet_vars,
-#'                                     #group_var = group_var,
-#'                                     #yridges_var = yridges_var
-#'                                     )
-#'   }
-#'     
-#'   xlim <- range(df[[xvar]])
-#'   ylim <- range(df[[yvar]])
-#'   if(!is.null(data_range)){
-#'     xlim <- data_range[[xvar]]
-#'     ylim <- data_range[[yvar]]
-#'   }
-#'   
-#'   if(!is.null(color_var)){
-#'     if(color_var == "cluster"){
-#'       df[["cluster"]] <- as.factor(df[["cluster"]])
-#'     }
-#'   }
-#'   
-#'   # if(is.null(color_var)){
-#'   #   color_var <- group_var
-#'   # }
-#'   
-#'   ##################################################################################
-#'   # plot density hexagonal
-#'   if(type == "hexagonal"){
-#'     
-#'     
-#'     p <- ggplot(df,
-#'                 aes_(x = as.name( xvar ), 
-#'                      y = as.name( yvar ) ) )+
-#'       geom_hex(bins = bins, show.legend = show.legend)
-#'     
-#'     if(use_log10_count){
-#'       p <- p + scale_fill_viridis(trans = log10_trans())
-#'     }else{
-#'       p <- p + scale_fill_viridis()
-#'     }
-#'       
-#'     
-#'     #p <- as.ggplot(p)
-#'   }
-#'   
-#'   ##################################################################################
-#'   # plot histogram
-#'   
-#'   if(type == "histogram"){
-#'     
-#'     p <- ggplot(df,
-#'                 aes_(x = as.name( xvar )))
-#'     
-#'     if(norm_density){
-#'       stat_var <- "stat(ndensity)"
-#'     }else{
-#'       stat_var <- "stat(density)"
-#'     }
-#' 
-#'     if(smooth){
-#'       if(ridges){
-#'         p <- p + geom_density_ridges(mapping = aes_string(fill = color_var, 
-#'                                                           color = color_var, 
-#'                                                           y = yridges_var, 
-#'                                                           height = stat_var), 
-#'                                      alpha = alpha, 
-#'                                      #bw = dist(transformation[[xvar]]$transform( range(df[[xvar]]) / bins ))[1], 
-#'                                      #bw = dist(range(df[[xvar]])/bins)[1], 
-#'                                      bw = 1/bins, 
-#'                                      stat = "density",
-#'                                      show.legend = show.legend)
-#'       }else{
-#'         p <- p + geom_density(mapping = aes_string(fill = color_var, color = color_var, y = stat_var), 
-#'                               alpha = alpha, 
-#'                               #bw = dist(transformation[[xvar]]$transform( range(df[[xvar]]) / bins ))[1], 
-#'                               #bw = dist(range(df[[xvar]])/bins)[1], 
-#'                               bw = 1/bins, 
-#'                               show.legend = show.legend)
-#'       }
-#'     }else{
-#'       p <- p + geom_histogram(mapping = aes_string(fill = color_var, color = color_var, y = stat_var), 
-#'                               alpha = alpha,  
-#'                               bins = bins, 
-#'                               position = "identity", 
-#'                               boundary = 0, 
-#'                               show.legend = show.legend) 
-#'     }
-#'     
-#'   }
-#'   
-#'   ##################################################################################
-#'   # plot dots
-#'   
-#'   if(type %in% c("dots", "contour")){
-#' 
-#'     p <- ggplot(df,
-#'                 aes_string(x = as.name( xvar ), 
-#'                      y = as.name( yvar )))
-#'     
-#'     if(type == "dots"){
-#' 
-#'       if(!is.null(color_var)){
-#'           if(color_var != ""){
-#'             #idx_col <- match(color_var, names(df))
-#'             p <- p + geom_point(mapping =  aes_(colour = as.name(color_var)),
-#'                                 alpha = alpha, 
-#'                                 size = size, 
-#'                                 show.legend = show.legend)
-#'             
-#'             if(color_var %in% gs@data@colnames){
-#'               if(color_var != "cluster"){
-#'                 if(is.null(color_var_name)){
-#'                   color_var_name <- color_var
-#'                 }
-#'                 p <- p + scale_colour_viridis(trans = transformation[[color_var]], 
-#'                                               name = color_var_name)
-#'                   
-#'               }
-#'               
-#'             }
-#'           }else{
-#'             p <- p + geom_point(alpha = alpha, 
-#'                                 size = size, 
-#'                                 show.legend = show.legend)
-#'           }
-#'       }else{
-#'         p <- p + geom_point(alpha = alpha, 
-#'                             size = size, 
-#'                             show.legend = show.legend)
-#'       }
-#'     }
-#' 
-#'     
-#'     if(type == "contour"){
-#'       if(!is.null(color_var)){
-#'         
-#'           p <- p + geom_density_2d(mapping =  aes_(colour = as.name(color_var)), 
-#'                                    alpha = alpha, 
-#'                                    size =size, 
-#'                                    n = bins, 
-#'                                    show.legend = show.legend) 
-#'         
-#'         
-#'       }else{
-#'         p <- p + geom_density_2d(alpha = alpha, 
-#'                                  size =size, 
-#'                                  n = bins, 
-#'                                  show.legend = show.legend,
-#'                                  colour = "black") 
-#'       }
-#'       
-#'     }
-#'     
-#'   }
-#'   
-#'   ##################################################################################
-#'   # plot gate
-#'   
-#'   if(type != "histogram" & !is.null(gate)){
-#'     
-#'     for(j in 1:length(gate)){
-#'       
-#'         gate_int <- gate[[j]]
-#'         polygon <- NULL
-#'         
-#'         if(class(gate_int) == "polygonGate" ){
-#'           if(length(unique(colnames(gate_int@boundaries)))>1){
-#'             polygon <- as.data.frame(gate_int@boundaries)
-#'           }
-#'         }else if(class(gate_int) == "rectangleGate"){
-#' 
-#'           idx_x <- match(xvar, names(gate_int@min))
-#'           idx_y <- match(yvar, names(gate_int@min))
-#'           
-#'           if(!is.na(idx_x) & !is.na(idx_y)){
-#'             if(!is.na(idx_x)){
-#'               range_x <- c(gate_int@min[idx_x], gate_int@max[idx_x])
-#'             }else{
-#'               range_x <- xlim
-#'             }
-#'             if(!is.na(idx_y)){
-#'               range_y <- c(gate_int@min[idx_y], gate_int@max[idx_y])
-#'             }else{
-#'               range_y <- ylim
-#'             }
-#'             
-#'             polygon <- data.frame(x = c(range_x[1], range_x[2], range_x[2], range_x[1]),
-#'                                   y = c(range_y[1], range_y[1], range_y[2], range_y[2]))
-#'             
-#'             names(polygon) <- c(xvar, yvar)
-#'           }
-#' 
-#'         }else if(class(gate_int) %in% c("ellipsoidGate")){
-#'           cov <- gate_int@cov
-#'           mean <- gate_int@mean
-#'           polygon <- ellipse_path(cov = cov, mean = mean)
-#'         }else{
-#'           warning("gate format not supported")
-#'           break
-#'         }
-#'       
-#'         idx_match <- match(c(xvar, yvar), names(polygon))
-#'         
-#'         #if(sum(is.na(idx_match))==0){
-#'          if(setequal(c(xvar, yvar), names(polygon))){ 
-#'           df_trans <- polygon
-#'           
-#'           df_trans[,idx_match[1]] <- transformation[[xvar]]$transform(df_trans[,idx_match[1]])
-#'           df_trans[,idx_match[2]] <- transformation[[yvar]]$transform(df_trans[,idx_match[2]])
-#'           
-#'           
-#'           center <- c(mean(df_trans[,idx_match[1]]), mean(df_trans[,idx_match[2]]))
-#'           
-#'           polygon <- rbind(polygon, polygon[1,])
-#' 
-#'           xlim <- range(c(xlim, polygon[,idx_match[1]]))
-#'           ylim <- range(c(ylim, polygon[,idx_match[2]]))
-#'           
-#'           #trueCentroids = gCentroid(sids,byid=TRUE)
-#'           
-#'           
-#'           df_label <- data.frame(x = transformation[[xvar]]$inverse(center[idx_match[1]]), 
-#'                                  y = transformation[[yvar]]$inverse(center[idx_match[2]]),
-#'                                  label = gate_int@filterId)
-#' 
-#'           p <- p +
-#'             geom_path(data = polygon, color = "red") +
-#'             geom_polygon(data=polygon,
-#'                          fill="red",
-#'                          alpha=0.05) +
-#'             geom_label(data = df_label, aes(x=x, y=y, label = label),
-#'                        fill = rgb(1,1,1,0.5), color = "red", hjust = "middle", vjust = "center")
-#'             # annotate("text", 
-#'             #          x=transformation[[xvar]]$inverse(center[idx_match[1]]), 
-#'             #          y=transformation[[yvar]]$inverse(center[idx_match[2]]),
-#'             #          label = gate_int@filterId,
-#'             #          color = "red", fill = "white")
-#'         
-#'       }
-#'     }
-#'     
-#'   }
-#'   
-#'   ##################################################################################
-#'   # plot polygon gate
-#'   if(type != "histogram" & setequal(names(polygon_gate), c("x", "y"))){
-#'     if(!is.null(polygon_gate$x)){
-#'       polygon <- data.frame(x = polygon_gate$x, y = polygon_gate$y)
-#'       polygon <- rbind(polygon, polygon[1,])
-#'       if(xvar != yvar){
-#'         names(polygon) <- c(xvar, yvar)
-#'         
-#'         # if(!is.null(data_range)){
-#'         #   xlim <- range(c(data_range[[xvar]], polygon[,1]))
-#'         #   ylim <- range(c(data_range[[yvar]], polygon[,2]))
-#'         # }
-#'         
-#'         xlim <- range(c(xlim, polygon[,1]))
-#'         ylim <- range(c(ylim, polygon[,2]))
-#'         
-#'         p <- p +
-#'           geom_path(data = polygon, color = "red") +
-#'           geom_polygon(data=polygon,
-#'                        fill="red",
-#'                        alpha=0.05) 
-#'       }
-#'       
-#'     }
-#'     
-#'     
-#'   }
-#'   
-#'   
-#'   ##################################################################################
-#'   # general plot parameters
-#'  
-#'   if(!is.null(min_value)){
-#'     xlim[1] <- min_value
-#'     ylim[1] <- min_value
-#'   }
-#'   
-#'   
-#'   if(!is.null(facet_vars)){
-#'     formula_facet <- as.formula(paste(" ~", paste(facet_vars, collapse = " + ")))
-#'     p <- p + facet_grid(formula_facet,
-#'                         labeller = label_both, 
-#'                         #scales = scale_y,
-#'                         scales = "free")
-#'   }else{
-#'     p <- p + facet_null()
-#'   }
-#'   
-#' 
-#'   # if(!is.null(facet_vars)){
-#'   #   p <- p + facet_wrap(facets = sapply(facet_vars, as.name), labeller = label_both)
-#'   # }else{
-#'   #   p <- p + facet_null()
-#'   # }
-#'   
-#'   labx <- ifelse(is.null(axis_labels), xvar, axis_labels[[xvar]])
-#'   p <- p + scale_x_continuous(name = labx, trans = transformation[[xvar]], limits = xlim) 
-#'   
-#'   if(length(subset)==1){
-#'     p <- p + ggtitle(subset)
-#'   }
-#'   
-#'   if(type != "histogram"){
-#'     laby <- ifelse(is.null(axis_labels), yvar, axis_labels[[yvar]])
-#'     p <- p + scale_y_continuous(name = laby, trans = transformation[[yvar]], limits = ylim) 
-#'   }
-#'   
-#'   p <- p + theme_function() + 
-#'     theme(plot.title = element_text(face = "bold"), legend.position = legend.position)
-#'   
-#'   p
-#'   
-#' }
-#' 
-#' 
-#' #' Plot all gates for a given sample of a gating set
-#' #' @description  Plot all gates for a given sample of a gating set
-#' #' @param df data.frame with columns \code{name} and \code{subset} 
-#' #' containing sample and subset names respectively and
-#' #' columns with plot variables. Ignored if \code{NULL}
-#' #' @param gs a gating set
-#' #' @param sample sample names
-#' #' @param selected_subsets subset names
-#' #' @param spill spillover matrix. If NULL, uncompensated data is used both for gating and plotting.
-#' #' @param ... parameters passed to \code{plot_gs()}
-#' #' @return a list of ggplot objects
-#' #' @import flowWorkspace
-#' plot_gh <- function(df = NULL, gs, sample, selected_subsets = NULL, spill = NULL, ...){
-#'   
-#'   # if(length(sample) != 1){
-#'   #   stop("length of idx must be equal to 1")
-#'   # }
-#'   
-#'   idx <- match(sample, pData(gs)$name)
-#'   
-#'   if(is.null(selected_subsets)){
-#'     subset <- getNodes(gs)
-#'   }else{
-#'     subset <- selected_subsets[selected_subsets %in% getNodes(gs)]
-#'     parent_subsets <- sapply(subset, function(x){getParent(gs[[idx[1]]], x)})
-#'     subset <- union(subset, parent_subsets)
-#'   }
-#'   
-#'   if(is.null(df)){
-#'     
-#'     df <- get_data_gs(gs = gs,
-#'                       sample = sample,
-#'                       subset = subset,
-#'                       spill = spill)
-#'     
-#'   }
-#'   
-#'   child_nodes <- getChildren(gs[[idx[1]]], "root")
-#'   child_nodes <- child_nodes[child_nodes %in% selected_subsets]
-#'   
-#'   plist <- list()
-#'   count <- 0
-#'   
-#'   #plot gates descending the gh until there are no more children gates
-#'   while(length(child_nodes)>0){
-#'     
-#'     child_nodes_int <- NULL
-#'     nodes_to_plot <- child_nodes
-#'     all_parents <- sapply(nodes_to_plot, function(x){getParent(gs[[idx[1]]], x)})
-#'     names(all_parents) <- NULL
-#'     
-#'     for(parent in unique(all_parents)){
-#'       
-#'       idx_parent <- which(all_parents == parent)
-#'       
-#'       nodes_to_plot_parent <- nodes_to_plot[idx_parent]
-#'       
-#'     #plot together gates that share the same set of parameters
-#'       
-#'       while(length(nodes_to_plot_parent) > 0){
-#'         
-#'           
-#'           par_nodes <- lapply(nodes_to_plot_parent, function(x){
-#'             
-#'             g <- getGate(gs[[idx[1]]], x)
-#'             
-#'             if(class(g) %in% c("polygonGate")){
-#'               try(colnames(g@boundaries), silent = TRUE)
-#'             }else if(class(g) %in% c("ellipsoidGate")){
-#'               try(colnames(g@cov), silent = TRUE)
-#'             }else if(class(g) %in% c("rectangleGate")){
-#'               try(names(g@min), silent = TRUE)
-#'             }
-#'             
-#'           })
-#'           
-#'           same_par <- sapply(par_nodes, function(x){setequal(x, par_nodes[[1]])})
-#'           
-#'           count <- count + 1
-#'           
-#'           plist[[count]] <- plot_gs(df = df, gs=gs, sample=sample, subset = parent, gate = nodes_to_plot_parent[same_par], ...)
-#'           
-#'           all_children <- unlist(sapply(nodes_to_plot_parent[same_par], function(x){getChildren(gs[[1]], x)}))
-#'           names(all_children) <- NULL
-#'           
-#'           child_nodes_int <- c(child_nodes_int, all_children)
-#'           nodes_to_plot_parent <- setdiff(nodes_to_plot_parent, nodes_to_plot_parent[same_par])
-#'           
-#'       }
-#'       
-#'     }
-#'     
-#'     child_nodes <- child_nodes_int[child_nodes_int %in% selected_subsets]
-#' 
-#'   }
-#'   return(plist)
-#' }
-
-
-#' Plot summary statistics from a gating set
-#' @description  Plot summary statistics from a gating set
-#' @param df data.frame with columns \code{name} and \code{subset} 
-#' containing sample and subset names respectively and
-#' columns with plot variables. Ignored if \code{NULL}
-#' @param gs a gating set
-#' @param sample sample names
-#' @param subset subset names
-#' @param yvar y variable
-#' @param type plot type : either "bar", "tile" or "heatmap"
-#' @param metadata data.frame with metadata
-#' @param axis_labels Named vector with axis labels. 
-#' Vector names should correspond to variable names
-#' @param color_var color variable
-#' @param type plot type 
-#' @param transformation  Named list of \code{trans} objects. 
-#' List names should correspond to variable names.
-#' @param y_trans default \code{trans} object to be used if \code{transformation} is NULL.
-#' @param spill spillover matrix. If NULL, uncompensated data is used both for gating and plotting.
-#' @param metadata data.frame with metadata.
-#' @param facet_vars variables used to facet plots along the x axis
-#' @param group_var group variable
-#' @param show.legend logical. Should plot legend be displayed?
-#' @param scale_values logical. Scale values for each y variable
-#' @param free_y_scale logical. Free y scale (use a different scale for each y variable)
-#' @param expand_factor numeric value expanding y scale. Used only if \code{free_y_scale = FALSE}
-#' @param max_scale maximum scale for absolute y values. Used only if \code{scale_values = TRUE}
-#' @param stat_function Name of the summary statistics function used
-#' @param strip.text.y.angle angle of y strip labels
-#' @param theme_name ggplot2 theme name ('theme_gray' by default)
-#' @param Rowv Cluster rows using hierarchical clustering?
-#' @param Colv Cluster columns using hierarchical clustering?
-#' @return a ggplot object
-#' @import flowWorkspace
-#' @import ggplot2
-#' @import viridis
 #' @import scales
-#' @import ggsignif
-#' @import data.table
-#' @import heatmaply
-#' @import dplyr
+compute_stats <- function(df = NULL,
+                          gs = NULL,
+                          transformation=NULL,
+                          stat_function = "mean",
+                          y_trans = identity_trans(),
+                          apply_inverse = TRUE,
+                          var_names = NULL
+                          ){
+  
+  inverse <- NULL
+  id.vars <- c("name", "subset")
+  yvar <- setdiff(names(df), id.vars)
+  custom_name <- NULL
+  
+  if(stat_function == "GeoMean"){
+    y_trans = log_trans()
+    apply_inverse = TRUE
+    stat_function = "mean"
+    custom_name <- "GeoMean"
+    warning("Note that negative values will be discarded when computing the geometric mean")
+  }
+  
+  if(stat_function == "median"){
+    y_trans = identity_trans()
+    apply_inverse = FALSE
+  }
+  
+  if(is.null(var_names)){
+    var_names <- yvar
+    names(var_names) <- yvar
+  }
+  
+  if(! stat_function %in% c("cell count", "percentage")){
+    if(!is.null(yvar)){
+
+      if(!is.null(y_trans)){
+        transformation <- lapply(yvar, function(x){y_trans})
+        names(transformation) <- yvar
+      }
+      
+      
+      for(i in 1:length(yvar)){
+        df[[yvar[i]]] <- transformation[[yvar[i]]]$transform(df[[yvar[i]]])
+      }
+      
+      
+      df_melt <- melt(df, id.vars = id.vars, measure.vars = yvar)
+      df_melt <- df_melt[is.finite(df_melt$value), ]
+      
+      
+      stat.fun <- function(...){do.call(stat_function, args = list(...))}
+      df_cast <- dcast(df_melt, 
+                       formula = as.formula(paste(paste(id.vars, collapse = " + "), " ~ variable", sep ="")), 
+                       fun.aggregate =  stat.fun, 
+                       na.rm = TRUE)
+      
+      if(apply_inverse){
+        for(i in 1:length(yvar)){
+          df_cast[[yvar[i]]] <- transformation[[yvar[i]]]$inverse(df_cast[[yvar[i]]])
+          if(transformation[[yvar[i]]]$name != "identity"){
+            inverse <- "inverse"
+          }
+        }
+      }
+     
+      
+      for(i in 1:length(yvar)){
+        idx <- which(names(df_cast) == yvar[i])
+        trans_name <- NULL
+        if(transformation[[yvar[i]]]$name != "identity"){
+          trans_name <- transformation[[yvar[i]]]$name
+        }
+        if(is.null(custom_name)){
+          names(df_cast)[idx] <- paste(stat_function, trans_name, inverse, var_names[[i]])
+        }else{
+          names(df_cast)[idx] <- paste(custom_name,  var_names[[i]])
+        }
+        
+      }
+    }
+    
+  }else{
+    if(!is.null(gs)){
+      variable <- switch(stat_function,
+                         "cell count" = "Count",
+                         "percentage" = "perc_parent")
+      
+      df_pop_stat <- as.data.frame(getPopStatsPlus(gs))
+      df_pop_stat <- dplyr::rename(df_pop_stat, subset = Population)
+      df_pop_stat[['perc_parent']] <- df_pop_stat$Count / df_pop_stat$ParentCount * 100
+      df_cast <- df_pop_stat[c("name", "subset", variable)]
+
+      df_cast <- df_cast[df_cast$name %in% unique(as.character(df$name)) & 
+                           df_cast$subset %in% unique(as.character(df$subset)), ]
+      
+    }
+    
+    
+    #df_cast <- df[df$name %in% sample & df$subset %in% subset, ]
+    
+    # idx <- which(as.character(df$name) %in% sample & as.character(df$subset) %in% subset)
+    # print(idx)
+    # if(length(idx)>0){
+    #   df_cast <- df[idx, ]
+    # }else{
+    #   df_cast <- NULL
+    # }
+
+    
+    # trans_name <- NULL
+    # yvar <- switch(stat_function,
+    #                "cell count" = "Count",
+    #                "percentage" = "perc_parent")
+    # id.vars <- c("name", "subset")
+    
+    
+  }
+  
+  return(df_cast)
+  
+}
+
 plot_stat <- function(df = NULL,
                       gs,
                       sample, 
@@ -2085,7 +1739,7 @@ plot_stat <- function(df = NULL,
     }
   }
   
-  
+  print(names(df_melt2))
   
   if(type == "heatmap"){
     

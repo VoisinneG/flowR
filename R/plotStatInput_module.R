@@ -289,7 +289,8 @@ plotStat <- function(input, output, session, rval) {
       }
       name_x_var <- switch(input$group_var,
                            "subset" = "gate",
-                           "name" = "samples")
+                           "name" = "samples",
+                           input$group_var)
       if(input$cluster_x & length(selected[[name_x_var]])>1){
         Colv <- TRUE
       }
@@ -298,6 +299,7 @@ plotStat <- function(input, output, session, rval) {
 
     p <- plot_stat(df = update_data_plot_stat(),
                    gs = rval$gating_set,
+                   metadata = rval$pdata,
                    sample = selected$samples,
                    subset = selected$gate, 
                    spill = rval$spill,

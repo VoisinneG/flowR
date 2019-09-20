@@ -99,6 +99,7 @@ plotGatingSet <- function(input, output, session,
                               xvar = NULL,
                               yvar = NULL,
                               color_var = "none",
+                              group_var = "none",
                               facet_var = NULL,
                               split_variable = "x_variable")
   
@@ -127,7 +128,7 @@ plotGatingSet <- function(input, output, session,
     ns <- session$ns
     x <- list()
     
-    x[["morm"]] <- checkboxInput(ns("norm"), "normalize (set max to 1)", value = rval_plot_default[["norm"]])
+    x[["norm_density"]] <- checkboxInput(ns("norm_density"), "normalize (set max to 1)", value = rval_plot_default[["norm"]])
     x[["smooth"]] <- checkboxInput(ns("smooth"), "smooth", value = rval_plot_default[["smooth"]])
     
     x[["ridges"]] <- checkboxInput(ns("ridges"), "ridges", value = rval_plot_default[["ridges"]])
@@ -178,6 +179,13 @@ plotGatingSet <- function(input, output, session,
     ns <- session$ns
     x <- list()
     
+    x[["group_var"]] <- selectizeInput(ns("group_var"), 
+                                       multiple = !simple_plot,
+                                       label = "group variable",
+                                       choices = c("none", "subset", names(rval$pdata)),
+                                       selected = rval_plot_default[["group_var"]])
+    
+    
     if(input$plot_type %in% c('histogram', "contour")){
       x[["color_var"]] <- selectizeInput(ns("color_var"), 
                                          multiple = !simple_plot,
@@ -216,7 +224,7 @@ plotGatingSet <- function(input, output, session,
     if(input$plot_type == 'histogram'){
       vars <- names(x)
     }else if (input$plot_type == 'hexagonal'){
-      vars <- setdiff(names(x), "color_var")
+      vars <- setdiff(names(x), c("color_var", "group_var"))
     }else if (input$plot_type == 'dots'){
       vars <- names(x)
     }else if (input$plot_type == 'contour'){
@@ -229,7 +237,13 @@ plotGatingSet <- function(input, output, session,
   observe({
     
     #print(names(plot_params))
-    for(var in intersect( names(plot_params), c("xvar", "yvar", "color_var", "gate", "samples", "plot_type") )){
+    for(var in intersect( names(plot_params), c("xvar", 
+                                                "yvar", 
+                                                "color_var", 
+                                                "group_var",  
+                                                "gate", 
+                                                "samples", 
+                                                "plot_type") )){
       if(!is.null(plot_params[[var]])){
           if(plot_params[[var]]!=""){
             updateSelectInput(session, var, selected = plot_params[[var]])
@@ -245,11 +259,15 @@ plotGatingSet <- function(input, output, session,
     var_name <- switch(input$"var_name",
                        "x variable" = "xvar", 
                        "y variable" = "yvar", 
-                       "color variable" = "color_var")
+                       "color variable" = "color_var",
+                       "group variable" = "group_var")
     
     choices <- rval$plot_var
     if(var_name == "color_variable"){
       choices <- c("none", "subset", names(rval$pdata), rval$plot_var)
+    }
+    if(var_name == "group_variable"){
+      choices <- c("none", "subset", names(rval$pdata))
     }
     
     var_selected <- NULL
@@ -286,7 +304,8 @@ plotGatingSet <- function(input, output, session,
       switch(input$split_variable, 
              "x variable" = "xvar",
              "y variable" = "yvar",
-             "color variable" = "color_var"
+             "color variable" = "color_var",
+             "group variable" = "group_var"
       )
     }else{
       "xvar"
@@ -318,6 +337,7 @@ plotGatingSet <- function(input, output, session,
                       "xvar",
                       "yvar",
                       "color_var",
+                      "group_var",
                       "bins",
                       "size", 
                       "alpha", 
@@ -373,6 +393,7 @@ plotGatingSet <- function(input, output, session,
     validate(
       need(rval$gating_set, "Empty gating set") %then%
         need(selected$samples, "Please select samples") %then%
+        need(all(selected$samples %in% pData(rval$gating_set)$name), "Samples not found in gating set") %then%
         need(selected$gate, "Please select subsets")
     )
     
@@ -386,6 +407,9 @@ plotGatingSet <- function(input, output, session,
   })
   
   observeEvent(c(params_update_plot_raw(),  data_plot_focus()), {
+    
+    
+      
     print("raw")
     df <- data_plot_focus()
 
@@ -395,7 +419,12 @@ plotGatingSet <- function(input, output, session,
     idx_y <- match(input$yvar, rval$parameters$name_long)
     yvar <- rval$parameters$name[idx_y]
     
+    validate(need(xvar, "x variable not available"))
+    validate(need(yvar, "y variable not available"))
+    
     color_var <- input$color_var
+    group_var <- input$group_var
+
     
     if(!is.null(input$color_var)){
       for(i in 1:length(input$color_var)){
@@ -417,11 +446,14 @@ plotGatingSet <- function(input, output, session,
     for(i in 1:length(input[[split_var()]])){
 
           plot_args[["color_var"]] <- color_var[1]
+          plot_args[["group_var"]] <- group_var[1]
           plot_args[["xvar"]] <- xvar[1]
           plot_args[["yvar"]] <- yvar[1]
 
           if(split_var() == "color_var"){
             plot_args[["color_var"]] <- color_var[i]
+          }else if(split_var() == "group_var"){
+            plot_args[["group_var"]] <- group_var[i]
           }else if(split_var() == "xvar"){
             plot_args[["xvar"]] <- xvar[i]
           }else if(split_var() == "yvar"){

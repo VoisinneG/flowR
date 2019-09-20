@@ -70,10 +70,13 @@ simpleDisplay <- function(input, output, session, plist, gate = reactiveValues()
        
        if(n > 0){
          p <- plot_list()[[1]]
-         facet_layout <- p$facet$compute_layout(p, p$facet$params)
-         if(!is.null(facet_layout)){
-           rval_plot$ncol_facet <- max(facet_layout$COL)
-           rval_plot$nrow_facet <- max(facet_layout$ROW)
+         if("facet" %in% names(p)){
+           facet_layout <- p$facet$compute_layout(p, p$facet$params)
+           print(facet_layout)
+           if(!is.null(facet_layout)){
+             rval_plot$ncol_facet <- max(facet_layout$COL)
+             rval_plot$nrow_facet <- max(facet_layout$ROW)
+           }
          }
        }
        
@@ -92,11 +95,14 @@ simpleDisplay <- function(input, output, session, plist, gate = reactiveValues()
        
      }else{
        p <- plot_list()
-       facet_layout <- p$facet$compute_layout(p, p$facet$params)
-       if(!is.null(facet_layout)){
-         rval_plot$ncol_facet <- max(facet_layout$COL)
-         rval_plot$nrow_facet <- max(facet_layout$ROW)
+       if("facet" %in% names(p)){
+         facet_layout <- p$facet$compute_layout(p, p$facet$params)
+         if(!is.null(facet_layout)){
+           rval_plot$ncol_facet <- max(facet_layout$COL)
+           rval_plot$nrow_facet <- max(facet_layout$ROW)
+         }
        }
+       
        plot_list()
      }
      

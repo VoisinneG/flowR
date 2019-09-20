@@ -240,6 +240,7 @@ compensation <- function(input, output, session, rval) {
     names(pos_values) <- rval$flow_set@colnames
     rval$pos_values[[input$fluo]] <- pos_values
     
+    print(rval$pos_values)
     
     df_neg <- get_data_gs(gs = rval$gating_set,
                           sample = input$sample_neg,
@@ -250,6 +251,8 @@ compensation <- function(input, output, session, rval) {
     neg_values <- neg_values[rval$flow_set@colnames]
     names(neg_values) <- rval$flow_set@colnames
     rval$neg_values[[input$fluo]] <- neg_values
+    
+    print(rval$pos_values)
     
   })
   
@@ -496,7 +499,7 @@ compensation <- function(input, output, session, rval) {
       
       selectInput(ns("gate_pos"),
                   "gate pos",
-                  choices = getNodes(rval$gating_set),
+                  choices = names(rval$gates_flowCore),
                   selected = "root"),
       
       selectInput(ns("sample_neg"), 
@@ -506,7 +509,7 @@ compensation <- function(input, output, session, rval) {
       
       selectInput(ns("gate_neg"),
                   "gate neg",
-                  choices = getNodes(rval$gating_set),
+                  choices = names(rval$gates_flowCore),
                   selected = "root")
     )
     

@@ -13,6 +13,7 @@ library(ggplot2)
 library(rlang)
 library(viridis)
 library(sp)
+library(pheatmap)
 
 ws <- openWorkspace(file = "./data/tetra/workspace.wsp")
 
@@ -23,24 +24,43 @@ gs <- parseWorkspace(ws,
                      sampNloc = "sampleNode")
 
 ####################################################################################
-
-sample <-  pData(gs)$name[1]
+metadata <- read.csv(file = "./data/tetra/meta.csv")
+sample <-  pData(gs)$name[1:4]
 subset <- getNodes(gs)[1:3]
 
-df <- get_plot_data(gs = gs, sample = sample, subset = subset)
+#df <- get_plot_data(gs = gs, sample = pData(gs)$name, subset = getNodes(gs), metadata = NULL)
+df <- get_plot_data(gs = gs, sample = sample, subset = subset, metadata = NULL)
+
+
 plot_var <- names(df)
 axis_labels <- paste(plot_var, "c")
 names(axis_labels) <- plot_var
 
+df_cast1 <- compute_stats(df, gs =gs, stat_function = "cell count", y_trans = logicle_trans(), var_names = axis_labels)
+df_cast2 <- compute_stats(df, stat_function = "median", y_trans = logicle_trans(), var_names = axis_labels)
+df_stats <- merge.data.frame(df_cast1, df_cast2, by = c("name", "subset"))
+df_stats <- add_columns_from_metadata(df_stats, metadata = metadata)
+
+p <- plot_gs_data(df=df_stats,
+                  plot_type = "stat_pca",
+                  plot_args = list(annotation_vars = names(metadata),
+                                   color_var = "stim",
+                                   label_var = "dose")
+)
+
+p <- format_plot(p,
+                 options = list(show.legend = FALSE, 
+                                facet_vars = c("subset")
+                                ))
+
 p <- plot_gs_data(df=df, 
              plot_type = "contour",
-             plot_args = list(xvar = "Comp-FSC-A",
+             plot_args = list(xvar = "Comp-Time",
                               yvar = "Comp-R-APC-A")
              )
 
 p <- format_plot(p,
-                 options = list(default_trans = logicle_trans(), 
-                                color_var_name = "ok", 
+                 options = list(color_var_name = "ok", 
                                 show.legend = FALSE, 
                                 facet_vars = c("name", "subset"),
                                 axis_labels = axis_labels))
@@ -63,8 +83,11 @@ plot_gs2(gs = gs,
 
 ####################################################################################
 
-p <- plot_stat(gs = gs, stat_function = "mean", yvar = c("Comp-Time", "Comp-FSC-A"), 
-          sample = pData(gs)$name[1], 
+metadata <- read.csv(file = "./data/tetra/meta.csv")
+
+p <- plot_stat(gs = gs, metadata = metadata, group_var = "stim",
+               stat_function = "mean", yvar = c("Comp-Time", "Comp-FSC-A"), 
+          sample = pData(gs)$name[1:3], 
           subset = getNodes(gs), y_trans = identity_trans())$plot
 
 p + theme(strip.background = element_rect(fill = "white"), legend.position = "none")

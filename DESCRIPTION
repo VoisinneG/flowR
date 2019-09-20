@@ -34,7 +34,8 @@ Imports:
   ClusterX,
   Rphenograph,
   heatmaply,
-  rlang
+  rlang,
+  readxl
 Remotes: 
   JinmiaoChenLab/ClusterX,
   JinmiaoChenLab/Rphenograph

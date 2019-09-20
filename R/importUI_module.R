@@ -247,7 +247,7 @@ import <- function(input, output, session) {
         names_imported <- fsApply(fs, function(x){description(x)[["FILENAME"]]})
         names_imported <- basename(names_imported)
         idx_match <- match(names_imported, rval_mod$df_files$name)
-        fs <- ncdfFlow::read.ncdfFlowSet( rval_mod$df_files$datapath[idx_match] )
+        fs <- ncdfFlow::read.ncdfFlowSet( rval_mod$df_files$datapath[idx_match], truncate_max_range = FALSE )
         phenoData(fs)$name <- rval_mod$df_files$name[idx_match]
 
         rval$flow_set_list[[input$fs_name]] <- list(flow_set = fs,
@@ -300,7 +300,9 @@ import <- function(input, output, session) {
         
       }else{
         
-        fs <- ncdfFlow::read.ncdfFlowSet( rval_mod$df_files$datapath[input$files_table_rows_selected] , emptyValue=FALSE)
+        fs <- ncdfFlow::read.ncdfFlowSet( rval_mod$df_files$datapath[input$files_table_rows_selected] , 
+                                          emptyValue=FALSE, 
+                                          truncate_max_range = FALSE )
         phenoData(fs)$name <- rval_mod$df_files$name[input$files_table_rows_selected]
         
         rval$flow_set_list[[input$fs_name]] <- list(flow_set = fs,
