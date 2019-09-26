@@ -195,9 +195,15 @@ gating <- function(input, output, session, rval) {
       xvar <- rval$parameters$name[match(res$params$xvar, rval$parameters$name_long)]
       yvar <- rval$parameters$name[match(res$params$yvar, rval$parameters$name_long)]
       
-      gate$x <- rval$transformation[[xvar]]$inverse(c(brush$xmin, brush$xmax, brush$xmax, brush$xmin))
-      gate$y <- rval$transformation[[yvar]]$inverse(c(brush$ymin, brush$ymin, brush$ymax, brush$ymax))
+      x <- try(rval$transformation[[xvar]]$inverse(c(brush$xmin, brush$xmax, brush$xmax, brush$xmin)), silent = TRUE)
+      y <- try(rval$transformation[[yvar]]$inverse(c(brush$ymin, brush$ymin, brush$ymax, brush$ymax)), silent = TRUE)
       
+      if(class(x) != "try-error"){
+        gate$x <- x
+      }
+      if(class(y) != "try-error"){
+        gate$y <- y
+      }
       #session$resetBrush("plot_brush")
       
     }
@@ -269,6 +275,7 @@ gating <- function(input, output, session, rval) {
         gate$x <- NULL
         gate$y <- NULL
         
+        plot_params$gate <- gate_name
       }
     }
     

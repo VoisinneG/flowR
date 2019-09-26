@@ -1978,7 +1978,6 @@ dim_reduction <- function(df,
 #' @param method Name of the method used. Either "ClusterX" or "Rphenograph".
 #' @return a data.frame with the additionnal column "cluster"
 #' @import ClusterX
-#' @import Rphenograph
 #' @import igraph
 #' @import scales
 get_cluster <- function(df,
@@ -2020,9 +2019,10 @@ get_cluster <- function(df,
   
   
   if(method == "Rphenograph"){
-    message(paste("Clustering ", dim(df_trans)[1], " cells using 'Rphenograph' on ",  length(yvar), " parameters", sep = ""))
-    Rphenograph_out <- Rphenograph(df_trans[ , yvar], k = k)
-    df_filter$cluster <- igraph::membership(Rphenograph_out[[2]])
+    return(list(df = df_filter, keep = idx_cells_kept))
+    #message(paste("Clustering ", dim(df_trans)[1], " cells using 'Rphenograph' on ",  length(yvar), " parameters", sep = ""))
+    #Rphenograph_out <- Rphenograph(df_trans[ , yvar], k = k)
+    #df_filter$cluster <- igraph::membership(Rphenograph_out[[2]])
   }else if(method == "ClusterX"){
     message(paste("Clustering ", dim(df_trans)[1], " cells using 'CluserX' on ",  length(yvar), " parameters", sep = ""))
     DC <- ClusterX(df_trans[ , yvar], dc = dc, alpha = alpha)
@@ -2074,14 +2074,14 @@ build_flowset_from_df <- function(df,
         
         if(!is.na(idx)){
           
-          #par <- parameters(fs[[idx]])
-          par <- origin$par[[idx]]
+          par <- parameters(origin$flow_set[[idx]])
+          #par <- origin$par[[idx]]
           
           par@data$name <- as.character(par@data$name)
           par@data$desc <- as.character(par@data$desc)
           
-          #desc <- description(fs[[idx]])
-          desc <- origin$desc[[idx]]
+          desc <- description(origin$flow_set[[idx]])
+          #desc <- origin$desc[[idx]]
           new_par <- setdiff(chanel_col, par@data$name)
           npar <- length(par@data$name)
           

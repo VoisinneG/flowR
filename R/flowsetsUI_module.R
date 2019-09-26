@@ -96,15 +96,15 @@ flowsets <- function(input, output, session, rval) {
                           spill = NULL,
                           return_comp_data = FALSE)
       
-      res[[1]]$data <- df
-                       # flow_set = rval$flow_set,
-                       # metadata = pData(rval$gating_set),
-                       # spill = rval$df_spill,
-                       # transformation = rval$transformation,
-                       # trans_parameters = rval$trans_parameters,
-                       # gates = rval$gates_flowCore[setdiff(getNodes(rval$gating_set), "root")],
-                       # parent = NULL,
-                       # name = input$flow_set)
+      res[[1]] <- list(data = df,
+                       flow_set = rval$flow_set,
+                       metadata = pData(rval$gating_set),
+                       spill = rval$df_spill,
+                       transformation = rval$transformation,
+                       trans_parameters = rval$trans_parameters,
+                       gates = rval$gates_flowCore[setdiff(getNodes(rval$gating_set), "root")],
+                       parent = NULL,
+                       name = input$flow_set)
                   
       
       
@@ -131,16 +131,16 @@ flowsets <- function(input, output, session, rval) {
                           spill = NULL,
                           return_comp_data = FALSE)
         
-        res_all[[i]]$data <- df
-                             # flow_set = rval$flow_set_list[[i]]$flow_set,
-                             # metadata = pData(gs),
-                             # spill = rval$df_spill,
-                             # parameters = rval$parameters,
-                             # transformation = rval$transformation,
-                             # trans_parameters = rval$trans_parameters,
-                             # gates = rval$gates_flowCore,
-                             # parent = rval$flow_set_list[[i]]$parent,
-                             # name = rval$flow_set_list[[i]]$name)
+        res_all[[i]] <- list(data = df,
+                             flow_set = rval$flow_set_list[[i]]$flow_set,
+                             metadata = pData(gs),
+                             spill = rval$df_spill,
+                             parameters = rval$parameters,
+                             transformation = rval$transformation,
+                             trans_parameters = rval$trans_parameters,
+                             gates = rval$gates_flowCore,
+                             parent = rval$flow_set_list[[i]]$parent,
+                             name = rval$flow_set_list[[i]]$name)
                     
       }
       

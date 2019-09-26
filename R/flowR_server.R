@@ -101,12 +101,31 @@ flowR_server <- function(session, input, output, user_module_name = NULL) {
     
     rval$flow_set_selected <- input$flow_set
     rval$flow_set <- rval$flow_set_list[[input$flow_set]]$flow_set
-    rval$gates_flowCore <- rval$flow_set_list[[input$flow_set]]$gates
-    rval$df_spill <- rval$flow_set_list[[input$flow_set]]$spill
-    rval$parameters <- rval$flow_set_list[[input$flow_set]]$parameters[[1]]
-    rval$transformation <- rval$flow_set_list[[input$flow_set]]$transformation
-    rval$trans_parameters <- rval$flow_set_list[[input$flow_set]]$trans_parameters
-    rval$pdata <- rval$flow_set_list[[input$flow_set]]$metadata
+    
+    print(input$flow_set)
+    print(rval$gates_flowCore)
+    print(rval$flow_set_list[[input$flow_set]]$gates)
+    
+    if(length(rval$gates_flowCore) == 0){
+      rval$gates_flowCore <- rval$flow_set_list[[input$flow_set]]$gates
+      print("gates updated")
+      print(rval$gates_flowCore)
+    }
+    if(is.null(rval$df_spill)){
+      rval$df_spill <- rval$flow_set_list[[input$flow_set]]$spill
+    }
+    if(is.null(rval$transformation)){
+      rval$transformation <- rval$flow_set_list[[input$flow_set]]$transformation
+    }
+    if(is.null(rval$trans_parameters)){
+      rval$trans_parameters <- rval$flow_set_list[[input$flow_set]]$trans_parameters
+    }
+    if(is.null(rval$pdata)){
+      rval$pdata <- rval$flow_set_list[[input$flow_set]]$metadata
+    }
+    #if(is.null(rval$parameters)){
+     rval$parameters <- rval$flow_set_list[[input$flow_set]]$parameters[[1]]
+    #}
     
     rval$gating_set <- GatingSet(rval$flow_set)
     rval$gating_set <- add_gates_flowCore(rval$gating_set, rval$gates_flowCore)
