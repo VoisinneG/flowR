@@ -87,6 +87,7 @@ metabolismUI <- function(id) {
 #' @import flowCore
 #' @import shiny
 #' @import DT
+#' @import data.table
 #' @export
 #' @rdname metabolismUI
 metabolism <- function(input, output, session, rval) {
