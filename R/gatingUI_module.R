@@ -424,7 +424,7 @@ gating <- function(input, output, session, rval) {
   
   pop_stats <- reactive({
     validate(need(rval$gating_set, "No gating set available"))
-    df <- getPopStatsPlus(rval$gating_set)
+    df <- getPopStatsPlus(rval$gating_set, spill = rval$df_spill)
     df <- df[df$name %in% res$params$samples, ]
     df[['% parent']] <- sprintf("%.1f", df$Count / df$ParentCount * 100)
     df <- df[, c("name", "Population", "Parent", "% parent", "Count", "ParentCount")] 

@@ -135,7 +135,6 @@ flowsets <- function(input, output, session, rval) {
                              flow_set = rval$flow_set_list[[i]]$flow_set,
                              metadata = pData(gs),
                              spill = rval$df_spill,
-                             parameters = rval$parameters,
                              transformation = rval$transformation,
                              trans_parameters = rval$trans_parameters,
                              gates = rval$gates_flowCore,

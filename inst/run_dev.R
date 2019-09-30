@@ -7,3 +7,4 @@ devtools::load_all('.') # charge le package
 #run_flowR("metabolism") # lance l'application
 #run_flowR()
 runApp("./")
+

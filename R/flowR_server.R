@@ -61,7 +61,7 @@ flowR_server <- function(session, input, output, user_module_name = NULL) {
   #                               module_server_name = "plotStat")
   
   # save module
-  callModule(saveWorkspace, "save_module", rval)
+  #callModule(saveWorkspace, "save_module", rval)
     
   
   ##########################################################################################################
@@ -124,7 +124,7 @@ flowR_server <- function(session, input, output, user_module_name = NULL) {
       rval$pdata <- rval$flow_set_list[[input$flow_set]]$metadata
     }
     #if(is.null(rval$parameters)){
-     rval$parameters <- rval$flow_set_list[[input$flow_set]]$parameters[[1]]
+     rval$parameters <- NULL #rval$flow_set_list[[input$flow_set]]$parameters
     #}
     
     rval$gating_set <- GatingSet(rval$flow_set)

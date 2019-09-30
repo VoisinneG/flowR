@@ -97,6 +97,7 @@ simpleDisplay <- function(input, output, session, plist, gate = reactiveValues()
        p <- plot_list()
        if("facet" %in% names(p)){
          facet_layout <- p$facet$compute_layout(p, p$facet$params)
+         print(facet_layout)
          if(!is.null(facet_layout)){
            rval_plot$ncol_facet <- max(facet_layout$COL)
            rval_plot$nrow_facet <- max(facet_layout$ROW)

@@ -1,3 +1,4 @@
+#' @import plotly
 #' @export
 metabolismUI <- function(id) {
   # Create a namespace function using the provided id
@@ -11,20 +12,25 @@ metabolismUI <- function(id) {
            box(width = NULL, height = NULL, title = "Parameters",
                box(collapsible = TRUE, collapsed = TRUE, width = NULL, height = NULL,
                    title = "Samples",
-                   selectInput(ns("A_sample"),
+                   selectizeInput(ns("A_sample"),
                                   label = "A sample",
+                                  multiple = TRUE,
                                   choices = NULL,
-                                  selected = NULL),
-                   selectInput(ns("B_sample"),
+                                  selected = NULL
+                                  ),
+                   selectizeInput(ns("B_sample"),
                                label = "B sample",
+                               multiple = TRUE,
                                choices = NULL,
                                selected = NULL),
-                   selectInput(ns("C_sample"),
+                   selectizeInput(ns("C_sample"),
                                label = "C sample",
+                               multiple = TRUE,
                                choices = NULL,
                                selected = NULL),
-                   selectInput(ns("Z_sample"),
+                   selectizeInput(ns("Z_sample"),
                                label = "Z sample",
+                               multiple = TRUE,
                                choices = NULL,
                                selected = NULL)
                ),
@@ -54,7 +60,7 @@ metabolismUI <- function(id) {
                
            ),
            box(width = NULL, height = NULL, title = "Create Flow-set",
-               textInput(ns("fs_name"), "Flow-set name", "sub-sample"),
+               textInput(ns("fs_name"), "Flow-set name", "metabolism"),
                actionButton(ns("create"), "Create Flow-set")
           )
     ),
@@ -62,8 +68,14 @@ metabolismUI <- function(id) {
            tabBox(title = "",
                   width = NULL, height = NULL,
                   tabPanel(title = "Plot",
-                           plotOutput(ns("plot1")),
-                           plotOutput(ns("plot2"))
+                           plotlyOutput(ns("plot1")),
+                           plotlyOutput(ns("plot2"))
+                  ),
+                  tabPanel(title = "Options",
+                           checkboxInput(ns("show_error_bar"), "show error bar (multiple samples selected)", TRUE),
+                           checkboxInput(ns("set_y_lim"), "Set y axis limits", TRUE),
+                           numericInput(ns("ymin"), "min y value", 0),
+                           numericInput(ns("ymax"), "max y value", 100)
                   ),
                   tabPanel(title = "Data",
                            br(),
@@ -88,6 +100,8 @@ metabolismUI <- function(id) {
 #' @import shiny
 #' @import DT
 #' @import data.table
+#' @import dplyr
+#' @import plotly
 #' @export
 #' @rdname metabolismUI
 metabolism <- function(input, output, session, rval) {
@@ -116,6 +130,13 @@ metabolism <- function(input, output, session, rval) {
     validate(need(input$B_sample, "Please select samples"))
     validate(need(input$C_sample, "Please select samples"))
     validate(need(input$Z_sample, "Please select samples"))
+    
+    samples_table <- table(c(input$A_sample, input$B_sample, input$C_sample, input$Z_sample))
+    
+    validate(need(sum(samples_table>1)==0, 
+                  "Please select different samples for A, B, C and Z conditions"))
+      
+    
     validate(need(input$gate, "Please select subsets"))
     
     
@@ -169,32 +190,87 @@ metabolism <- function(input, output, session, rval) {
     df_melt <- melt(df, id.vars = c("name", "subset"), measure.vars = "value")
     df_cast <- dcast(df_melt, subset ~ name + variable, mean, na.rm = TRUE)
     
-    df_cast[["score_gluc_dep"]] <- (df_cast[[paste0(input$A_sample, "_value")]] - df_cast[[paste0(input$B_sample, "_value")]]) /
-      (df_cast[[paste0(input$A_sample, "_value")]] - df_cast[[paste0(input$Z_sample, "_value")]]) * 100
+    print(df_cast)
     
-    df_cast[["score_mito_dep"]] <- (df_cast[[paste0(input$A_sample, "_value")]] - df_cast[[paste0(input$C_sample, "_value")]]) /
-      (df_cast[[paste0(input$A_sample, "_value")]] - df_cast[[paste0(input$Z_sample, "_value")]]) * 100
+    df_melt2 <- melt(df_cast)
+    df_melt2$variable <- as.character(df_melt2$variable)
+    df_melt2$variable[df_melt2$variable %in% paste0(input$A_sample, "_value")] <- "A"
+    df_melt2$variable[df_melt2$variable %in% paste0(input$B_sample, "_value")] <- "B"
+    df_melt2$variable[df_melt2$variable %in% paste0(input$C_sample, "_value")] <- "C"
+    df_melt2$variable[df_melt2$variable %in% paste0(input$Z_sample, "_value")] <- "Z"
     
-    df_cast
+    df_mean <- dcast(df_melt2, subset ~ variable, mean)
+    df_sd <- dcast(df_melt2, subset ~ variable, sd)
+    names(df_sd) <- paste0("sd", names(df_sd))
+    
+    print(df_mean)
+    print(df_sd)
+    
+    df_mean <- cbind(df_mean, df_sd[-1])
+    
+    
+    df_mean <- df_mean %>% mutate(mean_score_gluc_dep = 100*(A-B)/(A-Z), 
+                                  mean_score_mito_dep = 100*(A-C)/(A-Z),
+                                  sd_score_gluc_dep = 100*(abs(sdA*(Z-B)/(A-Z)^2) + abs(sdB/(Z-A)) + abs(sdZ*(A-B)/(A-Z)^2)),
+                                  sd_score_mito_dep = 100*(abs(sdA*(Z-C)/(A-Z)^2) + abs(sdC/(Z-A)) + abs(sdZ*(A-C)/(A-Z)^2)))
+    
+    # df_mean[["mean_score_gluc_dep"]] <- (df_mean[["A"]] - df_mean[["B"]]) /
+    #   (df_mean[["A"]] - df_mean[["Z"]]) * 100
+    # 
+    # df_mean[["mean_score_mito_dep"]] <- (df_mean[["A"]] - df_mean[["C"]]) /
+    #   (df_mean[["A"]] - df_mean[["Z"]]) * 100
+    # 
+    # df_mean[["sd_score_gluc_dep"]] <- (df_mean[["A"]] - df_mean[["B"]]) /
+    #   (df_mean[["A"]] - df_mean[["Z"]]) * 100
+  
+    
+    df_mean
   })
   
   plot_gluc_dep <- reactive({
     df <- metabo_data()
-    p <- ggplot(df, aes(x=subset, y=score_gluc_dep)) + geom_col()
+    df[["ymin"]] <-  df[["mean_score_gluc_dep"]] -  df[["sd_score_gluc_dep"]]
+    df[["ymax"]] <-  df[["mean_score_gluc_dep"]] +  df[["sd_score_gluc_dep"]]
+    
+    p <- ggplot(df, aes(x=subset, y=mean_score_gluc_dep, color = subset, fill = subset)) +
+      geom_col(alpha = 0.5)
+    
+    if(input$show_error_bar){
+      p <- p + geom_errorbar(mapping = aes(ymin = ymin, ymax = ymax), width = 0.25)
+    }
+    
+    
+    if(input$set_y_lim){
+      p <- p + coord_cartesian(ylim = c(input$ymin, input$ymax))
+    }
+    
     p
   })
   
   plot_mito_dep <- reactive({
     df <- metabo_data()
-    p <- ggplot(df, aes(x=subset, y=score_mito_dep)) + geom_col()
+    df[["ymin"]] <-  df[["mean_score_mito_dep"]] -  df[["sd_score_mito_dep"]]
+    df[["ymax"]] <-  df[["mean_score_mito_dep"]] +  df[["sd_score_mito_dep"]]
+      
+    p <- ggplot(df, aes(x=subset, y=mean_score_mito_dep, color = subset, fill = subset)) + 
+      geom_col(alpha = 0.5)
+    
+    if(input$show_error_bar){
+      p <- p + geom_errorbar(mapping = aes(ymin = ymin, ymax = ymax), width = 0.25)
+    }
+    
+    if(input$set_y_lim){
+      p <- p + coord_cartesian(ylim = c(input$ymin, input$ymax))
+    }
+    
     p
   })
   
-  output$plot1 <- renderPlot({
+  output$plot1 <- renderPlotly({
     plot_gluc_dep()
   })
   
-  output$plot2 <- renderPlot({
+  output$plot2 <- renderPlotly({
     plot_mito_dep()
   })
   
@@ -229,8 +305,8 @@ metabolism <- function(input, output, session, rval) {
     df <- raw_data()
     df_metabo <- metabo_data()
     
-    df[["score_gluc_dep"]] <- df_metabo[["score_gluc_dep"]][match(df$subset, df_metabo$subset)]
-    df[["score_mito_dep"]] <- df_metabo[["score_mito_dep"]][match(df$subset, df_metabo$subset)]
+    df[["mean_score_gluc_dep"]] <- df_metabo[["mean_score_gluc_dep"]][match(df$subset, df_metabo$subset)]
+    df[["mean_score_mito_dep"]] <- df_metabo[["mean_score_mito_dep"]][match(df$subset, df_metabo$subset)]
     
     fs <- build_flowset_from_df(df, 
                                 origin = rval$flow_set_list[[rval$flow_set_selected]])

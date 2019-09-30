@@ -68,10 +68,10 @@ flowR_ui <- function(user_module_name = NULL) {
       },
       tabItem(tabName = "Flowsets_tab",
               flowsetsUI(id = "flowsets_module")
-      ),
-      tabItem(tabName = "Save_tab",
-              saveWorkspaceUI(id = "save_module")
       )
+      #tabItem(tabName = "Save_tab",
+      #        saveWorkspaceUI(id = "save_module")
+      #)
     )
     
   )

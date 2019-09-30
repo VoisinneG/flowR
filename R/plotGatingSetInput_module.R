@@ -128,6 +128,7 @@ plotGatingSet <- function(input, output, session,
     ns <- session$ns
     x <- list()
     
+    x[["show_defining_gates"]] <- checkboxInput(ns("show_defining_gates"), "show defining gates", value = FALSE)
     x[["norm_density"]] <- checkboxInput(ns("norm_density"), "normalize (set max to 1)", value = rval_plot_default[["norm"]])
     x[["smooth"]] <- checkboxInput(ns("smooth"), "smooth", value = rval_plot_default[["smooth"]])
     
@@ -149,13 +150,13 @@ plotGatingSet <- function(input, output, session,
   output$plot_options <- renderUI({
     x <- rval_mod$plot_options
     if(input$plot_type == 'histogram'){
-      vars <- names(x)
+      vars <- setdiff(names(x), "show_defining_gates")
     }else if (input$plot_type == 'hexagonal'){
-      vars <- "bins"
+      vars <- c("show_defining_gates", "bins")
     }else if (input$plot_type == 'dots'){
-      vars <- c("alpha", "size")
+      vars <- c("show_defining_gates","alpha", "size")
     }else if (input$plot_type == 'contour'){
-      vars <- c("bins", "alpha", "size")
+      vars <- c("show_defining_gates", "bins", "alpha", "size")
     }
     
     tagList(rval_mod$plot_options[vars])
@@ -194,7 +195,7 @@ plotGatingSet <- function(input, output, session,
                                          selected = rval_plot_default[["color_var"]])
     
     }else{
-      x[["color_var"]] <- selectizeInput(ns("color_var"), 
+      x[["color_var"]] <- selectizeInput(ns("color_var"),
                                          multiple = !simple_plot,
                                          label = "color variable",
                                          choices = c("none", "subset", names(rval$pdata), rval$plot_var),
@@ -202,10 +203,16 @@ plotGatingSet <- function(input, output, session,
     }
     
     if(!simple_plot){
+      
+        extra_facet_vars <- rval$parameters$name[rval$parameters$name %in% c("cluster", "bin")]
+        if(length(extra_facet_vars) == 0){
+          extra_facet_vars <- NULL
+        }
+      
         x[["facet_var"]] <- selectizeInput(ns("facet_var"), 
                        multiple =TRUE,
                        label = "facet variables",
-                       choices = c("subset", names(rval$pdata)),
+                       choices = c("subset", names(rval$pdata), extra_facet_vars),
                        selected = rval_plot_default[["facet_var"]]
         )
         x[["split_variable"]] <- selectInput(ns("split_variable"),
@@ -537,11 +544,28 @@ plotGatingSet <- function(input, output, session,
   })
   
   plot_gate <- reactive({
+    
+      gate <- NULL
+      if(!is.null(input$show_defining_gates)){
+        if(input$show_defining_gates){
+          gate <- selected$gate
+        }
+      }
+      
+    
       plist <- lapply(rval_mod$plot_list,
                       function(p){
                         if(!is.null(polygon_gate$x)){
                           p <- add_polygon_layer(p, polygon = polygon_gate)
                         }
+                        
+                        if(!is.null(gate)){
+                          for(gate_name in setdiff(gate, "root")){
+                            g <- rval$gates_flowCore[[gate_name]]$gate
+                            p <- add_gate(p, g)
+                          }
+                        }
+                        
                         p
                       })
       plist

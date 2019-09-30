@@ -410,12 +410,27 @@ transform_gates <- function(gates,
 
 ####################################################################################################
 # Getting data
-
-getPopStatsPlus <- function(gs){
-  df <- getPopStats(gs)
-  df$name <- sapply(df$name, function(x){strsplit(x, split = "_[0-9]+$")[[1]][1]})
-  fs <- getData(gs)
+#' @import flowCore
+getPopStatsPlus <- function(gs, spill = NULL, filter = NULL){
   
+  fs <- getData(gs)
+  gates <- get_gates_from_gs(gs) 
+  if(!is.null(filter)){
+    fs <- Subset(fs, filter)
+  }
+  
+  if(!is.null(spill)){
+    spill <- spill[row.names(spill) %in% colnames(gs), colnames(spill) %in% colnames(gs)]
+    spill_list <- lapply(1:length(fs), function(x){return(spill)})
+    names(spill_list) <- sampleNames(fs)
+    fs <- compensate(fs, spill_list)
+  }
+  
+  gs_comp <- GatingSet(fs)
+  gs_comp <- add_gates_flowCore(gs_comp, gates)
+  df <- getPopStats(gs_comp)
+  
+  df$name <- sapply(df$name, function(x){strsplit(x, split = "_[0-9]+$")[[1]][1]})
   df_root <- data.frame(name = pData(fs)$name)
   df_root$name <- pData(fs)$name
   df_root$Population <- "root"
@@ -644,6 +659,7 @@ format_plot <- function(p,
   ylim <- NULL
   color_var <- p$plot_env$color_var
   
+  facet_scales <- "fixed"
   # if(!is_null(color_var)){
   #   if(color_var == "none"){
   #     color_var <- NULL
@@ -714,7 +730,7 @@ format_plot <- function(p,
            p <- p + facet_grid(formula_facet,
                                labeller = label_both, 
                                #scales = scale_y,
-                               scales = "free")
+                               scales = facet_scales)
     }
     
   ############################################################################
@@ -1109,7 +1125,7 @@ plot_stat_pca <-function(args = list()){
   return(p)
 }
 
-
+#' @import ggrepel
 add_polygon_layer <-function(p,
                              polygon = NULL,
                              label = NULL){
@@ -1127,10 +1143,16 @@ add_polygon_layer <-function(p,
                      alpha=0.05)
       if(!is.null(label)){
         df_label <- data.frame(x=mean(polygon$x), y= mean(polygon$y))
-        p <- p +  geom_label(data = df_label, 
+        p <- p +  geom_label_repel(data = df_label, force = 4,
                              mapping = aes(x=x, y=y), 
                              label = label, 
-                             fill = rgb(1,1,1,0.85), color = "red", hjust = "middle", vjust = "center")
+                             fill = rgb(1,1,1,0.85), 
+                             color = "red", 
+                             nudge_y = 0, 
+                             nudge_x =0, 
+                             point.padding = 0,
+                             max.iter = 30000)
+                             #hjust = "middle", vjust = "center")
       }
 
     }
@@ -1412,6 +1434,7 @@ get_gate_coordinates <- function(gate){
 #' @import scales
 compute_stats <- function(df = NULL,
                           gs = NULL,
+                          spill = NULL,
                           transformation=NULL,
                           stat_function = "mean",
                           y_trans = identity_trans(),
@@ -1497,7 +1520,7 @@ compute_stats <- function(df = NULL,
                          "cell count" = "Count",
                          "percentage" = "perc_parent")
       
-      df_pop_stat <- as.data.frame(getPopStatsPlus(gs))
+      df_pop_stat <- as.data.frame(getPopStatsPlus(gs, spill = spill))
       df_pop_stat <- dplyr::rename(df_pop_stat, subset = Population)
       df_pop_stat[['perc_parent']] <- df_pop_stat$Count / df_pop_stat$ParentCount * 100
       df_cast <- df_pop_stat[c("name", "subset", variable)]
@@ -1575,6 +1598,14 @@ plot_stat <- function(df = NULL,
     max_scale <- 0
   }
   
+  extra_facet <- NULL
+  if(!is.null(facet_vars)){
+     extra_facet <- facet_vars[facet_vars %in% "cluster"]
+     if(length(extra_facet) == 0){
+       extra_facet <- NULL
+     }
+  }
+  
   #if(log10_trans){
   #  trans <- log10_trans()
   #}else{
@@ -1610,7 +1641,7 @@ plot_stat <- function(df = NULL,
         df[[yvar[i]]] <- transformation[[yvar[i]]]$transform(df[[yvar[i]]])
       }
   
-      id.vars <- c("name", "subset")
+      id.vars <- unique(c("name", "subset", extra_facet))
       
       df_melt <- melt(df, id.vars = id.vars, measure.vars = yvar)
       df_melt <- df_melt[is.finite(df_melt$value), ]
@@ -1633,7 +1664,33 @@ plot_stat <- function(df = NULL,
     
   }else{
     
-    df <- getPopStatsPlus(gs)
+    if(!is.null(extra_facet)){
+
+        id.vars <- unique(c("name", "subset", extra_facet))
+        
+        df_data <- get_data_gs(gs = gs,
+                               sample = sample,
+                               subset = subset,
+                               spill = spill)
+        
+        var_levels <- unique(df_data[[extra_facet]])
+        
+        df <- NULL
+        for(level in var_levels){
+          df_gate <- data.frame(x  = c(level-0.5, level+0.5))
+          names(df_gate) <- extra_facet
+          filter <- rectangleGate(filterId = "filter", df_gate )
+          print(filter)
+          df_filter <- getPopStatsPlus(gs, spill = spill, filter = filter)
+          df_filter[[extra_facet]] <- level
+          df <- rbind(df, df_filter)
+        }
+      
+    }else{
+      id.vars <- c("name", "subset")
+      df <- getPopStatsPlus(gs, spill = spill, filter = NULL)
+    }
+    
     df <- dplyr::rename(df, subset = Population)
     df[['perc_parent']] <- df$Count / df$ParentCount * 100
 
@@ -1659,7 +1716,7 @@ plot_stat <- function(df = NULL,
     yvar <- switch(stat_function,
                    "cell count" = "Count",
                    "percentage" = "perc_parent")
-    id.vars <- c("name", "subset")
+    #
     
   }
   
@@ -1749,8 +1806,8 @@ plot_stat <- function(df = NULL,
     # print(df)
     # print(class(df_melt2))
     
-    df_cast2 <- data.table::dcast(df[, c("variable", group_var, "value")],
-                      formula = as.formula(paste("variable ~", paste(group_var, collapse = " + "))),
+    df_cast2 <- data.table::dcast(df[, c("variable", c(group_var, extra_facet), "value")],
+                      formula = as.formula(paste("variable ~", paste(c(group_var, extra_facet), collapse = " + "))),
                       fun.aggregate = mean )
     
     # df_cast2 <- data.table::dcast(df_melt2[, c("variable", "subset", "value")],
@@ -1978,6 +2035,7 @@ dim_reduction <- function(df,
 #' @param method Name of the method used. Either "ClusterX" or "Rphenograph".
 #' @return a data.frame with the additionnal column "cluster"
 #' @import ClusterX
+#' @import Rphenograph
 #' @import igraph
 #' @import scales
 get_cluster <- function(df,
@@ -2019,10 +2077,10 @@ get_cluster <- function(df,
   
   
   if(method == "Rphenograph"){
-    return(list(df = df_filter, keep = idx_cells_kept))
-    #message(paste("Clustering ", dim(df_trans)[1], " cells using 'Rphenograph' on ",  length(yvar), " parameters", sep = ""))
-    #Rphenograph_out <- Rphenograph(df_trans[ , yvar], k = k)
-    #df_filter$cluster <- igraph::membership(Rphenograph_out[[2]])
+    #return(list(df = df_filter, keep = idx_cells_kept))
+    message(paste("Clustering ", dim(df_trans)[1], " cells using 'Rphenograph' on ",  length(yvar), " parameters", sep = ""))
+    Rphenograph_out <- Rphenograph(df_trans[ , yvar], k = k)
+    df_filter$cluster <- igraph::membership(Rphenograph_out[[2]])
   }else if(method == "ClusterX"){
     message(paste("Clustering ", dim(df_trans)[1], " cells using 'CluserX' on ",  length(yvar), " parameters", sep = ""))
     DC <- ClusterX(df_trans[ , yvar], dc = dc, alpha = alpha)

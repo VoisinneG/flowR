@@ -29,6 +29,12 @@ cat(".libPaths('C:/Temp/R_library')\n", file = paste0(getwd(), "/.Rprofile"))
 Now close and restart Rstudio.
 By default, all your packages will be saved in `C:/Temp/R_library`.
 
+### Change working directory
+
+```
+setwd("C:/Temp/R_library")
+```
+
 ### Install flowR
 
 ```

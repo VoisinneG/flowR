@@ -165,6 +165,11 @@ plotStat <- function(input, output, session, rval) {
     color_var_default <- "subset"
     group_var_default <- "subset"
    
+    extra_facet_vars <- rval$parameters$name[rval$parameters$name %in% c("cluster", "bin")]
+    if(length(extra_facet_vars) == 0){
+      extra_facet_vars <- NULL
+    }
+    
     updateSelectInput(session, "color_var", 
                       choices = c("subset", names(rval$pdata)), 
                       selected = color_var_default)
@@ -174,7 +179,7 @@ plotStat <- function(input, output, session, rval) {
                       selected = color_var_default)
     
     updateSelectInput(session, "facet_var",
-                        choices = c("subset", names(rval$pdata)), 
+                        choices = c("subset", names(rval$pdata), extra_facet_vars), 
                         selected = facet_var_default )
     
   })

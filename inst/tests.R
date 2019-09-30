@@ -22,6 +22,13 @@ gs <- parseWorkspace(ws,
                      execute = TRUE,
                      isNcdf = TRUE,
                      sampNloc = "sampleNode")
+gates <- get_gates_from_gs(gs)
+fs <- getData(gs)
+
+filter <- rectangleGate(filterId="Comp-FSC-A-gate", "Comp-FSC-A"=c(100, 1000) )
+fs_filter <- Subset(fs, filter)
+dim(fs[[1]]@exprs)
+dim(fs_filter[[1]]@exprs)
 
 ####################################################################################
 metadata <- read.csv(file = "./data/tetra/meta.csv")
