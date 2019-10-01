@@ -35,7 +35,9 @@ Imports:
   rlang,
   readxl,
   data.table,
-  forcats
+  forcats,
+  ggrepel,
+  FlowSOM
 LazyData: TRUE
 License: file LICENSE
 RoxygenNote: 6.1.1

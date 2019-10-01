@@ -23,7 +23,10 @@ clusterUI <- function(id) {
                                          label = "Transform variables:",
                                          choices = c("log10", "asinh", "identity", "default"),
                                          selected = "default"),
-                             selectInput(ns("clustering_method"), label = "method", choices = c("ClusterX", "Rphenograph"), selected = "ClusterX"),
+                             selectInput(ns("clustering_method"), 
+                                         label = "method", 
+                                         choices = c("FlowSOM", "ClusterX", "Rphenograph"), 
+                                         selected = "FlowSOM"),
                              uiOutput(ns("method_ui"))
                     ),
                     tabPanel("Cluster",
@@ -36,7 +39,11 @@ clusterUI <- function(id) {
                              verbatimTextOutput(ns("summary_cluster"))
                     )
              )
-      )
+      ),
+      column(width = 6,
+             #plotOutput(ns("plot_pies"))
+             uiOutput(ns("cluster_plot_ui"))
+             )
     )
   
 }
@@ -51,6 +58,7 @@ clusterUI <- function(id) {
 #' @import flowCore
 #' @import shiny
 #' @import DT
+#' @import FlowSOM
 #' @export
 #' @rdname clusterUI
 cluster <- function(input, output, session, rval) {
@@ -60,6 +68,7 @@ cluster <- function(input, output, session, rval) {
   selected <- callModule(selection, "selection_module", rval)
   
   rval_mod <- reactiveValues( flow_set_cluster = NULL )
+  res_display <- callModule(simpleDisplay, "simple_display_module", plot_fSOM)
   
   ##########################################################################################################
   # Observe functions for t-SNE
@@ -72,8 +81,33 @@ cluster <- function(input, output, session, rval) {
       x[[2]] <- numericInput(ns("cluster_alpha"), "alpha", 0.0001)
     }else if(input$clustering_method == 'Rphenograph'){
       x[[1]] <- numericInput(ns("k_param"), "k", 100)
+    }else if(input$clustering_method == 'FlowSOM'){
+      x[[1]] <- numericInput(ns("k_meta"), "k", 7)
     }
     tagList(x)
+  })
+  
+  output$cluster_plot_ui <- renderUI({
+    
+    ns <- session$ns
+
+    if(input$clustering_method == 'FlowSOM'){
+      tabBox(title = "FlowSOM",
+             width = NULL, height = NULL,
+             tabPanel("Plot",
+                      simpleDisplayUI(ns("simple_display_module"), save = FALSE)
+                      #plotOutput(ns("plot_fSOM"))
+             ),
+             tabPanel("Options",
+                      selectInput(ns("fSOM_plot_type"), "Plot type", choices = c("stars", "pies", "marker"), selected = "pies"),
+                      selectInput(ns("cellTypes"), "Pie variable", choices = c("name", "subset"), selected = "subset"),
+                      checkboxInput(ns("scale_node_size"), "Scale node size", TRUE),
+                      checkboxInput(ns("show_background"), "Show background", TRUE),
+                      selectInput(ns("color_var"), "Color variable", choices = rval$plot_var, selected = rval$plot_var[1])
+             )
+      )
+    }
+
   })
   
   ##########################################################################################################
@@ -183,11 +217,21 @@ cluster <- function(input, output, session, rval) {
                        method = input$clustering_method,
                        dc = ifelse(is.null(input$cluster_dc), 5, input$cluster_dc), 
                        alpha = ifelse(is.null(input$cluster_alpha), 0.0001, input$cluster_alpha),
-                       k = ifelse(is.null(input$k_param), 100, input$k_param)
+                       k = ifelse(is.null(input$k_param), 100, input$k_param),
+                       k_meta = ifelse(is.null(input$k_meta), 7, input$k_meta)
     )
     
+    if("fSOM" %in% names(res)){
+      rval_mod$fSOM <- res$fSOM
+    }
+    
     rval_mod$df_cluster <- res$df
-    df <- cbind(df_raw[res$keep, ], rval_mod$df_cluster[c("cluster")])
+    if("cluster" %in% names(rval_mod$df_cluster)){
+      df <- cbind(df_raw[res$keep, ], rval_mod$df_cluster[c("cluster")])
+    }else{
+      df <- df_raw[res$keep, ]
+    }
+    
     
     fs <- build_flowset_from_df(df = df, origin = rval$flow_set_list[[rval$flow_set_selected]])
     rval_mod$flow_set_cluster <- fs
@@ -204,19 +248,21 @@ cluster <- function(input, output, session, rval) {
     
     uclust <- unique(rval_mod$df_cluster$cluster)
     uclust <- uclust[ order(as.numeric(uclust), decreasing = FALSE) ]
-    
-    for(i in 1:length(uclust)){
-      filterID <- paste("cluster", uclust[i], sep = "")
-      polygon <- matrix(c(as.numeric(uclust[i])-0.25, 
-                          as.numeric(uclust[i])+0.25, 
-                          range(rval_mod$df_cluster[[rval_mod$flow_set_cluster@colnames[1]]])
-      ), 
-      ncol = 2)
-      row.names(polygon) <- c("min", "max")
-      colnames(polygon) <- c("cluster", rval_mod$flow_set_cluster@colnames[1])
-      g <- rectangleGate(.gate = polygon, filterId=filterID)
-      rval$gates_flowCore[[paste("/",filterID, sep="")]] <- list(gate = g, parent = "root")
+    if(length(uclust) > 0){
+      for(i in 1:length(uclust)){
+        filterID <- paste("cluster", uclust[i], sep = "")
+        polygon <- matrix(c(as.numeric(uclust[i])-0.25, 
+                            as.numeric(uclust[i])+0.25, 
+                            range(rval_mod$df_cluster[[rval_mod$flow_set_cluster@colnames[1]]])
+        ), 
+        ncol = 2)
+        row.names(polygon) <- c("min", "max")
+        colnames(polygon) <- c("cluster", rval_mod$flow_set_cluster@colnames[1])
+        g <- rectangleGate(.gate = polygon, filterId=filterID)
+        rval$gates_flowCore[[paste("/",filterID, sep="")]] <- list(gate = g, parent = "root")
+      }
     }
+    
     
     rval$flow_set_list[[input$fs_name]] <- list(flow_set = fs, 
                                                 par = lapply(1:length(fs), function(x){parameters(fs[[x]])}),
@@ -230,6 +276,47 @@ cluster <- function(input, output, session, rval) {
     
     rval$flow_set_selected <- input$fs_name
 
+    
+  })
+  
+  
+  plot_fSOM <- reactive({
+    validate(need(input$clustering_method == "FlowSOM", "No plot to display"))
+    validate(need("fSOM" %in% names(rval_mod), "No plot to display"))
+    
+    fSOM <- rval_mod$fSOM
+    metaClustering <- metaClustering_consensus(fSOM$map$codes, k=input$k_meta)
+    
+    if(!input$scale_node_size){
+      fSOM <- UpdateNodeSize(fSOM, reset=TRUE)
+    }
+    
+    backgroundValues <- NULL
+    if(input$show_background){
+      backgroundValues <- as.factor(metaClustering)
+    }
+    
+    
+    plot.new()
+    
+    if(input$fSOM_plot_type == "pies"){
+      FlowSOM::PlotPies(fSOM,
+                        cellTypes=rval_mod$df_cluster[[input$cellTypes]], 
+                        backgroundValues = backgroundValues
+      )
+    }else if(input$fSOM_plot_type == "stars"){
+      FlowSOM::PlotStars(fSOM, 
+                         backgroundValues = backgroundValues)
+    }else if(input$fSOM_plot_type == "marker"){
+      color_var <- rval$parameters$name[match(input$color_var, rval$parameters$name_long)]
+      print(color_var)
+      FlowSOM::PlotMarker(fSOM, marker =  color_var)
+    }
+  })
+  
+  output$plot_fSOM <- renderPlot({
+
+    plot_fSOM()
     
   })
   

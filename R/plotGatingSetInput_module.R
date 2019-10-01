@@ -166,7 +166,6 @@ plotGatingSet <- function(input, output, session,
   observe({
     
     validate(need(rval$plot_var, "No plotting variables"))
-    
     updateSelectInput(session, "xvar", choices = rval$plot_var, selected = rval$plot_var[1])
     updateSelectInput(session, "yvar", choices = rval$plot_var, selected = rval$plot_var[2]) 
     

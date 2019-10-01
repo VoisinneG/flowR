@@ -121,6 +121,8 @@ df <- df[ sample(1:dim(df)[1], 1000), ]
 
 df_cluster <- get_cluster(df, yvar = names(df)[4:7], y_trans = logicle_trans() )
 
+
+
 data <- as.matrix(df[, -which(names(df) %in% c("name", "subset", "cluster"))])
 
 fSOM <- list(data = data, 
@@ -133,16 +135,25 @@ fSOM <- list(data = data,
              prettyColnames = colnames(data))
 
 fSOM <- BuildSOM(fSOM, colsToUse = c(4:7))
-fSOM <- BuildMST(fSOM,tSNE=TRUE)
-metaClustering <- metaClustering_consensus(fSOM$map$codes,k=7)
+fSOM <- BuildMST(fSOM, tSNE=TRUE)
+metaClustering <- metaClustering_consensus(fSOM$map$codes, k=7)
+metaClustering_perCell <- metaClustering[fSOM$map$mapping[,1]]
 
-df$metaClustering <- metaClustering
+df$cluster <- metaClustering_perCell
   
 fSOM <- UpdateNodeSize(fSOM, reset=TRUE)
 
-PlotPies(fSOM, cellTypes=df$subset, backgroundValues = as.factor(metaClustering))
-
+PlotPies(fSOM, cellTypes=as.factor(df$name), backgroundValues = as.factor(metaClustering))
 PlotStars(fSOM, backgroundValues = as.factor(metaClustering))
+PlotMarker(fSOM,"Comp-FSC-A")
+
+
+df <- get_data_gs(gs = gs, sample = pData(gs)$name[8], subset = c("/live/CD8+/p0", "/live/CD8+/p1") )
+res <- get_cluster(df, yvar = names(df)[4:7], y_trans = logicle_trans(), method = "FlowSOM", k=8 )
+PlotPies(res$fSOM, cellTypes=res$df$subset)
+PlotPies(res$fSOM, cellTypes=res$df$subset, backgroundValues = as.factor(res$df$cluster))
+PlotStars(res$fSOM, backgroundValues = as.factor(res$df$cluster))
+p <- as.ggplot( expression(PlotMarker(res$fSOM, marker = "Comp-Time") ))
 
 #save parameters and description data
 

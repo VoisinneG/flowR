@@ -2034,6 +2034,7 @@ dim_reduction <- function(df,
 #' @param alpha ClusterX alpha parameter
 #' @param method Name of the method used. Either "ClusterX" or "Rphenograph".
 #' @return a data.frame with the additionnal column "cluster"
+#' @import FlowSOM
 #' @import igraph
 #' @import scales
 get_cluster <- function(df,
@@ -2043,7 +2044,8 @@ get_cluster <- function(df,
                         dc=3, 
                         alpha = 0.001,
                         k = 100,
-                        method = "ClusterX"){
+                        k_meta = 8,
+                        method = "FlowSOM"){
          
   idx_cells_kept <- 1:dim(df)[1]
   
@@ -2073,8 +2075,25 @@ get_cluster <- function(df,
     idx_cells_kept <- idx_cells_kept[-idx_filter]
   }
   
-  
-  if(method == "Rphenograph"){
+  if(method == "FlowSOM"){
+    
+    data <- as.matrix(df_filter[, -which(names(df_filter) %in% c("name", "subset", "cluster"))])
+    fSOM <- list(data = data, 
+                 compensate = FALSE,
+                 spillover = NULL,
+                 transform = FALSE,
+                 scale = TRUE,
+                 prettyColnames = colnames(data))
+    
+    fSOM <- BuildSOM(fSOM, colsToUse = which(colnames(data) %in% yvar))
+    fSOM <- BuildMST(fSOM, tSNE=TRUE)
+    metaClustering <- metaClustering_consensus(fSOM$map$codes, k=k_meta) 
+    metaClustering_perCell <- metaClustering[fSOM$map$mapping[,1]]
+    df_filter$cluster <- metaClustering_perCell
+    
+    return(list(df = df_filter, keep = idx_cells_kept, fSOM = fSOM))
+    
+  }else if(method == "Rphenograph"){
     warning("Rphenograph is not supported")
     df_filter$cluster <- 1 
     return(list(df = df_filter, keep = idx_cells_kept))
@@ -2189,3 +2208,4 @@ build_flowset_from_df <- function(df,
   return(fs_new)
   
 }
+

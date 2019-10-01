@@ -4,7 +4,7 @@
 #' @importFrom shinydashboard box tabBox
 #' @import shiny
 #' @import DT
-simpleDisplayUI <- function(id, nrow = 1, size = 400){
+simpleDisplayUI <- function(id, nrow = 1, size = 400, save = TRUE){
   # Create a namespace function using the provided id
   ns <- NS(id)
 
@@ -24,11 +24,16 @@ simpleDisplayUI <- function(id, nrow = 1, size = 400){
             numericInput(ns("col_size"), label = "plot width (px)", value = size)
             
         ),
-        box(title = "Save", width = 6, collapsible = TRUE, collapsed = TRUE,
-            #numericInput(ns("width_plot"), label = "width", value = 5),
-            #numericInput(ns("height_plot"), label = "height", value = 5),
-            downloadButton(ns("download_plot"), "Save plot")
-        )
+        if(save){
+          tagList(
+            box(title = "Save", width = 6, collapsible = TRUE, collapsed = TRUE,
+                #numericInput(ns("width_plot"), label = "width", value = 5),
+                #numericInput(ns("height_plot"), label = "height", value = 5),
+                downloadButton(ns("download_plot"), "Save plot")
+            )
+          )
+        }
+        
       )
     )
   )
@@ -65,34 +70,36 @@ simpleDisplay <- function(input, output, session, plist, gate = reactiveValues()
     
     
      if(class(plot_list()) == "list"){
-       
-       n <- length(plot_list())
-       
-       if(n > 0){
-         p <- plot_list()[[1]]
-         if("facet" %in% names(p)){
-           facet_layout <- p$facet$compute_layout(p, p$facet$params)
-           print(facet_layout)
-           if(!is.null(facet_layout)){
-             rval_plot$ncol_facet <- max(facet_layout$COL)
-             rval_plot$nrow_facet <- max(facet_layout$ROW)
+       if("ggplot" %in% class(plot_list()[[1]]) ){
+         n <- length(plot_list())
+         
+         if(n > 0){
+           p <- plot_list()[[1]]
+           if("facet" %in% names(p)){
+             facet_layout <- p$facet$compute_layout(p, p$facet$params)
+             print(facet_layout)
+             if(!is.null(facet_layout)){
+               rval_plot$ncol_facet <- max(facet_layout$COL)
+               rval_plot$nrow_facet <- max(facet_layout$ROW)
+             }
            }
          }
-       }
-       
-       
-       
-       if(n > 1){
-         rval_plot$nrow <- min(n, input$nrow_split)
-         rval_plot$ncol <- ceiling(n/rval_plot$nrow)
-         g <- gridExtra::marrangeGrob(plot_list(), nrow = rval_plot$nrow, ncol = rval_plot$ncol, top = "")
-         g
-       }else if(n == 1){
-         plot_list()[[1]]
+         
+         
+         
+         if(n > 1){
+           rval_plot$nrow <- min(n, input$nrow_split)
+           rval_plot$ncol <- ceiling(n/rval_plot$nrow)
+           g <- gridExtra::marrangeGrob(plot_list(), nrow = rval_plot$nrow, ncol = rval_plot$ncol, top = "")
+           g
+         }else if(n == 1){
+           plot_list()[[1]]
+         }else{
+           plot_list()
+         }
        }else{
          plot_list()
        }
-       
      }else{
        p <- plot_list()
        if("facet" %in% names(p)){
@@ -159,7 +166,9 @@ simpleDisplay <- function(input, output, session, plist, gate = reactiveValues()
       pdf(file, 
           width = rval_plot$ncol * rval_plot$ncol_facet * input$col_size * 5/400, 
           height = rval_plot$nrow * rval_plot$nrow_facet * input$row_size * 5/400)
+      
       print(plot_display())
+
       dev.off()
     }
   )
