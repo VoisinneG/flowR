@@ -142,11 +142,11 @@ flowR_ui <- function(user_module_name = NULL) {
                          startExpanded = FALSE,
                          icon = icon("check-circle")
                 ),
-                menuItem("Save",
-                         tabName = "Save_tab", 
-                         startExpanded = FALSE,
-                         icon = icon("check-circle")
-                ),
+                # menuItem("Save",
+                #          tabName = "Save_tab", 
+                #          startExpanded = FALSE,
+                #          icon = icon("check-circle")
+                #),
                 menuItem("General controls",
                          tabName = "General_tab",
                          startExpanded = FALSE,

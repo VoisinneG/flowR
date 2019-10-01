@@ -2034,7 +2034,6 @@ dim_reduction <- function(df,
 #' @param alpha ClusterX alpha parameter
 #' @param method Name of the method used. Either "ClusterX" or "Rphenograph".
 #' @return a data.frame with the additionnal column "cluster"
-#' @import ClusterX
 #' @import Rphenograph
 #' @import igraph
 #' @import scales
@@ -2077,14 +2076,18 @@ get_cluster <- function(df,
   
   
   if(method == "Rphenograph"){
+    #df_filter$cluster <- 1 
     #return(list(df = df_filter, keep = idx_cells_kept))
     message(paste("Clustering ", dim(df_trans)[1], " cells using 'Rphenograph' on ",  length(yvar), " parameters", sep = ""))
     Rphenograph_out <- Rphenograph(df_trans[ , yvar], k = k)
     df_filter$cluster <- igraph::membership(Rphenograph_out[[2]])
   }else if(method == "ClusterX"){
-    message(paste("Clustering ", dim(df_trans)[1], " cells using 'CluserX' on ",  length(yvar), " parameters", sep = ""))
-    DC <- ClusterX(df_trans[ , yvar], dc = dc, alpha = alpha)
-    df_filter$cluster <- DC$cluster
+    warning("ClusterX is not supported")
+    df_filter$cluster <- 1 
+    return(list(df = df_filter, keep = idx_cells_kept))
+    #message(paste("Clustering ", dim(df_trans)[1], " cells using 'CluserX' on ",  length(yvar), " parameters", sep = ""))
+    #DC <- ClusterX(df_trans[ , yvar], dc = dc, alpha = alpha)
+    #df_filter$cluster <- DC$cluster
   }
  
   return(list(df = df_filter, keep = idx_cells_kept))
