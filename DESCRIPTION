@@ -36,8 +36,6 @@ Imports:
   readxl,
   data.table,
   forcats
-Remotes: 
-biocViews:
 LazyData: TRUE
 License: file LICENSE
 RoxygenNote: 6.1.1
