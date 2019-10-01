@@ -37,7 +37,6 @@ Imports:
   data.table,
   forcats
 Remotes: 
-  JinmiaoChenLab/Rphenograph
 biocViews:
 LazyData: TRUE
 License: file LICENSE
