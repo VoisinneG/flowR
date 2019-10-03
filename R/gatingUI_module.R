@@ -287,7 +287,14 @@ gating <- function(input, output, session, rval) {
       
       idx_gh <- which( getNodes(rval$gating_set) == input$gate_to_delete )
       target_gate <- getNodes(rval$gating_set)[idx_gh]
-      child_gates <- getChildren(rval$gating_set[[1]], target_gate)
+      
+      child_gates <- get_all_descendants(rval$gates_flowCore, target_gate)
+      #child_gates <- getChildren(rval$gating_set[[1]], target_gate)
+      if(length(child_gates)==0){
+        child_gates <- NULL
+      }
+      print(child_gates)
+      
       idx_delete <- which( names(rval$gates_flowCore) %in% c(target_gate, child_gates) )
       rval$gates_flowCore <- rval$gates_flowCore[-idx_delete]
       
@@ -295,7 +302,6 @@ gating <- function(input, output, session, rval) {
       recompute(rval$gating_set)
       
       plot_params$gate <- "root"
-      
       
     }
     
@@ -307,21 +313,33 @@ gating <- function(input, output, session, rval) {
   })
   
   observeEvent(input$rename_gate, {
+    
     if(input$gate_to_rename != "root"){
       
       idx_gh <- which( getNodes(rval$gating_set) == input$gate_to_rename )
       target_gate <- getNodes(rval$gating_set)[idx_gh]
-      
+
+
       setNode(rval$gating_set, target_gate, input$new_name)
-      
-      
+      #recompute(rval$gating_set)
+
       idx <- which( names(rval$gates_flowCore) == input$gate_to_rename )
-      names(rval$gates_flowCore)[idx] <- paste(dirname(input$gate_to_rename), input$new_name, sep = "/")
+
+      parent_name <- dirname(input$gate_to_rename)
+      if(parent_name == "/"){
+        parent_name <- ""
+      }
+
+
+      names(rval$gates_flowCore)[idx] <- paste(parent_name, input$new_name, sep = "/")
       rval$gates_flowCore[[idx]]$gate@filterId <- input$new_name
-      
+
       child_gates <- get_all_descendants(rval$gates_flowCore, input$gate_to_rename)
+      new_name <- paste(parent_name, input$new_name, sep = "/")
       for(child in child_gates){
-        rval$gates_flowCore[[child]]$parent <- paste(dirname(input$gate_to_rename), input$new_name, sep = "/")
+        rval$gates_flowCore[[child]]$parent <- gsub(input$gate_to_rename, new_name, rval$gates_flowCore[[child]]$parent, fixed = TRUE)
+        idx <- which(names(rval$gates_flowCore) == child)
+        names(rval$gates_flowCore)[idx] <- gsub(input$gate_to_rename, new_name, names(rval$gates_flowCore)[idx], fixed = TRUE)
       }
       
       #Rm(target_gate, rval$gating_set)

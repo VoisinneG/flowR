@@ -83,6 +83,7 @@ cluster <- function(input, output, session, rval) {
       x[[1]] <- numericInput(ns("k_param"), "k", 100)
     }else if(input$clustering_method == 'FlowSOM'){
       x[[1]] <- numericInput(ns("k_meta"), "k", 7)
+      x[[2]] <- checkboxInput(ns("scale"), "scale", FALSE)
     }
     tagList(x)
   })
@@ -210,7 +211,7 @@ cluster <- function(input, output, session, rval) {
     progress$set(message = "Clustering...", value = 50)
     
     
-    res <- get_cluster(df=rval_mod$df_cluster, 
+    res <- try(get_cluster(df=rval_mod$df_cluster, 
                        yvar = rval$parameters$name[input$clustering_variables_table_rows_selected],
                        y_trans = y_trans,
                        transformation = transformation,
@@ -218,63 +219,75 @@ cluster <- function(input, output, session, rval) {
                        dc = ifelse(is.null(input$cluster_dc), 5, input$cluster_dc), 
                        alpha = ifelse(is.null(input$cluster_alpha), 0.0001, input$cluster_alpha),
                        k = ifelse(is.null(input$k_param), 100, input$k_param),
-                       k_meta = ifelse(is.null(input$k_meta), 7, input$k_meta)
-    )
+                       k_meta = ifelse(is.null(input$k_meta), 7, input$k_meta),
+                       scale = ifelse(is.null(input$scale), FALSE, input$scale)
+    ), silent = TRUE)
     
-    if("fSOM" %in% names(res)){
-      rval_mod$fSOM <- res$fSOM
-    }
-    
-    rval_mod$df_cluster <- res$df
-    if("cluster" %in% names(rval_mod$df_cluster)){
-      df <- cbind(df_raw[res$keep, ], rval_mod$df_cluster[c("cluster")])
+    if(class(res) == "try-error"){
+      showModal(modalDialog(
+        title = "Error during clustering",
+        print(res),
+        easyClose = TRUE,
+        footer = NULL
+      ))
     }else{
-      df <- df_raw[res$keep, ]
-    }
-    
-    
-    fs <- build_flowset_from_df(df = df, origin = rval$flow_set_list[[rval$flow_set_selected]])
-    rval_mod$flow_set_cluster <- fs
-    
-    # delete previous cluster gates
-    
-    idx_cluster_gates <- grep("^/cluster[0-9]+", names(rval$gates_flowCore))
-    
-    if(length(idx_cluster_gates)>0){
-      rval$gates_flowCore <- rval$gates_flowCore[-idx_cluster_gates]
-    }
-    
-    # create one gate per cluster
-    
-    uclust <- unique(rval_mod$df_cluster$cluster)
-    uclust <- uclust[ order(as.numeric(uclust), decreasing = FALSE) ]
-    if(length(uclust) > 0){
-      for(i in 1:length(uclust)){
-        filterID <- paste("cluster", uclust[i], sep = "")
-        polygon <- matrix(c(as.numeric(uclust[i])-0.25, 
-                            as.numeric(uclust[i])+0.25, 
-                            range(rval_mod$df_cluster[[rval_mod$flow_set_cluster@colnames[1]]])
-        ), 
-        ncol = 2)
-        row.names(polygon) <- c("min", "max")
-        colnames(polygon) <- c("cluster", rval_mod$flow_set_cluster@colnames[1])
-        g <- rectangleGate(.gate = polygon, filterId=filterID)
-        rval$gates_flowCore[[paste("/",filterID, sep="")]] <- list(gate = g, parent = "root")
+      if("fSOM" %in% names(res)){
+        rval_mod$fSOM <- res$fSOM
       }
+      
+      rval_mod$df_cluster <- res$df
+      if("cluster" %in% names(rval_mod$df_cluster)){
+        df <- cbind(df_raw[res$keep, setdiff(names(df_raw), "cluster")], rval_mod$df_cluster[c("cluster")])
+      }else{
+        df <- df_raw[res$keep, ]
+      }
+      
+      
+      fs <- build_flowset_from_df(df = df, origin = rval$flow_set_list[[rval$flow_set_selected]])
+      rval_mod$flow_set_cluster <- fs
+      
+      # delete previous cluster gates
+      
+      idx_cluster_gates <- grep("^/cluster[0-9]+", names(rval$gates_flowCore))
+      
+      if(length(idx_cluster_gates)>0){
+        rval$gates_flowCore <- rval$gates_flowCore[-idx_cluster_gates]
+      }
+      
+      # create one gate per cluster
+      
+      uclust <- unique(rval_mod$df_cluster$cluster)
+      uclust <- uclust[ order(as.numeric(uclust), decreasing = FALSE) ]
+      if(length(uclust) > 0){
+        for(i in 1:length(uclust)){
+          filterID <- paste("cluster", uclust[i], sep = "")
+          polygon <- matrix(c(as.numeric(uclust[i])-0.25, 
+                              as.numeric(uclust[i])+0.25, 
+                              range(rval_mod$df_cluster[[rval_mod$flow_set_cluster@colnames[1]]])
+          ), 
+          ncol = 2)
+          row.names(polygon) <- c("min", "max")
+          colnames(polygon) <- c("cluster", rval_mod$flow_set_cluster@colnames[1])
+          g <- rectangleGate(.gate = polygon, filterId=filterID)
+          rval$gates_flowCore[[paste("/",filterID, sep="")]] <- list(gate = g, parent = "root")
+        }
+      }
+      
+      
+      rval$flow_set_list[[input$fs_name]] <- list(flow_set = fs, 
+                                                  par = lapply(1:length(fs), function(x){parameters(fs[[x]])}),
+                                                  desc = lapply(1:length(fs), function(x){description(fs[[x]])}),
+                                                  name = input$fs_name, 
+                                                  parent = rval$flow_set_selected,
+                                                  gates = rval$gates_flowCore,
+                                                  spill = rval$df_spill,
+                                                  transformation = rval$transformation,
+                                                  trans_parameters = rval$trans_parameters)
+      
+      rval$flow_set_selected <- input$fs_name
     }
     
     
-    rval$flow_set_list[[input$fs_name]] <- list(flow_set = fs, 
-                                                par = lapply(1:length(fs), function(x){parameters(fs[[x]])}),
-                                                desc = lapply(1:length(fs), function(x){description(fs[[x]])}),
-                                                name = input$fs_name, 
-                                                parent = rval$flow_set_selected,
-                                                gates = rval$gates_flowCore,
-                                                spill = rval$df_spill,
-                                                transformation = rval$transformation,
-                                                trans_parameters = rval$trans_parameters)
-    
-    rval$flow_set_selected <- input$fs_name
 
     
   })
@@ -285,7 +298,6 @@ cluster <- function(input, output, session, rval) {
     validate(need("fSOM" %in% names(rval_mod), "No plot to display"))
     
     fSOM <- rval_mod$fSOM
-    metaClustering <- metaClustering_consensus(fSOM$map$codes, k=input$k_meta)
     
     if(!input$scale_node_size){
       fSOM <- UpdateNodeSize(fSOM, reset=TRUE)
@@ -293,7 +305,7 @@ cluster <- function(input, output, session, rval) {
     
     backgroundValues <- NULL
     if(input$show_background){
-      backgroundValues <- as.factor(metaClustering)
+      backgroundValues <- as.factor(fSOM$metaClustering)
     }
     
     

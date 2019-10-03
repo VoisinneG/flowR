@@ -1946,7 +1946,8 @@ dim_reduction <- function(df,
                           y_trans = log10_trans(),
                           perplexity = 50,
                           dims = 2,
-                          method = "tSNE"){
+                          method = "tSNE",
+                          check_duplicates = FALSE){
   
   idx_cells_kept <- 1:dim(df)[1]
   
@@ -1999,7 +2000,7 @@ dim_reduction <- function(df,
   }
 
   if(method == "tSNE"){
-    tSNE <- Rtsne(df_trans[ idx_cells , yvar], perplexity = perplexity, dims = dims)
+    tSNE <- Rtsne(df_trans[ idx_cells , yvar], perplexity = perplexity, dims = dims, check_duplicates = check_duplicates)
     df_tSNE <- tSNE$Y
     colnames(df_tSNE) <- c("tSNE1","tSNE2")
     return(list( df = cbind(df_filter[idx_cells, ], df_tSNE), keep = idx_cells_kept, vars = c("tSNE1","tSNE2")))
@@ -2045,6 +2046,7 @@ get_cluster <- function(df,
                         alpha = 0.001,
                         k = 100,
                         k_meta = 8,
+                        scale = FALSE,
                         method = "FlowSOM"){
          
   idx_cells_kept <- 1:dim(df)[1]
@@ -2077,18 +2079,21 @@ get_cluster <- function(df,
   
   if(method == "FlowSOM"){
     
-    data <- as.matrix(df_filter[, -which(names(df_filter) %in% c("name", "subset", "cluster"))])
-    fSOM <- list(data = data, 
+    data <- as.matrix(df_trans[, which(names(df_trans) %in% yvar)])
+    fSOM <- list(data = data,
                  compensate = FALSE,
                  spillover = NULL,
                  transform = FALSE,
-                 scale = TRUE,
+                 scale = scale,
                  prettyColnames = colnames(data))
     
+    message(paste("Clustering ", dim(data)[1], " cells using 'FlowSOM' on ",  length(yvar), " parameters", sep = ""))
+    
     fSOM <- BuildSOM(fSOM, colsToUse = which(colnames(data) %in% yvar))
-    fSOM <- BuildMST(fSOM, tSNE=TRUE)
-    metaClustering <- metaClustering_consensus(fSOM$map$codes, k=k_meta) 
-    metaClustering_perCell <- metaClustering[fSOM$map$mapping[,1]]
+    fSOM <- BuildMST(fSOM)
+    fSOM$metaClustering <- MetaClustering(fSOM$map$codes, "metaClustering_consensus", max=k_meta)
+    
+    metaClustering_perCell <- fSOM$metaClustering[fSOM$map$mapping[,1]]
     df_filter$cluster <- metaClustering_perCell
     
     return(list(df = df_filter, keep = idx_cells_kept, fSOM = fSOM))

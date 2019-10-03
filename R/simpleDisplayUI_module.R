@@ -67,44 +67,53 @@ simpleDisplay <- function(input, output, session, plist, gate = reactiveValues()
     
   plot_display <- reactive({
     
-    
+    rval_plot$ncol_facet <- 1
+    rval_plot$nrow_facet <- 1
+    rval_plot$nrow <- 1
+    rval_plot$ncol <- 1
     
      if(class(plot_list()) == "list"){
-       if("ggplot" %in% class(plot_list()[[1]]) ){
+       
          n <- length(plot_list())
          
-         if(n > 0){
-           p <- plot_list()[[1]]
-           if("facet" %in% names(p)){
-             facet_layout <- p$facet$compute_layout(p, p$facet$params)
-             print(facet_layout)
-             if(!is.null(facet_layout)){
-               rval_plot$ncol_facet <- max(facet_layout$COL)
-               rval_plot$nrow_facet <- max(facet_layout$ROW)
-             }
-           }
-         }
+         if(n>0){
+          if("ggplot" %in% class(plot_list()[[1]]) ){
+            
+            if(n > 0){
+              p <- plot_list()[[1]]
+              if("facet" %in% names(p)){
+                facet_layout <- p$facet$compute_layout(p, p$facet$params)
+                #print(facet_layout)
+                if(!is.null(facet_layout)){
+                  rval_plot$ncol_facet <- max(facet_layout$COL)
+                  rval_plot$nrow_facet <- max(facet_layout$ROW)
+                }
+              }
+            }
+            
+            
+            
+            if(n > 1){
+              rval_plot$nrow <- min(n, input$nrow_split)
+              rval_plot$ncol <- ceiling(n/rval_plot$nrow)
+              g <- gridExtra::marrangeGrob(plot_list(), nrow = rval_plot$nrow, ncol = rval_plot$ncol, top = "")
+              g
+            }else if(n == 1){
+              plot_list()[[1]]
+            }else{
+              plot_list()
+            }
+            
+          }else{
+            plot_list()
+          }
+        }
          
-         
-         
-         if(n > 1){
-           rval_plot$nrow <- min(n, input$nrow_split)
-           rval_plot$ncol <- ceiling(n/rval_plot$nrow)
-           g <- gridExtra::marrangeGrob(plot_list(), nrow = rval_plot$nrow, ncol = rval_plot$ncol, top = "")
-           g
-         }else if(n == 1){
-           plot_list()[[1]]
-         }else{
-           plot_list()
-         }
-       }else{
-         plot_list()
-       }
      }else{
        p <- plot_list()
        if("facet" %in% names(p)){
          facet_layout <- p$facet$compute_layout(p, p$facet$params)
-         print(facet_layout)
+         #print(facet_layout)
          if(!is.null(facet_layout)){
            rval_plot$ncol_facet <- max(facet_layout$COL)
            rval_plot$nrow_facet <- max(facet_layout$ROW)
@@ -127,7 +136,7 @@ simpleDisplay <- function(input, output, session, plist, gate = reactiveValues()
   output$ui_plot <- renderUI({
     ns <- session$ns
     
-    print(params$use_plotly)
+    #print(params$use_plotly)
     
     if(params$use_plotly){
       div( style = 'overflow-x: scroll',

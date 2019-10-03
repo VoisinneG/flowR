@@ -395,7 +395,7 @@ plotGatingSet <- function(input, output, session,
   
   
   data_plot_focus <- eventReactive(params_update_data(), {
-    print("data")
+    #print("data")
     validate(
       need(rval$gating_set, "Empty gating set") %then%
         need(selected$samples, "Please select samples") %then%
@@ -416,7 +416,7 @@ plotGatingSet <- function(input, output, session,
     
     
       
-    print("raw")
+    #print("raw")
     df <- data_plot_focus()
 
     idx_x <- match(input$xvar, rval$parameters$name_long)
@@ -466,7 +466,7 @@ plotGatingSet <- function(input, output, session,
             plot_args[["yvar"]] <- xvar[i]
           }
     
-          args <- as.list(rval_plot)
+          #args <- reactiveValuesToList(rval_plot)
           
           rval_mod$plot_list[[i]] <- plot_gs_data(df=df,
                                      plot_type = input$plot_type,
@@ -516,13 +516,15 @@ plotGatingSet <- function(input, output, session,
     
     validate(need(rval$gating_set, "No gating set"))
     
-    print("gate")
+    #print("gate")
     gate <- NULL
     
     if(show_gates){
-      child_gates <- getChildren(rval$gating_set[[1]], selected$gate)
-      if(length(child_gates) > 0){
-        gate <- child_gates
+      if(selected$gate %in% getNodes(rval$gating_set[[1]])){
+        child_gates <- getChildren(rval$gating_set[[1]], selected$gate)
+        if(length(child_gates) > 0){
+          gate <- child_gates
+        }
       }
     }
     

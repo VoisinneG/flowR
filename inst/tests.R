@@ -148,11 +148,13 @@ PlotStars(fSOM, backgroundValues = as.factor(metaClustering))
 PlotMarker(fSOM,"Comp-FSC-A")
 
 
-df <- get_data_gs(gs = gs, sample = pData(gs)$name[8], subset = c("/live/CD8+/p0", "/live/CD8+/p1") )
-res <- get_cluster(df, yvar = names(df)[4:7], y_trans = logicle_trans(), method = "FlowSOM", k=8 )
+df <- get_data_gs(gs = gs, sample = pData(gs)$name[8], subset = c("/live/CD8+") )
+res <- get_cluster(df, yvar = names(df)[4:7], y_trans = logicle_trans(), method = "FlowSOM", k_meta=30, scale = TRUE )
 PlotPies(res$fSOM, cellTypes=res$df$subset)
-PlotPies(res$fSOM, cellTypes=res$df$subset, backgroundValues = as.factor(res$df$cluster))
-PlotStars(res$fSOM, backgroundValues = as.factor(res$df$cluster))
+
+PlotPies(res$fSOM, cellTypes=res$df$subset, backgroundValues = as.factor(res$fSOM$metaClustering))
+PlotStars(res$fSOM, backgroundValues = as.factor(res$fSOM$metaClustering))
+
 p <- as.ggplot( expression(PlotMarker(res$fSOM, marker = "Comp-Time") ))
 
 #save parameters and description data
@@ -194,3 +196,7 @@ is_y_parameter_log <- xml_text(xml_find_all(gate, ".//is_y_parameter_log"))
 points <- xml_find_first(region, ".//points")
 vertexes <- xml_find_all(points, ".//point")
 m <- do.call(rbind, lapply(vertexes, function(v){return(list(x=xml_attr(v, "x"), y =xml_attr(v, "y")))}))
+
+
+#####################################################33333
+

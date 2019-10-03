@@ -77,6 +77,7 @@ dimRed <- function(input, output, session, rval) {
     if(input$dim_red_method == 'tSNE'){
       x[[1]] <- numericInput(ns("perplexity"), "perplexity", 50)
       x[[2]] <- numericInput(ns("dims"), "# dimensions", 2)
+      x[[3]] <- checkboxInput(ns("check_duplicates"), "check duplicates", FALSE)
     }
     tagList(x)
   })
@@ -186,7 +187,8 @@ dimRed <- function(input, output, session, rval) {
                          transformation = transformation,
                          method = input$dim_red_method,
                          perplexity = ifelse(is.null(input$perplexity), 50, input$perplexity),
-                         dims = ifelse(is.null(input$dims), 2, input$dims)
+                         dims = ifelse(is.null(input$dims), 2, input$dims),
+                         check_duplicates = ifelse(is.null(input$check_duplicates), 2, input$check_duplicates)
                          ), silent = TRUE)
     if(class(res) == "try-error"){
       showModal(modalDialog(
