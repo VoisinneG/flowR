@@ -37,7 +37,9 @@ Imports:
   data.table,
   forcats,
   ggrepel,
-  FlowSOM
+  FlowSOM,
+  Rphenograph,
+  ClusterX
 Remotes: 
   JinmiaoChenLab/ClusterX,
   JinmiaoChenLab/Rphenograph
