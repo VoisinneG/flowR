@@ -64,14 +64,15 @@ simpleDisplay <- function(input, output, session, plist, gate = reactiveValues()
   plot_list <- reactive({
     plist()
   })
-    
+  
+
   plot_display <- reactive({
     
     rval_plot$ncol_facet <- 1
     rval_plot$nrow_facet <- 1
     rval_plot$nrow <- 1
     rval_plot$ncol <- 1
-    
+
      if(class(plot_list()) == "list"){
        
          n <- length(plot_list())
@@ -125,8 +126,13 @@ simpleDisplay <- function(input, output, session, plist, gate = reactiveValues()
      
    })
 
+  # observe({
+  #   updateNumericInput(session, "row_size", value = 400)
+  #   updateNumericInput(session, "col_size", value = 400)
+  # })
+  
   output$plot_display  <- renderPlot({
-   plot_display()
+    plot_display()
   })
 
   output$plot_display_ly  <- renderPlotly({

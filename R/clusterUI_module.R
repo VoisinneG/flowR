@@ -67,7 +67,7 @@ cluster <- function(input, output, session, rval) {
   
   selected <- callModule(selection, "selection_module", rval)
   
-  rval_mod <- reactiveValues( flow_set_cluster = NULL )
+  rval_mod <- reactiveValues( flow_set_cluster = NULL, parameters = NULL )
   res_display <- callModule(simpleDisplay, "simple_display_module", plot_fSOM)
   
   ##########################################################################################################
@@ -104,7 +104,9 @@ cluster <- function(input, output, session, rval) {
                       selectInput(ns("cellTypes"), "Pie variable", choices = c("name", "subset"), selected = "subset"),
                       checkboxInput(ns("scale_node_size"), "Scale node size", TRUE),
                       checkboxInput(ns("show_background"), "Show background", TRUE),
-                      selectInput(ns("color_var"), "Color variable", choices = rval$plot_var, selected = rval$plot_var[1])
+                      selectInput(ns("color_var"), "Color variable", 
+                                  choices = rval_mod$parameters, 
+                                  selected = NULL)
              )
       )
     }
@@ -210,6 +212,7 @@ cluster <- function(input, output, session, rval) {
     
     progress$set(message = "Clustering...", value = 50)
     
+    rval_mod$parameters <- rval$parameters$name_long[input$clustering_variables_table_rows_selected]
     
     res <- try(get_cluster(df=rval_mod$df_cluster, 
                        yvar = rval$parameters$name[input$clustering_variables_table_rows_selected],

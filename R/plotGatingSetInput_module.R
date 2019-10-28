@@ -20,7 +20,7 @@ plotGatingSetInput <- function(id, simple_plot = TRUE, auto_update = TRUE) {
         title = "Sample/Subset",
         selectionInput(ns("selection_module"), multiple_subset = !simple_plot)
     ),
-    box(collapsible = TRUE, collapsed = FALSE, width = NULL, height = NULL,
+    box(collapsible = TRUE, collapsed = TRUE, width = NULL, height = NULL,
         title ="Variables",
         selectizeInput(ns("xvar"), 
                         multiple = !simple_plot,
@@ -142,6 +142,8 @@ plotGatingSet <- function(input, output, session,
     x[["bins"]] <- numericInput(ns("bins"), label = "number of bins", value = rval_plot_default[["bins"]])
     x[["alpha"]] <- numericInput(ns("alpha"), label = "alpha", value = rval_plot_default[["alpha"]])
     x[["size"]] <- numericInput(ns("size"), label = "size", value = rval_plot_default[["size"]])
+    x[["show_label"]] <- checkboxInput(ns("show_label"), "show labels", value = FALSE)
+    x[["show_outliers"]] <- checkboxInput(ns("show_outliers"), "show outliers", value = FALSE)
     
     rval_mod$plot_options <- x
     
@@ -154,9 +156,9 @@ plotGatingSet <- function(input, output, session,
     }else if (input$plot_type == 'hexagonal'){
       vars <- c("show_defining_gates", "bins")
     }else if (input$plot_type == 'dots'){
-      vars <- c("show_defining_gates","alpha", "size")
+      vars <- c("show_defining_gates","alpha", "size", "show_label")
     }else if (input$plot_type == 'contour'){
-      vars <- c("show_defining_gates", "bins", "alpha", "size")
+      vars <- c("show_defining_gates", "show_outliers",  "bins", "alpha", "size")
     }
     
     tagList(rval_mod$plot_options[vars])
@@ -203,15 +205,15 @@ plotGatingSet <- function(input, output, session,
     
     if(!simple_plot){
       
-        extra_facet_vars <- rval$parameters$name[rval$parameters$name %in% c("cluster", "bin")]
-        if(length(extra_facet_vars) == 0){
-          extra_facet_vars <- NULL
+        extra_facet_var <- rval$parameters$name[rval$parameters$name %in% c("cluster", "bin")]
+        if(length(extra_facet_var) == 0){
+          extra_facet_var <- NULL
         }
       
         x[["facet_var"]] <- selectizeInput(ns("facet_var"), 
                        multiple =TRUE,
                        label = "facet variables",
-                       choices = c("subset", names(rval$pdata), extra_facet_vars),
+                       choices = c("subset", names(rval$pdata), extra_facet_var),
                        selected = rval_plot_default[["facet_var"]]
         )
         x[["split_variable"]] <- selectInput(ns("split_variable"),
@@ -350,7 +352,9 @@ plotGatingSet <- function(input, output, session,
                       "norm", 
                       "smooth", 
                       "ridges", 
-                      "yridges_var")
+                      "yridges_var",
+                      "show_label",
+                      "show_outliers")
       var_update <- var_update[var_update %in% names(input)]
       for(var in var_update){
         update_params <- c(update_params, input[[var]])
@@ -414,8 +418,6 @@ plotGatingSet <- function(input, output, session,
   
   observeEvent(c(params_update_plot_raw(),  data_plot_focus()), {
     
-    
-      
     #print("raw")
     df <- data_plot_focus()
 
@@ -468,9 +470,10 @@ plotGatingSet <- function(input, output, session,
     
           #args <- reactiveValuesToList(rval_plot)
           
-          rval_mod$plot_list[[i]] <- plot_gs_data(df=df,
-                                     plot_type = input$plot_type,
-                                     plot_args = plot_args)
+          rval_mod$plot_list[[i]] <- call_plot_function(df=df,
+                                                        plot_type = input$plot_type,
+                                                        plot_args = plot_args)
+                                     
           
           
     }
@@ -490,15 +493,15 @@ plotGatingSet <- function(input, output, session,
     }
      
     if(!simple_plot){
-      facet_vars <- input$facet_var
+      facet_var <- input$facet_var
     }else{
-      facet_vars <- NULL
+      facet_var <- NULL
     }
     
-    options <- list(theme_name = paste("theme_", input$theme, sep = ""),
+    options <- list(theme = input$theme,
                     transformation = transformation,
                     axis_labels = axis_labels,
-                    facet_vars = facet_vars,
+                    facet_var = facet_var,
                     legend.position = input[["legend.position"]])
     
     plist <- lapply( rval_mod$plot_list, 

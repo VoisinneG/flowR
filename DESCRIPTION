@@ -38,6 +38,9 @@ Imports:
   forcats,
   ggrepel,
   FlowSOM
+Remotes: 
+  JinmiaoChenLab/ClusterX,
+  JinmiaoChenLab/Rphenograph
 LazyData: TRUE
 License: file LICENSE
 RoxygenNote: 6.1.1

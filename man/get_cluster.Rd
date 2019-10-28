@@ -6,7 +6,7 @@
 \usage{
 get_cluster(df, yvar, transformation = NULL,
   y_trans = identity_trans(), dc = 3, alpha = 0.001, k = 100,
-  k_meta = 8, method = "FlowSOM")
+  k_meta = 8, scale = FALSE, method = "FlowSOM")
 }
 \arguments{
 \item{df}{a data.frame with only numeric variables.}

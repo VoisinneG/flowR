@@ -57,7 +57,7 @@ stats <- function(input, output, session, rval) {
   observe({
     if("plot_type" %in% names(res$params)){
       rval_mod$use_plotly <- switch(res$params$plot_type,
-                                    "heatmap" = TRUE,
+                                    "heatmaply" = TRUE,
                                     FALSE)
     }
 
@@ -66,7 +66,7 @@ stats <- function(input, output, session, rval) {
   output$stats_data <- DT::renderDataTable({
     validate(need(res$data(), "No data available"))
     df <- res$data()
-    df[['value']] <- sprintf("%.2f", as.numeric(df[['value']]))
+    #df[['value']] <- sprintf("%.2f", as.numeric(df[['value']]))
     DT::datatable(df, rownames = FALSE)
   })
   

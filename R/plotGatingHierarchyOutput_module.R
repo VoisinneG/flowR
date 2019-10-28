@@ -63,7 +63,7 @@ plotGatingHierarchy <- function(input, output, session, rval, plot_params = reac
       transformation <- rval$transformation
     }
     
-    options <- list(theme_name = paste("theme_", plot_params[["theme"]], sep = ""),
+    options <- list(theme = plot_params[["theme"]],
                     transformation = transformation,
                     axis_labels = axis_labels,
                     legend.position = plot_params[["legend.position"]])

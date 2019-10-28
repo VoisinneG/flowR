@@ -17,7 +17,7 @@ plotStatInput <- function(id) {
         title = "Sample/Subset",
         selectionInput(ns("selection_module"), multiple_subset = TRUE)
     ),
-    box(collapsible = TRUE, collapsed = FALSE, width = NULL, height = NULL,
+    box(collapsible = TRUE, collapsed = TRUE, width = NULL, height = NULL,
         title ="Stat",
         selectInput(ns("stat_function"), 
                     label = "statistics", 
@@ -39,7 +39,7 @@ plotStatInput <- function(id) {
         #     actionButton(ns("select_var"), "Select variable (y-axis)")
         # )
     ),
-    box(collapsible = TRUE, collapsed = FALSE, width = NULL, height = NULL,
+    box(collapsible = TRUE, collapsed = TRUE, width = NULL, height = NULL,
         title ="Plot variables",
         
         selectizeInput(ns("group_var"), 
@@ -60,7 +60,10 @@ plotStatInput <- function(id) {
     box(collapsible = TRUE, collapsed = TRUE, width = NULL, height = NULL,
         title ="Options",
         selectInput(ns("plot_type"), label = "plot type",
-                    choices = c("bar", "tile", "heatmap"),
+                    choices = c("bar", 
+                                "tile", 
+                                "heatmap",
+                                "pca"),
                     selected = "bar"),
         uiOutput(ns("plot_options"))
     )
@@ -101,26 +104,33 @@ plotStat <- function(input, output, session, rval) {
                 label = "plot theme", 
                 choices = c("gray", "light", "minimal", "classic", "bw", "dark", "void"), 
                 selected = "gray")
-    x[["free_y_scale"]] <- checkboxInput(ns("free_y_scale"), "free y scale", value = TRUE)
+    x[["scales"]] <- selectInput(ns("scales"), 
+                                 label = "facet scales", 
+                                 choices = c("fixed", "free", "free_x", "free_y"), 
+                                 selected = "fixed")
     x[["scale_values"]] <- checkboxInput(ns("scale_values"), "scale values by row", value = FALSE)
     x[["max_scale"]] <- numericInput(ns("max_scale"), label = "scale limit", value = 0)
     x[["expand_factor"]] <- numericInput(ns("expand_factor"), label = "expand factor", value = 0.1)
     x[["strip_text_angle"]] <- numericInput(ns("strip_text_angle"), label = "y strip text angle", value = 0)
     x[["cluster_x"]] <- checkboxInput(ns("cluster_x"), "cluster x variables", value = TRUE)
     x[["cluster_y"]] <- checkboxInput(ns("cluster_y"), "cluster y variables", value = TRUE)
-
+    
     rval_mod$plot_options <- x
     
   })
   
   output$plot_options <- renderUI({
-    x <- rval_mod$plot_options
+    ns <- session$ns
+    # x <- rval_mod$plot_options
     if(input$plot_type == 'bar'){
-      vars <- c("legend", "theme", "free_y_scale", "scale_values", "max_scale", "expand_factor", "strip_text_angle")
+      vars <- c("legend", "theme", "scales", "scale_values", "max_scale", "expand_factor", "strip_text_angle")
     }else if (input$plot_type == 'tile'){
       vars <- c("legend", "theme", "scale_values", "max_scale", "strip_text_angle" )
     }else if (input$plot_type == 'heatmap'){
       vars <- c("scale_values", "max_scale", "cluster_x", "cluster_y")
+    }else if (input$plot_type == 'pca'){
+      vars <- c("scale_values")
+      rval_mod$plot_options[["scale_values"]] <- checkboxInput(ns("scale_values"), "scale values by row", value = TRUE)
     }
     tagList(rval_mod$plot_options[vars])
     
@@ -165,9 +175,9 @@ plotStat <- function(input, output, session, rval) {
     color_var_default <- "subset"
     group_var_default <- "subset"
    
-    extra_facet_vars <- rval$parameters$name[rval$parameters$name %in% c("cluster", "bin")]
-    if(length(extra_facet_vars) == 0){
-      extra_facet_vars <- NULL
+    extra_facet_var <- rval$parameters$name[rval$parameters$name %in% c("cluster", "bin")]
+    if(length(extra_facet_var) == 0){
+      extra_facet_var <- NULL
     }
     
     updateSelectInput(session, "color_var", 
@@ -179,7 +189,7 @@ plotStat <- function(input, output, session, rval) {
                       selected = color_var_default)
     
     updateSelectInput(session, "facet_var",
-                        choices = c("subset", names(rval$pdata), extra_facet_vars), 
+                        choices = c("subset", names(rval$pdata), extra_facet_var), 
                         selected = facet_var_default )
     
   })
@@ -244,6 +254,7 @@ plotStat <- function(input, output, session, rval) {
                       sample = selected$samples,
                       subset = selected$gate,
                       spill = rval$spill)
+    
     return(df)
 
   })
@@ -255,6 +266,7 @@ plotStat <- function(input, output, session, rval) {
       need(rval$gating_set, "Empty gating set") %then%
         need(selected$samples, "Please select samples") %then%
         need(selected$gate, "Please select subsets")
+        
     )
     
     if(!input$stat_function %in% c("cell count", "percentage")){
@@ -279,57 +291,92 @@ plotStat <- function(input, output, session, rval) {
                       "identity" = identity_trans(),
                       NULL)
     
-    theme <- input$theme
-    if(is.null(theme)){
-      theme <- "gray"
-    }else if(theme == ""){
-      theme <- "gray"
-    }
     
-    Rowv <- FALSE
-    Colv <- FALSE
-    if(input$plot_type == "heatmap"){
-      if(input$cluster_y & (! input$stat_function %in% c("cell count", "percentage")) & length(input$yvar)>1){
-        Rowv <- TRUE
-      }
-      name_x_var <- switch(input$group_var,
-                           "subset" = "gate",
-                           "name" = "samples",
-                           input$group_var)
-      if(input$cluster_x & length(selected[[name_x_var]])>1){
-        Colv <- TRUE
-      }
-    }
-    
+    # Rowv <- FALSE
+    # Colv <- FALSE
+    # if(input$plot_type == "heatmap"){
+    #   if(input$cluster_y & (! input$stat_function %in% c("cell count", "percentage")) & length(input$yvar)>1){
+    #     Rowv <- TRUE
+    #   }
+    #   name_x_var <- switch(input$group_var,
+    #                        "subset" = "gate",
+    #                        "name" = "samples",
+    #                        input$group_var)
+    #   if(input$cluster_x & length(selected[[name_x_var]])>1){
+    #     Colv <- TRUE
+    #   }
+    # }
+    # 
 
-    p <- plot_stat(df = update_data_plot_stat(),
+    plot_args <- list()
+    options <- list()
+    for(var in names(input) ){
+      plot_args[[var]] <- input[[var]]
+      options[[var]] <- input[[var]]
+    }
+    
+    scale <- FALSE
+    if(!is.null(input$scale_values)){
+      scale <- input$scale_values
+    }
+    
+    p <- try(plot_stat(df = update_data_plot_stat(),
                    gs = rval$gating_set,
                    metadata = rval$pdata,
                    sample = selected$samples,
                    subset = selected$gate, 
                    spill = rval$spill,
                    yvar = yvar,
-                   type = input$plot_type,
                    transformation = transformation,
-                   axis_labels = axis_labels,
-                   default_trans = identity_trans(),
-                   scale_values = input$scale_values,
-                   max_scale = input$max_scale,
-                   free_y_scale = input$free_y_scale,
-                   color_var = input$color_var, 
-                   facet_vars = input$facet_var,
-                   group_var = input$group_var,
-                   expand_factor = input$expand_factor,
                    stat_function = input$stat_function,
-                   show.legend = input$legend,
                    y_trans = y_trans,
-                   strip.text.y.angle = input$strip_text_angle,
-                   theme_name = paste("theme_", theme, sep = ""),
-                   Rowv = Rowv,
-                   Colv = Colv
-                   )
+                   apply_inverse = TRUE,
+                   scale = scale,
+                   plot_type = input$plot_type,
+                   plot_args = plot_args,
+                   options = options
+                   ), silent = TRUE)
     
-    p                          
+    if(class(p) == "try-error"){
+      showModal(modalDialog(
+        title = "Error",
+        p,
+        easyClose = TRUE,
+        footer = NULL
+      ))
+      NULL
+    }else{
+      p
+    }
+    
+    # p <- plot_stat(df = update_data_plot_stat(),
+    #                gs = rval$gating_set,
+    #                metadata = rval$pdata,
+    #                sample = selected$samples,
+    #                subset = selected$gate, 
+    #                spill = rval$spill,
+    #                yvar = yvar,
+    #                type = input$plot_type,
+    #                transformation = transformation,
+    #                axis_labels = axis_labels,
+    #                default_trans = identity_trans(),
+    #                scale_values = input$scale_values,
+    #                max_scale = input$max_scale,
+    #                free_y_scale = input$free_y_scale,
+    #                color_var = input$color_var, 
+    #                facet_vars = input$facet_var,
+    #                group_var = input$group_var,
+    #                expand_factor = input$expand_factor,
+    #                stat_function = input$stat_function,
+    #                show.legend = input$legend,
+    #                y_trans = y_trans,
+    #                strip.text.y.angle = input$strip_text_angle,
+    #                theme_name = paste("theme_", theme, sep = ""),
+    #                Rowv = Rowv,
+    #                Colv = Colv
+    #                )
+    
+    #p                          
     
   })
   

@@ -35,6 +35,15 @@ metadata <- read.csv(file = "./data/tetra/meta.csv")
 sample <-  pData(gs)$name[1:4]
 subset <- getNodes(gs)[1:3]
 
+p <- plot_stat(gs =gs, 
+                 sample = sample, 
+                 subset = subset, 
+                 plot_type = "bar",
+                 plot_args = list(color_var = "stim",
+                                  label_var = "dose"),
+                 metadata = metadata)
+                                                                            
+
 #df <- get_plot_data(gs = gs, sample = pData(gs)$name, subset = getNodes(gs), metadata = NULL)
 df <- get_plot_data(gs = gs, sample = sample, subset = subset, metadata = NULL)
 
@@ -44,8 +53,12 @@ axis_labels <- paste(plot_var, "c")
 names(axis_labels) <- plot_var
 
 df_cast1 <- compute_stats(df, gs =gs, stat_function = "cell count", y_trans = logicle_trans(), var_names = axis_labels)
+
 df_cast2 <- compute_stats(df, stat_function = "median", y_trans = logicle_trans(), var_names = axis_labels)
+df_stats <- df_cast2
+
 df_stats <- merge.data.frame(df_cast1, df_cast2, by = c("name", "subset"))
+
 df_stats <- add_columns_from_metadata(df_stats, metadata = metadata)
 
 p <- plot_gs_data(df=df_stats,

@@ -627,7 +627,7 @@ get_plot_data <- function(gs,
 }
 
 
-plot_gs_data <- function(df,
+call_plot_function <- function(df,
                          plot_type,
                          plot_args = list()
                          ){
@@ -649,22 +649,35 @@ format_plot <- function(p,
   xvar <- NULL
   yvar <- NULL
   if("x" %in% names(p$mapping)){
-    xvar <- as.character(quo_get_expr(p$mapping$x))
+    if("quosure" %in% class(p$mapping$x)){
+      xvar <- as.character(quo_get_expr(p$mapping$x))
+    }
   }
+ 
   if("y" %in% names(p$mapping)){
-    yvar <- as.character(quo_get_expr(p$mapping$y))
+    if("quosure" %in% class(p$mapping$x)){
+      yvar <- as.character(quo_get_expr(p$mapping$y))
+    }
   }
   
   xlim <- NULL
   ylim <- NULL
   color_var <- p$plot_env$color_var
   
-  facet_scales <- "fixed"
+  facet_yvar <- NULL
+  if(p$plot_env$plot_type == "bar"){
+    facet_yvar <- "variable"
+  }
+  
+  #facet scales
+  scales <- "fixed"
+  
   # if(!is_null(color_var)){
   #   if(color_var == "none"){
   #     color_var <- NULL
   #   }
   # }
+
   
   ############################################################################33
   #default parameters
@@ -689,23 +702,28 @@ format_plot <- function(p,
   
   
   if(!is.null(xvar)){
-    labx <- ifelse(is.null(options$axis_labels[[xvar]]), xvar, options$axis_labels[[xvar]])
-    if(xvar %in% names(transformation)){
-      p <- p + scale_x_continuous(name = labx, trans = transformation[[xvar]], limits = xlim) 
-    }else{
-      p <- p + scale_x_continuous(name = labx, trans = default_trans, limits = xlim)
+    if(length(xvar) == 1){
+      labx <- ifelse(is.null(options$axis_labels[[xvar]]), xvar, options$axis_labels[[xvar]])
+      if(xvar %in% names(transformation)){
+        p <- p + scale_x_continuous(name = labx, trans = transformation[[xvar]], limits = xlim) 
+      }else if(is.numeric(p$data[[xvar]])){
+        p <- p + scale_x_continuous(name = labx, trans = default_trans, limits = xlim)
+      }
     }
   }
   
   if(!is.null(yvar)){
-    laby <- ifelse(is.null(options$axis_labels[[yvar]]), yvar, options$axis_labels[[yvar]])
-    if(yvar %in% names(transformation)){
-      p <- p + scale_y_continuous(name = laby, trans = transformation[[yvar]], limits = ylim) 
-    }else{
-      p <- p + scale_y_continuous(name = laby, trans = default_trans, limits = ylim) 
+    if(length(yvar) == 1){
+      laby <- ifelse(is.null(options$axis_labels[[yvar]]), yvar, options$axis_labels[[yvar]])
+      if(yvar %in% names(transformation)){
+        p <- p + scale_y_continuous(name = laby, trans = transformation[[yvar]], limits = ylim) 
+      }else if(is.numeric(p$data[[yvar]])){
+        p <- p + scale_y_continuous(name = laby, trans = default_trans, limits = ylim)
+      }
     }
   }
 
+  
   if(p$plot_env$plot_type == "dots"){
     
     if(!is.null(color_var)){
@@ -721,18 +739,30 @@ format_plot <- function(p,
       }
     }
   }
-
-    ############################################################################33
-    #facet
+  
+  ############################################################################33
+  #facet
+  
+  if(!is.null(options$facet_var) | !is.null(facet_yvar)){
     
-    if(!is.null(options$facet_vars)){
-           formula_facet <- as.formula(paste(" ~", paste(options$facet_vars, collapse = " + ")))
-           p <- p + facet_grid(formula_facet,
-                               labeller = label_both, 
-                               #scales = scale_y,
-                               scales = facet_scales)
+    left_formula <- paste(facet_yvar, collapse = " + ")
+    right_formula <- "."
+    if(!is.null(options$facet_var)){
+      if(options$facet_var != ""){
+        right_formula <- paste(options$facet_var, collapse = " + ")
+      }
     }
     
+    print(paste(left_formula, "~", right_formula))
+    formula_facet <- as.formula(paste(left_formula, "~", right_formula))
+    
+    
+    p <- p + facet_grid(formula_facet,
+                        labeller = label_both, 
+                        #scales = scale_y,
+                        scales = scales)
+  }
+
   ############################################################################
   #theme
   
@@ -740,12 +770,16 @@ format_plot <- function(p,
     p <- p + ggtitle(unique(p$data$subset))
   }
   
-  if(!is.null(options$theme_name)){
-    theme_function <- function(...){
-      do.call(options$theme_name, list(...))
+  if("theme" %in% names(options)){
+    if(options$theme != ""){
+      theme_name = paste("theme_", options$theme, sep = "")
+      theme_function <- function(...){
+        do.call(theme_name, list(...))
+      }
+      p <- p + theme_function()
     }
-    p <- p + theme_function()
   }
+  
   
   if(!is.null(options$legend.position)){
     p <- p + theme(legend.position = options$legend.position)
@@ -865,10 +899,12 @@ plot_histogram <- function(args = list()){
   
 }
 
+#' @import ggrepel
 plot_dots <-function(args = list()){
   
   plot_type <- "dots"
-  
+  id.vars <- "subset"
+  show_label <- FALSE
   color_var <- NULL
   group_var <- NULL
   bins <- 100
@@ -882,6 +918,8 @@ plot_dots <-function(args = list()){
   if(!is.null(color_var)){
     if(color_var == "none"){
       color_var <- NULL
+    }else{
+      id.vars <- color_var
     }
   }
   
@@ -892,6 +930,8 @@ plot_dots <-function(args = list()){
   if(!is.null(group_var)){
     if(group_var == "none"){
       group_var <- NULL
+    }else{
+      id.vars <- group_var
     }
   }
   
@@ -907,6 +947,20 @@ plot_dots <-function(args = list()){
     geom_point(alpha = alpha, 
                size = size)
    
+  if(show_label){
+    df_stat <- compute_stats(df = df,
+                             stat_function = "median",
+                             yvar = c(xvar, yvar),
+                             id.vars = id.vars)
+    
+    p <- p + geom_label_repel(mapping = aes_string(x = as.name( xvar ), 
+                                                  y = as.name( yvar ),
+                                                  color = id.vars,
+                                                  label = id.vars), 
+                             data = df_stat,
+                             fill = "white")
+  }
+  
   
   #if(!is.null(color_var)){
       # p <- p + geom_point(mapping =  aes_string(colour = color_var),
@@ -964,14 +1018,16 @@ plot_contour <-function(args = list()){
   
   
   p <- ggplot(df,
-              aes_string(x = as.name( xvar ), 
-                         y = as.name( yvar )))
+              aes_string(x = as.name( xvar ),
+                         y = as.name( yvar ),
+                         colour = color_var,
+                         group = group_var))
 
 
 
   if(show_outliers){
-    
-    p <- p + geom_point(size = 0.1)
+    p <- p + geom_point(size = size, alpha = alpha)
+    size <- 0.1
     alpha <- 1
     fill <- "white"
   }
@@ -979,16 +1035,16 @@ plot_contour <-function(args = list()){
   
   
    if(!is.null(color_var)){
-    #p <- p + stat_density2d(aes_string(alpha='..level..', fill='..level..'), 
+    #p <- p + stat_density2d(aes_string(alpha='..level..', fill='..level..'),
     p <- p + stat_density2d(aes_string(colour = color_var, group = group_var),
                             fill = fill,
-                            size=size, 
+                            size=size,
                             alpha= alpha,
                             geom="polygon",
                             bins=bins
                             )
-    
-    #scale_fill_gradient(low = "yellow", high = "red") 
+
+    #scale_fill_gradient(low = "yellow", high = "red")
    }else{
     p <- p + stat_density2d(aes_string(group = group_var),
                             fill = fill,
@@ -1003,127 +1059,6 @@ plot_contour <-function(args = list()){
   return(p)
 }
 
-
-#' @import pheatmap
-#' @import dplyr
-#' @import forcats
-plot_stat_heatmap <-function(args = list()){
-  
-  plot_type <- "stat_heatmap"
-  stat_var <- NULL
-  annotation_vars <- NULL
-  group_var <- NULL
-  cluster_rows <- FALSE
-  cluster_cols <- FALSE
-  scale = "none"
-  legend <- TRUE
-  
-  for(var in names(args)){
-    assign(var, args[[var]])
-  }
-  
-  df <- as.data.frame(df)
-
-  labels_col <- 1:dim(df)[1]
-  
-  if(!is.null(group_var)){
-    df <- df[order(df[[group_var[1]]]), ]
-    #labels_col <- df$group_var
-  }
-  
-  
-  row.names(df) <- 1:dim(df)[1]
-  print(df)
-  
-  idx <- which(names(df) %in% c("name", "subset", annotation_vars))
-  #idx_annot <- which(names(df) %in% annotation_vars)
-  idx_annot <- idx
-  print(idx)
-  
-  df_stat <- df[-idx]
-  if(!is.null(stat_var)){
-    df_stat <- df_stat[which(names(df_stat) %in% stat_var)]
-  }
-  annotation <- df[idx_annot]
-
-  df_plot <- t(df_stat)
-  colnames(df_plot) <- 1:dim(df_plot)[2]
-  
-  if(dim(df_plot)[1]<2){
-    cluster_rows <- FALSE
-  }
-  if(dim(df_plot)[2]<2){
-    cluster_cols <- FALSE
-  }
-  p <- pheatmap(df_plot, show_colnames = FALSE,
-                labels_col = labels_col,
-                scale = scale,
-                annotation_col = annotation,
-                cluster_rows = cluster_rows,
-                cluster_cols = cluster_cols,
-                legend = legend
-
-  )
-  
-  return(p)
-}
-
-#' @import ggplot2
-#' @import dplyr
-#' @import ggrepel
-plot_stat_pca <-function(args = list()){
-  
-  plot_type <- "stat_pca"
-  PCx <- "PC1"
-  PCy <- "PC2"
-  stat_var <- NULL
-  annotation_vars <- NULL
-  color_var <- NULL
-  label_var <- "name"
-  scale <- TRUE
-
-  for(var in names(args)){
-    assign(var, args[[var]])
-  }
-  
-  df <- as.data.frame(df)
-  
-  idx <- which(names(df) %in% c("name", "subset", annotation_vars))
-  idx_annot <- idx
-  
-  df_stat <- df[-idx]
-  if(!is.null(stat_var)){
-    df_stat <- df_stat[which(names(df_stat) %in% stat_var)]
-  }
-  df_stat <- df_stat[ , which(sapply(df_stat, is.numeric)) ] 
-  
-  
-  rownames(df_stat) <- 1:dim(df_stat)[1]
-  
-  annotation <- df[idx_annot]
-  rownames(annotation) <- 1:dim(annotation)[1]
-  
-  pca_res <- prcomp( df_stat, center = scale, scale. = scale)
-  
-  df_pca <- as.data.frame(pca_res$x)
-  df_pca <- cbind(df_pca, annotation[match(row.names(annotation), row.names(df_pca)), ])
-  
-  if(!is.null(color_var)){
-    color_var <- as.name(color_var)
-  }
-  if(!is.null(label_var)){
-    label_var <- as.name(label_var)
-  }
-  
-  p <- ggplot(df_pca, aes_string(x=as.name(PCx), 
-                                        y=as.name(PCy),
-                                        color = color_var, 
-                                        label = label_var)) +
-    geom_point() +
-    geom_text_repel(show.legend = FALSE)
-  
-  return(p)
-}
 
 #' @import ggrepel
 add_polygon_layer <-function(p,
@@ -1228,9 +1163,9 @@ plot_gs <- function(gs,
                       spill = spill, 
                       metadata = metadata)
   
-  print(names(plot_args))
+  #print(names(plot_args))
   
-  p <- plot_gs_data(df = df,
+  p <- call_plot_function(df = df,
                     plot_type = plot_type,
                     plot_args = plot_args)
   
@@ -1243,8 +1178,306 @@ plot_gs <- function(gs,
     }
   }
   
+  return(p)
+}
+
+#' @import viridis
+#' @import pheatmap
+#' @import dplyr
+#' @import forcats
+plot_heatmap <-function(args = list()){
+  
+  plot_type <- "heatmap"
+  stat_var <- NULL
+  annotation_vars <- NULL
+  group_var <- NULL
+  cluster_y <- FALSE
+  cluster_x <- FALSE
+  #scale <- "none"
+  show.legend <- TRUE
+  
+  for(var in names(args)){
+    assign(var, args[[var]])
+  }
+  
+  df <- as.data.frame(df)
+  
+  labels_col <- 1:dim(df)[1]
+  
+  if(!is.null(group_var)){
+    df <- df[order(df[[group_var[1]]]), ]
+    #labels_col <- df$group_var
+  }
+  
+  row.names(df) <- 1:dim(df)[1]
+  #print(df)
+  
+  if(is.null(annotation_vars)){
+    annotation_vars <- c("name", "subset")
+  }
+  idx <- which(names(df) %in% annotation_vars)
+  idx_annot <- idx
+  
+  df_stat <- df[-idx]
+  
+  if(!is.null(stat_var)){
+    df_stat <- df_stat[which(names(df_stat) %in% stat_var)]
+  }else{
+    df_stat <- df_stat[which(sapply(df_stat, is.numeric))]
+  }
+  
+  annotation <- df[idx_annot]
+  
+  df_plot <- t(df_stat)
+  colnames(df_plot) <- 1:dim(df_plot)[2]
+  
+  if(dim(df_plot)[1]<2){
+    cluster_y <- FALSE
+  }
+  if(dim(df_plot)[2]<2){
+    cluster_x <- FALSE
+  }
+  
+  print(annotation)
+  
+  p <- pheatmap(df_plot, show_colnames = FALSE, 
+                color = viridis(16),
+                labels_col = labels_col,
+                scale = "none",
+                annotation_col = annotation,
+                cluster_rows = cluster_y,
+                cluster_cols = cluster_x,
+                legend = show.legend
+                
+  )
   
   return(p)
+}
+
+
+#' @import dplyr
+#' @import forcats
+plot_bar <-function(args = list()){
+  
+  plot_type <- "bar"
+  stat_var <- NULL
+  group_var <- NULL
+  color_var <- NULL
+  show.legend <- TRUE
+  
+  for(var in names(args)){
+    assign(var, args[[var]])
+  }
+  
+  df <- as.data.frame(df)
+  
+  id.vars <- names(df)[which(!sapply(df, is.numeric))]
+  df_melt <- melt(df, id.vars = id.vars)
+  
+  #print(df_melt)
+  
+  if(is.null(stat_var)){
+    stat_var <- names(df)[which(sapply(df, is.numeric))]
+  }
+  
+  if(!is.null(group_var)){
+    group_var <- as.name(group_var)
+  }
+  
+  if(!is.null(color_var)){
+    color_var <- as.name(color_var)
+  }
+  
+  df_melt <- df_melt[df_melt$variable %in% stat_var, ]
+  
+  p <- ggplot(df_melt, aes_string(x = group_var, y = "value"))
+  
+  p <- p + 
+    geom_bar(mapping = aes_string(fill = group_var), alpha = 0.5, stat = "summary", fun.y = "mean") + 
+    geom_point( mapping = aes_string(colour = color_var), 
+                inherit.aes = TRUE, 
+                position = position_jitter(width = 0.25, height = 0),
+                alpha = 0.5,
+                size = 3,
+                show.legend = show.legend)
+
+  
+  return(p)
+  
+}
+
+#' @import viridis
+#' @import dplyr
+#' @import forcats
+plot_tile <-function(args = list()){
+  
+  plot_type <- "tile"
+  stat_var <- NULL
+  group_var <- NULL
+  show.legend <- TRUE
+  
+  for(var in names(args)){
+    assign(var, args[[var]])
+  }
+  
+  df <- as.data.frame(df)
+  
+  id.vars <- names(df)[which(!sapply(df, is.numeric))]
+  df_melt <- melt(df, id.vars = id.vars)
+  
+  #print(df_melt)
+  
+  if(is.null(stat_var)){
+    stat_var <- names(df)[which(sapply(df, is.numeric))]
+  }
+  
+  if(!is.null(group_var)){
+    group_var <- as.name(group_var)
+  }
+
+  
+  df_melt <- df_melt[df_melt$variable %in% stat_var, ]
+  
+  p <- ggplot(df_melt, aes_string(x = group_var, y = "variable", fill = "value")) +
+    geom_tile(show.legend = show.legend) +
+    scale_fill_viridis()
+  
+  return(p)
+  
+}
+
+#' @import ggplot2
+#' @import dplyr
+#' @import ggrepel
+plot_pca <-function(args = list()){
+  
+  plot_type <- "pca"
+  PCx <- "PC1"
+  PCy <- "PC2"
+  stat_var <- NULL
+  annotation_vars <- NULL
+  color_var <- NULL
+  label_var <- "name"
+  scale <- FALSE
+  
+  for(var in names(args)){
+    assign(var, args[[var]])
+  }
+  
+  df <- as.data.frame(df)
+  
+  idx <- which(names(df) %in% c("name", "subset", annotation_vars))
+  idx_annot <- idx
+  
+  df_stat <- df[-idx]
+  if(!is.null(stat_var)){
+    df_stat <- df_stat[which(names(df_stat) %in% stat_var)]
+  }
+  
+  idx_cols <- which(sapply(df_stat, is.numeric))
+  if(length(idx_cols)>1){
+    df_stat <- df_stat[ , idx_cols ] 
+  }else{
+    stop("Not enough numeric variables to perform PCA")
+  }
+  
+  
+  
+  rownames(df_stat) <- 1:dim(df_stat)[1]
+  
+  annotation <- df[idx_annot]
+  rownames(annotation) <- 1:dim(annotation)[1]
+  
+  pca_res <- prcomp( df_stat, center = scale, scale. = scale)
+  
+  df_pca <- as.data.frame(pca_res$x)
+  df_pca <- cbind(df_pca, annotation[match(row.names(annotation), row.names(df_pca)), ])
+  
+  if(!is.null(color_var)){
+    color_var <- as.name(color_var)
+  }
+  if(!is.null(label_var)){
+    label_var <- as.name(label_var)
+  }
+  
+  p <- ggplot(df_pca, aes_string(x=as.name(PCx), 
+                                 y=as.name(PCy),
+                                 color = color_var, 
+                                 label = label_var)) +
+    geom_point() +
+    geom_text_repel(show.legend = FALSE)
+  
+  return(p)
+}
+
+
+plot_stat <- function(df = NULL,
+                        gs,
+                        sample = NULL,
+                        subset = NULL,
+                        spill = NULL,
+                        transformation=NULL,
+                        stat_function = "mean",
+                        y_trans = identity_trans(),
+                        apply_inverse = TRUE,
+                        yvar = NULL,
+                        var_names = NULL,
+                        metadata = NULL,
+                        scale = FALSE,
+                        plot_type = "heatmap",
+                        plot_args = list(),
+                        options = list() ){
+  
+  
+  if(is.null(sample)) sample <-  pData(gs)$name[1]
+  if(is.null(subset)) subset <- getNodes(gs)[1]
+  
+  if(is.null(df)){
+    df <- get_plot_data(df = df,
+                        gs = gs,
+                        sample = sample,
+                        subset = subset,
+                        spill = spill, 
+                        metadata = NULL)
+  }
+  
+  df <- df[df$name %in% sample & df$subset %in% subset, ]
+  
+  df_stat <- compute_stats(df = df,
+                      gs = gs,
+                      spill = spill,
+                      transformation = transformation,
+                      stat_function = stat_function,
+                      y_trans = y_trans,
+                      apply_inverse = apply_inverse,
+                      yvar = yvar,
+                      var_names = var_names)
+  
+  if(scale){
+    df_stat <- scale_values(df_stat, id.vars = c("name", "subset"))
+  }                          
+  
+  df_stat <- add_columns_from_metadata(df_stat, metadata = metadata)
+  
+  plot_args$stat_var <- switch(stat_function,
+                               "cell count" = "Count",
+                               "percentage" = "perc_parent",
+                               yvar)
+  
+  plot_args$annotation_vars <- unique(c("name", "subset", names(metadata)))
+  
+  print(df_stat)
+  
+  p <- call_plot_function(df = df_stat,
+                          plot_type = plot_type,
+                          plot_args = plot_args)
+  
+  
+  if("plot_type" %in% names(p$plot_env)){
+   p <- format_plot(p, options = options)
+  }
+  
+  return( list(plot = p, data = df_stat) )
 }
 
 #' Plot all gates for a given sample of a gating set
@@ -1392,7 +1625,7 @@ plot_gate <- function(gate,
                       spill = spill, 
                       metadata = metadata)
   
-  p <- plot_gs_data(df = df,
+  p <- call_plot_function(df = df,
                     plot_type = plot_type,
                     plot_args = plot_args)
   
@@ -1431,6 +1664,20 @@ get_gate_coordinates <- function(gate){
   
 }
 
+
+scale_values <- function(df, id.vars = NULL){
+  
+  if(is.null(id.vars)){
+    id.vars <- names(df)[which(!sapply(df, is.numeric))]
+  }
+  
+  df_scale <- df
+  df_scale[-which(names(df) %in% id.vars)] <- scale(df[-which(names(df) %in% id.vars)])
+  
+  df_scale
+}
+
+
 #' @import scales
 compute_stats <- function(df = NULL,
                           gs = NULL,
@@ -1439,12 +1686,17 @@ compute_stats <- function(df = NULL,
                           stat_function = "mean",
                           y_trans = identity_trans(),
                           apply_inverse = TRUE,
-                          var_names = NULL
+                          yvar = NULL,
+                          var_names = NULL,
+                          id.vars = c("name", "subset")
                           ){
   
   inverse <- NULL
-  id.vars <- c("name", "subset")
-  yvar <- setdiff(names(df), id.vars)
+  
+  if(is.null(yvar)){
+    yvar <- setdiff(names(df), id.vars)
+  }
+  
   custom_name <- NULL
   
   if(stat_function == "GeoMean"){
@@ -1499,19 +1751,21 @@ compute_stats <- function(df = NULL,
       }
      
       
-      for(i in 1:length(yvar)){
-        idx <- which(names(df_cast) == yvar[i])
-        trans_name <- NULL
-        if(transformation[[yvar[i]]]$name != "identity"){
-          trans_name <- transformation[[yvar[i]]]$name
-        }
-        if(is.null(custom_name)){
-          names(df_cast)[idx] <- paste(stat_function, trans_name, inverse, var_names[[i]])
-        }else{
-          names(df_cast)[idx] <- paste(custom_name,  var_names[[i]])
-        }
-        
-      }
+      # for(i in 1:length(yvar)){
+      #   idx <- which(names(df_cast) == yvar[i])
+      #   trans_name <- NULL
+      #   if(transformation[[yvar[i]]]$name != "identity"){
+      #     trans_name <- transformation[[yvar[i]]]$name
+      #   }
+      #   if(is.null(custom_name)){
+      #     names(df_cast)[idx] <- paste(stat_function, trans_name, inverse, var_names[[i]])
+      #   }else{
+      #     names(df_cast)[idx] <- paste(custom_name,  var_names[[i]])
+      #   }
+      #   
+      # }
+      
+      
     }
     
   }else{
@@ -1555,368 +1809,368 @@ compute_stats <- function(df = NULL,
   
 }
 
-plot_stat <- function(df = NULL,
-                      gs,
-                      sample, 
-                      subset,
-                      yvar,
-                      type = "bar",
-                      metadata = NULL,
-                      color_var = "subset", 
-                      axis_labels = NULL,
-                      transformation = NULL,
-                      spill = NULL,
-                      default_trans = identity_trans(),
-                      scale_values = FALSE,
-                      free_y_scale = TRUE,
-                      max_scale = 0,
-                      facet_vars = NULL,
-                      group_var = "subset",
-                      expand_factor = 0.2,
-                      stat_function = "mean",
-                      show.legend = TRUE,
-                      y_trans = NULL,
-                      strip.text.y.angle = 0,
-                      theme_name = "theme_gray",
-                      Rowv = TRUE,
-                      Colv = TRUE
-){
-  
-  theme_function <- function(...){
-    do.call(theme_name, list(...))
-  }
-                    
-  if(!is.logical(scale_values)){
-    scale_values <- FALSE
-  }
-  
-  if(!is.logical(free_y_scale)){
-    free_y_scale <- TRUE
-  }
-  
-  if(!is.numeric(max_scale)){
-    max_scale <- 0
-  }
-  
-  extra_facet <- NULL
-  if(!is.null(facet_vars)){
-     extra_facet <- facet_vars[facet_vars %in% "cluster"]
-     if(length(extra_facet) == 0){
-       extra_facet <- NULL
-     }
-  }
-  
-  #if(log10_trans){
-  #  trans <- log10_trans()
-  #}else{
-  #  trans <- identity_trans()
-  #}
-  
-  if(! stat_function %in% c("cell count", "percentage")){
-    if(!is.null(yvar)){
-  
-      if(!is.null(y_trans)){
-        transformation <- lapply(yvar, function(x){y_trans})
-        names(transformation) <- yvar
-      }
-      
-      trans_name <-  unique(unlist(sapply(transformation[yvar], function(tf){tf$name})))
-      
-      
-      #ylim <- NULL
-      #if(!is.null(data_range)){
-      #  ylim <- data_range[[yvar]]
-      #}
-      if(is.null(df)){
-        df <- get_data_gs(gs = gs,
-                          sample = sample,
-                          subset = subset,
-                          spill = spill)
-      }else{
-        df <- df[df$name %in% sample & df$subset %in% subset, ]
-      } 
-      
-      
-      for(i in 1:length(yvar)){
-        df[[yvar[i]]] <- transformation[[yvar[i]]]$transform(df[[yvar[i]]])
-      }
-  
-      id.vars <- unique(c("name", "subset", extra_facet))
-      
-      df_melt <- melt(df, id.vars = id.vars, measure.vars = yvar)
-      df_melt <- df_melt[is.finite(df_melt$value), ]
-      
-      
-      stat.fun <- function(...){do.call(stat_function, args = list(...))}
-      df_cast <- dcast(df_melt, 
-                       formula = as.formula(paste(paste(id.vars, collapse = " + "), " ~ variable", sep ="")), 
-                       fun.aggregate =  stat.fun, 
-                       na.rm = TRUE)
-      
-      
-      for(i in 1:length(yvar)){
-        print(yvar[i])
-        print(transformation[[yvar[i]]])
-        df_cast[[yvar[i]]] <- transformation[[yvar[i]]]$inverse(df_cast[[yvar[i]]])
-        #  #df_cast[[yvar[i]]] <- trans$inverse(df_cast[[yvar[i]]])
-      }
-    }
-    
-  }else{
-    
-    if(!is.null(extra_facet)){
-
-        id.vars <- unique(c("name", "subset", extra_facet))
-        
-        df_data <- get_data_gs(gs = gs,
-                               sample = sample,
-                               subset = subset,
-                               spill = spill)
-        
-        var_levels <- unique(df_data[[extra_facet]])
-        
-        df <- NULL
-        for(level in var_levels){
-          df_gate <- data.frame(x  = c(level-0.5, level+0.5))
-          names(df_gate) <- extra_facet
-          filter <- rectangleGate(filterId = "filter", df_gate )
-          print(filter)
-          df_filter <- getPopStatsPlus(gs, spill = spill, filter = filter)
-          df_filter[[extra_facet]] <- level
-          df <- rbind(df, df_filter)
-        }
-      
-    }else{
-      id.vars <- c("name", "subset")
-      df <- getPopStatsPlus(gs, spill = spill, filter = NULL)
-    }
-    
-    df <- dplyr::rename(df, subset = Population)
-    df[['perc_parent']] <- df$Count / df$ParentCount * 100
-
-    print(df)
-    
-    idx <- which(as.character(df$name) %in% sample & as.character(df$subset) %in% subset)
-    print(idx)
-    if(length(idx)>0){
-      df_cast <- df[idx, ]
-    }else{
-      df_cast <- NULL
-    }
-    
-    
-    # if(length(idx)>0){
-    #   df_cast <- df[idx, ]
-    # }else{
-    #   df_cast <- NULL
-    #   return(NULL)
-    # }
-    
-    trans_name <- NULL
-    yvar <- switch(stat_function,
-                   "cell count" = "Count",
-                   "percentage" = "perc_parent")
-    #
-    
-  }
-  
-  
-  
-  
-  df_scale <- df_cast
-  if(scale_values){
-    df_scale[-which(names(df_cast) %in% id.vars)] <- scale(df_cast[-which(names(df_cast) %in% id.vars)])
-  }
-
-  print(df_cast)
-  print(df_scale)
-  print(id.vars)
-  print(yvar)
-  
-  df_melt2 <- data.table::melt(df_scale, id.vars = id.vars, measure.vars = yvar )
-  
-  if(is.null(metadata) & !is.null(gs)){
-    metadata <- pData(gs)
-  }
-  
-  if(!is.null(metadata)){
-    df_melt2 <- add_columns_from_metadata(df_melt2,
-                                          metadata = metadata
-                                          #color_var = color_var,
-                                          #facet_vars = facet_vars,
-                                          #group_var = group_var
-                                          )
-  }
-
-  df_melt2 <- df_melt2[df_melt2$variable %in% yvar, ]
-
-  ylim <- NULL
-
-  if(!free_y_scale){
-    if(!is.null(y_trans)){
-      rg = y_trans$transform(range(df_melt2$value))
-    }else{
-      rg = range(df_melt2$value)
-    }
-    delta <- abs(rg[2]-rg[1])
-    
-    if(!is.null(y_trans)){
-      ylim <- y_trans$inverse(c( min(rg) - expand_factor*delta, 
-                 max(rg) + expand_factor*delta))
-    }else{
-      ylim <- c( min(rg) - expand_factor*delta, 
-                 max(rg) + expand_factor*delta)
-    }
-    
-    # ylim <- c( min(df_melt2$value, na.rm = TRUE) - expand_factor*delta, 
-    #            max(df_melt2$value, na.rm = TRUE) + expand_factor*delta)
-    #scale_y <- "free"
-  }
-  
-  if(scale_values & max_scale > 0){
-    #df_melt2$value[df_melt2$value > max_scale] <- max_scale
-    #df_melt2$value[df_melt2$value < -max_scale] <- -max_scale
-    ylim <- c(-max_scale - expand_factor*2*max_scale, 
-              max_scale + expand_factor*2*max_scale)
-    #scale_y <- "free_y"
-    #main_title <- "Scaled values (Z-score)"
-  }
-  
-  # if(free_y_scale){
-  #   scale_y <- "free_y"
-  # }
-  
-  df_melt2$variable <- as.character(df_melt2$variable)
-  
-  if(!is.null(axis_labels)){
-    for(i in 1:length(yvar)){
-      if(yvar[i] %in% names(axis_labels)){
-        df_melt2$variable[df_melt2$variable == yvar[i]] <- axis_labels[[yvar[i]]]
-      }
-    }
-  }
-  
-  print(names(df_melt2))
-  
-  if(type == "heatmap"){
-    
-    df <- as.data.frame(df_melt2)
-    # s <- group_var
-    # df <- df[ , c("variable", s, "value")]
-    # print(df)
-    # print(class(df_melt2))
-    
-    df_cast2 <- data.table::dcast(df[, c("variable", c(group_var, extra_facet), "value")],
-                      formula = as.formula(paste("variable ~", paste(c(group_var, extra_facet), collapse = " + "))),
-                      fun.aggregate = mean )
-    
-    # df_cast2 <- data.table::dcast(df_melt2[, c("variable", "subset", "value")],
-    #                               formula = as.formula(paste("variable ~", paste("subset", collapse = " + "))), 
-    #                               fun.aggregate = mean )
-    
-    row_labels <- df_cast2$variable
-    p <- heatmaply(df_cast2[-1], 
-                   labRow = row_labels,
-                   margins = c(80, 80, 50, 0),
-                   Rowv = Rowv,
-                   Colv = Colv
-                   )
-    return(list(plot = p, data = df_melt2))
-  }
-  
-  
-  if(type == "tile"){
-    
-    p <- ggplot(df_melt2, aes_string( x = group_var ))
-    p <- p + geom_tile(mapping = aes_string(y = "variable", fill = "value"),
-                       show.legend = show.legend)
-    
-    
-    p <- p + scale_fill_viridis(limits = ylim) +
-      scale_y_discrete(labels = NULL, name = "")
-    
-    # if(!is.null(facet_vars)){
-    #   formula_facet <- as.formula(paste(". ~", paste(facet_vars, collapse = " + ")))
-    # }else{
-    #   formula_facet <- NULL
-    # }
-  }
-  
-  if(type == "bar"){
-    
-    p <- ggplot(df_melt2, aes_string(x = group_var, y = "value"))
-    
-    p <- p + 
-      geom_bar(alpha = 0.5, stat = "summary", fun.y = "mean") + 
-      geom_point( mapping = aes_(colour = as.name(color_var)), 
-                  inherit.aes = TRUE, 
-                  position = position_jitter(width = 0.25, height = 0),
-                  alpha = 0.5,
-                  size = 3,
-                  show.legend = show.legend) 
-      # geom_signif(comparisons = list(c(1,2)),
-      #             test="t.test",
-      #             test.args = list("paired"=FALSE))
-    
-    if(!is.null(y_trans)){
-      p <- p + scale_y_continuous(trans = y_trans)
-    }
-    
-    if(!is.null(ylim)){
-      if(!is.finite(ylim[1])){
-        ylim[1] <- 1
-      }
-    }
-    
-   
-    p <- p + coord_cartesian(ylim = ylim, expand = free_y_scale)
-        
-    
-    
-      #geom_boxplot(mapping = aes_string( y = "value", fill = "variable")) +
-      #geom_point(mapping = aes_string(y = "value"))
-    
-  }
-  
-  if(!is.null(facet_vars)){
-    formula_facet <- as.formula(paste("variable ~", paste(facet_vars, collapse = " + ")))
-  }else{
-    formula_facet <- as.formula("variable ~ .")
-  }
-  
-  #if(!is.null(formula_facet)){
-  
-  p <- p + facet_grid(formula_facet,
-                      labeller = label_both, 
-                      #scales = scale_y,
-                      scales = "free")
-
-  #}
-  
-  
-  ##################################################################################
-  # general plot parameters
-  
-  
-  p <- p +
-    theme_function() +
-    theme( axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5), 
-           strip.text.y = element_text(angle = strip.text.y.angle)
-    )
-
-  if(!is.null(trans_name)){
-    trans_name_plot <- trans_name
-    if(length(trans_name)>1){
-      trans_name_plot <- "defined by variable"
-    }
-    p <- p + ggtitle(paste("statistic : ", stat_function, " / transform : ", trans_name_plot, sep = ""))
-  }else{
-    p <- p + ggtitle(paste("statistic : ", stat_function))
-  }
-
-  return(list(plot = p, data = df_melt2))
-  
-}
+# plot_stat <- function(df = NULL,
+#                       gs,
+#                       sample, 
+#                       subset,
+#                       yvar,
+#                       type = "bar",
+#                       metadata = NULL,
+#                       color_var = "subset", 
+#                       axis_labels = NULL,
+#                       transformation = NULL,
+#                       spill = NULL,
+#                       default_trans = identity_trans(),
+#                       scale_values = FALSE,
+#                       free_y_scale = TRUE,
+#                       max_scale = 0,
+#                       facet_vars = NULL,
+#                       group_var = "subset",
+#                       expand_factor = 0.2,
+#                       stat_function = "mean",
+#                       show.legend = TRUE,
+#                       y_trans = NULL,
+#                       strip.text.y.angle = 0,
+#                       theme_name = "theme_gray",
+#                       Rowv = TRUE,
+#                       Colv = TRUE
+# ){
+#   
+#   theme_function <- function(...){
+#     do.call(theme_name, list(...))
+#   }
+#                     
+#   if(!is.logical(scale_values)){
+#     scale_values <- FALSE
+#   }
+#   
+#   if(!is.logical(free_y_scale)){
+#     free_y_scale <- TRUE
+#   }
+#   
+#   if(!is.numeric(max_scale)){
+#     max_scale <- 0
+#   }
+#   
+#   extra_facet <- NULL
+#   if(!is.null(facet_vars)){
+#      extra_facet <- facet_vars[facet_vars %in% "cluster"]
+#      if(length(extra_facet) == 0){
+#        extra_facet <- NULL
+#      }
+#   }
+#   
+#   #if(log10_trans){
+#   #  trans <- log10_trans()
+#   #}else{
+#   #  trans <- identity_trans()
+#   #}
+#   
+#   if(! stat_function %in% c("cell count", "percentage")){
+#     if(!is.null(yvar)){
+#   
+#       if(!is.null(y_trans)){
+#         transformation <- lapply(yvar, function(x){y_trans})
+#         names(transformation) <- yvar
+#       }
+#       
+#       trans_name <-  unique(unlist(sapply(transformation[yvar], function(tf){tf$name})))
+#       
+#       
+#       #ylim <- NULL
+#       #if(!is.null(data_range)){
+#       #  ylim <- data_range[[yvar]]
+#       #}
+#       if(is.null(df)){
+#         df <- get_data_gs(gs = gs,
+#                           sample = sample,
+#                           subset = subset,
+#                           spill = spill)
+#       }else{
+#         df <- df[df$name %in% sample & df$subset %in% subset, ]
+#       } 
+#       
+#       
+#       for(i in 1:length(yvar)){
+#         df[[yvar[i]]] <- transformation[[yvar[i]]]$transform(df[[yvar[i]]])
+#       }
+#   
+#       id.vars <- unique(c("name", "subset", extra_facet))
+#       
+#       df_melt <- melt(df, id.vars = id.vars, measure.vars = yvar)
+#       df_melt <- df_melt[is.finite(df_melt$value), ]
+#       
+#       
+#       stat.fun <- function(...){do.call(stat_function, args = list(...))}
+#       df_cast <- dcast(df_melt, 
+#                        formula = as.formula(paste(paste(id.vars, collapse = " + "), " ~ variable", sep ="")), 
+#                        fun.aggregate =  stat.fun, 
+#                        na.rm = TRUE)
+#       
+#       
+#       for(i in 1:length(yvar)){
+#         print(yvar[i])
+#         print(transformation[[yvar[i]]])
+#         df_cast[[yvar[i]]] <- transformation[[yvar[i]]]$inverse(df_cast[[yvar[i]]])
+#         #  #df_cast[[yvar[i]]] <- trans$inverse(df_cast[[yvar[i]]])
+#       }
+#     }
+#     
+#   }else{
+#     
+#     if(!is.null(extra_facet)){
+# 
+#         id.vars <- unique(c("name", "subset", extra_facet))
+#         
+#         df_data <- get_data_gs(gs = gs,
+#                                sample = sample,
+#                                subset = subset,
+#                                spill = spill)
+#         
+#         var_levels <- unique(df_data[[extra_facet]])
+#         
+#         df <- NULL
+#         for(level in var_levels){
+#           df_gate <- data.frame(x  = c(level-0.5, level+0.5))
+#           names(df_gate) <- extra_facet
+#           filter <- rectangleGate(filterId = "filter", df_gate )
+#           print(filter)
+#           df_filter <- getPopStatsPlus(gs, spill = spill, filter = filter)
+#           df_filter[[extra_facet]] <- level
+#           df <- rbind(df, df_filter)
+#         }
+#       
+#     }else{
+#       id.vars <- c("name", "subset")
+#       df <- getPopStatsPlus(gs, spill = spill, filter = NULL)
+#     }
+#     
+#     df <- dplyr::rename(df, subset = Population)
+#     df[['perc_parent']] <- df$Count / df$ParentCount * 100
+# 
+#     print(df)
+#     
+#     idx <- which(as.character(df$name) %in% sample & as.character(df$subset) %in% subset)
+#     print(idx)
+#     if(length(idx)>0){
+#       df_cast <- df[idx, ]
+#     }else{
+#       df_cast <- NULL
+#     }
+#     
+#     
+#     # if(length(idx)>0){
+#     #   df_cast <- df[idx, ]
+#     # }else{
+#     #   df_cast <- NULL
+#     #   return(NULL)
+#     # }
+#     
+#     trans_name <- NULL
+#     yvar <- switch(stat_function,
+#                    "cell count" = "Count",
+#                    "percentage" = "perc_parent")
+#     #
+#     
+#   }
+#   
+#   
+#   
+#   
+#   df_scale <- df_cast
+#   if(scale_values){
+#     df_scale[-which(names(df_cast) %in% id.vars)] <- scale(df_cast[-which(names(df_cast) %in% id.vars)])
+#   }
+# 
+#   print(df_cast)
+#   print(df_scale)
+#   print(id.vars)
+#   print(yvar)
+#   
+#   df_melt2 <- data.table::melt(df_scale, id.vars = id.vars, measure.vars = yvar )
+#   
+#   if(is.null(metadata) & !is.null(gs)){
+#     metadata <- pData(gs)
+#   }
+#   
+#   if(!is.null(metadata)){
+#     df_melt2 <- add_columns_from_metadata(df_melt2,
+#                                           metadata = metadata
+#                                           #color_var = color_var,
+#                                           #facet_vars = facet_vars,
+#                                           #group_var = group_var
+#                                           )
+#   }
+# 
+#   df_melt2 <- df_melt2[df_melt2$variable %in% yvar, ]
+# 
+#   ylim <- NULL
+# 
+#   if(!free_y_scale){
+#     if(!is.null(y_trans)){
+#       rg = y_trans$transform(range(df_melt2$value))
+#     }else{
+#       rg = range(df_melt2$value)
+#     }
+#     delta <- abs(rg[2]-rg[1])
+#     
+#     if(!is.null(y_trans)){
+#       ylim <- y_trans$inverse(c( min(rg) - expand_factor*delta, 
+#                  max(rg) + expand_factor*delta))
+#     }else{
+#       ylim <- c( min(rg) - expand_factor*delta, 
+#                  max(rg) + expand_factor*delta)
+#     }
+#     
+#     # ylim <- c( min(df_melt2$value, na.rm = TRUE) - expand_factor*delta, 
+#     #            max(df_melt2$value, na.rm = TRUE) + expand_factor*delta)
+#     #scale_y <- "free"
+#   }
+#   
+#   if(scale_values & max_scale > 0){
+#     #df_melt2$value[df_melt2$value > max_scale] <- max_scale
+#     #df_melt2$value[df_melt2$value < -max_scale] <- -max_scale
+#     ylim <- c(-max_scale - expand_factor*2*max_scale, 
+#               max_scale + expand_factor*2*max_scale)
+#     #scale_y <- "free_y"
+#     #main_title <- "Scaled values (Z-score)"
+#   }
+#   
+#   # if(free_y_scale){
+#   #   scale_y <- "free_y"
+#   # }
+#   
+#   df_melt2$variable <- as.character(df_melt2$variable)
+#   
+#   if(!is.null(axis_labels)){
+#     for(i in 1:length(yvar)){
+#       if(yvar[i] %in% names(axis_labels)){
+#         df_melt2$variable[df_melt2$variable == yvar[i]] <- axis_labels[[yvar[i]]]
+#       }
+#     }
+#   }
+#   
+#   print(names(df_melt2))
+#   
+#   if(type == "heatmap"){
+#     
+#     df <- as.data.frame(df_melt2)
+#     # s <- group_var
+#     # df <- df[ , c("variable", s, "value")]
+#     # print(df)
+#     # print(class(df_melt2))
+#     
+#     df_cast2 <- data.table::dcast(df[, c("variable", c(group_var, extra_facet), "value")],
+#                       formula = as.formula(paste("variable ~", paste(c(group_var, extra_facet), collapse = " + "))),
+#                       fun.aggregate = mean )
+#     
+#     # df_cast2 <- data.table::dcast(df_melt2[, c("variable", "subset", "value")],
+#     #                               formula = as.formula(paste("variable ~", paste("subset", collapse = " + "))), 
+#     #                               fun.aggregate = mean )
+#     
+#     row_labels <- df_cast2$variable
+#     p <- heatmaply(df_cast2[-1], 
+#                    labRow = row_labels,
+#                    margins = c(80, 80, 50, 0),
+#                    Rowv = Rowv,
+#                    Colv = Colv
+#                    )
+#     return(list(plot = p, data = df_melt2))
+#   }
+#   
+#   
+#   if(type == "tile"){
+#     
+#     p <- ggplot(df_melt2, aes_string( x = group_var ))
+#     p <- p + geom_tile(mapping = aes_string(y = "variable", fill = "value"),
+#                        show.legend = show.legend)
+#     
+#     
+#     p <- p + scale_fill_viridis(limits = ylim) +
+#       scale_y_discrete(labels = NULL, name = "")
+#     
+#     # if(!is.null(facet_vars)){
+#     #   formula_facet <- as.formula(paste(". ~", paste(facet_vars, collapse = " + ")))
+#     # }else{
+#     #   formula_facet <- NULL
+#     # }
+#   }
+#   
+#   if(type == "bar"){
+#     
+#     p <- ggplot(df_melt2, aes_string(x = group_var, y = "value"))
+#     
+#     p <- p + 
+#       geom_bar(alpha = 0.5, stat = "summary", fun.y = "mean") + 
+#       geom_point( mapping = aes_(colour = as.name(color_var)), 
+#                   inherit.aes = TRUE, 
+#                   position = position_jitter(width = 0.25, height = 0),
+#                   alpha = 0.5,
+#                   size = 3,
+#                   show.legend = show.legend) 
+#       # geom_signif(comparisons = list(c(1,2)),
+#       #             test="t.test",
+#       #             test.args = list("paired"=FALSE))
+#     
+#     if(!is.null(y_trans)){
+#       p <- p + scale_y_continuous(trans = y_trans)
+#     }
+#     
+#     if(!is.null(ylim)){
+#       if(!is.finite(ylim[1])){
+#         ylim[1] <- 1
+#       }
+#     }
+#     
+#    
+#     p <- p + coord_cartesian(ylim = ylim, expand = free_y_scale)
+#         
+#     
+#     
+#       #geom_boxplot(mapping = aes_string( y = "value", fill = "variable")) +
+#       #geom_point(mapping = aes_string(y = "value"))
+#     
+#   }
+#   
+#   if(!is.null(facet_vars)){
+#     formula_facet <- as.formula(paste("variable ~", paste(facet_vars, collapse = " + ")))
+#   }else{
+#     formula_facet <- as.formula("variable ~ .")
+#   }
+#   
+#   #if(!is.null(formula_facet)){
+#   
+#   p <- p + facet_grid(formula_facet,
+#                       labeller = label_both, 
+#                       #scales = scale_y,
+#                       scales = "free")
+# 
+#   #}
+#   
+#   
+#   ##################################################################################
+#   # general plot parameters
+#   
+#   
+#   p <- p +
+#     theme_function() +
+#     theme( axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5), 
+#            strip.text.y = element_text(angle = strip.text.y.angle)
+#     )
+# 
+#   if(!is.null(trans_name)){
+#     trans_name_plot <- trans_name
+#     if(length(trans_name)>1){
+#       trans_name_plot <- "defined by variable"
+#     }
+#     p <- p + ggtitle(paste("statistic : ", stat_function, " / transform : ", trans_name_plot, sep = ""))
+#   }else{
+#     p <- p + ggtitle(paste("statistic : ", stat_function))
+#   }
+# 
+#   return(list(plot = p, data = df_melt2))
+#   
+# }
 
 
 ####################################################################################################
@@ -2036,6 +2290,8 @@ dim_reduction <- function(df,
 #' @param method Name of the method used. Either "ClusterX" or "Rphenograph".
 #' @return a data.frame with the additionnal column "cluster"
 #' @import FlowSOM
+#' @import Rphenograph
+#' @import ClusterX
 #' @import igraph
 #' @import scales
 get_cluster <- function(df,
@@ -2099,19 +2355,19 @@ get_cluster <- function(df,
     return(list(df = df_filter, keep = idx_cells_kept, fSOM = fSOM))
     
   }else if(method == "Rphenograph"){
-    warning("Rphenograph is not supported")
-    df_filter$cluster <- 1 
-    return(list(df = df_filter, keep = idx_cells_kept))
-    # message(paste("Clustering ", dim(df_trans)[1], " cells using 'Rphenograph' on ",  length(yvar), " parameters", sep = ""))
-    # Rphenograph_out <- Rphenograph(df_trans[ , yvar], k = k)
-    # df_filter$cluster <- igraph::membership(Rphenograph_out[[2]])
+    # warning("Rphenograph is not supported")
+    # df_filter$cluster <- 1 
+    # return(list(df = df_filter, keep = idx_cells_kept))
+    message(paste("Clustering ", dim(df_trans)[1], " cells using 'Rphenograph' on ",  length(yvar), " parameters", sep = ""))
+    Rphenograph_out <- Rphenograph(df_trans[ , yvar], k = k)
+    df_filter$cluster <- igraph::membership(Rphenograph_out[[2]])
   }else if(method == "ClusterX"){
-    warning("ClusterX is not supported")
-    df_filter$cluster <- 1 
-    return(list(df = df_filter, keep = idx_cells_kept))
-    #message(paste("Clustering ", dim(df_trans)[1], " cells using 'CluserX' on ",  length(yvar), " parameters", sep = ""))
-    #DC <- ClusterX(df_trans[ , yvar], dc = dc, alpha = alpha)
-    #df_filter$cluster <- DC$cluster
+    # warning("ClusterX is not supported")
+    # df_filter$cluster <- 1 
+    # return(list(df = df_filter, keep = idx_cells_kept))
+    message(paste("Clustering ", dim(df_trans)[1], " cells using 'CluserX' on ",  length(yvar), " parameters", sep = ""))
+    DC <- ClusterX(df_trans[ , yvar], dc = dc, alpha = alpha)
+    df_filter$cluster <- DC$cluster
   }
  
   return(list(df = df_filter, keep = idx_cells_kept))
