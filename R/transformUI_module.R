@@ -18,7 +18,7 @@ transformUI <- function(id) {
                            "Select channels",
                            br(),
                            br(),
-                           div(style = 'overflow-x: scroll', DT::dataTableOutput(ns("parameters_table")))
+                           div(style = 'overflow-x: scroll', DT::DTOutput(ns("parameters_table")))
                            
                   ),
                   tabPanel(title = "Transform",
@@ -29,6 +29,12 @@ transformUI <- function(id) {
                            br(),
                            actionButton(ns("apply_transformation"), label = "apply to selected chanels"),
                            br()
+                  ),
+                  tabPanel(title = "Edit",
+                           "Edit table",
+                           br(),
+                           br(),
+                           div(style = 'overflow-x: scroll', DT::DTOutput(ns("parameters")))
                   )
            )
     ),
@@ -107,7 +113,10 @@ transform <- function(input, output, session, rval) {
       plot_params$yvar <- rval$plot_var[2]
       plot_params$plot_type <- "histogram"
       plot_params$color_var <- NULL
+      plot_params$use_all_cells <- FALSE
       rval_mod$init <- FALSE
+    }else{
+      plot_params <- reactiveValues()
     }
     
   })
@@ -125,34 +134,20 @@ transform <- function(input, output, session, rval) {
   
   res <- callModule(plotGatingSet, "plot_module", rval, plot_params, simple_plot = TRUE)
   callModule(simpleDisplay, "simple_display_module", res$plot)
-  
 
-  observe({
-    #plot_params <- res$params
-    for(var in names(res$params)){
-      plot_params[[var]] <- res$params[[var]]
-    }
-    
-    # for(var in intersect( names(res$params), c("xvar", "yvar", "color_var", "gate", "samples") )){
-    # 
-    # #print(names(res$params))
-    # 
-    # #for(var in names(res$params)){
-    #   if(!is.null(res$params[[var]])){
-    #     #print(res$params[[var]])
-    #     if(length(res$params[[var]]) == 1){
-    #       if(res$params[[var]] != "") {
-    #         plot_params[[var]] <- res$params[[var]]
-    #       }
-    #     }else{
-    #       plot_params[[var]] <- res$params[[var]]
-    #     }
-    #     
-    #   }else{
-    #     plot_params[[var]] <- res$params[[var]]
-    #   }
-    # }
-  })
+
+  # observe({
+  #   #plot_params <- res$params
+  #   for(var in names(res$params)){
+  #     plot_params[[var]] <- res$params[[var]]
+  #   }
+  # })
+  
+  
+  
+  
+  ##########################################################################################################
+  # Observe functions for data transformation
   
   #get parameters information from flow set
   observeEvent(rval$flow_set, {
@@ -162,14 +157,14 @@ transform <- function(input, output, session, rval) {
     )
     
     ff <- rval$flow_set[[1]]
-
+    
     #if(is.null(rval$parameters) | !setequal(rval$parameters$name, parameters(ff)$name)){
     if(is.null(rval$parameters)){
       
       desc <- as.character(parameters(ff)$desc)
       name <- as.character(parameters(ff)$name)
-      name_long <- name
-      name_long[!is.na(desc)] <- paste(name[!is.na(desc)], " (", desc[!is.na(desc)], ")", sep = "")
+      # name_long <- name
+      # name_long[!is.na(desc)] <- paste(name[!is.na(desc)], " (", desc[!is.na(desc)], ")", sep = "")
       
       display <- unlist(sapply(rownames(parameters(ff)@data), FUN = function(x){
         kw <- substr(x, start = 2, stop = nchar(x))
@@ -185,7 +180,7 @@ transform <- function(input, output, session, rval) {
       
       rval$parameters <- data.frame(name = name,
                                     desc = desc,
-                                    name_long = name_long,
+                                    # name_long = name_long,
                                     display = display[match(name, names(display))],
                                     range = parameters(ff)@data$range,
                                     minRange = parameters(ff)@data$minRange,
@@ -195,15 +190,21 @@ transform <- function(input, output, session, rval) {
     
   })
   
+  
+  observe({
+    validate(need(rval$parameters, "no parameters"))
+    desc <- as.character(rval$parameters$desc)
+    name <- as.character(rval$parameters$name)
+    name_long <- name
+    name_long[!is.na(desc)] <- paste(name[!is.na(desc)], " (", desc[!is.na(desc)], ")", sep = "")
+    rval$parameters$name_long <- name_long
+  })
+  
   observeEvent(rval$parameters, {
     validate(need(rval$parameters, "No parameters"))
     rval$plot_var <- rval$parameters$name_long
     names(rval$plot_var) <- NULL
   })
-  
-  
-  ##########################################################################################################
-  # Observe functions for data transformation
   
   # Initialization of transformation for new parameters
   observe({
@@ -302,7 +303,7 @@ transform <- function(input, output, session, rval) {
   })
   
   output$parameters_table <- DT::renderDataTable({
-    
+
     validate(
       need(rval$parameters, "No data imported")
     )
@@ -311,18 +312,32 @@ transform <- function(input, output, session, rval) {
     df$maxRange <- format(df$maxRange, digits = 2)
     df[["channel_name"]] <- df$name_long
     DT::datatable(
-      df[, c("channel_name", "transform", "transform parameters", "display", "range", "minRange", "maxRange", "name", "desc")],
+      df[, c("name", "desc", "channel_name", "transform", "transform parameters", "minRange", "maxRange",  "range", "display" )],
       rownames = FALSE)
   })
   
-  # output$download_plot <- downloadHandler(
-  #   filename = "plot.pdf",
-  #   content = function(file) {
-  #     pdf(file, width = input$width_plot, height = input$height_plot)
-  #     print(plot_trans())
-  #     dev.off()
-  #   }
-  # )
+  
+  
+  #Edit data table
+  output$parameters <- renderDT({validate(need(rval$parameters, "No metadata")); rval$parameters},
+                           rownames = FALSE,
+                           selection = 'none',
+                           editable = 'cell',
+                           server = TRUE)
+  
+  proxy = dataTableProxy('parameters')
+  observeEvent(input$parameters_cell_edit, {
+    info = input$parameters_cell_edit
+    info$col <- info$col + 1
+    str(info)  # check what info looks like (a data frame of 3 columns)
+    if(info$col == 2){
+      rval$parameters <<- editData(rval$parameters, info)
+      replaceData(proxy, rval$parameters, resetPaging = FALSE)
+    }
+      # important
+    # the above steps can be merged into a single editData() call; see examples below
+  })
+  
   
   return(rval)
   

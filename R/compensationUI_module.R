@@ -119,9 +119,12 @@ compensation <- function(input, output, session, rval) {
       plot_params$gate <- "root"
       plot_params$xvar <- colnames(rval$df_spill)[1]
       plot_params$yvar <- colnames(rval$df_spill)[2]
-      plot_params$plot_type <- "dots"
+      plot_params$plot_type <- "hexagonal"
       plot_params$color_var <- NULL
+      plot_params$use_all_cells <- FALSE
       rval_mod$init <- FALSE
+    }else{
+      plot_params <- reactiveValues()
     }
     
   })
@@ -138,25 +141,13 @@ compensation <- function(input, output, session, rval) {
   
   res <- callModule(plotGatingSet, "plot_module", rval, plot_params, simple_plot = FALSE)
   callModule(simpleDisplay, "simple_display_module", res$plot)
-  
-  observe({
-    #for(var in intersect( names(res$params), c("xvar", "yvar", "color_var", "gate", "samples") )){
-    
-    for(var in names(res$params)){
-      plot_params[[var]] <- res$params[[var]]
-    }
-    
-    # for(var in names(res$params)){
-    # 
-    #   if(!is.null(res$params[[var]])){
-    #     if(res$params[[var]] != "") {
-    #       plot_params[[var]] <- res$params[[var]]
-    #     }
-    #   }else{
-    #     plot_params[[var]] <- res$params[[var]]
-    #   }
-    # }
-  })
+
+  # observe({
+  #   #for(var in intersect( names(res$params), c("xvar", "yvar", "color_var", "gate", "samples") )){
+  #   for(var in names(res$params)){
+  #     plot_params[[var]] <- res$params[[var]]
+  #   }
+  # })
   
   output$plot_comp <- renderPlot({
     res$plot()[[1]]

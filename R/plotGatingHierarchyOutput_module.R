@@ -48,12 +48,10 @@ plotGatingHierarchy <- function(input, output, session, rval, plot_params = reac
     validate(
       need(rval$gating_set, "Empty gating set") %then%
       need(setdiff(names(rval$gates_flowCore), "root"), "No gates to display") %then%
-      need(plot_params$samples, "Please select a sample") %then%
-      need(plot_params$xvar, "Please select a x variable") %then%
-      need(plot_params$yvar, "Please select a y variable")
+      need(plot_params$samples, "Please select a sample")
     )
 
-    if(plot_params$plot_type == "histogram") plot_params$plot_type <- "dots"
+    if(plot_params$plot_type == "histogram") plot_params$plot_type <- "hexagonal"
     
     axis_labels <- rval$parameters$name_long
     names(axis_labels) <- rval$parameters$name
@@ -63,19 +61,28 @@ plotGatingHierarchy <- function(input, output, session, rval, plot_params = reac
       transformation <- rval$transformation
     }
     
+    Ncells <- 30000
+    if("use_all_cells" %in% names(plot_params)){
+      if(plot_params$use_all_cells){
+        Ncells <- NULL
+      }
+    }
+    
+    
     options <- list(theme = plot_params[["theme"]],
                     transformation = transformation,
                     axis_labels = axis_labels,
                     legend.position = plot_params[["legend.position"]])
     
-
+  
     p <- plot_gh( gs = rval$gating_set,
                   df = NULL,
                   sample = plot_params$samples,
-                  selected_subsets = plot_params$selected_subsets, 
-                  spill = rval$spill, 
+                  selected_subsets = plot_params$selected_subsets,
+                  spill = rval$spill,
+                  Ncells =  Ncells,
                   plot_type = plot_params$plot_type,
-                  plot_args = reactiveValuesToList(plot_params), 
+                  plot_args = reactiveValuesToList(plot_params),
                   options = options)
     
     p

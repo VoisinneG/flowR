@@ -73,7 +73,7 @@ p <- format_plot(p,
                                 facet_vars = c("subset")
                                 ))
 
-p <- plot_gs_data(df=df, 
+p <- call_plot_function(df=df, 
              plot_type = "contour",
              plot_args = list(xvar = "Comp-Time",
                               yvar = "Comp-R-APC-A")
@@ -95,7 +95,7 @@ plot_gate(gs = gs, sample = sample, gate =  getNodes(gs)[6])
 
 
 transformation[["Comp-Time"]] <- identity_trans()
-plot_gs2(gs = gs, 
+plot_gs(gs = gs, 
          gates = NULL,
          plot_type = "hexagonal", 
          plot_args = list(bins = 50), 

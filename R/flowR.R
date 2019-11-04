@@ -596,6 +596,7 @@ get_plot_data <- function(gs,
                           df=NULL, 
                           sample,
                           subset,
+                          Ncells = NULL,
                           spill = NULL,
                           metadata = NULL){
                        
@@ -604,7 +605,8 @@ get_plot_data <- function(gs,
     df <- get_data_gs(gs = gs,
                       sample = sample,
                       subset = subset,
-                      spill = spill)
+                      spill = spill,
+                      Ncells = Ncells)
   }else{
     df <- df[df$name %in% sample & df$subset %in% subset, ]
   }
@@ -648,6 +650,9 @@ format_plot <- function(p,
   
   xvar <- NULL
   yvar <- NULL
+  
+  print(names(p$mapping))
+  
   if("x" %in% names(p$mapping)){
     if("quosure" %in% class(p$mapping$x)){
       xvar <- as.character(quo_get_expr(p$mapping$x))
@@ -703,7 +708,9 @@ format_plot <- function(p,
   
   if(!is.null(xvar)){
     if(length(xvar) == 1){
-      labx <- ifelse(is.null(options$axis_labels[[xvar]]), xvar, options$axis_labels[[xvar]])
+      
+      labx <- ifelse(xvar %in% names(options$axis_labels), options$axis_labels[[xvar]], xvar)
+      
       if(xvar %in% names(transformation)){
         p <- p + scale_x_continuous(name = labx, trans = transformation[[xvar]], limits = xlim) 
       }else if(is.numeric(p$data[[xvar]])){
@@ -714,7 +721,8 @@ format_plot <- function(p,
   
   if(!is.null(yvar)){
     if(length(yvar) == 1){
-      laby <- ifelse(is.null(options$axis_labels[[yvar]]), yvar, options$axis_labels[[yvar]])
+      laby <- ifelse(yvar %in% names(options$axis_labels), options$axis_labels[[yvar]], yvar)
+      #laby <- ifelse(is.null(options$axis_labels[[yvar]]), yvar, options$axis_labels[[yvar]])
       if(yvar %in% names(transformation)){
         p <- p + scale_y_continuous(name = laby, trans = transformation[[yvar]], limits = ylim) 
       }else if(is.numeric(p$data[[yvar]])){
@@ -771,13 +779,16 @@ format_plot <- function(p,
   }
   
   if("theme" %in% names(options)){
-    if(options$theme != ""){
-      theme_name = paste("theme_", options$theme, sep = "")
-      theme_function <- function(...){
-        do.call(theme_name, list(...))
+    if(!is.null(options$theme)){
+      if(options$theme != ""){
+        theme_name = paste("theme_", options$theme, sep = "")
+        theme_function <- function(...){
+          do.call(theme_name, list(...))
+        }
+        p <- p + theme_function()
       }
-      p <- p + theme_function()
     }
+    
   }
   
   
@@ -982,11 +993,11 @@ plot_contour <-function(args = list()){
 
   color_var <- NULL
   group_var <- NULL
-  fill <- NULL
-  bins <- 30
-  alpha <- 0.5
-  size <- 0.25
-  show_outliers <- TRUE
+  fill <- NA
+  bins <- 10
+  alpha <- 0.75
+  size <- 0.2
+  show_outliers <- FALSE
   
   for(var in names(args)){
     assign(var, args[[var]])
@@ -1036,25 +1047,54 @@ plot_contour <-function(args = list()){
   
    if(!is.null(color_var)){
     #p <- p + stat_density2d(aes_string(alpha='..level..', fill='..level..'),
-    p <- p + stat_density2d(aes_string(colour = color_var, group = group_var),
-                            fill = fill,
+    
+     p <- p + stat_density2d(aes_string(colour = color_var, group = group_var),
+                             fill = fill,
+                             size=0,
+                             geom="polygon",
+                             bins=bins
+     ) 
+     
+    p <- p + geom_density2d(aes_string(colour = color_var, group = group_var),
                             size=size,
                             alpha= alpha,
-                            geom="polygon",
                             bins=bins
-                            )
-
+    )
+      
+    
+    
     #scale_fill_gradient(low = "yellow", high = "red")
    }else{
-    p <- p + stat_density2d(aes_string(group = group_var),
-                            fill = fill,
-                            size=size,
-                            alpha= alpha,
-                            color = "black",
-                            geom="polygon",
-                            bins=bins
-                            )
+     
+     p <- p + stat_density2d(aes_string(group = group_var),
+                             fill = fill,
+                             size=0,
+                             geom="polygon",
+                             bins=bins
+     )
+     
+     p <- p + geom_density2d(aes_string(group = group_var),
+                             color = "black",
+                             size=size,
+                             alpha= alpha,
+                             bins=bins
+     )
+     
+    
+    
   }
+
+  # pb <- ggplot_build(p)
+  # 
+  # exp <- 1
+  # xyscales = lapply(pb$data[[1]][,c("x","y")], function(var) {
+  #   rng = range(var)
+  #   rng + c(-exp*diff(rng), exp*diff(rng))
+  # })
+  # 
+  # print(xyscales)
+  # p <- p + scale_x_continuous(limits=xyscales[[1]]) +
+  #   scale_y_continuous(limits=xyscales[[2]])
 
   return(p)
 }
@@ -1085,8 +1125,7 @@ add_polygon_layer <-function(p,
                              color = "red", 
                              nudge_y = 0, 
                              nudge_x =0, 
-                             point.padding = 0,
-                             max.iter = 30000)
+                             point.padding = 0)
                              #hjust = "middle", vjust = "center")
       }
 
@@ -1106,10 +1145,24 @@ add_gate <- function(p, gate){
     return(p)
   }
   
-  polygon <- polygon <- get_gate_coordinates(gate)
+  polygon <- get_gate_coordinates(gate)
   
-  xvar <- as.character(quo_get_expr(p$mapping$x))
-  yvar <- as.character(quo_get_expr(p$mapping$y))
+  xvar <- NULL
+  yvar <- NULL
+  print(p$plot_env$plot_type)
+  print(names(p$mapping))
+  
+  if("x" %in% names(p$mapping)){
+    if("quosure" %in% class(p$mapping$x)){
+      xvar <- as.character(quo_get_expr(p$mapping$x))
+    }
+  }
+  
+  if("y" %in% names(p$mapping)){
+    if("quosure" %in% class(p$mapping$x)){
+      yvar <- as.character(quo_get_expr(p$mapping$y))
+    }
+  }
   
   
   if(setequal(c(xvar, yvar), names(polygon))){ 
@@ -1163,7 +1216,7 @@ plot_gs <- function(gs,
                       spill = spill, 
                       metadata = metadata)
   
-  #print(names(plot_args))
+  print(plot_type)
   
   p <- call_plot_function(df = df,
                     plot_type = plot_type,
@@ -1257,6 +1310,7 @@ plot_heatmap <-function(args = list()){
 
 #' @import dplyr
 #' @import forcats
+#' @import res
 plot_bar <-function(args = list()){
   
   plot_type <- "bar"
@@ -1495,6 +1549,7 @@ plot_stat <- function(df = NULL,
 plot_gh <- function( gs, 
                       df = NULL,
                       sample = NULL,
+                      Ncells = NULL,
                       selected_subsets = NULL,
                       spill = NULL,
                       plot_type = "contour",
@@ -1522,7 +1577,8 @@ plot_gh <- function( gs,
     df <- get_data_gs(gs = gs,
                       sample = sample,
                       subset = subset,
-                      spill = spill)
+                      spill = spill,
+                      Ncells = Ncells)
     
   }
   

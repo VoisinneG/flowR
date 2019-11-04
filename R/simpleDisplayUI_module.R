@@ -55,15 +55,15 @@ simpleDisplayUI <- function(id, nrow = 1, size = 400, save = TRUE){
 #' @import plotly
 #' @export
 #' @rdname simpleDisplayUI
-simpleDisplay <- function(input, output, session, plist, gate = reactiveValues(), params = reactiveValues(use_plotly = FALSE)) {
+simpleDisplay <- function(input, output, session, plot_list, gate = reactiveValues(), params = reactiveValues(use_plotly = FALSE)) {
   
   `%then%` <- shiny:::`%OR%`
   
   rval_plot <- reactiveValues(nrow = 1, ncol = 1, facet_layout = NULL, ncol_facet = 1, nrow_facet =1)
   
-  plot_list <- reactive({
-    plist()
-  })
+  # plot_list <- reactive({
+  #   plist()
+  # })
   
 
   plot_display <- reactive({
@@ -132,6 +132,7 @@ simpleDisplay <- function(input, output, session, plist, gate = reactiveValues()
   # })
   
   output$plot_display  <- renderPlot({
+    print("render_plot")
     plot_display()
   })
 
@@ -141,6 +142,7 @@ simpleDisplay <- function(input, output, session, plist, gate = reactiveValues()
 
   output$ui_plot <- renderUI({
     ns <- session$ns
+    
     
     #print(params$use_plotly)
     

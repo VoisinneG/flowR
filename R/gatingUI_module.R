@@ -11,7 +11,7 @@ gatingUI <- function(id) {
   fluidRow(
     column(width = 4,
            box(width = NULL, height = NULL, title = "Parameters", collapsible = TRUE, collapsed = FALSE,
-               actionButton(ns("show_gate"), label = "Show gate"),
+               actionButton(ns("show_gate"), label = "Show defining gate"),
                br(),
                br(),
                plotGatingSetInput(id = ns("plot_module"), simple_plot = TRUE)
@@ -98,6 +98,7 @@ gating <- function(input, output, session, rval) {
   `%then%` <- shiny:::`%OR%`
 
   plot_params <- reactiveValues()
+  plot_params_gh <- reactiveValues()
   gate <- reactiveValues()
   rval_mod <- reactiveValues(init = TRUE)
   
@@ -125,36 +126,36 @@ gating <- function(input, output, session, rval) {
       plot_params$gate <- "root"
       plot_params$xvar <- xvar
       plot_params$yvar <- yvar
-      plot_params$plot_type <- "dots"
+      plot_params$plot_type <- "hexagonal"
       plot_params$color_var <- NULL
+      plot_params$use_all_cells <- FALSE
       rval_mod$init <- FALSE
       
+    }else{
+      plot_params <- reactiveValues()
     }
-    
+
   })
   
   res <- callModule(plotGatingSet, "plot_module", rval, plot_params, simple_plot = TRUE, show_gates = TRUE, polygon_gate = gate)
   res_display <- callModule(simpleDisplay, "simple_display_module", res$plot, gate = gate)
-  plot_all_gates <- callModule(plotGatingHierarchy, "plot_hierarchy_module", rval, plot_params = plot_params)
+  plot_all_gates <- callModule(plotGatingHierarchy, "plot_hierarchy_module", rval, plot_params = plot_params_gh)
   callModule(simpleDisplay, "simple_display_module_2", plot_all_gates)
   
   # callModule(simpleDisplay, "simple_display_module", res$plot())
   
   observe({
-    for(var in names(res$params)){
-      plot_params[[var]] <- res$params[[var]]
+    for(var in setdiff(names(res$params), c("xvar",
+                                            "yvar",
+                                            "group_var",
+                                            "facet_var",
+                                            "norm", 
+                                            "smooth", 
+                                            "ridges", 
+                                            "yridges_var",
+                                            "show_label")) ){
+      plot_params_gh[[var]] <- res$params[[var]]
     }
-    
-    #for(var in intersect( names(res$params), c("xvar", "yvar", "color_var", "gate", "samples") )){
-    # for(var in names(res$params)){
-    #   if(!is.null(res$params[[var]])){
-    #     if(res$params[[var]] != "") {
-    #       plot_params[[var]] <- res$params[[var]]
-    #     }
-    #   }else{
-    #     plot_params[[var]] <- res$params[[var]]
-    #   }
-    # }
   })
   
   

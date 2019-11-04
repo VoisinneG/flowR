@@ -301,7 +301,7 @@ metadata <- function(input, output, session, rval) {
     }
   })
   
-  output$pData <- renderDT( {validate(need(rval$pdata, "No metadata")); rval$pdata},
+  output$pData <- renderDT({validate(need(rval$pdata, "No metadata")); rval$pdata},
                             rownames = FALSE,
                             selection = 'none',
                             editable = 'cell',

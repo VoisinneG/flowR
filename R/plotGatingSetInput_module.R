@@ -20,7 +20,7 @@ plotGatingSetInput <- function(id, simple_plot = TRUE, auto_update = TRUE) {
         title = "Sample/Subset",
         selectionInput(ns("selection_module"), multiple_subset = !simple_plot)
     ),
-    box(collapsible = TRUE, collapsed = TRUE, width = NULL, height = NULL,
+    box(collapsible = TRUE, collapsed = FALSE, width = NULL, height = NULL,
         title ="Variables",
         selectizeInput(ns("xvar"), 
                         multiple = !simple_plot,
@@ -50,8 +50,9 @@ plotGatingSetInput <- function(id, simple_plot = TRUE, auto_update = TRUE) {
         title ="Options",
         selectInput(ns("plot_type"), label = "plot type",
                     choices = c("hexagonal", "histogram", "dots", "contour"),
-                    selected = "dots"),
+                    selected = "hexagonal"),
         #checkboxInput(ns("legend"), "show legend", value = TRUE),
+        checkboxInput(ns("use_all_cells"), "Use all cells", FALSE),
         selectInput(ns("legend.position"), label = "legend position",
                     choices = c("none", "right", "top", "left", "bottom"),
                     selected = "right"),
@@ -89,76 +90,86 @@ plotGatingSet <- function(input, output, session,
   `%then%` <- shiny:::`%OR%`
   #ns <- session$ns
   
-  rval_plot_default <- reactiveValues(norm = TRUE,
-                              smooth = FALSE,
-                              ridges = FALSE,
-                              yridges_var = "subset",
-                              bins = 100,
-                              alpha = 0.1,
-                              size = 0.1,
-                              xvar = NULL,
-                              yvar = NULL,
-                              color_var = "none",
-                              group_var = "none",
-                              facet_var = NULL,
-                              split_variable = "x_variable")
+  rval_plot <- reactiveValues(show_gates = FALSE,
+                                      norm = TRUE,
+                                      smooth = FALSE,
+                                      ridges = FALSE,
+                                      yridges_var = "subset",
+                                      bins = 50,
+                                      alpha = 0.3,
+                                      size = 0.3,
+                                      xvar = NULL,
+                                      yvar = NULL,
+                                      color_var = "none",
+                                      group_var = "none",
+                                      facet_var = NULL,
+                                      split_variable = "x_variable",
+                                      show_label = FALSE,
+                                      show_outliers = FALSE)
   
-  observeEvent(input$plot_type, {
-    rval_plot_default$alpha <- switch(input$plot_type, 
-                                      "contour" = 0.75,
-                                      "dots" = 0.1,
-                                      0.1)
-    
-    rval_plot_default$size <- switch(input$plot_type, 
-                                      "contour" = 0.2,
-                                      0.1)
-  })
+                              
+  # observeEvent(input$plot_type, {
+  #   rval_plot_default$alpha <- switch(input$plot_type,
+  #                                     "contour" = 0.75,
+  #                                     "dots" = 0.1,
+  #                                     0.1)
+  #   
+  #   rval_plot_default$size <- switch(input$plot_type, 
+  #                                     "contour" = 0.2,
+  #                                     0.1)
+  #   
+  #   rval_plot_default$bins <- switch(input$plot_type, 
+  #                                    "contour" = 10,
+  #                                    100)
+  # })
   
-  rval_plot <- reactiveValues()
+  #rval_plot <- reactiveValues()
   
   rval_mod <- reactiveValues(plot_list = list(), count_raw = 0, count_format = 0)
   
   selected <- callModule(selection, "selection_module", rval, params = plot_params)
 
-  observe({
+  observeEvent(c(input$plot_type, names(rval$pdata)) , {
     
     validate(need(rval$pdata, "No metadata available"))
-    validate(need(rval$plot_var, "No plotting variables"))
     
     ns <- session$ns
     x <- list()
     
-    x[["show_defining_gates"]] <- checkboxInput(ns("show_defining_gates"), "show defining gates", value = FALSE)
-    x[["norm_density"]] <- checkboxInput(ns("norm_density"), "normalize (set max to 1)", value = rval_plot_default[["norm"]])
-    x[["smooth"]] <- checkboxInput(ns("smooth"), "smooth", value = rval_plot_default[["smooth"]])
     
-    x[["ridges"]] <- checkboxInput(ns("ridges"), "ridges", value = rval_plot_default[["ridges"]])
+      x[["show_gates"]] <- checkboxInput(ns("show_gates"), "show defining gates", value = rval_plot[["show_gates"]])
+      x[["norm_density"]] <- checkboxInput(ns("norm_density"), "normalize (set max to 1)", value = rval_plot[["norm"]])
+      x[["smooth"]] <- checkboxInput(ns("smooth"), "smooth", value = rval_plot[["smooth"]])
+      
+      x[["ridges"]] <- checkboxInput(ns("ridges"), "ridges", value = rval_plot[["ridges"]])
+      
+      x[["yridges_var"]] <- selectizeInput(ns("yridges_var"), 
+                                           multiple =FALSE,
+                                           label = "y ridges variable", 
+                                           choices = c("subset", names(rval$pdata)), 
+                                           selected = rval_plot[["yridges_var"]])
+      x[["bins"]] <- numericInput(ns("bins"), label = "number of bins", value = rval_plot[["bins"]])
+      x[["alpha"]] <- numericInput(ns("alpha"), label = "alpha", value = rval_plot[["alpha"]])
+      x[["size"]] <- numericInput(ns("size"), label = "size", value = rval_plot[["size"]])
+      x[["show_label"]] <- checkboxInput(ns("show_label"), "show labels", value = rval_plot[["show_label"]])
+      x[["show_outliers"]] <- checkboxInput(ns("show_outliers"), "show outliers", value = rval_plot[["show_outliers"]])
+      
+      rval_mod$plot_options <- x
     
-    x[["yridges_var"]] <- selectizeInput(ns("yridges_var"), 
-                                         multiple =FALSE,
-                                         label = "y ridges variable", 
-                                         choices = c("subset", names(rval$pdata)), 
-                                         selected = rval_plot_default[["yridges_var"]])
-    x[["bins"]] <- numericInput(ns("bins"), label = "number of bins", value = rval_plot_default[["bins"]])
-    x[["alpha"]] <- numericInput(ns("alpha"), label = "alpha", value = rval_plot_default[["alpha"]])
-    x[["size"]] <- numericInput(ns("size"), label = "size", value = rval_plot_default[["size"]])
-    x[["show_label"]] <- checkboxInput(ns("show_label"), "show labels", value = FALSE)
-    x[["show_outliers"]] <- checkboxInput(ns("show_outliers"), "show outliers", value = FALSE)
     
-    rval_mod$plot_options <- x
     
   })
   
   output$plot_options <- renderUI({
     x <- rval_mod$plot_options
     if(input$plot_type == 'histogram'){
-      vars <- setdiff(names(x), "show_defining_gates")
+      vars <- setdiff(names(x), "show_gates")
     }else if (input$plot_type == 'hexagonal'){
-      vars <- c("show_defining_gates", "bins")
+      vars <- c("show_gates", "bins")
     }else if (input$plot_type == 'dots'){
-      vars <- c("show_defining_gates","alpha", "size", "show_label")
+      vars <- c("show_gates","alpha", "size", "show_label")
     }else if (input$plot_type == 'contour'){
-      vars <- c("show_defining_gates", "show_outliers",  "bins", "alpha", "size")
+      vars <- c("show_gates", "show_outliers",  "bins", "alpha", "size")
     }
     
     tagList(rval_mod$plot_options[vars])
@@ -185,7 +196,7 @@ plotGatingSet <- function(input, output, session,
                                        multiple = !simple_plot,
                                        label = "group variable",
                                        choices = c("none", "subset", names(rval$pdata)),
-                                       selected = rval_plot_default[["group_var"]])
+                                       selected = rval_plot[["group_var"]])
     
     
     if(input$plot_type %in% c('histogram', "contour")){
@@ -193,14 +204,14 @@ plotGatingSet <- function(input, output, session,
                                          multiple = !simple_plot,
                                          label = "color variable",
                                          choices = c("none", "subset", names(rval$pdata)),
-                                         selected = rval_plot_default[["color_var"]])
+                                         selected = rval_plot[["color_var"]])
     
     }else{
       x[["color_var"]] <- selectizeInput(ns("color_var"),
                                          multiple = !simple_plot,
                                          label = "color variable",
                                          choices = c("none", "subset", names(rval$pdata), rval$plot_var),
-                                         selected = rval_plot_default[["color_var"]])
+                                         selected = rval_plot[["color_var"]])
     }
     
     if(!simple_plot){
@@ -214,12 +225,12 @@ plotGatingSet <- function(input, output, session,
                        multiple =TRUE,
                        label = "facet variables",
                        choices = c("subset", names(rval$pdata), extra_facet_var),
-                       selected = rval_plot_default[["facet_var"]]
+                       selected = rval_plot[["facet_var"]]
         )
         x[["split_variable"]] <- selectInput(ns("split_variable"),
                     label = "select variable used to split plots",
                     choices = c("x variable", "y variable", "color variable"),
-                    selected = rval_plot_default[["split_variable"]]
+                    selected = rval_plot[["split_variable"]]
         )
     }
 
@@ -241,7 +252,8 @@ plotGatingSet <- function(input, output, session,
     tagList(rval_mod$plot_variables[vars])
   })
   
-  
+  ######################################################################################
+  #Initialization of plot parameters
   observe({
     
     #print(names(plot_params))
@@ -260,7 +272,14 @@ plotGatingSet <- function(input, output, session,
         updateSelectInput(session, var, selected = plot_params[[var]])
       }
     }
+    
+    if("use_all_cells" %in% names(plot_params)){
+      updateCheckboxInput(session, "use_all_cells", value = plot_params[["use_all_cells"]])
+    }
+    
   })
+  ######################################################################################
+  
   
   observeEvent(input$select_var, {
     
@@ -304,7 +323,7 @@ plotGatingSet <- function(input, output, session,
     }
     rval_plot$gate <- selected$gate
     rval_plot$samples <- selected$samples
-  }) 
+  })
 
   
   split_var <- reactive({
@@ -328,9 +347,13 @@ plotGatingSet <- function(input, output, session,
       update_params <- c(selected$samples,
                          selected$gate,
                          rval$spill,
-                         rval$flow_set,
-                         rval$gating_set,
-                         rval$parameters
+                         rval$flow_set_selected,
+                         # rval$gating_set,
+                         # rval$parameters,
+                         rval$gates_flowCore,
+                         rval$plot_var,
+                         rval$pdata,
+                         rval_plot$use_all_cells
       )
       update_params
     }
@@ -355,9 +378,9 @@ plotGatingSet <- function(input, output, session,
                       "yridges_var",
                       "show_label",
                       "show_outliers")
-      var_update <- var_update[var_update %in% names(input)]
+      var_update <- var_update[var_update %in% names(rval_plot)]
       for(var in var_update){
-        update_params <- c(update_params, input[[var]])
+        update_params <- c(update_params, rval_plot[[var]])
       }
       update_params
     }
@@ -374,20 +397,18 @@ plotGatingSet <- function(input, output, session,
       var_update <- c("facet_var", 
                       "theme",
                       "legend",
-                      "legend_pos")
-      var_update <- var_update[var_update %in% names(input)]
+                      "legend.position")
+      var_update <- var_update[var_update %in% names(rval_plot)]
       for(var in var_update){
-        update_params <- c(update_params, input[[var]])
+        update_params <- c(update_params, rval_plot[[var]])
       }
       
       update_params <- c(update_params,
                          rval$apply_trans)
       
-      
       if(rval$apply_trans){
         update_params <- c(update_params, rval$transformation)
       }
-      
       
       if(show_gates){
         update_params <- c(update_params, 
@@ -399,7 +420,9 @@ plotGatingSet <- function(input, output, session,
   
   
   data_plot_focus <- eventReactive(params_update_data(), {
-    #print("data")
+    
+    print("data")
+    
     validate(
       need(rval$gating_set, "Empty gating set") %then%
         need(selected$samples, "Please select samples") %then%
@@ -407,18 +430,27 @@ plotGatingSet <- function(input, output, session,
         need(selected$gate, "Please select subsets")
     )
     
+    Ncells <- 30000
+    if(rval_plot$use_all_cells){
+      Ncells <- NULL
+    }
+    
     df <- get_plot_data(gs = rval$gating_set,
                       sample = selected$samples,
                       subset = selected$gate,
                       spill = rval$spill,
-                      metadata = rval$pdata)
+                      metadata = rval$pdata,
+                      Ncells = Ncells)
+    
+    print(names(df))
+    
     return(df)
     
   })
   
   observeEvent(c(params_update_plot_raw(),  data_plot_focus()), {
     
-    #print("raw")
+    print("call plot")
     df <- data_plot_focus()
 
     idx_x <- match(input$xvar, rval$parameters$name_long)
@@ -447,8 +479,8 @@ plotGatingSet <- function(input, output, session,
     rval_mod$plot_list <- list()
     
     plot_args <- list()
-    for(var in names(input) ){
-      plot_args[[var]] <- input[[var]]
+    for(var in names(rval_plot) ){
+      plot_args[[var]] <- rval_plot[[var]]
     }
     
     for(i in 1:length(input[[split_var()]])){
@@ -470,6 +502,8 @@ plotGatingSet <- function(input, output, session,
     
           #args <- reactiveValuesToList(rval_plot)
           
+         
+          
           rval_mod$plot_list[[i]] <- call_plot_function(df=df,
                                                         plot_type = input$plot_type,
                                                         plot_args = plot_args)
@@ -483,7 +517,9 @@ plotGatingSet <- function(input, output, session,
   })
   
   observeEvent(params_update_plot_format(),  {
-                                       
+    
+    print("format_plot")
+    
     axis_labels <- rval$parameters$name_long
     names(axis_labels) <- rval$parameters$name
     
@@ -493,16 +529,16 @@ plotGatingSet <- function(input, output, session,
     }
      
     if(!simple_plot){
-      facet_var <- input$facet_var
+      facet_var <- rval_plot$facet_var
     }else{
       facet_var <- NULL
     }
     
-    options <- list(theme = input$theme,
+    options <- list(theme = rval_plot$theme,
                     transformation = transformation,
                     axis_labels = axis_labels,
                     facet_var = facet_var,
-                    legend.position = input[["legend.position"]])
+                    legend.position = rval_plot[["legend.position"]])
     
     plist <- lapply( rval_mod$plot_list, 
                      function(p){
@@ -519,7 +555,7 @@ plotGatingSet <- function(input, output, session,
     
     validate(need(rval$gating_set, "No gating set"))
     
-    #print("gate")
+    print("show gate")
     gate <- NULL
     
     if(show_gates){
@@ -539,7 +575,7 @@ plotGatingSet <- function(input, output, session,
                            p <- add_gate(p = p, gate = gate_int)
                          }
                        }
-                       p
+                       return(p)
                      })
     
     rval_mod$plot_list <- plist
@@ -549,18 +585,23 @@ plotGatingSet <- function(input, output, session,
   
   plot_gate <- reactive({
     
+    print("plot polygon gate")
+    
       gate <- NULL
-      if(!is.null(input$show_defining_gates)){
-        if(input$show_defining_gates){
+      if(!is.null(rval_plot$show_gates)){
+        if(rval_plot$show_gates){
           gate <- selected$gate
         }
       }
       
+      polygon <- data.frame(x = polygon_gate$x, 
+                            y = polygon_gate$y)
     
       plist <- lapply(rval_mod$plot_list,
                       function(p){
-                        if(!is.null(polygon_gate$x)){
-                          p <- add_polygon_layer(p, polygon = polygon_gate)
+                        if(!is.null(polygon$x)){
+                         
+                          p <- add_polygon_layer(p, polygon = polygon)
                         }
                         
                         if(!is.null(gate)){
@@ -569,10 +610,10 @@ plotGatingSet <- function(input, output, session,
                             p <- add_gate(p, g)
                           }
                         }
-                        
-                        p
+                        return(p)
                       })
       plist
+      
   })
   
   return( list(plot = plot_gate, params = rval_plot) )

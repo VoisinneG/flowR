@@ -1,21 +1,22 @@
 ---
-title: ""
+title: ''
 output:
-  html_document
+  pdf_document: default
+  html_document: default
 ---
 
 
 ## Install flowR on Windows (inside CIML)
 
 
-To install flowR, you will need R version 3.5.3 or later
+To install flowR, you will need R version 3.6.1 or later
 
 ### Setup R in windows
 
-If you use windows 10, you can get R-3.6.0 and Rstudio using the 'Centre Logiciel:
+If you use windows 10, you can get R-3.6.1 and Rstudio using the 'Centre Logiciel':
 
 - go to 'Centre Logiciel'
-- download R-3.6.0
+- download R-3.6.1
 - download Rstudio
 - open Rstudio
 

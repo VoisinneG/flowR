@@ -71,13 +71,17 @@ plotting <- function(input, output, session, rval) {
       plot_params$gate <- "root"
       plot_params$xvar <- xvar
       plot_params$yvar <- yvar
-      plot_params$plot_type <- "dots"
+      plot_params$plot_type <- "hexagonal"
       plot_params$color_var <- NULL
       plot_params$group_var <- NULL
       plot_params$gate <- "root"
+      plot_params$use_all_cells <- TRUE
       rval_mod$init <- FALSE
       
+    }else{
+      plot_params <- reactiveValues()
     }
+    
     
   })
   
@@ -88,11 +92,11 @@ plotting <- function(input, output, session, rval) {
   
   
   
-  observe({
-    for(var in names(res$params)){
-      plot_params[[var]] <- res$params[[var]]
-    }
-  })
+  # observe({
+  #   for(var in names(res$params)){
+  #     plot_params[[var]] <- res$params[[var]]
+  #   }
+  # })
   
   return(rval)
   

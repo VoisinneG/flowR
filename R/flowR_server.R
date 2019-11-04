@@ -25,9 +25,6 @@ flowR_server <- function(session, input, output, user_module_name = NULL) {
   # Import module : import flowSet, gates from fcs files and workspace
   rval <- callModule(import, "import_module")
   
-  # flow-set module
-  rval <- callModule(flowsets, "flowsets_module", rval)
-  
   # Metadata module
   rval <- callModule(metadata, "metadata_module", rval)
 
@@ -51,18 +48,12 @@ flowR_server <- function(session, input, output, user_module_name = NULL) {
   
   # Plot module
   rval <- callModule(plotting, "plotting_module", rval)
-  # plot_display <- callModule(display, "plot_module", rval, 
-  #                            module_server_name = "plotGatingSet", 
-  #                            simple_plot = FALSE, auto_update = FALSE)
   
   # stats module
   rval <- callModule(stats, "stats_module", rval)
-  # plot_statistics <- callModule(display, "statistics_module", rval, 
-  #                               module_server_name = "plotStat")
-  
-  # save module
-  #callModule(saveWorkspace, "save_module", rval)
     
+  # flow-set module
+  rval <- callModule(flowsets, "flowsets_module", rval)
   
   ##########################################################################################################
   # Add user-defined module
@@ -155,6 +146,9 @@ flowR_server <- function(session, input, output, user_module_name = NULL) {
   #   rval$flow_set_list[[input$flow_set]]$trans_parameters <- rval$trans_parameters
   #   rval$flow_set_list[[input$flow_set]]$metadata <- rval$pdata
   # })
+  
+ 
+  
   
   ##########################################################################################################
   # Output value boxes

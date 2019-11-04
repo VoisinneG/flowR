@@ -17,27 +17,13 @@ plotStatInput <- function(id) {
         title = "Sample/Subset",
         selectionInput(ns("selection_module"), multiple_subset = TRUE)
     ),
-    box(collapsible = TRUE, collapsed = TRUE, width = NULL, height = NULL,
+    box(collapsible = TRUE, collapsed = FALSE, width = NULL, height = NULL,
         title ="Stat",
         selectInput(ns("stat_function"), 
                     label = "statistics", 
                     choices = c("mean", "median", "sd", "cell count", "percentage"), 
                     selected = "mean"),
         uiOutput(ns("stat_options"))
-        # selectInput(ns("y_trans"),
-        #             label = "Transform",
-        #             choices = c("log10", "asinh", "identity", "default"),
-        #             selected = "default"),
-        # selectizeInput(ns("yvar"),
-        #                multiple = TRUE,
-        #                label = "variable (y-axis)",
-        #                choices = NULL,
-        #                selected = NULL),
-        # box(title = "Select using pattern", width = NULL, height = NULL, collapsible = TRUE, collapsed = TRUE,
-        #     textInput(ns("pattern"), "Pattern"),
-        #     checkboxInput(ns("match_as_is"), "use pattern as regular expression", TRUE),
-        #     actionButton(ns("select_var"), "Select variable (y-axis)")
-        # )
     ),
     box(collapsible = TRUE, collapsed = TRUE, width = NULL, height = NULL,
         title ="Plot variables",
