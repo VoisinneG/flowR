@@ -1310,7 +1310,7 @@ plot_heatmap <-function(args = list()){
 
 #' @import dplyr
 #' @import forcats
-#' @import res
+#' @import reshape2
 plot_bar <-function(args = list()){
   
   plot_type <- "bar"
@@ -1326,7 +1326,7 @@ plot_bar <-function(args = list()){
   df <- as.data.frame(df)
   
   id.vars <- names(df)[which(!sapply(df, is.numeric))]
-  df_melt <- melt(df, id.vars = id.vars)
+  df_melt <- reshape2::melt(df, id.vars = id.vars)
   
   #print(df_melt)
   
@@ -1363,6 +1363,7 @@ plot_bar <-function(args = list()){
 #' @import viridis
 #' @import dplyr
 #' @import forcats
+#' @import reshape2
 plot_tile <-function(args = list()){
   
   plot_type <- "tile"
@@ -1377,7 +1378,7 @@ plot_tile <-function(args = list()){
   df <- as.data.frame(df)
   
   id.vars <- names(df)[which(!sapply(df, is.numeric))]
-  df_melt <- melt(df, id.vars = id.vars)
+  df_melt <- reshape2::melt(df, id.vars = id.vars)
   
   #print(df_melt)
   
@@ -1733,7 +1734,7 @@ scale_values <- function(df, id.vars = NULL){
   df_scale
 }
 
-
+#' @import reshape2
 #' @import scales
 compute_stats <- function(df = NULL,
                           gs = NULL,
@@ -1787,12 +1788,12 @@ compute_stats <- function(df = NULL,
       }
       
       
-      df_melt <- melt(df, id.vars = id.vars, measure.vars = yvar)
+      df_melt <- reshape2::melt(df, id.vars = id.vars, measure.vars = yvar)
       df_melt <- df_melt[is.finite(df_melt$value), ]
       
       
       stat.fun <- function(...){do.call(stat_function, args = list(...))}
-      df_cast <- dcast(df_melt, 
+      df_cast <- reshape2::dcast(df_melt, 
                        formula = as.formula(paste(paste(id.vars, collapse = " + "), " ~ variable", sep ="")), 
                        fun.aggregate =  stat.fun, 
                        na.rm = TRUE)
