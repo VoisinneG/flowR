@@ -39,6 +39,8 @@ flowsetsUI <- function(id) {
 #' @import ncdfFlow
 #' @import shiny
 #' @import DT
+#' @import graph
+#' @import Rgraphviz
 #' @export
 #' @rdname flowsetsUI
 flowsets <- function(input, output, session, rval) {

@@ -266,11 +266,11 @@ cluster <- function(input, output, session, rval) {
           filterID <- paste("cluster", uclust[i], sep = "")
           polygon <- matrix(c(as.numeric(uclust[i])-0.25, 
                               as.numeric(uclust[i])+0.25, 
-                              range(rval_mod$df_cluster[[rval_mod$flow_set_cluster@colnames[1]]])
+                              range(rval_mod$df_cluster[[colnames(rval_mod$flow_set_cluster)[1]]])
           ), 
           ncol = 2)
           row.names(polygon) <- c("min", "max")
-          colnames(polygon) <- c("cluster", rval_mod$flow_set_cluster@colnames[1])
+          colnames(polygon) <- c("cluster", colnames(rval_mod$flow_set_cluster)[1])
           g <- rectangleGate(.gate = polygon, filterId=filterID)
           rval$gates_flowCore[[paste("/",filterID, sep="")]] <- list(gate = g, parent = "root")
         }

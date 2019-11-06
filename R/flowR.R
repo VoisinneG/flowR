@@ -287,7 +287,7 @@ add_gates_flowCore <- function(gs, gates){
         
         if(g$parent %in% union(getNodes(gs), "root") ){
           
-          if( !is.null(names(g$gate@parameters)) & length( setdiff( names(g$gate@parameters), gs@data@colnames) ) == 0 ){
+          if( !is.null(names(g$gate@parameters)) & length( setdiff( names(g$gate@parameters), colnames(gs)) ) == 0 ){
             
             add(gs,
                 g$gate,
@@ -500,9 +500,11 @@ get_data_gs <- function(gs,
       
       if(subset[k] != "root"){
         if(!is.null(spill)){
-          idx_subset <- getIndices(gs_comp[[idx_comp]], as.name(subset[k]))[[1]]
+          #print(idx_comp)
+          idx_subset <- flowWorkspace::getIndices(gs_comp[[idx_comp]], subset[k])
         }else{
-          idx_subset <- getIndices(gs[[idx[i]]], as.name(subset[k]))[[1]]
+          #print(idx[i])
+          idx_subset <- flowWorkspace::getIndices(gs[[idx[i]]], subset[k])
         }
       }
       
@@ -511,12 +513,17 @@ get_data_gs <- function(gs,
       }else{
         ff <- getData(gs[[idx[i]]])
       }
+      print(ff@exprs)
+      print(idx_subset)
+      
 
-      df_int <- as.data.frame(flowCore::exprs(ff))
+      df_int <- as.data.frame(ff@exprs)
       if(!is.null(idx_subset)){
         df_int <- df_int[idx_subset, ]
       }
 
+      
+      
       if(dim(df_int)[1]>0){
         
         df_int[["name"]] <- pData(gs)$name[idx[i]]
@@ -1137,7 +1144,7 @@ add_polygon_layer <-function(p,
   
 }
 
-#' @importFrom sp over
+#' @import sp
 #' @import rlang
 add_gate <- function(p, gate){
   
@@ -1200,10 +1207,10 @@ plot_gs <- function(gs,
                      
   
   if(! "xvar" %in% names(plot_args)){
-    plot_args[["xvar"]] <- gs@data@colnames[1]
+    plot_args[["xvar"]] <- colnames(gs)[1]
   }
   if(! "yvar" %in% names(plot_args)){
-    plot_args[["yvar"]] <- gs@data@colnames[2]
+    plot_args[["yvar"]] <- colnames(gs)[2]
   }
   
   if(is.null(sample)) sample <-  pData(gs)$name[1]

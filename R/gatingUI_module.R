@@ -91,6 +91,8 @@ gatingUI <- function(id) {
 #' @import flowCore
 #' @import shiny
 #' @import DT
+#' @import graph
+#' @import Rgraphviz
 #' @export
 #' @rdname gatingUI
 gating <- function(input, output, session, rval) {

@@ -1,7 +1,5 @@
 #' @import shiny
 #' @import shinydashboard
-#' @import DT
-#' @import plotly
 #' @export
 flowR_ui <- function(user_module_name = NULL) {
   
@@ -12,8 +10,8 @@ flowR_ui <- function(user_module_name = NULL) {
       do.call(module_ui_name, list(...) )
     }
   }
-  
-  body <- dashboardBody(
+
+  body <- {dashboardBody(
     textOutput("flow_set_name"),
     br(),
     fluidRow(
@@ -65,11 +63,9 @@ flowR_ui <- function(user_module_name = NULL) {
       
     )
       
-  )
+  )}
 
-  
-  
-  sidebar <- dashboardSidebar(
+  sidebar <- {dashboardSidebar(
     sidebarMenu(id = "menu",
                 menuItem("Import",
                          tabName = "Import_tab", 
@@ -145,7 +141,7 @@ flowR_ui <- function(user_module_name = NULL) {
     )
     
     
-  )
+  )}
   
   ui <- dashboardPage(
     dashboardHeader(title = "flowR"),

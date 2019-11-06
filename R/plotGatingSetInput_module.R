@@ -521,7 +521,10 @@ plotGatingSet <- function(input, output, session,
     print("format_plot")
     
     axis_labels <- rval$parameters$name_long
-    names(axis_labels) <- rval$parameters$name
+    if(!is.null(axis_labels)){
+      names(axis_labels) <- rval$parameters$name
+    }
+    
     
     transformation <- NULL
     if(rval$apply_trans){

@@ -81,8 +81,8 @@ saveWorkspace <- function(input, output, session, rval) {
       if(input$apply_comp & !is.null(rval$df_spill)){
         comp <- rval$df_spill
       }else{
-        comp <- diag( length(rval$flow_set@colnames) )
-        colnames(comp) <- rval$flow_set@colnames
+        comp <- diag( length(colnames(rval$flow_set)))
+        colnames(comp) <- colnames(rval$flow_set)
         row.names(comp) <- colnames(comp)
       }
       comp <- compensation(comp)

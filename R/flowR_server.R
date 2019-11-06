@@ -172,7 +172,7 @@ flowR_server <- function(session, input, output, user_module_name = NULL) {
   output$progressBox4 <- renderValueBox({
     nparams <- 0
     if(!is.null(rval$flow_set)){
-      nparams <- length(rval$flow_set@colnames)
+      nparams <- length(colnames(rval$flow_set))
     }
     
     valueBox(
