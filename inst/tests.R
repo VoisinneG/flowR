@@ -15,7 +15,7 @@ library(viridis)
 library(sp)
 library(pheatmap)
 
-ws <- openWorkspace(file = "./data/tetra/workspace.wsp")
+ws <- open_flowjo_xml(file = "./data/tetra/workspace.wsp")
 
 gs <- parseWorkspace(ws,
                      name = "All Samples",

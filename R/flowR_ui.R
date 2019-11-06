@@ -13,8 +13,6 @@ flowR_ui <- function(user_module_name = NULL) {
     }
   }
   
-  
-  
   body <- dashboardBody(
     textOutput("flow_set_name"),
     br(),
@@ -42,14 +40,9 @@ flowR_ui <- function(user_module_name = NULL) {
       ),
       tabItem(tabName = "Plot_tab",
               plottingUI(id = "plotting_module")
-              # displayUI("plot_module", 
-              #           module_ui_name = "plotGatingSetInput", 
-              #           simple_plot = FALSE, auto_update = FALSE)
       ),
       tabItem(tabName = "Stat_tab",
               statsUI(id = "stats_module")
-              # displayUI("statistics_module", 
-              #           module_ui_name = "plotStatInput")
       ),
       tabItem(tabName = "Sub_tab",
               subsampleUI(id = "subsample_module")
@@ -69,13 +62,11 @@ flowR_ui <- function(user_module_name = NULL) {
       tabItem(tabName = "Flowsets_tab",
               flowsetsUI(id = "flowsets_module")
       )
-      #tabItem(tabName = "Save_tab",
-      #        saveWorkspaceUI(id = "save_module")
-      #)
+      
     )
-    
+      
   )
-  
+
   
   
   sidebar <- dashboardSidebar(
@@ -142,11 +133,6 @@ flowR_ui <- function(user_module_name = NULL) {
                          startExpanded = FALSE,
                          icon = icon("check-circle")
                 ),
-                # menuItem("Save",
-                #          tabName = "Save_tab", 
-                #          startExpanded = FALSE,
-                #          icon = icon("check-circle")
-                #),
                 menuItem("General controls",
                          tabName = "General_tab",
                          startExpanded = FALSE,

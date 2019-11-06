@@ -43,7 +43,7 @@ importUI <- function(id) {
 #' @param output shiny output
 #' @param session shiny session
 #' @return a reactivevalues object with values "df_files", "flow_set_imported" and "gates_flowCore"
-#' @importFrom CytoML parseWorkspace openWorkspace
+#' @importFrom CytoML parseWorkspace open_flowjo_xml open_diva_xml
 #' @import flowWorkspace
 #' @import flowCore
 #' @import ncdfFlow
@@ -78,13 +78,13 @@ import <- function(input, output, session) {
       need(length(input$files_table_rows_selected)>0, "Please select a file to load")
     )
     if(file_ext(rval_mod$df_files$datapath[input$files_table_rows_selected[1]]) %in% c("xml", "wsp") ){
-      ws <- try( openWorkspace(rval_mod$df_files$datapath[input$files_table_rows_selected[1]]),
+      ws <- try( open_flowjo_xml(rval_mod$df_files$datapath[input$files_table_rows_selected[1]]),
                  silent = TRUE)
       if(class(ws) != "try-error"){
         groups <- unique(getSampleGroups(ws)$groupName)
       }
       else{
-        ws <- try( openDiva(rval_mod$df_files$datapath[input$files_table_rows_selected[1]]),
+        ws <- try( open_diva_xml(rval_mod$df_files$datapath[input$files_table_rows_selected[1]]),
                    silent = TRUE)
         if(class(ws) != "try-error"){
           groups <- unique(getSampleGroups(ws)$specimen)
@@ -138,10 +138,10 @@ import <- function(input, output, session) {
     
       
       if(file_ext(rval_mod$df_files$datapath[input$files_table_rows_selected[1]]) %in% c("xml", "wsp")){
-        ws <- try( openWorkspace(rval_mod$df_files$datapath[input$files_table_rows_selected[1]]),
+        ws <- try( open_flowjo_xml(rval_mod$df_files$datapath[input$files_table_rows_selected[1]]),
                    silent = TRUE)
         if(class(ws) == "try-error"){
-          ws <- try( openDiva(rval_mod$df_files$datapath[input$files_table_rows_selected[1]]),
+          ws <- try( open_diva_xml(rval_mod$df_files$datapath[input$files_table_rows_selected[1]]),
                      silent = TRUE)
         }
         
