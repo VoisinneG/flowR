@@ -65,7 +65,6 @@ plotStatInput <- function(id) {
 #' @return a list containing the plot, the plot data, and the corresponding plot parameters
 #' @import shiny
 #' @importFrom scales identity_trans log10_trans
-#' @export
 #' @rdname plotStatUI
 plotStat <- function(input, output, session, rval) {
   
@@ -197,6 +196,9 @@ plotStat <- function(input, output, session, rval) {
     if(length(idx_selected)>0){
       var_selected <- choices[idx_selected]
     }
+    
+    print(choices)
+    
     updateSelectInput(session, var_name, choices = choices, selected = var_selected)
     
   })

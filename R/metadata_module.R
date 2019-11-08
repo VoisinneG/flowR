@@ -3,7 +3,7 @@
 #' @param id shiny id
 #' @import shiny
 #' @importFrom shinydashboard tabBox
-#' @importFrom DT dataTableOutput DTOutput
+#' @importFrom DT DTOutput DTOutput
 metadataUI <- function(id) {
   
   ns <- NS(id)
@@ -45,7 +45,7 @@ metadataUI <- function(id) {
                   tabPanel(title = "Load",
                            fileInput(ns("file_meta"), "load metadata file", multiple = FALSE),
                            selectInput(ns("sep_meta"), "column separator", choices = c("comma", "semi-column", "tab", "space"), selected = "tab"),
-                           div(style = 'overflow-x: scroll', DT::dataTableOutput(ns("meta"))),
+                           div(style = 'overflow-x: scroll', DT::DTOutput(ns("meta"))),
                            br(),
                            actionButton(ns("append_meta"), label = "Add metadata"),
                            br()
@@ -70,7 +70,7 @@ metadataUI <- function(id) {
 #' @importFrom tools file_ext
 #' @importFrom readxl read_excel
 #' @importFrom utils read.csv write.table
-#' @importFrom DT renderDataTable renderDT dataTableProxy editData replaceData
+#' @importFrom DT renderDT dataTableProxy editData replaceData
 #' @rdname importUI
 metadata <- function(input, output, session, rval) {
   
@@ -319,7 +319,7 @@ metadata <- function(input, output, session, rval) {
   })
   
 
-  output$meta <- DT::renderDataTable({
+  output$meta <- DT::renderDT({
     validate(
       need(rval_mod$df_meta_imported, "No meta data imported")
     )

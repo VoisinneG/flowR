@@ -3,7 +3,7 @@
 #' @param id shiny id
 #' @import shiny
 #' @importFrom shinydashboard box tabBox
-#' @importFrom DT dataTableOutput
+#' @importFrom DT DTOutput
 gatingUI <- function(id) {
 
   ns <- NS(id)
@@ -65,7 +65,7 @@ gatingUI <- function(id) {
                            downloadButton(ns("download_data")),
                            br(),
                            br(),
-                           div(style = 'overflow-x: scroll', DT::dataTableOutput(ns("pop_stats"))),
+                           div(style = 'overflow-x: scroll', DT::DTOutput(ns("pop_stats"))),
                            br() 
                   )
                   
@@ -84,16 +84,15 @@ gatingUI <- function(id) {
 #' @param rval A reactive values object
 #' @return The updated reactiveValues object \code{rval}
 #' @import shiny
-#' @importFrom flowWorkspace add Rm setNode recompute gs_get_pop_paths
+#' @importFrom flowWorkspace gs_pop_add Rm setNode recompute gs_get_pop_paths
 #' @importFrom flowCore polygonGate
 #' @importFrom graph addEdge
 #' @importFrom Rgraphviz renderGraph layoutGraph
 #' @importFrom methods new
 #' @importFrom grDevices chull
-#' @importFrom DT datatable renderDataTable
-#' @importFromn dplyr rename
+#' @importFrom DT datatable renderDT
+#' @importFrom dplyr rename
 #' @importFrom utils write.table
-#' @export
 #' @rdname gatingUI
 gating <- function(input, output, session, rval) {
   
@@ -258,7 +257,7 @@ gating <- function(input, output, session, rval) {
           
         rval$gates_flowCore[[gate_name]] <- list(gate = poly_gate, parent = res$params$gate)
         
-        flowWorkspace::add(rval$gating_set, poly_gate, parent = res$params$gate)
+        flowWorkspace::gs_pop_add(rval$gating_set, poly_gate, parent = res$params$gate)
         flowWorkspace::recompute(rval$gating_set)
         
         #updateSelectInput(session, "gate_to_delete", choices = setdiff(flowWorkspace::gs_get_pop_paths(rval$gating_set), "root"))
@@ -438,7 +437,7 @@ gating <- function(input, output, session, rval) {
     df
   })
   
-  output$pop_stats <- DT::renderDataTable({
+  output$pop_stats <- DT::renderDT({
     DT::datatable(pop_stats(), rownames = FALSE)
   })
   

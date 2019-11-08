@@ -3,7 +3,7 @@
 #' @param id shiny id
 #' @importFrom shinydashboard box tabBox
 #' @import shiny
-#' @importFrom  DT dataTableOutput
+#' @importFrom  DT DTOutput
 statsUI <- function(id) {
   
   ns <- NS(id)
@@ -25,7 +25,7 @@ statsUI <- function(id) {
                            downloadButton(ns("download_data")),
                            br(),
                            br(),
-                           div(style = 'overflow-x: scroll', DT::dataTableOutput(ns("stats_data"))),
+                           div(style = 'overflow-x: scroll', DT::DTOutput(ns("stats_data"))),
                            br()
                   )
            )
@@ -43,7 +43,7 @@ statsUI <- function(id) {
 #' @param rval A reactive values object
 #' @return The updated reactiveValues object \code{rval}
 #' @import shiny
-#' @importFrom DT renderDataTable datatable
+#' @importFrom DT renderDT datatable
 #' @importFrom utils write.table
 #' @rdname statsUI
 stats <- function(input, output, session, rval) {
@@ -61,7 +61,7 @@ stats <- function(input, output, session, rval) {
     }
   })
   
-  output$stats_data <- DT::renderDataTable({
+  output$stats_data <- DT::renderDT({
     validate(need(res$data(), "No data available"))
     df <- res$data()
     #df[['value']] <- sprintf("%.2f", as.numeric(df[['value']]))

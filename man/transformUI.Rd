@@ -28,12 +28,14 @@ transform(input, output, session, rval)
 \item{output}{shiny output}
 
 \item{session}{shiny session}
+
+\item{rval}{A reactive values object}
 }
 \value{
 The updated reactiveValues object \code{rval}
 
-a reactivevalues object with values "flow_set", "parameters" and "gates_flowCore"
+The updated reactiveValues object \code{rval}
 }
 \description{
-A shiny Module that deals with metadata
+A shiny Module that deals with data transformation and parameters description
 }

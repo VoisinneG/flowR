@@ -3,7 +3,7 @@
 #' @param id shiny id
 #' @import shiny
 #' @importFrom shinydashboard box tabBox
-#' @importFrom DT dataTableOutput
+#' @importFrom DT DTOutput
 zenithUI <- function(id) {
 
   ns <- NS(id)
@@ -81,7 +81,7 @@ zenithUI <- function(id) {
                   tabPanel(title = "Data",
                            br(),
                            br(),
-                           div(style = 'overflow-x: scroll', DT::dataTableOutput(ns("data"))),
+                           div(style = 'overflow-x: scroll', DT::DTOutput(ns("data"))),
                            br()
                   )
            )
@@ -101,7 +101,7 @@ zenithUI <- function(id) {
 #' @importFrom flowWorkspace gs_get_pop_paths
 #' @importFrom reshape2 melt dcast
 #' @importFrom dplyr rename arrange mutate
-#' @importFrom DT datatable renderDataTable
+#' @importFrom DT datatable renderDT
 #' @import ggplot2
 #' @export
 #' @rdname zenithUI
@@ -257,7 +257,7 @@ zenith <- function(input, output, session, rval) {
     plot_mito_dep()
   })
   
-  output$data <- DT::renderDataTable({
+  output$data <- DT::renderDT({
     df <- metabo_data()
     #df[["value"]] <- sprintf("%.2f", df[["value"]])
     DT::datatable(df, rownames = FALSE)

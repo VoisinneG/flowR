@@ -5,6 +5,7 @@ Date: 2019-06-19
 Author: Guillaume Voisinne
 Maintainer: Guillaume Voisinne <voisinne@ciml.univ-mrs.fr>
 Description: Annalyze flow cytometry data using R
+Encoding: UTF-8
 Imports:
   shiny,
   shinydashboard,

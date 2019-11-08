@@ -17,9 +17,11 @@ subsample(input, output, session, rval)
 \item{output}{shiny output}
 
 \item{session}{shiny session}
+
+\item{rval}{A reactive values object}
 }
 \value{
-a reactivevalues object with values "df_files", "flow_set_imported" and "gates_flowCore"
+The updated reactiveValues object \code{rval}
 }
 \description{
 A shiny Module that deals with subsampling

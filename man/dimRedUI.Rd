@@ -10,5 +10,5 @@ dimRedUI(id)
 \item{id}{shiny id}
 }
 \description{
-A shiny Module that deals with metadata
+A shiny Module that deals with dimensionality reduction
 }

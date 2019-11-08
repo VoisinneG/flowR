@@ -55,8 +55,6 @@ simpleDisplayUI <- function(id, nrow = 1, size = 400, save = TRUE){
 #' @rdname simpleDisplayUI
 simpleDisplay <- function(input, output, session, plot_list, params = reactiveValues(use_plotly = FALSE)) {
   
-  `%then%` <- shiny:::`%OR%`
-  
   rval_plot <- reactiveValues(nrow = 1, ncol = 1, facet_layout = NULL, ncol_facet = 1, nrow_facet =1)
   
   # plot_list <- reactive({
@@ -71,7 +69,10 @@ simpleDisplay <- function(input, output, session, plot_list, params = reactiveVa
     rval_plot$nrow <- 1
     rval_plot$ncol <- 1
 
-     if(class(plot_list()) == "list"){
+    print("class(plot_list())")
+    print(class(plot_list()))
+    
+     if(class(plot_list())[1] == "list"){
        
          n <- length(plot_list())
          
@@ -109,8 +110,9 @@ simpleDisplay <- function(input, output, session, plot_list, params = reactiveVa
      }else{
        p <- plot_list()
        if("facet" %in% names(p)){
+         
          facet_layout <- p$facet$compute_layout(p, p$facet$params)
-
+         
          if(!is.null(facet_layout)){
            rval_plot$ncol_facet <- max(facet_layout$COL)
            rval_plot$nrow_facet <- max(facet_layout$ROW)

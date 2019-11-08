@@ -6,7 +6,6 @@
 #' @param plot_params A reactiveValues object with plot parameters
 #' @return A list of plots
 #' @import shiny
-#' @export
 plotGatingHierarchy <- function(input, output, session, rval, plot_params = reactiveValues() ){
   
   `%then%` <- shiny:::`%OR%`

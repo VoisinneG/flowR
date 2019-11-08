@@ -1,12 +1,10 @@
-#' @title   compensationUI and compensation
-#' @description  A shiny Module that deals with metadata
+#' @title compensationUI and compensation
+#' @description  A shiny Module that deals with compensation
 #' @param id shiny id
-#' @importFrom shinydashboard box tabBox
 #' @import shiny
-#' @import plotly
-#' @import heatmaply
-#' @import scales
-#' @import DT
+#' @importFrom shinydashboard box tabBox
+#' @importFrom plotly plotlyOutput
+#' @importFrom DT DTOutput
 compensationUI <- function(id) {
   # Create a namespace function using the provided id
   ns <- NS(id)
@@ -16,7 +14,7 @@ compensationUI <- function(id) {
       column(width = 6,
              tabBox(title = "",
                     width = NULL, height = NULL,
-                    tabPanel(title = "Heatmap",
+                    tabPanel(title = "Matrix",
                              plotly::plotlyOutput(ns("heatmap_spill")),
                              checkboxInput(ns("show_all_channels"), "Show all channels", FALSE)
                     ),
@@ -31,33 +29,25 @@ compensationUI <- function(id) {
                                           step = 0.01),
                              numericInput(ns("step_size"), label = "step size", value = 0.01),
                              actionButton(ns("set_spill_value"), "set value")
-                             
                     ),
                     tabPanel(title = "Table",
                              actionButton(ns("reset_comp"), "reset"),
                              downloadButton(ns("download_spill")),
                              br(),
                              br(),
-                             div(style = 'overflow-x: scroll', DT::dataTableOutput(ns("spill_table"))),
+                             div(style = 'overflow-x: scroll', DT::DTOutput(ns("spill_table"))),
                              br()    
                     )
              ),
              tabBox(title = "",
-                    width = NULL, height = NULL,
-                    # tabPanel("Save",
-                    #          width = NULL, height = NULL,
-                    #          "Save spillover matrix in .txt format :",
-                    #          br(),
-                    #          br(),
-                    #          downloadButton("download_spill")
-                    # ),               
+                    width = NULL, height = NULL,   
                     tabPanel("Import",
                              width = NULL, height = NULL,
                              fileInput(inputId = ns("spill_file"), 
                                        label = "Choose spillover matrix file", 
                                        multiple = FALSE),
                              selectInput(ns("sep_spill"), "column separator", choices = c("comma", "semi-column", "tab", "space"), selected = "tab"),
-                             div(style = 'overflow-x: scroll', DT::dataTableOutput(ns("spill_imported"))),
+                             div(style = 'overflow-x: scroll', DT::DTOutput(ns("spill_imported"))),
                              br(),
                              actionButton(ns("set_spillover_matrix"), "Set spillover matrix")
                     ),
@@ -69,9 +59,7 @@ compensationUI <- function(id) {
                              br(),
                              selectizeInput(ns("spill_params"), "Spillover parameters", choices = NULL, selected = NULL, multiple = TRUE),
                              actionButton(ns("compute_spillover_matrix"), "Compute spillover matrix")
-                             
                     )
-                    
              )
     ),
     column(width = 6,
@@ -97,15 +85,14 @@ compensationUI <- function(id) {
 #' @param session shiny session
 #' @param rval A reactive values object
 #' @return The updated reactiveValues object \code{rval}
-#' @import flowWorkspace
-#' @import flowCore
 #' @import shiny
-#' @import DT
-#' @export
+#' @importFrom flowCore parameters description
+#' @importFrom heatmaply heatmaply
+#' @importFrom plotly renderPlotly event_data
+#' @importFrom DT renderDT
+#' @importFrom utils read.table
 #' @rdname transformUI
 compensation <- function(input, output, session, rval) {
-  
-  `%then%` <- shiny:::`%OR%`
 
   plot_params <- reactiveValues()
   rval_mod <- reactiveValues(init = TRUE)
@@ -142,41 +129,30 @@ compensation <- function(input, output, session, rval) {
   
   res <- callModule(plotGatingSet, "plot_module", rval, plot_params, simple_plot = FALSE)
   callModule(simpleDisplay, "simple_display_module", res$plot)
-
-  # observe({
-  #   #for(var in intersect( names(res$params), c("xvar", "yvar", "color_var", "gate", "samples") )){
-  #   for(var in names(res$params)){
-  #     plot_params[[var]] <- res$params[[var]]
-  #   }
-  # })
-  
-  output$plot_comp <- renderPlot({
-    res$plot()[[1]]
-  })
-  
   
   ##########################################################################################################
   # Observe functions for compensation
   
-  
   observeEvent(rval$flow_set, {
     
     validate(need(rval$flow_set, "no flow-set available"))
-    validate(need(length(parameters(rval$flow_set[[1]])$name) < 100, "Maximum number of parameters exceeded (100)"))
+    validate(need(length(flowCore::parameters(rval$flow_set[[1]])$name) < 100, "Maximum number of parameters exceeded (100)"))
     
     
     if(is.null(rval$df_spill)){
       fs <- rval$flow_set
-      m <- diag( length(parameters(fs[[1]])$name) )
-      colnames(m) <- parameters(fs[[1]])$name
+      params <- flowCore::parameters(fs[[1]])
+      m <- diag( length(params$name) )
+      colnames(m) <- params$name
       rval$df_spill <- as.data.frame(m)
       row.names(rval$df_spill) <- colnames(rval$df_spill)
       
       #rval$df_spill <- NULL
       
       for(i in 1:length(fs)){
-        if("SPILL" %in% names(description(fs[[i]]))){
-          df <- as.data.frame(description(fs[[i]])[["SPILL"]])
+        desc <- flowCore::description(fs[[i]])
+        if("SPILL" %in% names(desc)){
+          df <- as.data.frame(desc[["SPILL"]])
           is_identity <- sum(apply(X=df, MARGIN = 1, FUN = function(x){sum(x==0) == (length(x)-1)})) == dim(df)[1]
           if(!is_identity){
             rval$df_spill <- df
@@ -190,6 +166,11 @@ compensation <- function(input, output, session, rval) {
     }
     
   })
+  
+  
+  ##################################################################################################
+  # Updating comp matrix for all flow sets
+  ##################################################################################################
   
   observeEvent(rval$df_spill, {
     
@@ -214,7 +195,9 @@ compensation <- function(input, output, session, rval) {
     }
     
   })
-  
+  ##################################################################################################
+  # Computing comp matrix
+  ##################################################################################################
   observeEvent(input$add_spill_param, {
     
     validate(
@@ -238,6 +221,7 @@ compensation <- function(input, output, session, rval) {
                           sample = input$sample_neg,
                           subset = input$gate_neg,
                           spill = NULL)
+    
     df_neg <- df_neg[names(df_neg) %in% rval$flow_set@colnames]
     neg_values <- apply(df_neg, MARGIN = 2, FUN = median, na.rm = TRUE)
     neg_values <- neg_values[rval$flow_set@colnames]
@@ -279,6 +263,8 @@ compensation <- function(input, output, session, rval) {
     
   })
   
+  ##################################################################################################
+  
   observe({
     validate(
       need(rval$parameters, "No parameters available")
@@ -300,7 +286,7 @@ compensation <- function(input, output, session, rval) {
                   "tab" = "\t",
                   "space" = " ")
     
-    rval$df_spill_imported <- read.table(file = input$spill_file$datapath, 
+    rval$df_spill_imported <- utils::read.table(file = input$spill_file$datapath, 
                                          sep = sep,
                                          fill = TRUE,
                                          quote = "\"",
@@ -366,7 +352,7 @@ compensation <- function(input, output, session, rval) {
   
   observe({
     df <- rval$df_spill
-    event.data <- event_data("plotly_click", source = "select_heatmap")
+    event.data <- plotly::event_data("plotly_click", source = "select_heatmap")
     idx_y <- dim(df)[1] - event.data$pointNumber[[1]][1]
     idx_x <- event.data$pointNumber[[1]][2] + 1
     
@@ -395,20 +381,18 @@ compensation <- function(input, output, session, rval) {
     
   })
   
-  
-  
   observe({
     updateNumericInput(session, "spill_value", step = input$step_size)
   })
   
-  output$spill_imported <- DT::renderDataTable({
+  output$spill_imported <- DT::renderDT({
     validate(
       need(rval$df_spill_imported, "No spillover data imported")
     )
     as.data.frame(rval$df_spill_imported)
   })
   
-  output$spill_table <- DT::renderDataTable({
+  output$spill_table <- DT::renderDT({
     
     validate(
       need(rval$df_spill, "No spillover matrix")
@@ -458,15 +442,6 @@ compensation <- function(input, output, session, rval) {
     filename = "spillover_matrix.txt",
     content = function(file) {
       write.table(rval$df_spill, file = file, row.names = FALSE, quote = FALSE, sep = "\t")
-    }
-  )
-  
-  output$download_plot <- downloadHandler(
-    filename = "plot.pdf",
-    content = function(file) {
-      pdf(file, width = input$width_plot, height = input$height_plot)
-      print(plot_comp())
-      dev.off()
     }
   )
   

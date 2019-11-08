@@ -81,7 +81,7 @@ plotGatingSetInput <- function(id, simple_plot = TRUE, auto_update = TRUE) {
 #' @param show_gates Should gates with coordinates matching plot coordinates be displayed
 #' @param polygon_gate a reactiveValues object with polygon coordinates to be plotted as an additionnal layer
 #' @return a list containing the plot and the corresponding plot parameters
-#' @import flowWorkspace getChildren getGate gs_get_pop_paths
+#' @importFrom flowWorkspace gs_pop_get_children gh_pop_get_gate gs_get_pop_paths
 #' @import shiny
 #' @rdname plotGatingSetInput
 plotGatingSet <- function(input, output, session, 
@@ -139,6 +139,11 @@ plotGatingSet <- function(input, output, session,
     x[["size"]] <- numericInput(ns("size"), label = "size", value = rval_plot[["size"]])
     x[["show_label"]] <- checkboxInput(ns("show_label"), "show labels", value = rval_plot[["show_label"]])
     x[["show_outliers"]] <- checkboxInput(ns("show_outliers"), "show outliers", value = rval_plot[["show_outliers"]])
+    x[["option"]] <- selectizeInput(ns("option"), 
+                                    multiple =FALSE,
+                                    label = "color palette", 
+                                    choices = c("viridis", "magma", "plasma",  "inferno", "cividis"), 
+                                    selected = "viridis")
     
     rval_mod$plot_options <- x
 
@@ -149,7 +154,7 @@ plotGatingSet <- function(input, output, session,
     if(input$plot_type == 'histogram'){
       vars <- setdiff(names(x), "show_gates")
     }else if (input$plot_type == 'hexagonal'){
-      vars <- c("show_gates", "bins")
+      vars <- c("show_gates", "bins", "option")
     }else if (input$plot_type == 'dots'){
       vars <- c("show_gates","alpha", "size", "show_label")
     }else if (input$plot_type == 'contour'){
@@ -362,7 +367,8 @@ plotGatingSet <- function(input, output, session,
                       "ridges", 
                       "yridges_var",
                       "show_label",
-                      "show_outliers")
+                      "show_outliers",
+                      "option")
       var_update <- var_update[var_update %in% names(rval_plot)]
       for(var in var_update){
         update_params <- c(update_params, rval_plot[[var]])
@@ -541,7 +547,7 @@ plotGatingSet <- function(input, output, session,
     
     if(show_gates){
       if(selected$gate %in% flowWorkspace::gs_get_pop_paths(rval$gating_set[[1]])){
-        child_gates <- flowWorkspace::getChildren(rval$gating_set[[1]], selected$gate)
+        child_gates <- flowWorkspace::gs_pop_get_children(rval$gating_set[[1]], selected$gate)
         if(length(child_gates) > 0){
           gate <- child_gates
         }
@@ -552,7 +558,7 @@ plotGatingSet <- function(input, output, session,
                      function(p){
                        if(!is.null(gate)){
                          for(gate_name in setdiff(gate, "root")){
-                           gate_int <- flowWorkspace::getGate(rval$gating_set[[1]], gate_name)
+                           gate_int <- flowWorkspace::gh_pop_get_gate(rval$gating_set[[1]], gate_name)
                            p <- add_gate(p = p, gate = gate_int)
                          }
                        }

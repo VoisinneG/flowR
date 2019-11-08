@@ -1,5 +1,6 @@
 #' flowR server function
 #' @import shiny
+#' @importFrom flowCore fsApply each_col
 #' @importFrom flowWorkspace gs_get_pop_paths
 #' @importFrom shinydashboard renderValueBox
 flowR_server <- function(session, input, output, user_module_name = NULL) {

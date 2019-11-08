@@ -22,6 +22,9 @@ gs <- parseWorkspace(ws,
                      execute = TRUE,
                      isNcdf = TRUE,
                      sampNloc = "sampleNode")
+
+df <- gs@data[[pData(gs)$name[1]]]@exprs
+
 gates <- get_gates_from_gs(gs)
 fs <- getData(gs)
 

@@ -30,7 +30,8 @@ simpleDisplay(input, output, session, plot_list,
 \item{params}{a reactivevalues object with an option to display plotly objects}
 }
 \value{
-the plot displayed
+A list containing the plot displayed and input parameters (these include events 
+describing user interaction with the plot)
 }
 \description{
 A shiny Module to display and save plots

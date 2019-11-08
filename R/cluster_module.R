@@ -1,11 +1,11 @@
-#' @title   clusterUI and cluster
-#' @description  A shiny Module that deals with metadata
+#' @title clusterUI and cluster
+#' @description  A shiny Module for cluster identification
 #' @param id shiny id
-#' @importFrom shinydashboard box tabBox
+#' @importFrom shinydashboard tabBox
 #' @import shiny
-#' @import DT
+#' @importFrom DT DTOutput
 clusterUI <- function(id) {
-  # Create a namespace function using the provided id
+  
   ns <- NS(id)
   
     fluidRow(
@@ -16,7 +16,7 @@ clusterUI <- function(id) {
                              selectionInput(ns("selection_module"), multiple_subset = TRUE)
                     ),
                     tabPanel("Variables",
-                             div(style = 'overflow-x: scroll', DT::dataTableOutput(ns("clustering_variables_table")))
+                             div(style = 'overflow-x: scroll', DT::DTOutput(ns("clustering_variables_table")))
                     ),
                     tabPanel("Options",
                              selectInput(ns("y_trans_clustering"),
@@ -41,11 +41,9 @@ clusterUI <- function(id) {
              )
       ),
       column(width = 6,
-             #plotOutput(ns("plot_pies"))
              uiOutput(ns("cluster_plot_ui"))
              )
     )
-  
 }
 
 
@@ -53,17 +51,16 @@ clusterUI <- function(id) {
 #' @param input shiny input
 #' @param output shiny output
 #' @param session shiny session
-#' @return a reactivevalues object with values "df_files", "flow_set_imported" and "gates_flowCore"
-#' @import flowWorkspace
-#' @import flowCore
+#' @param rval A reactive values object
+#' @return The updated reactiveValues object \code{rval}
 #' @import shiny
-#' @import DT
-#' @import FlowSOM
-#' @export
+#' @importFrom flowCore rectangleGate
+#' @importFrom shinydashboard tabBox
+#' @importFrom DT renderDT datatable
+#' @importFrom FlowSOM UpdateNodeSize PlotPies PlotStars PlotMarker
+#' @importFrom scales identity_trans log10_trans
 #' @rdname clusterUI
 cluster <- function(input, output, session, rval) {
-  
-  `%then%` <- shiny:::`%OR%`
   
   selected <- callModule(selection, "selection_module", rval)
   
@@ -187,9 +184,9 @@ cluster <- function(input, output, session, rval) {
     }
     
     y_trans <- switch(input$y_trans_clustering,
-                      "log10" = log10_trans(),
+                      "log10" = scales::log10_trans(),
                       "asinh" = asinh_trans(),
-                      "identity" = identity_trans(),
+                      "identity" = scales::identity_trans(),
                       NULL)
     
     progress$set(message = "Clustering...", value = 0)
@@ -245,7 +242,6 @@ cluster <- function(input, output, session, rval) {
         df <- df_raw[res$keep, ]
       }
       
-      
       fs <- build_flowset_from_df(df = df, origin = rval$flow_set_list[[rval$flow_set_selected]])
       rval_mod$flow_set_cluster <- fs
       
@@ -271,15 +267,12 @@ cluster <- function(input, output, session, rval) {
           ncol = 2)
           row.names(polygon) <- c("min", "max")
           colnames(polygon) <- c("cluster", colnames(rval_mod$flow_set_cluster)[1])
-          g <- rectangleGate(.gate = polygon, filterId=filterID)
+          g <- flowCore::rectangleGate(.gate = polygon, filterId=filterID)
           rval$gates_flowCore[[paste("/",filterID, sep="")]] <- list(gate = g, parent = "root")
         }
       }
       
-      
       rval$flow_set_list[[input$fs_name]] <- list(flow_set = fs, 
-                                                  par = lapply(1:length(fs), function(x){parameters(fs[[x]])}),
-                                                  desc = lapply(1:length(fs), function(x){description(fs[[x]])}),
                                                   name = input$fs_name, 
                                                   parent = rval$flow_set_selected,
                                                   gates = rval$gates_flowCore,
@@ -303,7 +296,7 @@ cluster <- function(input, output, session, rval) {
     fSOM <- rval_mod$fSOM
     
     if(!input$scale_node_size){
-      fSOM <- UpdateNodeSize(fSOM, reset=TRUE)
+      fSOM <- FlowSOM::UpdateNodeSize(fSOM, reset=TRUE)
     }
     
     backgroundValues <- NULL
@@ -336,7 +329,7 @@ cluster <- function(input, output, session, rval) {
   })
   
   
-  output$clustering_variables_table <- DT::renderDataTable({
+  output$clustering_variables_table <- DT::renderDT({
     
     validate(
       need(rval$parameters, "No data imported")

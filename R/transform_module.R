@@ -1,11 +1,11 @@
 #' @title   transformUI and transform
-#' @description  A shiny Module that deals with metadata
+#' @description  A shiny Module that deals with data transformation and parameters description
 #' @param id shiny id
-#' @importFrom shinydashboard box tabBox
+#' @importFrom shinydashboard tabBox
 #' @import shiny
-#' @import DT
+#' @importFrom DT DTOutput
 transformUI <- function(id) {
-  # Create a namespace function using the provided id
+  
   ns <- NS(id)
   
   
@@ -58,17 +58,16 @@ transformUI <- function(id) {
 #' @param input shiny input
 #' @param output shiny output
 #' @param session shiny session
-#' @return a reactivevalues object with values "flow_set", "parameters" and "gates_flowCore"
-#' @import flowWorkspace
-#' @import flowCore
+#' @param rval A reactive values object
+#' @return The updated reactiveValues object \code{rval}
 #' @import shiny
-#' @import DT
-#' @export
+#' @importFrom flowWorkspace logicle_trans flowjo_fasinh_trans
+#' @importFrom scales log_trans identity_trans
+#' @importFrom flowCore parameters description
+#' @importFrom DT renderDT dataTableProxy editData replaceData
 #' @rdname transformUI
 transform <- function(input, output, session, rval) {
-  
-  `%then%` <- shiny:::`%OR%`
-  
+
   rval_mod <- reactiveValues(init = TRUE)
   
   output$trans_param_ui <- renderUI({
@@ -77,7 +76,7 @@ transform <- function(input, output, session, rval) {
     if(input$trans == 'asinh'){
       x[[1]] <- h5("Parameters")
       x[[2]] <- numericInput(ns("base_asinh"), label = "base", value = 1)
-    } else if(input$trans == 'flowJo_asinh'){
+    } else if(input$trans == 'flowjo_fasinh'){
       x[[1]] <- h5("Parameters")
       x[[2]] <- numericInput(ns("m"), label = "m", value = 5)
       x[[3]] <- numericInput(ns("t"), label = "t", value = 12000)
@@ -135,16 +134,6 @@ transform <- function(input, output, session, rval) {
   res <- callModule(plotGatingSet, "plot_module", rval, plot_params, simple_plot = TRUE)
   callModule(simpleDisplay, "simple_display_module", res$plot)
 
-
-  # observe({
-  #   #plot_params <- res$params
-  #   for(var in names(res$params)){
-  #     plot_params[[var]] <- res$params[[var]]
-  #   }
-  # })
-  
-  
-  
   
   ##########################################################################################################
   # Observe functions for data transformation
@@ -161,12 +150,13 @@ transform <- function(input, output, session, rval) {
     #if(is.null(rval$parameters) | !setequal(rval$parameters$name, parameters(ff)$name)){
     if(is.null(rval$parameters)){
       
-      desc <- as.character(parameters(ff)$desc)
-      name <- as.character(parameters(ff)$name)
-      # name_long <- name
-      # name_long[!is.na(desc)] <- paste(name[!is.na(desc)], " (", desc[!is.na(desc)], ")", sep = "")
+      params <- flowCore::parameters(ff)
       
-      display <- unlist(sapply(rownames(parameters(ff)@data), FUN = function(x){
+      desc <- as.character(params$desc)
+      name <- as.character(params$name)
+     
+      
+      display <- unlist(sapply(rownames(params@data), FUN = function(x){
         kw <- substr(x, start = 2, stop = nchar(x))
         kw <- paste(kw, "DISPLAY", sep = "")
         disp <- ff@description[[kw]]
@@ -176,15 +166,14 @@ transform <- function(input, output, session, rval) {
         return(disp)
       }))
       
-      names(display) <- parameters(ff)@data$name
+      names(display) <- params@data$name
       
       rval$parameters <- data.frame(name = name,
                                     desc = desc,
-                                    # name_long = name_long,
                                     display = display[match(name, names(display))],
-                                    range = parameters(ff)@data$range,
-                                    minRange = parameters(ff)@data$minRange,
-                                    maxRange = parameters(ff)@data$maxRange,
+                                    range = params@data$range,
+                                    minRange = params@data$minRange,
+                                    maxRange = params@data$maxRange,
                                     stringsAsFactors = FALSE)
     }
     
@@ -219,11 +208,11 @@ transform <- function(input, output, session, rval) {
     if(length(new_par)>0){
       for(i in 1:length(new_par)){
         rval$transformation[[new_par[i]]] <- switch(rval$parameters$display[idx_new[i]],
-                                                    "LOG" = logicle_trans(w=0.5, 
+                                                    "LOG" = flowWorkspace::logicle_trans(w=0.5, 
                                                                           m=4.5, 
                                                                           t = 262144, 
                                                                           a = 0),
-                                                    identity_trans())
+                                                    scales::identity_trans())
         rval$trans_parameters[[new_par[i]]] <- switch(rval$parameters$display[idx_new[i]],
                                                       "LOG" = list(w=0.5, 
                                                                    m=4.5, 
@@ -247,7 +236,7 @@ transform <- function(input, output, session, rval) {
                              "identity" = list(),
                              "asinh" = list(base = input$base_asinh),
                              "log" = list(base = input$base_log),
-                             "flowJo_asinh" = list(m=input$m,
+                             "flowjo_fasinh" = list(m=input$m,
                                                    t = input$t,
                                                    a = input$a,
                                                    length = input$length),
@@ -257,14 +246,14 @@ transform <- function(input, output, session, rval) {
                                               a = input$a_logicle))
       
       trans <- switch(input$trans,
-                      "identity" = identity_trans(),
-                      "log" = log_trans(base = input$base_log),
+                      "identity" = scales::identity_trans(),
+                      "log" = scales::log_trans(base = input$base_log),
                       "asinh" = asinh_trans(b = input$base_asinh),
-                      "flowJo_asinh" = flowJo_fasinh_trans(m=input$m,
+                      "flowjo_fasinh" = flowWorkspace::flowjo_fasinh_trans(m=input$m,
                                                            t = input$t,
                                                            a = input$a,
                                                            length = input$length),
-                      "logicle" = logicle_trans(w=input$w_logicle,
+                      "logicle" = flowWorkspace::logicle_trans(w=input$w_logicle,
                                                 m=input$m_logicle,
                                                 t = input$t_logicle,
                                                 a = input$a_logicle))
@@ -302,8 +291,7 @@ transform <- function(input, output, session, rval) {
     
   })
   
-  output$parameters_table <- DT::renderDataTable({
-
+  output$parameters_table <- DT::renderDT({
     validate(
       need(rval$parameters, "No data imported")
     )
@@ -316,8 +304,6 @@ transform <- function(input, output, session, rval) {
       rownames = FALSE)
   })
   
-  
-  
   #Edit data table
   output$parameters <- renderDT({validate(need(rval$parameters, "No metadata")); rval$parameters},
                            rownames = FALSE,
@@ -326,18 +312,15 @@ transform <- function(input, output, session, rval) {
                            server = TRUE)
   
   proxy = dataTableProxy('parameters')
+  
   observeEvent(input$parameters_cell_edit, {
     info = input$parameters_cell_edit
     info$col <- info$col + 1
-    str(info)  # check what info looks like (a data frame of 3 columns)
     if(info$col == 2){
       rval$parameters <<- editData(rval$parameters, info)
       replaceData(proxy, rval$parameters, resetPaging = FALSE)
     }
-      # important
-    # the above steps can be merged into a single editData() call; see examples below
   })
-  
   
   return(rval)
   

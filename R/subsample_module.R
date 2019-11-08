@@ -3,7 +3,6 @@
 #' @param id shiny id
 #' @importFrom shinydashboard tabBox valueBoxOutput
 #' @import shiny
-#' @import DT
 subsampleUI <- function(id) {
   
   ns <- NS(id)
@@ -42,12 +41,11 @@ subsampleUI <- function(id) {
 #' @param input shiny input
 #' @param output shiny output
 #' @param session shiny session
-#' @return a reactivevalues object with values "df_files", "flow_set_imported" and "gates_flowCore"
+#' @param rval A reactive values object
+#' @return The updated reactiveValues object \code{rval}
 #' @importFrom flowWorkspace gs_get_pop_paths
-#' @import flowCore
 #' @import shiny
-#' @import DT
-#' @export
+#' @importFrom shinydashboard renderValueBox
 #' @rdname subsampleUI
 subsample <- function(input, output, session, rval) {
   
@@ -138,9 +136,7 @@ subsample <- function(input, output, session, rval) {
     
     rval_mod$flow_set_subsample <- fs
     
-    rval$flow_set_list[[input$fs_name]] <- list(flow_set = fs, 
-                                                par = lapply(1:length(fs), function(x){parameters(fs[[x]])}),
-                                                desc = lapply(1:length(fs), function(x){description(fs[[x]])}),
+    rval$flow_set_list[[input$fs_name]] <- list(flow_set = fs,
                                                 name = input$fs_name, 
                                                 parent = rval$flow_set_selected,
                                                 gates = rval$gates_flowCore[setdiff(flowWorkspace::gs_get_pop_paths(rval$gating_set), "root")],
@@ -150,13 +146,6 @@ subsample <- function(input, output, session, rval) {
     
     rval$flow_set_selected <- input$fs_name
     
-  })
-  
-  
-  output$sub_sample_table <- DT::renderDataTable({
-    if(!is.null(rval$flow_set)){
-      data.frame("name" = rval$pdata$name, row.names = NULL)
-    }
   })
   
   output$progressBox <- renderValueBox({

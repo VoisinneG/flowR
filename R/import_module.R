@@ -2,7 +2,7 @@
 #' @description  A shiny Module that imports data and builds flow-sets
 #' @param id shiny id
 #' @importFrom shinydashboard box
-#' @importFrom DT dataTableOutput
+#' @importFrom DT DTOutput
 #' @import shiny
 importUI <- function(id) {
 
@@ -24,7 +24,7 @@ importUI <- function(id) {
     column(width = 6,
            box(title = "Flow-set",
                width = NULL, height = NULL,
-               div(style = 'overflow-x: scroll', DT::dataTableOutput(ns("files_table"))),
+               div(style = 'overflow-x: scroll', DT::DTOutput(ns("files_table"))),
                br(),
                selectizeInput(ns("groups"), "select groups",
                               choices = NULL,
@@ -44,9 +44,11 @@ importUI <- function(id) {
 #' @param session shiny session
 #' @return a reactivevalues object
 #' @import shiny
-#' @importFrom CytoML open_flowjo_xml open_diva_xml parseWorkspace getSampleGroups
+#' @importFrom flowWorkspace pData
+#' @importFrom flowCore fsApply
+#' @importFrom CytoML open_flowjo_xml open_diva_xml flowjo_to_gatingset fj_ws_get_sample_groups
 #' @importFrom ncdfFlow read.ncdfFlowSet
-#' @importFrom DT renderDataTable
+#' @importFrom DT renderDT
 #' @importFrom tools file_ext
 #' @importFrom utils read.table
 #' @rdname importUI
@@ -80,13 +82,13 @@ import <- function(input, output, session) {
       ws <- try( CytoML::open_flowjo_xml(rval_mod$df_files$datapath[input$files_table_rows_selected[1]]),
                  silent = TRUE)
       if(class(ws) != "try-error"){
-        groups <- unique(CytoML::getSampleGroups(ws)$groupName)
+        groups <- unique(CytoML::fj_ws_get_sample_groups(ws)$groupName)
       }
       else{
         ws <- try( CytoML::open_diva_xml(rval_mod$df_files$datapath[input$files_table_rows_selected[1]]),
                    silent = TRUE)
         if(class(ws) != "try-error"){
-          groups <- unique(CytoML::getSampleGroups(ws)$specimen)
+          groups <- unique(CytoML::diva_ws_get_sample_groups(ws)$specimen)
         }
       }
       
@@ -152,7 +154,7 @@ import <- function(input, output, session) {
           ))
         }
   
-        gs <- try(CytoML::parseWorkspace(ws,
+        gs <- try(CytoML::flowjo_to_gatingset(ws,
                                  name = input$groups,
                                  execute = TRUE,
                                  isNcdf = TRUE,
@@ -173,7 +175,7 @@ import <- function(input, output, session) {
           need(class(gs) == "GatingSet", "No gating set imported")
         )
         
-        fs <- getData(gs)
+        fs <- gs@data
         
         ###################################################################################
         #get gates and transfrom gates
@@ -244,11 +246,11 @@ import <- function(input, output, session) {
         ###################################################################################
         #match fcs file names and import non-compensated, non-transformed data
         
-        names_imported <- fsApply(fs, function(x){description(x)[["FILENAME"]]})
+        names_imported <- flowCore::fsApply(fs, function(x){description(x)[["FILENAME"]]})
         names_imported <- basename(names_imported)
         idx_match <- match(names_imported, rval_mod$df_files$name)
         fs <- ncdfFlow::read.ncdfFlowSet( rval_mod$df_files$datapath[idx_match], truncate_max_range = TRUE )
-        phenoData(fs)$name <- rval_mod$df_files$name[idx_match]
+        flowWorkspace::pData(fs)$name <- rval_mod$df_files$name[idx_match]
 
         rval$flow_set_list[[input$fs_name]] <- list(flow_set = fs,
                                                     spill = NULL,
@@ -330,7 +332,7 @@ import <- function(input, output, session) {
   })
 
   
-  output$files_table <- DT::renderDataTable({
+  output$files_table <- DT::renderDT({
     validate(
       need(rval_mod$df_files, "Please select a file to import")
     )
