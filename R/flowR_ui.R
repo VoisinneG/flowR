@@ -1,6 +1,6 @@
+#' FlowR UI function
 #' @import shiny
 #' @import shinydashboard
-#' @export
 flowR_ui <- function(user_module_name = NULL) {
   
   module_ui_name <- paste(user_module_name, "UI", sep = "")

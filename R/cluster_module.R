@@ -68,7 +68,7 @@ cluster <- function(input, output, session, rval) {
   selected <- callModule(selection, "selection_module", rval)
   
   rval_mod <- reactiveValues( flow_set_cluster = NULL, parameters = NULL )
-  res_display <- callModule(simpleDisplay, "simple_display_module", plot_fSOM)
+  callModule(simpleDisplay, "simple_display_module", plot_fSOM)
   
   ##########################################################################################################
   # Observe functions for t-SNE

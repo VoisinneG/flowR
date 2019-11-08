@@ -54,7 +54,7 @@ dimRedUI <- function(id) {
 #' @param output shiny output
 #' @param session shiny session
 #' @return a reactivevalues object with values "df_files", "flow_set_imported" and "gates_flowCore"
-#' @import flowWorkspace
+#' @importFrom flowWorkspace gs_get_pop_paths
 #' @import flowCore
 #' @import shiny
 #' @import DT
@@ -216,7 +216,7 @@ dimRed <- function(input, output, session, rval) {
                                                     desc = lapply(1:length(fs), function(x){description(fs[[x]])}),
                                                     name = input$fs_name, 
                                                     parent = rval$flow_set_selected,
-                                                    gates = rval$gates_flowCore[setdiff(getNodes(rval$gating_set), "root")],
+                                                    gates = rval$gates_flowCore[setdiff(flowWorkspace::gs_get_pop_paths(rval$gating_set), "root")],
                                                     spill = rval$df_spill,
                                                     transformation = rval$transformation,
                                                     trans_parameters = rval$trans_parameters)

@@ -1,11 +1,10 @@
 #' @title   plottingUI and plotting
-#' @description  A shiny Module that deals with metadata
+#' @description  A shiny Module to build, display and save plots from a gating set
 #' @param id shiny id
 #' @importFrom shinydashboard box tabBox
 #' @import shiny
-#' @import DT
 plottingUI <- function(id) {
-  # Create a namespace function using the provided id
+  
   ns <- NS(id)
   
   fluidRow(
@@ -32,19 +31,13 @@ plottingUI <- function(id) {
 #' @param input shiny input
 #' @param output shiny output
 #' @param session shiny session
-#' @return a reactivevalues object with values "flow_set", "parameters" and "gates_flowCore"
-#' @import flowWorkspace
-#' @import flowCore
+#' @param rval A reactive values object
+#' @return The updated reactiveValues object \code{rval}
 #' @import shiny
-#' @import DT
-#' @export
 #' @rdname plottingUI
 plotting <- function(input, output, session, rval) {
-  
-  `%then%` <- shiny:::`%OR%`
 
   plot_params <- reactiveValues()
-  gate <- reactiveValues()
   rval_mod <- reactiveValues(init = TRUE)
   
   observe({
@@ -88,16 +81,8 @@ plotting <- function(input, output, session, rval) {
   res <- callModule(plotGatingSet, "plot_module", rval, plot_params, 
                     simple_plot = FALSE, 
                     auto_update = FALSE)
-  res_display <- callModule(simpleDisplay, "simple_display_module", res$plot, gate = gate)
   
-  
-  
-  # observe({
-  #   for(var in names(res$params)){
-  #     plot_params[[var]] <- res$params[[var]]
-  #   }
-  # })
+  callModule(simpleDisplay, "simple_display_module", res$plot)
   
   return(rval)
-  
 }

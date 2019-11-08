@@ -1,12 +1,10 @@
 #' @title   plotStatInput and plotStat
-#' @description  A shiny Module that deals with metadata
+#' @description  A shiny Module to build plots with data aggregation
 #' @param id shiny id
 #' @importFrom shinydashboard box tabBox
 #' @import shiny
-#' @import DT
 plotStatInput <- function(id) {
 
-  # Create a namespace function using the provided id
   ns <- NS(id)
   
   tagList(
@@ -63,12 +61,10 @@ plotStatInput <- function(id) {
 #' @param input shiny input
 #' @param output shiny output
 #' @param session shiny session
-#' @return a reactivevalues object with values "df_files", "flow_set_imported" and "gates_flowCore"
-#' @import flowWorkspace
-#' @import flowCore
+#' @param rval A reactive values object
+#' @return a list containing the plot, the plot data, and the corresponding plot parameters
 #' @import shiny
-#' @import DT
-#' @import plotly
+#' @importFrom scales identity_trans log10_trans
 #' @export
 #' @rdname plotStatUI
 plotStat <- function(input, output, session, rval) {
@@ -180,17 +176,6 @@ plotStat <- function(input, output, session, rval) {
     
   })
   
-  # observe({
-  # 
-  #   validate(
-  #     need(rval$plot_var, "No plotting parameters")
-  #   )
-  # 
-  #   yvar_default <- rval$plot_var[1]
-  # 
-  #   updateSelectInput(session, "yvar", choices = rval$plot_var, selected = yvar_default)
-  # 
-  # })
   
   observeEvent(input$select_var, {
 
@@ -272,27 +257,10 @@ plotStat <- function(input, output, session, rval) {
     names(axis_labels) <- rval$parameters$name
     
     y_trans <- switch(input$y_trans,
-                      "log10" = log10_trans(),
+                      "log10" = scales::log10_trans(),
                       "asinh" = asinh_trans(),
-                      "identity" = identity_trans(),
+                      "identity" = scales::identity_trans(),
                       NULL)
-    
-    
-    # Rowv <- FALSE
-    # Colv <- FALSE
-    # if(input$plot_type == "heatmap"){
-    #   if(input$cluster_y & (! input$stat_function %in% c("cell count", "percentage")) & length(input$yvar)>1){
-    #     Rowv <- TRUE
-    #   }
-    #   name_x_var <- switch(input$group_var,
-    #                        "subset" = "gate",
-    #                        "name" = "samples",
-    #                        input$group_var)
-    #   if(input$cluster_x & length(selected[[name_x_var]])>1){
-    #     Colv <- TRUE
-    #   }
-    # }
-    # 
 
     plot_args <- list()
     options <- list()
@@ -334,35 +302,6 @@ plotStat <- function(input, output, session, rval) {
     }else{
       p
     }
-    
-    # p <- plot_stat(df = update_data_plot_stat(),
-    #                gs = rval$gating_set,
-    #                metadata = rval$pdata,
-    #                sample = selected$samples,
-    #                subset = selected$gate, 
-    #                spill = rval$spill,
-    #                yvar = yvar,
-    #                type = input$plot_type,
-    #                transformation = transformation,
-    #                axis_labels = axis_labels,
-    #                default_trans = identity_trans(),
-    #                scale_values = input$scale_values,
-    #                max_scale = input$max_scale,
-    #                free_y_scale = input$free_y_scale,
-    #                color_var = input$color_var, 
-    #                facet_vars = input$facet_var,
-    #                group_var = input$group_var,
-    #                expand_factor = input$expand_factor,
-    #                stat_function = input$stat_function,
-    #                show.legend = input$legend,
-    #                y_trans = y_trans,
-    #                strip.text.y.angle = input$strip_text_angle,
-    #                theme_name = paste("theme_", theme, sep = ""),
-    #                Rowv = Rowv,
-    #                Colv = Colv
-    #                )
-    
-    #p                          
     
   })
   

@@ -1,11 +1,11 @@
 #' @title   importUI and import
-#' @description  A shiny Module that imports a flow set and gates from fcs files and a workspace 
+#' @description  A shiny Module that imports data and builds flow-sets
 #' @param id shiny id
 #' @importFrom shinydashboard box
-#' @import DT
+#' @importFrom DT dataTableOutput
 #' @import shiny
 importUI <- function(id) {
-  # Create a namespace function using the provided id
+
   ns <- NS(id)
   
   fluidRow(
@@ -42,15 +42,13 @@ importUI <- function(id) {
 #' @param input shiny input
 #' @param output shiny output
 #' @param session shiny session
-#' @return a reactivevalues object with values "df_files", "flow_set_imported" and "gates_flowCore"
-#' @import CytoML
-#' @import flowWorkspace
-#' @import flowCore
-#' @import ncdfFlow
+#' @return a reactivevalues object
 #' @import shiny
-#' @import DT
-#' @import tools
-#' @export
+#' @importFrom CytoML open_flowjo_xml open_diva_xml parseWorkspace getSampleGroups
+#' @importFrom ncdfFlow read.ncdfFlowSet
+#' @importFrom DT renderDataTable
+#' @importFrom tools file_ext
+#' @importFrom utils read.table
 #' @rdname importUI
 import <- function(input, output, session) {
   
@@ -79,16 +77,16 @@ import <- function(input, output, session) {
       need(length(input$files_table_rows_selected)>0, "Please select a file to load")
     )
     if(file_ext(rval_mod$df_files$datapath[input$files_table_rows_selected[1]]) %in% c("xml", "wsp") ){
-      ws <- try( open_flowjo_xml(rval_mod$df_files$datapath[input$files_table_rows_selected[1]]),
+      ws <- try( CytoML::open_flowjo_xml(rval_mod$df_files$datapath[input$files_table_rows_selected[1]]),
                  silent = TRUE)
       if(class(ws) != "try-error"){
-        groups <- unique(getSampleGroups(ws)$groupName)
+        groups <- unique(CytoML::getSampleGroups(ws)$groupName)
       }
       else{
-        ws <- try( open_diva_xml(rval_mod$df_files$datapath[input$files_table_rows_selected[1]]),
+        ws <- try( CytoML::open_diva_xml(rval_mod$df_files$datapath[input$files_table_rows_selected[1]]),
                    silent = TRUE)
         if(class(ws) != "try-error"){
-          groups <- unique(getSampleGroups(ws)$specimen)
+          groups <- unique(CytoML::getSampleGroups(ws)$specimen)
         }
       }
       
@@ -101,7 +99,6 @@ import <- function(input, output, session) {
         ))
       }
       
-      #groups <- unique(getSampleGroups(ws)$groupName)
       updateSelectInput(session, "groups", choices = groups, selected = groups[1])
     }
     
@@ -138,7 +135,7 @@ import <- function(input, output, session) {
     
     
       
-      if(file_ext(rval_mod$df_files$datapath[input$files_table_rows_selected[1]]) %in% c("xml", "wsp")){
+      if(tools::file_ext(rval_mod$df_files$datapath[input$files_table_rows_selected[1]]) %in% c("xml", "wsp")){
         ws <- try( open_flowjo_xml(rval_mod$df_files$datapath[input$files_table_rows_selected[1]]),
                    silent = TRUE)
         if(class(ws) == "try-error"){
@@ -155,7 +152,7 @@ import <- function(input, output, session) {
           ))
         }
   
-        gs <- try(parseWorkspace(ws,
+        gs <- try(CytoML::parseWorkspace(ws,
                                  name = input$groups,
                                  execute = TRUE,
                                  isNcdf = TRUE,
@@ -182,7 +179,7 @@ import <- function(input, output, session) {
         #get gates and transfrom gates
         
         gates <- get_gates_from_gs(gs)
-        if(file_ext(rval_mod$df_files$datapath[input$files_table_rows_selected[1]]) %in% c("wsp")){
+        if(tools::file_ext(rval_mod$df_files$datapath[input$files_table_rows_selected[1]]) %in% c("wsp")){
           gates <- get_gates_from_ws(ws_path = rval_mod$df_files$datapath[input$files_table_rows_selected[1]], 
                                      group = input$groups)
         }
@@ -192,35 +189,36 @@ import <- function(input, output, session) {
         # time_step is needed to transform gates containing the parameter "Time"
         time_step <- as.numeric(description(ff)[["$TIMESTEP"]])
         
-        # Parameters with a DISPLAY = LOG have been transformed with flowJo_biexp_trans().
-        # We need to apply the inverse transfrom for such parameters
+        # # Parameters with a DISPLAY = LOG have been transformed with flowJo_biexp_trans().
+        # # We need to apply the inverse transfrom for such parameters
+        # 
+        # display <- unlist(sapply(rownames(parameters(ff)@data), FUN = function(x){
+        #   kw <- substr(x, start = 2, stop = nchar(x))
+        #   kw <- paste(kw, "DISPLAY", sep = "")
+        #   disp <- ff@description[[kw]]
+        #   if(is.null(disp)){
+        #     disp <- "NA"
+        #   }
+        #   return(disp)
+        # }))
+        # names(display) <- NULL
+        # 
+        # trans.log <- identity_trans()
+        # # if(input$apply_biexp_inverse){
+        # #   trans.log <- flowJo_biexp_inverse_trans()
+        # # }else{
+        # #   trans.log <- identity_trans()
+        # # }
+        # 
+        # myTrans <- lapply(display, function(x){
+        #   switch(x,
+        #          "LOG" = trans.log,
+        #          scales::identity_trans())
+        # })
         
-        display <- unlist(sapply(rownames(parameters(ff)@data), FUN = function(x){
-          kw <- substr(x, start = 2, stop = nchar(x))
-          kw <- paste(kw, "DISPLAY", sep = "")
-          disp <- ff@description[[kw]]
-          if(is.null(disp)){
-            disp <- "NA"
-          }
-          return(disp)
-        }))
-        names(display) <- NULL
         
-        trans.log <- identity_trans()
-        # if(input$apply_biexp_inverse){
-        #   trans.log <- flowJo_biexp_inverse_trans()
-        # }else{
-        #   trans.log <- identity_trans()
-        # }
-        
-        myTrans <- lapply(display, function(x){
-          switch(x,
-                 "LOG" = trans.log,
-                 identity_trans())
-        })
         
         params <- parameters(ff)$name
-        #print(params)
         
         pattern <- NULL
         if( length( grep("[\\<|\\>]", params) ) >0 ){
@@ -228,12 +226,12 @@ import <- function(input, output, session) {
         }else if(length( grep("Comp-", params) ) >0){
           pattern <- "Comp-"
         }
-        #print(pattern)
         replacement <- ""
         if(!is.null(pattern)){
           params <- gsub(pattern = pattern, replacement = replacement, params)
         }
         
+        myTrans <- lapply(params, function(x){scales::identity_trans()})
         names(myTrans) <- params
         
         rval$gates_flowCore <- transform_gates(gates = gates, 
@@ -242,8 +240,9 @@ import <- function(input, output, session) {
                                                transformation = myTrans, 
                                                time_step = time_step)
         
+        
         ###################################################################################
-        #match fcs file names and import non-compensated, non-transfromed data
+        #match fcs file names and import non-compensated, non-transformed data
         
         names_imported <- fsApply(fs, function(x){description(x)[["FILENAME"]]})
         names_imported <- basename(names_imported)
@@ -280,8 +279,12 @@ import <- function(input, output, session) {
         rval$flow_set_selected <- names(rval$flow_set_list)[[1]]
         
       }else if(file_ext(rval_mod$df_files$datapath[input$files_table_rows_selected[1]]) %in% c("csv", "txt")){
-        df <- read.table(rval_mod$df_files$datapath[input$files_table_rows_selected[1]], header = TRUE, sep = "\t", as.is = TRUE)
-        #print(df)
+        
+        df <- utils::read.table(rval_mod$df_files$datapath[input$files_table_rows_selected[1]], 
+                                header = TRUE, 
+                                sep = "\t", 
+                                as.is = TRUE)
+        
         df$name <- basename(rval_mod$df_files$datapath[input$files_table_rows_selected[1]])
         df$subset <- "root"
         fs <- build_flowset_from_df(df)
@@ -298,6 +301,7 @@ import <- function(input, output, session) {
                                                     gates = list(),
                                                     name = input$fs_name, 
                                                     parent = NULL)
+        
         rval$flow_set_selected <- input$fs_name
         
       }else{
@@ -305,6 +309,7 @@ import <- function(input, output, session) {
         fs <- ncdfFlow::read.ncdfFlowSet( rval_mod$df_files$datapath[input$files_table_rows_selected] , 
                                           emptyValue=FALSE, 
                                           truncate_max_range = TRUE )
+        
         phenoData(fs)$name <- rval_mod$df_files$name[input$files_table_rows_selected]
         
         rval$flow_set_list[[input$fs_name]] <- list(flow_set = fs,

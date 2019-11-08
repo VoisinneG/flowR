@@ -1,14 +1,13 @@
+#' flowR server function
 #' @import shiny
-#' @export
+#' @importFrom flowWorkspace gs_get_pop_paths
+#' @importFrom shinydashboard renderValueBox
 flowR_server <- function(session, input, output, user_module_name = NULL) {
   
-  `%then%` <- shiny:::`%OR%`
-  
   rval <- reactiveValues()
-
   gate <- reactiveValues(x = NULL, y = NULL)
   
-  # Import module : import flowSet, gates from fcs files and workspace
+  # Import module
   rval <- callModule(import, "import_module")
   
   # Metadata module
@@ -69,7 +68,6 @@ flowR_server <- function(session, input, output, user_module_name = NULL) {
     updateSelectInput(session, "flow_set", choices = names(rval$flow_set_list), selected = rval$flow_set_selected)
   })
   
-  
   observeEvent(input$flow_set, {
     
     validate(
@@ -78,10 +76,6 @@ flowR_server <- function(session, input, output, user_module_name = NULL) {
     
     rval$flow_set_selected <- input$flow_set
     rval$flow_set <- rval$flow_set_list[[input$flow_set]]$flow_set
-    
-    print(input$flow_set)
-    print(rval$gates_flowCore)
-    print(rval$flow_set_list[[input$flow_set]]$gates)
     
     if(length(rval$gates_flowCore) == 0){
       rval$gates_flowCore <- rval$flow_set_list[[input$flow_set]]$gates
@@ -149,7 +143,7 @@ flowR_server <- function(session, input, output, user_module_name = NULL) {
   output$progressBox2 <- renderValueBox({
     ngates <- 0
     if(!is.null(rval$gating_set)){
-      ngates <- length(setdiff(getNodes(rval$gating_set), "root"))
+      ngates <- length(setdiff(flowWorkspace::gs_get_pop_paths(rval$gating_set), "root"))
     }
     
     valueBox(

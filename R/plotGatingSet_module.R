@@ -1,11 +1,13 @@
 #' @title plotGatingSetInput and plotGatingSet
-#' @description  A shiny Module that deals with metadata
+#' @description  A shiny Module to build plots from a gating set
 #' @param id shiny id
-#' @importFrom shinydashboard box tabBox
+#' @param simple_plot logical, disable a number of plot options
+#' @param auto_update Should plot update be automatic? 
+#' If FALSE, plot update is controlled by an action button.
 #' @import shiny
-#' @import DT
+#' @importFrom shinydashboard box 
 plotGatingSetInput <- function(id, simple_plot = TRUE, auto_update = TRUE) {
-  # Create a namespace function using the provided id
+  
   ns <- NS(id)
   
   tagList(
@@ -51,7 +53,6 @@ plotGatingSetInput <- function(id, simple_plot = TRUE, auto_update = TRUE) {
         selectInput(ns("plot_type"), label = "plot type",
                     choices = c("hexagonal", "histogram", "dots", "contour"),
                     selected = "hexagonal"),
-        #checkboxInput(ns("legend"), "show legend", value = TRUE),
         checkboxInput(ns("use_all_cells"), "Use all cells", FALSE),
         selectInput(ns("legend.position"), label = "legend position",
                     choices = c("none", "right", "top", "left", "bottom"),
@@ -72,12 +73,16 @@ plotGatingSetInput <- function(id, simple_plot = TRUE, auto_update = TRUE) {
 #' @param input shiny input
 #' @param output shiny output
 #' @param session shiny session
-#' @return a reactivevalues object with values "df_files", "flow_set_imported" and "gates_flowCore"
-#' @import flowWorkspace
-#' @import flowCore
+#' @param rval A reactive values object
+#' @param plot_params A reactiveValues object with plot parameters
+#' @param simple_plot logical, disable a number of plot options
+#' @param auto_update Should plot update be automatic? 
+#' If FALSE, plot update is controlled by an action button.
+#' @param show_gates Should gates with coordinates matching plot coordinates be displayed
+#' @param polygon_gate a reactiveValues object with polygon coordinates to be plotted as an additionnal layer
+#' @return a list containing the plot and the corresponding plot parameters
+#' @import flowWorkspace getChildren getGate gs_get_pop_paths
 #' @import shiny
-#' @import DT
-#' @export
 #' @rdname plotGatingSetInput
 plotGatingSet <- function(input, output, session, 
                           rval, 
@@ -88,7 +93,6 @@ plotGatingSet <- function(input, output, session,
                           polygon_gate = NULL) {
   
   `%then%` <- shiny:::`%OR%`
-  #ns <- session$ns
   
   rval_plot <- reactiveValues(show_gates = FALSE,
                                       norm = TRUE,
@@ -106,24 +110,7 @@ plotGatingSet <- function(input, output, session,
                                       split_variable = "x_variable",
                                       show_label = FALSE,
                                       show_outliers = FALSE)
-  
-                              
-  # observeEvent(input$plot_type, {
-  #   rval_plot_default$alpha <- switch(input$plot_type,
-  #                                     "contour" = 0.75,
-  #                                     "dots" = 0.1,
-  #                                     0.1)
-  #   
-  #   rval_plot_default$size <- switch(input$plot_type, 
-  #                                     "contour" = 0.2,
-  #                                     0.1)
-  #   
-  #   rval_plot_default$bins <- switch(input$plot_type, 
-  #                                    "contour" = 10,
-  #                                    100)
-  # })
-  
-  #rval_plot <- reactiveValues()
+
   
   rval_mod <- reactiveValues(plot_list = list(), count_raw = 0, count_format = 0)
   
@@ -136,28 +123,25 @@ plotGatingSet <- function(input, output, session,
     ns <- session$ns
     x <- list()
     
+    x[["show_gates"]] <- checkboxInput(ns("show_gates"), "show defining gates", value = rval_plot[["show_gates"]])
+    x[["norm_density"]] <- checkboxInput(ns("norm_density"), "normalize (set max to 1)", value = rval_plot[["norm"]])
+    x[["smooth"]] <- checkboxInput(ns("smooth"), "smooth", value = rval_plot[["smooth"]])
     
-      x[["show_gates"]] <- checkboxInput(ns("show_gates"), "show defining gates", value = rval_plot[["show_gates"]])
-      x[["norm_density"]] <- checkboxInput(ns("norm_density"), "normalize (set max to 1)", value = rval_plot[["norm"]])
-      x[["smooth"]] <- checkboxInput(ns("smooth"), "smooth", value = rval_plot[["smooth"]])
-      
-      x[["ridges"]] <- checkboxInput(ns("ridges"), "ridges", value = rval_plot[["ridges"]])
-      
-      x[["yridges_var"]] <- selectizeInput(ns("yridges_var"), 
-                                           multiple =FALSE,
-                                           label = "y ridges variable", 
-                                           choices = c("subset", names(rval$pdata)), 
-                                           selected = rval_plot[["yridges_var"]])
-      x[["bins"]] <- numericInput(ns("bins"), label = "number of bins", value = rval_plot[["bins"]])
-      x[["alpha"]] <- numericInput(ns("alpha"), label = "alpha", value = rval_plot[["alpha"]])
-      x[["size"]] <- numericInput(ns("size"), label = "size", value = rval_plot[["size"]])
-      x[["show_label"]] <- checkboxInput(ns("show_label"), "show labels", value = rval_plot[["show_label"]])
-      x[["show_outliers"]] <- checkboxInput(ns("show_outliers"), "show outliers", value = rval_plot[["show_outliers"]])
-      
-      rval_mod$plot_options <- x
+    x[["ridges"]] <- checkboxInput(ns("ridges"), "ridges", value = rval_plot[["ridges"]])
     
+    x[["yridges_var"]] <- selectizeInput(ns("yridges_var"), 
+                                         multiple =FALSE,
+                                         label = "y ridges variable", 
+                                         choices = c("subset", names(rval$pdata)), 
+                                         selected = rval_plot[["yridges_var"]])
+    x[["bins"]] <- numericInput(ns("bins"), label = "number of bins", value = rval_plot[["bins"]])
+    x[["alpha"]] <- numericInput(ns("alpha"), label = "alpha", value = rval_plot[["alpha"]])
+    x[["size"]] <- numericInput(ns("size"), label = "size", value = rval_plot[["size"]])
+    x[["show_label"]] <- checkboxInput(ns("show_label"), "show labels", value = rval_plot[["show_label"]])
+    x[["show_outliers"]] <- checkboxInput(ns("show_outliers"), "show outliers", value = rval_plot[["show_outliers"]])
     
-    
+    rval_mod$plot_options <- x
+
   })
   
   output$plot_options <- renderUI({
@@ -254,9 +238,9 @@ plotGatingSet <- function(input, output, session,
   
   ######################################################################################
   #Initialization of plot parameters
+  
   observe({
     
-    #print(names(plot_params))
     for(var in intersect( names(plot_params), c("xvar", 
                                                 "yvar", 
                                                 "color_var", 
@@ -278,6 +262,7 @@ plotGatingSet <- function(input, output, session,
     }
     
   })
+  
   ######################################################################################
   
   
@@ -499,16 +484,10 @@ plotGatingSet <- function(input, output, session,
           }else if(split_var() == "yvar"){
             plot_args[["yvar"]] <- xvar[i]
           }
-    
-          #args <- reactiveValuesToList(rval_plot)
-          
-         
-          
+
           rval_mod$plot_list[[i]] <- call_plot_function(df=df,
                                                         plot_type = input$plot_type,
                                                         plot_args = plot_args)
-                                     
-          
           
     }
     
@@ -524,7 +503,6 @@ plotGatingSet <- function(input, output, session,
     if(!is.null(axis_labels)){
       names(axis_labels) <- rval$parameters$name
     }
-    
     
     transformation <- NULL
     if(rval$apply_trans){
@@ -562,8 +540,8 @@ plotGatingSet <- function(input, output, session,
     gate <- NULL
     
     if(show_gates){
-      if(selected$gate %in% getNodes(rval$gating_set[[1]])){
-        child_gates <- getChildren(rval$gating_set[[1]], selected$gate)
+      if(selected$gate %in% flowWorkspace::gs_get_pop_paths(rval$gating_set[[1]])){
+        child_gates <- flowWorkspace::getChildren(rval$gating_set[[1]], selected$gate)
         if(length(child_gates) > 0){
           gate <- child_gates
         }
@@ -574,7 +552,7 @@ plotGatingSet <- function(input, output, session,
                      function(p){
                        if(!is.null(gate)){
                          for(gate_name in setdiff(gate, "root")){
-                           gate_int <- getGate(rval$gating_set[[1]], gate_name)
+                           gate_int <- flowWorkspace::getGate(rval$gating_set[[1]], gate_name)
                            p <- add_gate(p = p, gate = gate_int)
                          }
                        }

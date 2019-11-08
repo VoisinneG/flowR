@@ -1,11 +1,13 @@
-#' @title   simpleDisplayUI and simpleDisplay
-#' @description  A shiny Module that deals with metadata
+#' @title simpleDisplayUI and simpleDisplay
+#' @description  A shiny Module to display and save plots
 #' @param id shiny id
-#' @importFrom shinydashboard box tabBox
+#' @param nrow number of rows in the layout
+#' @param size Initial size of a single plot (in pixels)
+#' @param save logical, add a box with a save button
+#' @importFrom shinydashboard box
 #' @import shiny
-#' @import DT
 simpleDisplayUI <- function(id, nrow = 1, size = 400, save = TRUE){
-  # Create a namespace function using the provided id
+  
   ns <- NS(id)
 
   tagList(
@@ -27,8 +29,6 @@ simpleDisplayUI <- function(id, nrow = 1, size = 400, save = TRUE){
         if(save){
           tagList(
             box(title = "Save", width = 6, collapsible = TRUE, collapsed = TRUE,
-                #numericInput(ns("width_plot"), label = "width", value = 5),
-                #numericInput(ns("height_plot"), label = "height", value = 5),
                 downloadButton(ns("download_plot"), "Save plot")
             )
           )
@@ -37,8 +37,6 @@ simpleDisplayUI <- function(id, nrow = 1, size = 400, save = TRUE){
       )
     )
   )
-  
-  
 }
 
 
@@ -46,16 +44,16 @@ simpleDisplayUI <- function(id, nrow = 1, size = 400, save = TRUE){
 #' @param input shiny input
 #' @param output shiny output
 #' @param session shiny session
-#' @return a reactivevalues object with values "df_files", "flow_set_imported" and "gates_flowCore"
-#' @import flowWorkspace
-#' @import flowCore
+#' @param plot_list list of plots to display
+#' @param params a reactivevalues object with an option to display plotly objects
+#' @return A list containing the plot displayed and input parameters (these include events 
+#' describing user interaction with the plot)
 #' @import shiny
-#' @import gridExtra
-#' @import DT
-#' @import plotly
-#' @export
+#' @importFrom gridExtra marrangeGrob
+#' @importFrom grDevices pdf dev.off
+#' @importFrom plotly plotlyOutput renderPlotly
 #' @rdname simpleDisplayUI
-simpleDisplay <- function(input, output, session, plot_list, gate = reactiveValues(), params = reactiveValues(use_plotly = FALSE)) {
+simpleDisplay <- function(input, output, session, plot_list, params = reactiveValues(use_plotly = FALSE)) {
   
   `%then%` <- shiny:::`%OR%`
   
@@ -92,8 +90,6 @@ simpleDisplay <- function(input, output, session, plot_list, gate = reactiveValu
               }
             }
             
-            
-            
             if(n > 1){
               rval_plot$nrow <- min(n, input$nrow_split)
               rval_plot$ncol <- ceiling(n/rval_plot$nrow)
@@ -114,7 +110,7 @@ simpleDisplay <- function(input, output, session, plot_list, gate = reactiveValu
        p <- plot_list()
        if("facet" %in% names(p)){
          facet_layout <- p$facet$compute_layout(p, p$facet$params)
-         #print(facet_layout)
+
          if(!is.null(facet_layout)){
            rval_plot$ncol_facet <- max(facet_layout$COL)
            rval_plot$nrow_facet <- max(facet_layout$ROW)
@@ -125,14 +121,8 @@ simpleDisplay <- function(input, output, session, plot_list, gate = reactiveValu
      }
      
    })
-
-  # observe({
-  #   updateNumericInput(session, "row_size", value = 400)
-  #   updateNumericInput(session, "col_size", value = 400)
-  # })
   
   output$plot_display  <- renderPlot({
-    print("render_plot")
     plot_display()
   })
 
@@ -142,9 +132,6 @@ simpleDisplay <- function(input, output, session, plot_list, gate = reactiveValu
 
   output$ui_plot <- renderUI({
     ns <- session$ns
-    
-    
-    #print(params$use_plotly)
     
     if(params$use_plotly){
       div( style = 'overflow-x: scroll',
@@ -168,18 +155,10 @@ simpleDisplay <- function(input, output, session, plot_list, gate = reactiveValu
 
   })
 
-  observeEvent(gate, {
-    if( is.null(gate$x) & is.null(gate$y) ){
-      session$resetBrush("plot_brush")
-    }
-    
-   
-  })
   
   output$download_plot <- downloadHandler(
     filename = "plot.pdf",
     content = function(file) {
-      #pdf(file, width = rval_plot$ncol*input$width_plot, height = rval_plot$nrow*input$height_plot)
       pdf(file, 
           width = rval_plot$ncol * rval_plot$ncol_facet * input$col_size * 5/400, 
           height = rval_plot$nrow * rval_plot$nrow_facet * input$row_size * 5/400)
@@ -189,7 +168,6 @@ simpleDisplay <- function(input, output, session, plot_list, gate = reactiveValu
       dev.off()
     }
   )
-  
+
   return( list( plot = plot_display, params = input ) )
-  
 }

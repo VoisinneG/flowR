@@ -1,20 +1,8 @@
-# library(scales)
-# library(viridis)
-# library(ggcyto)
-# library(data.table)
-# library(ggsignif)
-# #library(sf) # need libudunits2-dev
-# #devtools::install_github("JinmiaoChenLab/ClusterX")
-# library(ClusterX)
-# #devtools::install_github("JinmiaoChenLab/Rphenograph")
-# library(Rphenograph)
-# library(Rtsne)
-# #BiocManager::install("Biobase")
-# library("Biobase")
-# library(xml2)
+
 
 ####################################################################################################
 # Parse workspace and gates from xml files
+####################################################################################################
 
 #' @import xml2
 parseSampleNodes <- function(x){
@@ -165,8 +153,37 @@ get_gates_from_ws <- function(ws_path, group = NULL){
   
 }
 
+get_gate_coordinates <- function(gate){
+  
+  polygon <- NULL
+  
+  if(class(gate) == "polygonGate" ){
+    if(length(unique(colnames(gate@boundaries)))>1){
+      polygon <- as.data.frame(gate@boundaries)
+    }
+  }else if(class(gate) == "rectangleGate"){
+    
+    polygon <- data.frame(x = c(gate@min[1], gate@max[1], gate@max[1], gate@min[1]),
+                          y = c(gate@min[2], gate@min[2], gate@max[2], gate@max[2]))
+    
+    colnames(polygon) <- names(gate@min)
+    
+  }else if(class(gate) == "ellipsoidGate"){
+    cov <- gate_int@cov
+    mean <- gate_int@mean
+    polygon <- ellipse_path(cov = cov, mean = mean)
+  }else{
+    warning("gate format not supported")
+    break
+  }
+  
+  return(polygon)
+  
+}
+
 ####################################################################################################
 # Transformations
+####################################################################################################
 
 #' @import flowWorkspace
 flowJo_biexp_inverse_trans <- function (..., n = 6, equal.space = FALSE){
@@ -194,6 +211,7 @@ asinh_trans <- function (..., n = 6, equal.space = FALSE){
 
 ####################################################################################################
 # Gating
+####################################################################################################
 
 ellipse_path <- function(cov, mean, n = 100){
   
@@ -248,7 +266,7 @@ get_all_ancestors <- function(named_list, names){
 #' @import flowWorkspace
 get_gates_from_gs <- function(gs){
   
-  nodes <- getNodes(gs)
+  nodes <- flowWorkspace::gs_get_pop_paths(gs)
   gates <- list()
   
   for(node in setdiff(nodes, "root")){
@@ -267,7 +285,7 @@ get_gates_from_gs <- function(gs){
 #' @import flowWorkspace
 add_gates_flowCore <- function(gs, gates){
   
-  new_gates_name <- setdiff(names(gates), getNodes(gs))
+  new_gates_name <- setdiff(names(gates), flowWorkspace::gs_get_pop_paths(gs))
   gates <- gates[new_gates_name]
   
   ngates <- length(gates)
@@ -285,7 +303,7 @@ add_gates_flowCore <- function(gs, gates){
         
         g <- gates[[idx[i]]]
         
-        if(g$parent %in% union(getNodes(gs), "root") ){
+        if(g$parent %in% union(flowWorkspace::gs_get_pop_paths(gs), "root") ){
           
           if( !is.null(names(g$gate@parameters)) & length( setdiff( names(g$gate@parameters), colnames(gs)) ) == 0 ){
             
@@ -316,7 +334,7 @@ add_gates_flowCore <- function(gs, gates){
 }
 
 #' @import flowWorkspace
-transform_gates <- function(gates, 
+transform_gates <- function(gates,
                             transformation = NULL, 
                             pattern = "[\\<|\\>]", 
                             replacement = "",
@@ -410,6 +428,8 @@ transform_gates <- function(gates,
 
 ####################################################################################################
 # Getting data
+####################################################################################################
+
 #' @import flowCore
 getPopStatsPlus <- function(gs, spill = NULL, filter = NULL){
   
@@ -500,10 +520,8 @@ get_data_gs <- function(gs,
       
       if(subset[k] != "root"){
         if(!is.null(spill)){
-          #print(idx_comp)
           idx_subset <- flowWorkspace::getIndices(gs_comp[[idx_comp]], subset[k])
         }else{
-          #print(idx[i])
           idx_subset <- flowWorkspace::getIndices(gs[[idx[i]]], subset[k])
         }
       }
@@ -513,8 +531,6 @@ get_data_gs <- function(gs,
       }else{
         ff <- getData(gs[[idx[i]]])
       }
-      print(ff@exprs)
-      print(idx_subset)
       
 
       df_int <- as.data.frame(ff@exprs)
@@ -561,7 +577,6 @@ get_data_gs <- function(gs,
     return(NULL)
   }
   
-  
 }
 
 #' Add metadata columns
@@ -595,9 +610,137 @@ add_columns_from_metadata <- function(df,
   return(df)
 }
 
-
-####################################################################################################
-# Plotting
+#' @import reshape2
+#' @import scales
+compute_stats <- function(df = NULL,
+                          gs = NULL,
+                          spill = NULL,
+                          transformation=NULL,
+                          stat_function = "mean",
+                          y_trans = identity_trans(),
+                          apply_inverse = TRUE,
+                          yvar = NULL,
+                          var_names = NULL,
+                          id.vars = c("name", "subset")
+){
+  
+  inverse <- NULL
+  
+  if(is.null(yvar)){
+    yvar <- setdiff(names(df), id.vars)
+  }
+  
+  custom_name <- NULL
+  
+  if(stat_function == "GeoMean"){
+    y_trans = log_trans()
+    apply_inverse = TRUE
+    stat_function = "mean"
+    custom_name <- "GeoMean"
+    warning("Note that negative values will be discarded when computing the geometric mean")
+  }
+  
+  if(stat_function == "median"){
+    y_trans = identity_trans()
+    apply_inverse = FALSE
+  }
+  
+  if(is.null(var_names)){
+    var_names <- yvar
+    names(var_names) <- yvar
+  }
+  
+  if(! stat_function %in% c("cell count", "percentage")){
+    if(!is.null(yvar)){
+      
+      if(!is.null(y_trans)){
+        transformation <- lapply(yvar, function(x){y_trans})
+        names(transformation) <- yvar
+      }
+      
+      
+      for(i in 1:length(yvar)){
+        df[[yvar[i]]] <- transformation[[yvar[i]]]$transform(df[[yvar[i]]])
+      }
+      
+      
+      df_melt <- reshape2::melt(df, id.vars = id.vars, measure.vars = yvar)
+      df_melt <- df_melt[is.finite(df_melt$value), ]
+      
+      
+      stat.fun <- function(...){do.call(stat_function, args = list(...))}
+      df_cast <- reshape2::dcast(df_melt, 
+                                 formula = as.formula(paste(paste(id.vars, collapse = " + "), " ~ variable", sep ="")), 
+                                 fun.aggregate =  stat.fun, 
+                                 na.rm = TRUE)
+      
+      if(apply_inverse){
+        for(i in 1:length(yvar)){
+          df_cast[[yvar[i]]] <- transformation[[yvar[i]]]$inverse(df_cast[[yvar[i]]])
+          if(transformation[[yvar[i]]]$name != "identity"){
+            inverse <- "inverse"
+          }
+        }
+      }
+      
+      
+      # for(i in 1:length(yvar)){
+      #   idx <- which(names(df_cast) == yvar[i])
+      #   trans_name <- NULL
+      #   if(transformation[[yvar[i]]]$name != "identity"){
+      #     trans_name <- transformation[[yvar[i]]]$name
+      #   }
+      #   if(is.null(custom_name)){
+      #     names(df_cast)[idx] <- paste(stat_function, trans_name, inverse, var_names[[i]])
+      #   }else{
+      #     names(df_cast)[idx] <- paste(custom_name,  var_names[[i]])
+      #   }
+      #   
+      # }
+      
+      
+    }
+    
+  }else{
+    if(!is.null(gs)){
+      variable <- switch(stat_function,
+                         "cell count" = "Count",
+                         "percentage" = "perc_parent")
+      
+      df_pop_stat <- as.data.frame(getPopStatsPlus(gs, spill = spill))
+      df_pop_stat <- dplyr::rename(df_pop_stat, subset = Population)
+      df_pop_stat[['perc_parent']] <- df_pop_stat$Count / df_pop_stat$ParentCount * 100
+      df_cast <- df_pop_stat[c("name", "subset", variable)]
+      
+      df_cast <- df_cast[df_cast$name %in% unique(as.character(df$name)) & 
+                           df_cast$subset %in% unique(as.character(df$subset)), ]
+      
+    }
+    
+    
+    #df_cast <- df[df$name %in% sample & df$subset %in% subset, ]
+    
+    # idx <- which(as.character(df$name) %in% sample & as.character(df$subset) %in% subset)
+    # print(idx)
+    # if(length(idx)>0){
+    #   df_cast <- df[idx, ]
+    # }else{
+    #   df_cast <- NULL
+    # }
+    
+    
+    # trans_name <- NULL
+    # yvar <- switch(stat_function,
+    #                "cell count" = "Count",
+    #                "percentage" = "perc_parent")
+    # id.vars <- c("name", "subset")
+    
+    
+  }
+  
+  return(df_cast)
+  
+}
 
 get_plot_data <- function(gs,
                           df=NULL, 
@@ -606,8 +749,8 @@ get_plot_data <- function(gs,
                           Ncells = NULL,
                           spill = NULL,
                           metadata = NULL){
-                       
-                      
+  
+  
   if(is.null(df)){
     df <- get_data_gs(gs = gs,
                       sample = sample,
@@ -635,6 +778,10 @@ get_plot_data <- function(gs,
   
 }
 
+####################################################################################################
+# Plotting
+####################################################################################################
+
 
 call_plot_function <- function(df,
                          plot_type,
@@ -648,166 +795,9 @@ call_plot_function <- function(df,
 }
 
 
-#' @import ggplot2
-#' @import viridis
-#' @import flowWorkspace
-#' @import rlang
-format_plot <- function(p,
-                        options = list()){
-  
-  xvar <- NULL
-  yvar <- NULL
-  
-  print(names(p$mapping))
-  
-  if("x" %in% names(p$mapping)){
-    if("quosure" %in% class(p$mapping$x)){
-      xvar <- as.character(quo_get_expr(p$mapping$x))
-    }
-  }
- 
-  if("y" %in% names(p$mapping)){
-    if("quosure" %in% class(p$mapping$x)){
-      yvar <- as.character(quo_get_expr(p$mapping$y))
-    }
-  }
-  
-  xlim <- NULL
-  ylim <- NULL
-  color_var <- p$plot_env$color_var
-  
-  facet_yvar <- NULL
-  if(p$plot_env$plot_type == "bar"){
-    facet_yvar <- "variable"
-  }
-  
-  #facet scales
-  scales <- "fixed"
-  
-  # if(!is_null(color_var)){
-  #   if(color_var == "none"){
-  #     color_var <- NULL
-  #   }
-  # }
 
-  
-  ############################################################################33
-  #default parameters
-  default_trans <- identity_trans()
-  
-  for(var in names(options)){
-    assign(var, options[[var]])
-  }
-  
-  ############################################################################33
-  #transformations
-  
-  #transformation <- options$transformation
-  #if(is.null(transformation)){
-    
-  #}
-  transformation <- list()
-  
-  for(var in names(options$transformation)){
-    transformation[[var]] <- options$transformation[[var]]
-  }
-  
-  
-  if(!is.null(xvar)){
-    if(length(xvar) == 1){
-      
-      labx <- ifelse(xvar %in% names(options$axis_labels), options$axis_labels[[xvar]], xvar)
-      
-      if(xvar %in% names(transformation)){
-        p <- p + scale_x_continuous(name = labx, trans = transformation[[xvar]], limits = xlim) 
-      }else if(is.numeric(p$data[[xvar]])){
-        p <- p + scale_x_continuous(name = labx, trans = default_trans, limits = xlim)
-      }
-    }
-  }
-  
-  if(!is.null(yvar)){
-    if(length(yvar) == 1){
-      laby <- ifelse(yvar %in% names(options$axis_labels), options$axis_labels[[yvar]], yvar)
-      #laby <- ifelse(is.null(options$axis_labels[[yvar]]), yvar, options$axis_labels[[yvar]])
-      if(yvar %in% names(transformation)){
-        p <- p + scale_y_continuous(name = laby, trans = transformation[[yvar]], limits = ylim) 
-      }else if(is.numeric(p$data[[yvar]])){
-        p <- p + scale_y_continuous(name = laby, trans = default_trans, limits = ylim)
-      }
-    }
-  }
-
-  
-  if(p$plot_env$plot_type == "dots"){
-    
-    if(!is.null(color_var)){
-      
-      color_var_name <- options$color_var_name
-
-      if( as.character(color_var) %in% setdiff(names(transformation), "cluster")){
-        if(is.null(color_var_name)){
-          color_var_name <- color_var
-        }
-        p <- p + scale_colour_viridis(trans = transformation[[color_var]],
-                                      name = color_var_name)
-      }
-    }
-  }
-  
-  ############################################################################33
-  #facet
-  
-  if(!is.null(options$facet_var) | !is.null(facet_yvar)){
-    
-    left_formula <- paste(facet_yvar, collapse = " + ")
-    right_formula <- "."
-    if(!is.null(options$facet_var)){
-      if(options$facet_var != ""){
-        right_formula <- paste(options$facet_var, collapse = " + ")
-      }
-    }
-    
-    print(paste(left_formula, "~", right_formula))
-    formula_facet <- as.formula(paste(left_formula, "~", right_formula))
-    
-    
-    p <- p + facet_grid(formula_facet,
-                        labeller = label_both, 
-                        #scales = scale_y,
-                        scales = scales)
-  }
-
-  ############################################################################
-  #theme
-  
-  if(length(unique(p$data$subset))==1){
-    p <- p + ggtitle(unique(p$data$subset))
-  }
-  
-  if("theme" %in% names(options)){
-    if(!is.null(options$theme)){
-      if(options$theme != ""){
-        theme_name = paste("theme_", options$theme, sep = "")
-        theme_function <- function(...){
-          do.call(theme_name, list(...))
-        }
-        p <- p + theme_function()
-      }
-    }
-    
-  }
-  
-  
-  if(!is.null(options$legend.position)){
-    p <- p + theme(legend.position = options$legend.position)
-  }
-  
-  p <- p + theme(plot.title = element_text(face = "bold"))
-  
-  return(p)
-  
-}
+####################################################################################################
+# Generate plot for data with single cell resolution (plotGatingSetInput_module)
 
 plot_hexagonal <- function(args = list()){
   
@@ -993,7 +983,6 @@ plot_dots <-function(args = list()){
   
 }
 
-
 plot_contour <-function(args = list()){
   
   plot_type <- "contour"
@@ -1106,140 +1095,10 @@ plot_contour <-function(args = list()){
   return(p)
 }
 
+####################################################################################################
+# Generate plot for aggregated data (plotStatInput_module)
+####################################################################################################
 
-#' @import ggrepel
-add_polygon_layer <-function(p,
-                             polygon = NULL,
-                             label = NULL){
-  
-  if(p$plot_env$plot_type != "histogram" & setequal(names(polygon), c("x", "y"))){
-    if(!is.null(polygon$x)){
-      
-      polygon <- data.frame(x = polygon$x, y = polygon$y)
-      polygon <- rbind(polygon, polygon[1,])
-      
-      p <- p +
-        geom_path(data = polygon, mapping = aes(x=x, y=y), color = "red") +
-        geom_polygon(data=polygon, mapping = aes(x=x, y=y),
-                     fill="red",
-                     alpha=0.05)
-      if(!is.null(label)){
-        df_label <- data.frame(x=mean(polygon$x), y= mean(polygon$y))
-        p <- p +  geom_label_repel(data = df_label, force = 4,
-                             mapping = aes(x=x, y=y), 
-                             label = label, 
-                             fill = rgb(1,1,1,0.85), 
-                             color = "red", 
-                             nudge_y = 0, 
-                             nudge_x =0, 
-                             point.padding = 0)
-                             #hjust = "middle", vjust = "center")
-      }
-
-    }
-    
-  }
-  
-  return(p)
-  
-}
-
-#' @import sp
-#' @import rlang
-add_gate <- function(p, gate){
-  
-  if(is.null(gate) | p$plot_env$plot_type == "histogram"){
-    return(p)
-  }
-  
-  polygon <- get_gate_coordinates(gate)
-  
-  xvar <- NULL
-  yvar <- NULL
-  print(p$plot_env$plot_type)
-  print(names(p$mapping))
-  
-  if("x" %in% names(p$mapping)){
-    if("quosure" %in% class(p$mapping$x)){
-      xvar <- as.character(quo_get_expr(p$mapping$x))
-    }
-  }
-  
-  if("y" %in% names(p$mapping)){
-    if("quosure" %in% class(p$mapping$x)){
-      yvar <- as.character(quo_get_expr(p$mapping$y))
-    }
-  }
-  
-  
-  if(setequal(c(xvar, yvar), names(polygon))){ 
-    
-    in_poly <- point.in.polygon(p$data[[xvar]], 
-                                p$data[[yvar]], 
-                                polygon[[xvar]],
-                                polygon[[yvar]], 
-                                mode.checked=FALSE)
-    
-    perc_in_poly <- sprintf("%.1f", sum(in_poly)/length(in_poly)*100)
-    
-    idx_match <- match(c(xvar, yvar), names(polygon))
-    names(polygon)[idx_match] <- c("x", "y")
-    
-    label <- paste(gate@filterId, " (", perc_in_poly, "%)", sep="")
-    p <- add_polygon_layer(p, polygon = polygon, label = label)
-  }
-  
-  return(p)
-
-}
-
-
-plot_gs <- function(gs,
-                     df = NULL,
-                     sample = NULL,
-                     subset = NULL,
-                     spill = NULL,
-                     metadata = NULL,
-                     plot_type = "contour",
-                     plot_args = list(),
-                     options = list(),
-                     gate = NULL){
-                     
-  
-  if(! "xvar" %in% names(plot_args)){
-    plot_args[["xvar"]] <- colnames(gs)[1]
-  }
-  if(! "yvar" %in% names(plot_args)){
-    plot_args[["yvar"]] <- colnames(gs)[2]
-  }
-  
-  if(is.null(sample)) sample <-  pData(gs)$name[1]
-  if(is.null(subset)) subset <- getNodes(gs)[1]
-       
-  df <- get_plot_data(df = df,
-                      gs = gs, 
-                      sample = sample,
-                      subset = subset,
-                      spill = spill, 
-                      metadata = metadata)
-  
-  print(plot_type)
-  
-  p <- call_plot_function(df = df,
-                    plot_type = plot_type,
-                    plot_args = plot_args)
-  
-  p <- format_plot(p, options = options)
-  
-  if(!is.null(gate)){
-    for(gate_name in setdiff(gate, "root")){
-      g <- getGate(gs[[1]], gate_name)
-      p <- add_gate(p, g)
-    }
-  }
-  
-  return(p)
-}
 
 #' @import viridis
 #' @import pheatmap
@@ -1270,7 +1129,7 @@ plot_heatmap <-function(args = list()){
   }
   
   row.names(df) <- 1:dim(df)[1]
-  #print(df)
+
   
   if(is.null(annotation_vars)){
     annotation_vars <- c("name", "subset")
@@ -1473,6 +1332,309 @@ plot_pca <-function(args = list()){
 }
 
 
+####################################################################################################
+# Add layers to plot
+####################################################################################################
+
+#' @import ggrepel
+add_polygon_layer <-function(p,
+                             polygon = NULL,
+                             label = NULL){
+  
+  if(p$plot_env$plot_type != "histogram" & setequal(names(polygon), c("x", "y"))){
+    if(!is.null(polygon$x)){
+      
+      polygon <- data.frame(x = polygon$x, y = polygon$y)
+      polygon <- rbind(polygon, polygon[1,])
+      
+      p <- p +
+        geom_path(data = polygon, mapping = aes(x=x, y=y), color = "red") +
+        geom_polygon(data=polygon, mapping = aes(x=x, y=y),
+                     fill="red",
+                     alpha=0.05)
+      if(!is.null(label)){
+        df_label <- data.frame(x=mean(polygon$x), y= mean(polygon$y))
+        p <- p +  geom_label_repel(data = df_label, force = 4,
+                                   mapping = aes(x=x, y=y), 
+                                   label = label, 
+                                   fill = rgb(1,1,1,0.85), 
+                                   color = "red", 
+                                   nudge_y = 0, 
+                                   nudge_x =0, 
+                                   point.padding = 0)
+        #hjust = "middle", vjust = "center")
+      }
+      
+    }
+    
+  }
+  
+  return(p)
+  
+}
+
+#' @import sp
+#' @import rlang
+add_gate <- function(p, gate){
+  
+  if(is.null(gate) | p$plot_env$plot_type == "histogram"){
+    return(p)
+  }
+  
+  polygon <- get_gate_coordinates(gate)
+  
+  xvar <- NULL
+  yvar <- NULL
+  
+  if("x" %in% names(p$mapping)){
+    if("quosure" %in% class(p$mapping$x)){
+      xvar <- as.character(quo_get_expr(p$mapping$x))
+    }
+  }
+  
+  if("y" %in% names(p$mapping)){
+    if("quosure" %in% class(p$mapping$x)){
+      yvar <- as.character(quo_get_expr(p$mapping$y))
+    }
+  }
+  
+  
+  if(setequal(c(xvar, yvar), names(polygon))){ 
+    
+    in_poly <- point.in.polygon(p$data[[xvar]], 
+                                p$data[[yvar]], 
+                                polygon[[xvar]],
+                                polygon[[yvar]], 
+                                mode.checked=FALSE)
+    
+    perc_in_poly <- sprintf("%.1f", sum(in_poly)/length(in_poly)*100)
+    
+    idx_match <- match(c(xvar, yvar), names(polygon))
+    names(polygon)[idx_match] <- c("x", "y")
+    
+    label <- paste(gate@filterId, " (", perc_in_poly, "%)", sep="")
+    p <- add_polygon_layer(p, polygon = polygon, label = label)
+  }
+  
+  return(p)
+  
+}
+
+####################################################################################################
+# Format plot (legend, scale, labels ...)
+####################################################################################################
+
+#' @import ggplot2
+#' @import viridis
+#' @import flowWorkspace
+#' @import rlang
+format_plot <- function(p,
+                        options = list()){
+  
+  xvar <- NULL
+  yvar <- NULL
+  
+  print(names(p$mapping))
+  
+  if("x" %in% names(p$mapping)){
+    if("quosure" %in% class(p$mapping$x)){
+      xvar <- as.character(quo_get_expr(p$mapping$x))
+    }
+  }
+  
+  if("y" %in% names(p$mapping)){
+    if("quosure" %in% class(p$mapping$x)){
+      yvar <- as.character(quo_get_expr(p$mapping$y))
+    }
+  }
+  
+  xlim <- NULL
+  ylim <- NULL
+  color_var <- p$plot_env$color_var
+  
+  facet_yvar <- NULL
+  if(p$plot_env$plot_type == "bar"){
+    facet_yvar <- "variable"
+  }
+  
+  #facet scales
+  scales <- "fixed"
+  
+  # if(!is_null(color_var)){
+  #   if(color_var == "none"){
+  #     color_var <- NULL
+  #   }
+  # }
+  
+  
+  ############################################################################33
+  #default parameters
+  default_trans <- identity_trans()
+  
+  for(var in names(options)){
+    assign(var, options[[var]])
+  }
+  
+  ############################################################################33
+  #transformations
+  
+  #transformation <- options$transformation
+  #if(is.null(transformation)){
+  
+  #}
+  transformation <- list()
+  
+  for(var in names(options$transformation)){
+    transformation[[var]] <- options$transformation[[var]]
+  }
+  
+  
+  if(!is.null(xvar)){
+    if(length(xvar) == 1){
+      
+      labx <- ifelse(xvar %in% names(options$axis_labels), options$axis_labels[[xvar]], xvar)
+      
+      if(xvar %in% names(transformation)){
+        p <- p + scale_x_continuous(name = labx, trans = transformation[[xvar]], limits = xlim) 
+      }else if(is.numeric(p$data[[xvar]])){
+        p <- p + scale_x_continuous(name = labx, trans = default_trans, limits = xlim)
+      }
+    }
+  }
+  
+  if(!is.null(yvar)){
+    if(length(yvar) == 1){
+      laby <- ifelse(yvar %in% names(options$axis_labels), options$axis_labels[[yvar]], yvar)
+      #laby <- ifelse(is.null(options$axis_labels[[yvar]]), yvar, options$axis_labels[[yvar]])
+      if(yvar %in% names(transformation)){
+        p <- p + scale_y_continuous(name = laby, trans = transformation[[yvar]], limits = ylim) 
+      }else if(is.numeric(p$data[[yvar]])){
+        p <- p + scale_y_continuous(name = laby, trans = default_trans, limits = ylim)
+      }
+    }
+  }
+  
+  
+  if(p$plot_env$plot_type == "dots"){
+    
+    if(!is.null(color_var)){
+      
+      color_var_name <- options$color_var_name
+      
+      if( as.character(color_var) %in% setdiff(names(transformation), "cluster")){
+        if(is.null(color_var_name)){
+          color_var_name <- color_var
+        }
+        p <- p + scale_colour_viridis(trans = transformation[[color_var]],
+                                      name = color_var_name)
+      }
+    }
+  }
+  
+  ############################################################################33
+  #facet
+  
+  if(!is.null(options$facet_var) | !is.null(facet_yvar)){
+    
+    left_formula <- paste(facet_yvar, collapse = " + ")
+    right_formula <- "."
+    if(!is.null(options$facet_var)){
+      if(options$facet_var != ""){
+        right_formula <- paste(options$facet_var, collapse = " + ")
+      }
+    }
+    
+    print(paste(left_formula, "~", right_formula))
+    formula_facet <- as.formula(paste(left_formula, "~", right_formula))
+    
+    
+    p <- p + facet_grid(formula_facet,
+                        labeller = label_both, 
+                        #scales = scale_y,
+                        scales = scales)
+  }
+  
+  ############################################################################
+  #theme
+  
+  if(length(unique(p$data$subset))==1){
+    p <- p + ggtitle(unique(p$data$subset))
+  }
+  
+  if("theme" %in% names(options)){
+    if(!is.null(options$theme)){
+      if(options$theme != ""){
+        theme_name = paste("theme_", options$theme, sep = "")
+        theme_function <- function(...){
+          do.call(theme_name, list(...))
+        }
+        p <- p + theme_function()
+      }
+    }
+    
+  }
+  
+  
+  if(!is.null(options$legend.position)){
+    p <- p + theme(legend.position = options$legend.position)
+  }
+  
+  p <- p + theme(plot.title = element_text(face = "bold"))
+  
+  return(p)
+  
+}
+
+####################################################################################################
+# Main plot functions
+####################################################################################################
+
+plot_gs <- function(gs,
+                    df = NULL,
+                    sample = NULL,
+                    subset = NULL,
+                    spill = NULL,
+                    metadata = NULL,
+                    plot_type = "contour",
+                    plot_args = list(),
+                    options = list(),
+                    gate = NULL){
+  
+  
+  if(! "xvar" %in% names(plot_args)){
+    plot_args[["xvar"]] <- colnames(gs)[1]
+  }
+  if(! "yvar" %in% names(plot_args)){
+    plot_args[["yvar"]] <- colnames(gs)[2]
+  }
+  
+  if(is.null(sample)) sample <-  pData(gs)$name[1]
+  if(is.null(subset)) subset <- flowWorkspace::gs_get_pop_paths(gs)[1]
+  
+  df <- get_plot_data(df = df,
+                      gs = gs, 
+                      sample = sample,
+                      subset = subset,
+                      spill = spill, 
+                      metadata = metadata)
+  
+  
+  p <- call_plot_function(df = df,
+                          plot_type = plot_type,
+                          plot_args = plot_args)
+  
+  p <- format_plot(p, options = options)
+  
+  if(!is.null(gate)){
+    for(gate_name in setdiff(gate, "root")){
+      g <- getGate(gs[[1]], gate_name)
+      p <- add_gate(p, g)
+    }
+  }
+  
+  return(p)
+}
+
 plot_stat <- function(df = NULL,
                         gs,
                         sample = NULL,
@@ -1492,7 +1654,7 @@ plot_stat <- function(df = NULL,
   
   
   if(is.null(sample)) sample <-  pData(gs)$name[1]
-  if(is.null(subset)) subset <- getNodes(gs)[1]
+  if(is.null(subset)) subset <- flowWorkspace::gs_get_pop_paths(gs)[1]
   
   if(is.null(df)){
     df <- get_plot_data(df = df,
@@ -1527,8 +1689,6 @@ plot_stat <- function(df = NULL,
                                yvar)
   
   plot_args$annotation_vars <- unique(c("name", "subset", names(metadata)))
-  
-  print(df_stat)
   
   p <- call_plot_function(df = df_stat,
                           plot_type = plot_type,
@@ -1572,10 +1732,10 @@ plot_gh <- function( gs,
   idx <- match(sample, pData(gs)$name)
   
   if(is.null(selected_subsets)){
-    selected_subsets <- setdiff(getNodes(gs), "root")
-    subset <- getNodes(gs)
+    selected_subsets <- setdiff(flowWorkspace::gs_get_pop_paths(gs), "root")
+    subset <- flowWorkspace::gs_get_pop_paths(gs)
   }else{
-    subset <- selected_subsets[selected_subsets %in% getNodes(gs)]
+    subset <- selected_subsets[selected_subsets %in% flowWorkspace::gs_get_pop_paths(gs)]
     parent_subsets <- sapply(subset, function(x){getParent(gs[[idx[1]]], x)})
     subset <- union(subset, parent_subsets)
   }
@@ -1700,33 +1860,7 @@ plot_gate <- function(gate,
   return(p)
 }
 
-get_gate_coordinates <- function(gate){
-  
-  polygon <- NULL
-  
-  if(class(gate) == "polygonGate" ){
-    if(length(unique(colnames(gate@boundaries)))>1){
-      polygon <- as.data.frame(gate@boundaries)
-    }
-  }else if(class(gate) == "rectangleGate"){
-    
-    polygon <- data.frame(x = c(gate@min[1], gate@max[1], gate@max[1], gate@min[1]),
-                          y = c(gate@min[2], gate@min[2], gate@max[2], gate@max[2]))
-    
-    colnames(polygon) <- names(gate@min)
-    
-  }else if(class(gate) == "ellipsoidGate"){
-    cov <- gate_int@cov
-    mean <- gate_int@mean
-    polygon <- ellipse_path(cov = cov, mean = mean)
-  }else{
-    warning("gate format not supported")
-    break
-  }
-  
-  return(polygon)
-  
-}
+
 
 
 scale_values <- function(df, id.vars = NULL){
@@ -1741,504 +1875,10 @@ scale_values <- function(df, id.vars = NULL){
   df_scale
 }
 
-#' @import reshape2
-#' @import scales
-compute_stats <- function(df = NULL,
-                          gs = NULL,
-                          spill = NULL,
-                          transformation=NULL,
-                          stat_function = "mean",
-                          y_trans = identity_trans(),
-                          apply_inverse = TRUE,
-                          yvar = NULL,
-                          var_names = NULL,
-                          id.vars = c("name", "subset")
-                          ){
-  
-  inverse <- NULL
-  
-  if(is.null(yvar)){
-    yvar <- setdiff(names(df), id.vars)
-  }
-  
-  custom_name <- NULL
-  
-  if(stat_function == "GeoMean"){
-    y_trans = log_trans()
-    apply_inverse = TRUE
-    stat_function = "mean"
-    custom_name <- "GeoMean"
-    warning("Note that negative values will be discarded when computing the geometric mean")
-  }
-  
-  if(stat_function == "median"){
-    y_trans = identity_trans()
-    apply_inverse = FALSE
-  }
-  
-  if(is.null(var_names)){
-    var_names <- yvar
-    names(var_names) <- yvar
-  }
-  
-  if(! stat_function %in% c("cell count", "percentage")){
-    if(!is.null(yvar)){
-
-      if(!is.null(y_trans)){
-        transformation <- lapply(yvar, function(x){y_trans})
-        names(transformation) <- yvar
-      }
-      
-      
-      for(i in 1:length(yvar)){
-        df[[yvar[i]]] <- transformation[[yvar[i]]]$transform(df[[yvar[i]]])
-      }
-      
-      
-      df_melt <- reshape2::melt(df, id.vars = id.vars, measure.vars = yvar)
-      df_melt <- df_melt[is.finite(df_melt$value), ]
-      
-      
-      stat.fun <- function(...){do.call(stat_function, args = list(...))}
-      df_cast <- reshape2::dcast(df_melt, 
-                       formula = as.formula(paste(paste(id.vars, collapse = " + "), " ~ variable", sep ="")), 
-                       fun.aggregate =  stat.fun, 
-                       na.rm = TRUE)
-      
-      if(apply_inverse){
-        for(i in 1:length(yvar)){
-          df_cast[[yvar[i]]] <- transformation[[yvar[i]]]$inverse(df_cast[[yvar[i]]])
-          if(transformation[[yvar[i]]]$name != "identity"){
-            inverse <- "inverse"
-          }
-        }
-      }
-     
-      
-      # for(i in 1:length(yvar)){
-      #   idx <- which(names(df_cast) == yvar[i])
-      #   trans_name <- NULL
-      #   if(transformation[[yvar[i]]]$name != "identity"){
-      #     trans_name <- transformation[[yvar[i]]]$name
-      #   }
-      #   if(is.null(custom_name)){
-      #     names(df_cast)[idx] <- paste(stat_function, trans_name, inverse, var_names[[i]])
-      #   }else{
-      #     names(df_cast)[idx] <- paste(custom_name,  var_names[[i]])
-      #   }
-      #   
-      # }
-      
-      
-    }
-    
-  }else{
-    if(!is.null(gs)){
-      variable <- switch(stat_function,
-                         "cell count" = "Count",
-                         "percentage" = "perc_parent")
-      
-      df_pop_stat <- as.data.frame(getPopStatsPlus(gs, spill = spill))
-      df_pop_stat <- dplyr::rename(df_pop_stat, subset = Population)
-      df_pop_stat[['perc_parent']] <- df_pop_stat$Count / df_pop_stat$ParentCount * 100
-      df_cast <- df_pop_stat[c("name", "subset", variable)]
-
-      df_cast <- df_cast[df_cast$name %in% unique(as.character(df$name)) & 
-                           df_cast$subset %in% unique(as.character(df$subset)), ]
-      
-    }
-    
-    
-    #df_cast <- df[df$name %in% sample & df$subset %in% subset, ]
-    
-    # idx <- which(as.character(df$name) %in% sample & as.character(df$subset) %in% subset)
-    # print(idx)
-    # if(length(idx)>0){
-    #   df_cast <- df[idx, ]
-    # }else{
-    #   df_cast <- NULL
-    # }
-
-    
-    # trans_name <- NULL
-    # yvar <- switch(stat_function,
-    #                "cell count" = "Count",
-    #                "percentage" = "perc_parent")
-    # id.vars <- c("name", "subset")
-    
-    
-  }
-  
-  return(df_cast)
-  
-}
-
-# plot_stat <- function(df = NULL,
-#                       gs,
-#                       sample, 
-#                       subset,
-#                       yvar,
-#                       type = "bar",
-#                       metadata = NULL,
-#                       color_var = "subset", 
-#                       axis_labels = NULL,
-#                       transformation = NULL,
-#                       spill = NULL,
-#                       default_trans = identity_trans(),
-#                       scale_values = FALSE,
-#                       free_y_scale = TRUE,
-#                       max_scale = 0,
-#                       facet_vars = NULL,
-#                       group_var = "subset",
-#                       expand_factor = 0.2,
-#                       stat_function = "mean",
-#                       show.legend = TRUE,
-#                       y_trans = NULL,
-#                       strip.text.y.angle = 0,
-#                       theme_name = "theme_gray",
-#                       Rowv = TRUE,
-#                       Colv = TRUE
-# ){
-#   
-#   theme_function <- function(...){
-#     do.call(theme_name, list(...))
-#   }
-#                     
-#   if(!is.logical(scale_values)){
-#     scale_values <- FALSE
-#   }
-#   
-#   if(!is.logical(free_y_scale)){
-#     free_y_scale <- TRUE
-#   }
-#   
-#   if(!is.numeric(max_scale)){
-#     max_scale <- 0
-#   }
-#   
-#   extra_facet <- NULL
-#   if(!is.null(facet_vars)){
-#      extra_facet <- facet_vars[facet_vars %in% "cluster"]
-#      if(length(extra_facet) == 0){
-#        extra_facet <- NULL
-#      }
-#   }
-#   
-#   #if(log10_trans){
-#   #  trans <- log10_trans()
-#   #}else{
-#   #  trans <- identity_trans()
-#   #}
-#   
-#   if(! stat_function %in% c("cell count", "percentage")){
-#     if(!is.null(yvar)){
-#   
-#       if(!is.null(y_trans)){
-#         transformation <- lapply(yvar, function(x){y_trans})
-#         names(transformation) <- yvar
-#       }
-#       
-#       trans_name <-  unique(unlist(sapply(transformation[yvar], function(tf){tf$name})))
-#       
-#       
-#       #ylim <- NULL
-#       #if(!is.null(data_range)){
-#       #  ylim <- data_range[[yvar]]
-#       #}
-#       if(is.null(df)){
-#         df <- get_data_gs(gs = gs,
-#                           sample = sample,
-#                           subset = subset,
-#                           spill = spill)
-#       }else{
-#         df <- df[df$name %in% sample & df$subset %in% subset, ]
-#       } 
-#       
-#       
-#       for(i in 1:length(yvar)){
-#         df[[yvar[i]]] <- transformation[[yvar[i]]]$transform(df[[yvar[i]]])
-#       }
-#   
-#       id.vars <- unique(c("name", "subset", extra_facet))
-#       
-#       df_melt <- melt(df, id.vars = id.vars, measure.vars = yvar)
-#       df_melt <- df_melt[is.finite(df_melt$value), ]
-#       
-#       
-#       stat.fun <- function(...){do.call(stat_function, args = list(...))}
-#       df_cast <- dcast(df_melt, 
-#                        formula = as.formula(paste(paste(id.vars, collapse = " + "), " ~ variable", sep ="")), 
-#                        fun.aggregate =  stat.fun, 
-#                        na.rm = TRUE)
-#       
-#       
-#       for(i in 1:length(yvar)){
-#         print(yvar[i])
-#         print(transformation[[yvar[i]]])
-#         df_cast[[yvar[i]]] <- transformation[[yvar[i]]]$inverse(df_cast[[yvar[i]]])
-#         #  #df_cast[[yvar[i]]] <- trans$inverse(df_cast[[yvar[i]]])
-#       }
-#     }
-#     
-#   }else{
-#     
-#     if(!is.null(extra_facet)){
-# 
-#         id.vars <- unique(c("name", "subset", extra_facet))
-#         
-#         df_data <- get_data_gs(gs = gs,
-#                                sample = sample,
-#                                subset = subset,
-#                                spill = spill)
-#         
-#         var_levels <- unique(df_data[[extra_facet]])
-#         
-#         df <- NULL
-#         for(level in var_levels){
-#           df_gate <- data.frame(x  = c(level-0.5, level+0.5))
-#           names(df_gate) <- extra_facet
-#           filter <- rectangleGate(filterId = "filter", df_gate )
-#           print(filter)
-#           df_filter <- getPopStatsPlus(gs, spill = spill, filter = filter)
-#           df_filter[[extra_facet]] <- level
-#           df <- rbind(df, df_filter)
-#         }
-#       
-#     }else{
-#       id.vars <- c("name", "subset")
-#       df <- getPopStatsPlus(gs, spill = spill, filter = NULL)
-#     }
-#     
-#     df <- dplyr::rename(df, subset = Population)
-#     df[['perc_parent']] <- df$Count / df$ParentCount * 100
-# 
-#     print(df)
-#     
-#     idx <- which(as.character(df$name) %in% sample & as.character(df$subset) %in% subset)
-#     print(idx)
-#     if(length(idx)>0){
-#       df_cast <- df[idx, ]
-#     }else{
-#       df_cast <- NULL
-#     }
-#     
-#     
-#     # if(length(idx)>0){
-#     #   df_cast <- df[idx, ]
-#     # }else{
-#     #   df_cast <- NULL
-#     #   return(NULL)
-#     # }
-#     
-#     trans_name <- NULL
-#     yvar <- switch(stat_function,
-#                    "cell count" = "Count",
-#                    "percentage" = "perc_parent")
-#     #
-#     
-#   }
-#   
-#   
-#   
-#   
-#   df_scale <- df_cast
-#   if(scale_values){
-#     df_scale[-which(names(df_cast) %in% id.vars)] <- scale(df_cast[-which(names(df_cast) %in% id.vars)])
-#   }
-# 
-#   print(df_cast)
-#   print(df_scale)
-#   print(id.vars)
-#   print(yvar)
-#   
-#   df_melt2 <- data.table::melt(df_scale, id.vars = id.vars, measure.vars = yvar )
-#   
-#   if(is.null(metadata) & !is.null(gs)){
-#     metadata <- pData(gs)
-#   }
-#   
-#   if(!is.null(metadata)){
-#     df_melt2 <- add_columns_from_metadata(df_melt2,
-#                                           metadata = metadata
-#                                           #color_var = color_var,
-#                                           #facet_vars = facet_vars,
-#                                           #group_var = group_var
-#                                           )
-#   }
-# 
-#   df_melt2 <- df_melt2[df_melt2$variable %in% yvar, ]
-# 
-#   ylim <- NULL
-# 
-#   if(!free_y_scale){
-#     if(!is.null(y_trans)){
-#       rg = y_trans$transform(range(df_melt2$value))
-#     }else{
-#       rg = range(df_melt2$value)
-#     }
-#     delta <- abs(rg[2]-rg[1])
-#     
-#     if(!is.null(y_trans)){
-#       ylim <- y_trans$inverse(c( min(rg) - expand_factor*delta, 
-#                  max(rg) + expand_factor*delta))
-#     }else{
-#       ylim <- c( min(rg) - expand_factor*delta, 
-#                  max(rg) + expand_factor*delta)
-#     }
-#     
-#     # ylim <- c( min(df_melt2$value, na.rm = TRUE) - expand_factor*delta, 
-#     #            max(df_melt2$value, na.rm = TRUE) + expand_factor*delta)
-#     #scale_y <- "free"
-#   }
-#   
-#   if(scale_values & max_scale > 0){
-#     #df_melt2$value[df_melt2$value > max_scale] <- max_scale
-#     #df_melt2$value[df_melt2$value < -max_scale] <- -max_scale
-#     ylim <- c(-max_scale - expand_factor*2*max_scale, 
-#               max_scale + expand_factor*2*max_scale)
-#     #scale_y <- "free_y"
-#     #main_title <- "Scaled values (Z-score)"
-#   }
-#   
-#   # if(free_y_scale){
-#   #   scale_y <- "free_y"
-#   # }
-#   
-#   df_melt2$variable <- as.character(df_melt2$variable)
-#   
-#   if(!is.null(axis_labels)){
-#     for(i in 1:length(yvar)){
-#       if(yvar[i] %in% names(axis_labels)){
-#         df_melt2$variable[df_melt2$variable == yvar[i]] <- axis_labels[[yvar[i]]]
-#       }
-#     }
-#   }
-#   
-#   print(names(df_melt2))
-#   
-#   if(type == "heatmap"){
-#     
-#     df <- as.data.frame(df_melt2)
-#     # s <- group_var
-#     # df <- df[ , c("variable", s, "value")]
-#     # print(df)
-#     # print(class(df_melt2))
-#     
-#     df_cast2 <- data.table::dcast(df[, c("variable", c(group_var, extra_facet), "value")],
-#                       formula = as.formula(paste("variable ~", paste(c(group_var, extra_facet), collapse = " + "))),
-#                       fun.aggregate = mean )
-#     
-#     # df_cast2 <- data.table::dcast(df_melt2[, c("variable", "subset", "value")],
-#     #                               formula = as.formula(paste("variable ~", paste("subset", collapse = " + "))), 
-#     #                               fun.aggregate = mean )
-#     
-#     row_labels <- df_cast2$variable
-#     p <- heatmaply(df_cast2[-1], 
-#                    labRow = row_labels,
-#                    margins = c(80, 80, 50, 0),
-#                    Rowv = Rowv,
-#                    Colv = Colv
-#                    )
-#     return(list(plot = p, data = df_melt2))
-#   }
-#   
-#   
-#   if(type == "tile"){
-#     
-#     p <- ggplot(df_melt2, aes_string( x = group_var ))
-#     p <- p + geom_tile(mapping = aes_string(y = "variable", fill = "value"),
-#                        show.legend = show.legend)
-#     
-#     
-#     p <- p + scale_fill_viridis(limits = ylim) +
-#       scale_y_discrete(labels = NULL, name = "")
-#     
-#     # if(!is.null(facet_vars)){
-#     #   formula_facet <- as.formula(paste(". ~", paste(facet_vars, collapse = " + ")))
-#     # }else{
-#     #   formula_facet <- NULL
-#     # }
-#   }
-#   
-#   if(type == "bar"){
-#     
-#     p <- ggplot(df_melt2, aes_string(x = group_var, y = "value"))
-#     
-#     p <- p + 
-#       geom_bar(alpha = 0.5, stat = "summary", fun.y = "mean") + 
-#       geom_point( mapping = aes_(colour = as.name(color_var)), 
-#                   inherit.aes = TRUE, 
-#                   position = position_jitter(width = 0.25, height = 0),
-#                   alpha = 0.5,
-#                   size = 3,
-#                   show.legend = show.legend) 
-#       # geom_signif(comparisons = list(c(1,2)),
-#       #             test="t.test",
-#       #             test.args = list("paired"=FALSE))
-#     
-#     if(!is.null(y_trans)){
-#       p <- p + scale_y_continuous(trans = y_trans)
-#     }
-#     
-#     if(!is.null(ylim)){
-#       if(!is.finite(ylim[1])){
-#         ylim[1] <- 1
-#       }
-#     }
-#     
-#    
-#     p <- p + coord_cartesian(ylim = ylim, expand = free_y_scale)
-#         
-#     
-#     
-#       #geom_boxplot(mapping = aes_string( y = "value", fill = "variable")) +
-#       #geom_point(mapping = aes_string(y = "value"))
-#     
-#   }
-#   
-#   if(!is.null(facet_vars)){
-#     formula_facet <- as.formula(paste("variable ~", paste(facet_vars, collapse = " + ")))
-#   }else{
-#     formula_facet <- as.formula("variable ~ .")
-#   }
-#   
-#   #if(!is.null(formula_facet)){
-#   
-#   p <- p + facet_grid(formula_facet,
-#                       labeller = label_both, 
-#                       #scales = scale_y,
-#                       scales = "free")
-# 
-#   #}
-#   
-#   
-#   ##################################################################################
-#   # general plot parameters
-#   
-#   
-#   p <- p +
-#     theme_function() +
-#     theme( axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5), 
-#            strip.text.y = element_text(angle = strip.text.y.angle)
-#     )
-# 
-#   if(!is.null(trans_name)){
-#     trans_name_plot <- trans_name
-#     if(length(trans_name)>1){
-#       trans_name_plot <- "defined by variable"
-#     }
-#     p <- p + ggtitle(paste("statistic : ", stat_function, " / transform : ", trans_name_plot, sep = ""))
-#   }else{
-#     p <- p + ggtitle(paste("statistic : ", stat_function))
-#   }
-# 
-#   return(list(plot = p, data = df_melt2))
-#   
-# }
-
 
 ####################################################################################################
 # Dimensionality Reduction 
+####################################################################################################
 
 #' Perform dimensionality reduction
 #' @description  Perform dimensionality reduction
@@ -2341,6 +1981,7 @@ dim_reduction <- function(df,
 
 ####################################################################################################
 # Clustering
+####################################################################################################
 
 #' Identify clusters
 #' @description  Identify clusters
@@ -2441,6 +2082,7 @@ get_cluster <- function(df,
 
 ####################################################################################################
 # Build FlowSet
+####################################################################################################
 
 #' Build a flowSet from a data.frame
 #' @description Build a flowSet from a data.frame

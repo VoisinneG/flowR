@@ -1,11 +1,10 @@
 #' @title   flowsetsUI and flowsets
-#' @description  A shiny Module that imports a flow set and gates from fcs files and a workspace 
+#' @description  A shiny module dealing with flow-sets and their hierarchy
 #' @param id shiny id
 #' @importFrom shinydashboard box
-#' @import DT
 #' @import shiny
 flowsetsUI <- function(id) {
-  # Create a namespace function using the provided id
+  
   ns <- NS(id)
   
   fluidRow(
@@ -32,16 +31,13 @@ flowsetsUI <- function(id) {
 #' @param input shiny input
 #' @param output shiny output
 #' @param session shiny session
-#' @return a reactivevalues object with values "df_files", "flow_set_imported" and "gates_flowCore"
-#' @importFrom CytoML parseWorkspace
-#' @import flowWorkspace
-#' @import flowCore
-#' @import ncdfFlow
+#' @param rval A reactive values object
+#' @return The updated reactive values object \code{rval}
 #' @import shiny
-#' @import DT
-#' @import graph
-#' @import Rgraphviz
-#' @export
+#' @importFrom flowWorkspace GatingSet pData gs_get_pop_paths
+#' @importFrom graph addEdge
+#' @importFrom Rgraphviz renderGraph layoutGraph
+#' @importFrom methods new
 #' @rdname flowsetsUI
 flowsets <- function(input, output, session, rval) {
   
@@ -63,7 +59,7 @@ flowsets <- function(input, output, session, rval) {
     
     validate(need(length(rval$flow_set_list)>1, "no hierarchy"))
     
-    gR = new("graphNEL", nodes = names(rval$flow_set_list), edgemode = "directed")
+    gR = methods::new("graphNEL", nodes = names(rval$flow_set_list), edgemode = "directed")
     
     for(i in 1:length(rval$flow_set_list)){
       if(!is.null(rval$flow_set_list[[i]]$parent)){
@@ -73,7 +69,7 @@ flowsets <- function(input, output, session, rval) {
       }
     }
     
-    renderGraph(layoutGraph(gR, 
+    Rgraphviz::renderGraph(Rgraphviz::layoutGraph(gR, 
                             attrs=list(node=list(fixedsize = FALSE,
                                                  fillcolor = "gray",
                                                  fontsize = 12,
@@ -104,11 +100,9 @@ flowsets <- function(input, output, session, rval) {
                        spill = rval$df_spill,
                        transformation = rval$transformation,
                        trans_parameters = rval$trans_parameters,
-                       gates = rval$gates_flowCore[setdiff(getNodes(rval$gating_set), "root")],
+                       gates = rval$gates_flowCore[setdiff(flowWorkspace::gs_get_pop_paths(rval$gating_set), "root")],
                        parent = NULL,
                        name = input$flow_set)
-                  
-      
       
       save(res, file=file)
       
@@ -142,7 +136,7 @@ flowsets <- function(input, output, session, rval) {
                              gates = rval$gates_flowCore,
                              parent = rval$flow_set_list[[i]]$parent,
                              name = rval$flow_set_list[[i]]$name)
-                    
+
       }
       
       save(res_all, file=file)

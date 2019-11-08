@@ -1,48 +1,16 @@
-#' @title plotGatingHierarchyOutput and plotGatingHierarchy
-#' @description  A shiny Module that deals with metadata
-#' @param id shiny id
-#' @importFrom shinydashboard box tabBox
-#' @import shiny
-#' @import DT
-plotGatingHierarchyOutput <- function(id) {
-  # Create a namespace function using the provided id
-  ns <- NS(id)
-  
-  plotOutput(ns("plot_gh"))
-  
-}
-
-
-#' plotGatingHierarchy server function
-#' @param input shiny input
+#' @title plotGatingHierarchy
+#' @description  A shiny Module to plot a gating hierarchy
 #' @param output shiny output
 #' @param session shiny session
-#' @return a reactivevalues object with values "df_files", "flow_set_imported" and "gates_flowCore"
-#' @import flowWorkspace
-#' @import flowCore
+#' @param rval A reactiveValues object
+#' @param plot_params A reactiveValues object with plot parameters
+#' @return A list of plots
 #' @import shiny
-#' @import DT
 #' @export
-#' @rdname plotGatingHierarchyOutput
 plotGatingHierarchy <- function(input, output, session, rval, plot_params = reactiveValues() ){
   
   `%then%` <- shiny:::`%OR%`
-  
-  #ns <- session$ns
-  
-  output$plot_gh <- renderPlot({
-    
-    p <- plot_all_gates()
-    
-    n <- length(p)
-    
-    ncol <- ceiling(n/2)
-    g <- marrangeGrob(p, nrow = 2, ncol = ncol, top = paste(plot_params$samples))
-    
-    g
-    
-  })
-  
+
   plot_all_gates <- reactive({
     
     validate(

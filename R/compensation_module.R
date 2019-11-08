@@ -95,7 +95,8 @@ compensationUI <- function(id) {
 #' @param input shiny input
 #' @param output shiny output
 #' @param session shiny session
-#' @return a reactivevalues object with values "flow_set", "parameters" and "gates_flowCore"
+#' @param rval A reactive values object
+#' @return The updated reactiveValues object \code{rval}
 #' @import flowWorkspace
 #' @import flowCore
 #' @import shiny

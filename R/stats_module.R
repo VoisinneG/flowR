@@ -1,11 +1,11 @@
 #' @title   statsUI and stats
-#' @description  A shiny Module that deals with metadata
+#' @description  A shiny Module to build, display and save plots from a gating set with data aggregation
 #' @param id shiny id
 #' @importFrom shinydashboard box tabBox
 #' @import shiny
-#' @import DT
+#' @importFrom  DT dataTableOutput
 statsUI <- function(id) {
-  # Create a namespace function using the provided id
+  
   ns <- NS(id)
   
   fluidRow(
@@ -40,19 +40,18 @@ statsUI <- function(id) {
 #' @param input shiny input
 #' @param output shiny output
 #' @param session shiny session
-#' @return a reactivevalues object with values "flow_set", "parameters" and "gates_flowCore"
-#' @import flowWorkspace
-#' @import flowCore
+#' @param rval A reactive values object
+#' @return The updated reactiveValues object \code{rval}
 #' @import shiny
-#' @import DT
-#' @export
+#' @importFrom DT renderDataTable datatable
+#' @importFrom utils write.table
 #' @rdname statsUI
 stats <- function(input, output, session, rval) {
 
   rval_mod <- reactiveValues(use_plotly = FALSE)
   
   res <- callModule(plotStat, "plotStat_module", rval)
-  res_display <- callModule(simpleDisplay, "simple_display_module", res$plot, params =  rval_mod)
+  callModule(simpleDisplay, "simple_display_module", res$plot, params =  rval_mod)
 
   observe({
     if("plot_type" %in% names(res$params)){
@@ -60,7 +59,6 @@ stats <- function(input, output, session, rval) {
                                     "heatmaply" = TRUE,
                                     FALSE)
     }
-
   })
   
   output$stats_data <- DT::renderDataTable({
@@ -73,7 +71,7 @@ stats <- function(input, output, session, rval) {
   output$download_data <- downloadHandler(
     filename = "stats.txt",
     content = function(file) {
-      write.table(res$data(), file = file, row.names = FALSE, quote = FALSE, sep = "\t")
+      utils::write.table(res$data(), file = file, row.names = FALSE, quote = FALSE, sep = "\t")
     }
   )
   

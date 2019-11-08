@@ -1,10 +1,11 @@
-#' @import plotly
-#' @export
-metabolismUI <- function(id) {
-  # Create a namespace function using the provided id
-  ns <- NS(id)
-  
-  
+#' @title zenithUI and zenith
+#' @description  A shiny Module that analyse cell metabolism using the ZeNITH method
+#' @param id shiny id
+#' @import shiny
+#' @importFrom shinydashboard box tabBox
+#' @importFrom DT dataTableOutput
+zenithUI <- function(id) {
+
   ns <- NS(id)
   
   fluidRow(
@@ -60,7 +61,7 @@ metabolismUI <- function(id) {
                
            ),
            box(width = NULL, height = NULL, title = "Create Flow-set",
-               textInput(ns("fs_name"), "Flow-set name", "metabolism"),
+               textInput(ns("fs_name"), "Flow-set name", "zenith"),
                actionButton(ns("create"), "Create Flow-set")
           )
     ),
@@ -90,21 +91,21 @@ metabolismUI <- function(id) {
 }
 
 
-#' metabolism server function
+#' zenith server function
 #' @param input shiny input
 #' @param output shiny output
 #' @param session shiny session
-#' @return a reactivevalues object with values "df_files", "flow_set_imported" and "gates_flowCore"
-#' @import flowWorkspace
-#' @import flowCore
+#' @param rval A reactive values object
+#' @return The updated reactiveValues object \code{rval}
 #' @import shiny
-#' @import DT
-#' @import data.table
-#' @import dplyr
-#' @import plotly
+#' @importFrom flowWorkspace gs_get_pop_paths
+#' @importFrom reshape2 melt dcast
+#' @importFrom dplyr rename arrange mutate
+#' @importFrom DT datatable renderDataTable
+#' @import ggplot2
 #' @export
-#' @rdname metabolismUI
-metabolism <- function(input, output, session, rval) {
+#' @rdname zenithUI
+zenith <- function(input, output, session, rval) {
   
   observe({
     validate(need(rval$plot_var, "No variables available"))
@@ -136,9 +137,7 @@ metabolism <- function(input, output, session, rval) {
     validate(need(sum(samples_table>1)==0, 
                   "Please select different samples for A, B, C and Z conditions"))
       
-    
     validate(need(input$gate, "Please select subsets"))
-    
     
     df <- get_data_gs(gs = rval$gating_set,
                       sample = unique(c(input$A_sample, input$B_sample, input$C_sample, input$Z_sample)),
@@ -174,56 +173,40 @@ metabolism <- function(input, output, session, rval) {
     
     df[[yvar]] <- y_trans$transform(df[[yvar]])
 
-    df_melt <- melt(df, id.vars = c("name", "subset"), measure.vars = yvar)
+    df_melt <- reshape2::melt(df, id.vars = c("name", "subset"), measure.vars = yvar)
     df_melt <- df_melt[is.finite(df_melt$value), ]
     
     stat.fun <- function(...){do.call(input$stat_function, args = list(...))}
-    df_cast <- dcast(df_melt, name + subset ~ variable, stat.fun, na.rm = TRUE)
+    df_cast <- reshape2::dcast(df_melt, name + subset ~ variable, stat.fun, na.rm = TRUE)
     df_cast[[yvar]] <- y_trans$inverse(df_cast[[yvar]])
-    df_cast <- rename(df_cast, "value" = yvar) %>% arrange(subset)
+    df_cast <- dplyr::rename(df_cast, "value" = yvar) %>% dplyr::arrange(subset)
     df_cast
     
   })
   
   metabo_data <- reactive({
     df <- reporter_data()
-    df_melt <- melt(df, id.vars = c("name", "subset"), measure.vars = "value")
-    df_cast <- dcast(df_melt, subset ~ name + variable, mean, na.rm = TRUE)
+    df_melt <- reshape2::melt(df, id.vars = c("name", "subset"), measure.vars = "value")
+    df_cast <- reshape2::dcast(df_melt, subset ~ name + variable, mean, na.rm = TRUE)
     
-    print(df_cast)
-    
-    df_melt2 <- melt(df_cast)
+    df_melt2 <- reshape2::melt(df_cast)
     df_melt2$variable <- as.character(df_melt2$variable)
     df_melt2$variable[df_melt2$variable %in% paste0(input$A_sample, "_value")] <- "A"
     df_melt2$variable[df_melt2$variable %in% paste0(input$B_sample, "_value")] <- "B"
     df_melt2$variable[df_melt2$variable %in% paste0(input$C_sample, "_value")] <- "C"
     df_melt2$variable[df_melt2$variable %in% paste0(input$Z_sample, "_value")] <- "Z"
     
-    df_mean <- dcast(df_melt2, subset ~ variable, mean)
-    df_sd <- dcast(df_melt2, subset ~ variable, sd)
+    df_mean <- reshape2::dcast(df_melt2, subset ~ variable, mean)
+    df_sd <- reshape2::dcast(df_melt2, subset ~ variable, sd)
     names(df_sd) <- paste0("sd", names(df_sd))
-    
-    print(df_mean)
-    print(df_sd)
     
     df_mean <- cbind(df_mean, df_sd[-1])
     
-    
-    df_mean <- df_mean %>% mutate(mean_score_gluc_dep = 100*(A-B)/(A-Z), 
+    df_mean <- df_mean %>% dplyr::mutate(mean_score_gluc_dep = 100*(A-B)/(A-Z), 
                                   mean_score_mito_dep = 100*(A-C)/(A-Z),
                                   sd_score_gluc_dep = 100*(abs(sdA*(Z-B)/(A-Z)^2) + abs(sdB/(Z-A)) + abs(sdZ*(A-B)/(A-Z)^2)),
                                   sd_score_mito_dep = 100*(abs(sdA*(Z-C)/(A-Z)^2) + abs(sdC/(Z-A)) + abs(sdZ*(A-C)/(A-Z)^2)))
-    
-    # df_mean[["mean_score_gluc_dep"]] <- (df_mean[["A"]] - df_mean[["B"]]) /
-    #   (df_mean[["A"]] - df_mean[["Z"]]) * 100
-    # 
-    # df_mean[["mean_score_mito_dep"]] <- (df_mean[["A"]] - df_mean[["C"]]) /
-    #   (df_mean[["A"]] - df_mean[["Z"]]) * 100
-    # 
-    # df_mean[["sd_score_gluc_dep"]] <- (df_mean[["A"]] - df_mean[["B"]]) /
-    #   (df_mean[["A"]] - df_mean[["Z"]]) * 100
-  
-    
+
     df_mean
   })
   
@@ -231,7 +214,7 @@ metabolism <- function(input, output, session, rval) {
     df <- metabo_data()
     df[["ymin"]] <-  df[["mean_score_gluc_dep"]] -  df[["sd_score_gluc_dep"]]
     df[["ymax"]] <-  df[["mean_score_gluc_dep"]] +  df[["sd_score_gluc_dep"]]
-    
+    df[["subset"]] <- factor(df[["subset"]], levels = input$gate)
     p <- ggplot(df, aes(x=subset, y=mean_score_gluc_dep, color = subset, fill = subset)) +
       geom_col(alpha = 0.5)
     
@@ -243,7 +226,6 @@ metabolism <- function(input, output, session, rval) {
     if(input$set_y_lim){
       p <- p + coord_cartesian(ylim = c(input$ymin, input$ymax))
     }
-    
     p
   })
   
@@ -251,7 +233,8 @@ metabolism <- function(input, output, session, rval) {
     df <- metabo_data()
     df[["ymin"]] <-  df[["mean_score_mito_dep"]] -  df[["sd_score_mito_dep"]]
     df[["ymax"]] <-  df[["mean_score_mito_dep"]] +  df[["sd_score_mito_dep"]]
-      
+    df[["subset"]] <- factor(df[["subset"]], levels = input$gate)
+    
     p <- ggplot(df, aes(x=subset, y=mean_score_mito_dep, color = subset, fill = subset)) + 
       geom_col(alpha = 0.5)
     
@@ -273,15 +256,6 @@ metabolism <- function(input, output, session, rval) {
   output$plot2 <- renderPlotly({
     plot_mito_dep()
   })
-  
-  # pop_stats <- reactive({
-  #   validate(need(rval$gating_set, "No gating set available"))
-  #   df <- getPopStats(rval$gating_set)
-  #   df <- df[df$name %in% res$params$samples, ]
-  #   df[['%']] <- sprintf("%.1f", df$Count / df$ParentCount * 100)
-  #   df <- df[, c("name", "Population", "Parent", "%", "Count", "ParentCount")]
-  #   
-  # })
   
   output$data <- DT::renderDataTable({
     df <- metabo_data()
@@ -316,7 +290,7 @@ metabolism <- function(input, output, session, rval) {
                                                 desc = lapply(1:length(fs), function(x){description(fs[[x]])}),
                                                 name = input$fs_name, 
                                                 parent = rval$flow_set_selected,
-                                                gates = rval$gates_flowCore[setdiff(getNodes(rval$gating_set), "root")],
+                                                gates = rval$gates_flowCore[setdiff(gs_get_pop_paths(rval$gating_set), "root")],
                                                 spill = rval$df_spill,
                                                 transformation = rval$transformation,
                                                 trans_parameters = rval$trans_parameters)

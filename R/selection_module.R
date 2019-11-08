@@ -1,20 +1,19 @@
-#' @title   selectionInput and selection
-#' @description  A shiny Module that deals with metadata
+#' @title selectionInput and selection
+#' @description A shiny Module for selecting samples and gates
 #' @param id shiny id
-#' @importFrom shinydashboard box tabBox
+#' @importFrom shinydashboard box
 #' @import shiny
-#' @import DT
 selectionInput <- function(id, multiple_subset = TRUE) {
-  # Create a namespace function using the provided id
+  
   ns <- NS(id)
   
   tagList(
-    selectizeInput(ns("samples"), 
+    selectizeInput(ns("samples"),
                    label = "samples",
                    choices = NULL,
                    selected = NULL,
                    multiple = TRUE),
-    selectizeInput(ns("gate"), 
+    selectizeInput(ns("gate"),
                    label = "subset",
                    choices = "root",
                    selected = "root",
@@ -40,12 +39,10 @@ selectionInput <- function(id, multiple_subset = TRUE) {
 #' @param input shiny input
 #' @param output shiny output
 #' @param session shiny session
-#' @return a reactivevalues object with values "df_files", "flow_set_imported" and "gates_flowCore"
-#' @import flowWorkspace
-#' @import flowCore
+#' @param rval Global reactivevalues object
+#' @param params reactivevalues object with initialization values for "samples" and "gate"
+#' @return a reactivevalues object with input values
 #' @import shiny
-#' @import DT
-#' @export
 #' @rdname selectionInput
 selection <- function(input, output, session, rval, params = reactiveValues()) {
   
@@ -115,8 +112,6 @@ selection <- function(input, output, session, rval, params = reactiveValues()) {
       updateSelectInput(session, "samples", choices = rval$pdata$name, selected = params$samples)
     }
   })
-  
-  
   
   return(input)
   

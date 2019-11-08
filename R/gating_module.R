@@ -1,11 +1,11 @@
 #' @title   gatingUI and gating
-#' @description  A shiny Module that deals with metadata
+#' @description  A shiny Module that deals with gating
 #' @param id shiny id
-#' @importFrom shinydashboard box tabBox
 #' @import shiny
-#' @import DT
+#' @importFrom shinydashboard box tabBox
+#' @importFrom DT dataTableOutput
 gatingUI <- function(id) {
-  # Create a namespace function using the provided id
+
   ns <- NS(id)
   
   fluidRow(
@@ -50,11 +50,6 @@ gatingUI <- function(id) {
                   tabPanel(title = "Plot",
                            simpleDisplayUI(ns("simple_display_module"))
                   )
-                  # tabPanel(title = "Save",
-                  #          numericInput(ns("width_plot"), label = "width", value = 5),
-                  #          numericInput(ns("height_plot"), label = "height", value = 5),
-                  #          downloadButton(ns("download_plot"), "Save plot")
-                  # )
            ),
            tabBox(title = "Gating hierarchy",
                   width = NULL, height = NULL,
@@ -86,24 +81,28 @@ gatingUI <- function(id) {
 #' @param input shiny input
 #' @param output shiny output
 #' @param session shiny session
-#' @return a reactivevalues object with values "flow_set", "parameters" and "gates_flowCore"
-#' @import flowWorkspace
-#' @import flowCore
+#' @param rval A reactive values object
+#' @return The updated reactiveValues object \code{rval}
 #' @import shiny
-#' @import DT
-#' @import graph
-#' @import Rgraphviz
+#' @importFrom flowWorkspace add Rm setNode recompute gs_get_pop_paths
+#' @importFrom flowCore polygonGate
+#' @importFrom graph addEdge
+#' @importFrom Rgraphviz renderGraph layoutGraph
+#' @importFrom methods new
+#' @importFrom grDevices chull
+#' @importFrom DT datatable renderDataTable
+#' @importFromn dplyr rename
+#' @importFrom utils write.table
 #' @export
 #' @rdname gatingUI
 gating <- function(input, output, session, rval) {
   
-  `%then%` <- shiny:::`%OR%`
-
-  plot_params <- reactiveValues()
-  plot_params_gh <- reactiveValues()
-  gate <- reactiveValues()
-  rval_mod <- reactiveValues(init = TRUE)
+  plot_params <- reactiveValues() # parameters controlling the main plot
+  plot_params_gh <- reactiveValues() # parameters controlling the gating hierarchy plot
+  gate <- reactiveValues() # polygon gate represented on plot
+  rval_mod <- reactiveValues(init = TRUE) # a local (module specific) reactiveValues object
   
+  #Plot initialization
   observe({
     
     validate(need(rval$plot_var, "No plotting parameters"))
@@ -139,13 +138,14 @@ gating <- function(input, output, session, rval) {
 
   })
   
+  # Calling other modules
   res <- callModule(plotGatingSet, "plot_module", rval, plot_params, simple_plot = TRUE, show_gates = TRUE, polygon_gate = gate)
-  res_display <- callModule(simpleDisplay, "simple_display_module", res$plot, gate = gate)
+  res_display <- callModule(simpleDisplay, "simple_display_module", res$plot)
+  
   plot_all_gates <- callModule(plotGatingHierarchy, "plot_hierarchy_module", rval, plot_params = plot_params_gh)
   callModule(simpleDisplay, "simple_display_module_2", plot_all_gates)
   
-  # callModule(simpleDisplay, "simple_display_module", res$plot())
-  
+  #Passing plot parameters to the gating hierarchy plot
   observe({
     for(var in setdiff(names(res$params), c("xvar",
                                             "yvar",
@@ -161,20 +161,10 @@ gating <- function(input, output, session, rval) {
   })
   
   
-  output$plot_gate <- renderPlot({
-    res$plot()[[1]]
-  })
-  
-  
-  
-  
   ##########################################################################################################
   # Observe functions for gating
-  
-  
-  
-  
-  
+
+  #update polygon coordinates upon mouse click on main plot
   observeEvent(res_display$params$plot_click, {
     
     xvar <- rval$parameters$name[match(res$params$xvar, rval$parameters$name_long)]
@@ -183,18 +173,18 @@ gating <- function(input, output, session, rval) {
     gate$x <- c(gate$x, rval$transformation[[xvar]]$inverse(res_display$params$plot_click$x))
     gate$y <- c(gate$y, rval$transformation[[yvar]]$inverse(res_display$params$plot_click$y))
     
-    idx <- chull(gate$x, gate$y)
+    idx <- grDevices::chull(gate$x, gate$y)
     
     gate$x <- gate$x[idx]
     gate$y <- gate$y[idx]
     
   })
   
+  #update polygon coordinates upon mouse brush on main plot
   observeEvent(res_display$params$plot_brush, {
     brush <- res_display$params$plot_brush
     
     if (!is.null(brush)) {
-      
       xvar <- rval$parameters$name[match(res$params$xvar, rval$parameters$name_long)]
       yvar <- rval$parameters$name[match(res$params$yvar, rval$parameters$name_long)]
       
@@ -207,38 +197,38 @@ gating <- function(input, output, session, rval) {
       if(class(y) != "try-error"){
         gate$y <- y
       }
-      #session$resetBrush("plot_brush")
-      
     }
   })
   
+  #reset polygon upon mouse double click on main plot
   observeEvent(res_display$params$plot_dblclick, {
     gate$x <- NULL
     gate$y <- NULL
-    #cat("dblclick")
-    #session$resetBrush("plot_brush")
   })
   
+  #reset polygon using action button
   observeEvent(input$reset_gate, {
     gate$x <- NULL
     gate$y <- NULL
     rval$gate <- NULL
-    #session$resetBrush("plot_brush")
   })
   
+  #reset polygon when plot x axis is modified
   observeEvent(res$params$xvar, {
     gate$x <- NULL
     gate$y <- NULL
   })
   
+  #reset polygon when plot y axis is modified
   observeEvent(res$params$yvar, {
     gate$x <- NULL
     gate$y <- NULL
   })
   
+  #Create gate from polygon, update rval$gates_flowCore and ravl$gating_set
   observeEvent(input$create_gate, {
     
-    if(input$gate_name %in% basename(getNodes(rval$gating_set))){
+    if(input$gate_name %in% basename(flowWorkspace::gs_get_pop_paths(rval$gating_set))){
       showModal(modalDialog(
         title = "Error",
         "Gate name already exists! Please choose another name.",
@@ -248,8 +238,7 @@ gating <- function(input, output, session, rval) {
     }else{
       if(!is.null(gate$x)){
         polygon <- data.frame(x =gate$x, y = gate$y)
-        hpts <- chull(polygon)
-        #hpts <- c(hpts, hpts[1])
+        hpts <- grDevices::chull(polygon)
         polygon <- polygon[hpts, ]
         polygon <- as.matrix(polygon)
         
@@ -258,7 +247,7 @@ gating <- function(input, output, session, rval) {
         names(var_names)<-NULL
         colnames(polygon) <- var_names
         
-        poly_gate <- polygonGate(.gate = polygon, filterId=input$gate_name)
+        poly_gate <- flowCore::polygonGate(.gate = polygon, filterId=input$gate_name)
         rval$gate <- poly_gate
         
         if(res$params$gate != "root"){
@@ -269,11 +258,10 @@ gating <- function(input, output, session, rval) {
           
         rval$gates_flowCore[[gate_name]] <- list(gate = poly_gate, parent = res$params$gate)
         
+        flowWorkspace::add(rval$gating_set, poly_gate, parent = res$params$gate)
+        flowWorkspace::recompute(rval$gating_set)
         
-        add(rval$gating_set, poly_gate, parent = res$params$gate)
-        recompute(rval$gating_set)
-        
-        #updateSelectInput(session, "gate_to_delete", choices = setdiff(getNodes(rval$gating_set), "root"))
+        #updateSelectInput(session, "gate_to_delete", choices = setdiff(flowWorkspace::gs_get_pop_paths(rval$gating_set), "root"))
 
         gate$x <- NULL
         gate$y <- NULL
@@ -284,12 +272,12 @@ gating <- function(input, output, session, rval) {
     
   })
   
-  
+  #Delete selected gate, update rval$gates_flowCore and rval$gating_set
   observeEvent(input$delete_gate, {
     if(input$gate_to_delete != "root"){
       
-      idx_gh <- which( getNodes(rval$gating_set) == input$gate_to_delete )
-      target_gate <- getNodes(rval$gating_set)[idx_gh]
+      idx_gh <- which( flowWorkspace::gs_get_pop_paths(rval$gating_set) == input$gate_to_delete )
+      target_gate <- flowWorkspace::gs_get_pop_paths(rval$gating_set)[idx_gh]
       
       child_gates <- get_all_descendants(rval$gates_flowCore, target_gate)
       #child_gates <- getChildren(rval$gating_set[[1]], target_gate)
@@ -301,8 +289,8 @@ gating <- function(input, output, session, rval) {
       idx_delete <- which( names(rval$gates_flowCore) %in% c(target_gate, child_gates) )
       rval$gates_flowCore <- rval$gates_flowCore[-idx_delete]
       
-      Rm(target_gate, rval$gating_set)
-      recompute(rval$gating_set)
+      flowWorkspace::Rm(target_gate, rval$gating_set)
+      flowWorkspace::recompute(rval$gating_set)
       
       plot_params$gate <- "root"
       
@@ -315,16 +303,15 @@ gating <- function(input, output, session, rval) {
     updateSelectInput(session, "gate_to_delete", choices = names(rval$gates_flowCore))
   })
   
+  #Rename selected gate, update rval$gates_flowCore and rval$gating_set
   observeEvent(input$rename_gate, {
     
     if(input$gate_to_rename != "root"){
       
-      idx_gh <- which( getNodes(rval$gating_set) == input$gate_to_rename )
-      target_gate <- getNodes(rval$gating_set)[idx_gh]
+      idx_gh <- which( flowWorkspace::gs_get_pop_paths(rval$gating_set) == input$gate_to_rename )
+      target_gate <- flowWorkspace::gs_get_pop_paths(rval$gating_set)[idx_gh]
 
-
-      setNode(rval$gating_set, target_gate, input$new_name)
-      #recompute(rval$gating_set)
+      flowWorkspace::setNode(rval$gating_set, target_gate, input$new_name)
 
       idx <- which( names(rval$gates_flowCore) == input$gate_to_rename )
 
@@ -345,9 +332,6 @@ gating <- function(input, output, session, rval) {
         names(rval$gates_flowCore)[idx] <- gsub(input$gate_to_rename, new_name, names(rval$gates_flowCore)[idx], fixed = TRUE)
       }
       
-      #Rm(target_gate, rval$gating_set)
-      #recompute(rval$gating_set)
-      
     }
     
   })
@@ -357,6 +341,7 @@ gating <- function(input, output, session, rval) {
     updateSelectInput(session, "gate_to_rename", choices = names(rval$gates_flowCore))
   })
   
+  #Update plot parameters to show defining gate
   observeEvent(input$show_gate, {
     if(res$params$gate != "root"){
 
@@ -364,7 +349,6 @@ gating <- function(input, output, session, rval) {
       gate_params <- names(rval$gate@parameters)
 
       params <- rval$parameters$name_long[match(gate_params, rval$parameters$name)]
-
 
       if(length(params) > 0){
         plot_params$xvar <- params[1]
@@ -414,7 +398,7 @@ gating <- function(input, output, session, rval) {
     plot_params$selected_subsets <- names(gates)
     
 
-    gR = new("graphNEL", nodes = union("root", names(gates)), edgemode = "directed")
+    gR = methods::new("graphNEL", nodes = union("root", names(gates)), edgemode = "directed")
 
     for(i in 1:length(gates)){
       if(!is.null(gates[[i]]$parent)){
@@ -423,11 +407,11 @@ gating <- function(input, output, session, rval) {
     }
 
     nAttrs <- list()
-    nodeNames <- basename(nodes(gR))
-    names(nodeNames) <- nodes(gR)
+    nodeNames <- basename(graph::nodes(gR))
+    names(nodeNames) <- graph::nodes(gR)
     nAttrs$label <- nodeNames
     
-    renderGraph(layoutGraph(gR,
+    Rgraphviz::renderGraph(Rgraphviz::layoutGraph(gR,
                             nodeAttrs=nAttrs,
                             attrs=list(graph=list(rankdir="LR", page=c(8.5,11)),
                                        node=list(fixedsize = FALSE,
@@ -449,7 +433,7 @@ gating <- function(input, output, session, rval) {
     df <- df[df$name %in% res$params$samples, ]
     df[['% parent']] <- sprintf("%.1f", df$Count / df$ParentCount * 100)
     df <- df[, c("name", "Population", "Parent", "% parent", "Count", "ParentCount")] 
-    df <- rename(df, subset = Population)
+    df <- dplyr::rename(df, subset = Population)
     df <- df[df$subset %in% plot_params$selected_subsets, ]
     df
   })
@@ -461,7 +445,7 @@ gating <- function(input, output, session, rval) {
   output$download_data <- downloadHandler(
     filename = "pop_stats.txt",
     content = function(file) {
-      write.table(pop_stats(), file = file, row.names = FALSE, quote = FALSE, sep = "\t")
+      utils::write.table(pop_stats(), file = file, row.names = FALSE, quote = FALSE, sep = "\t")
     }
   )
   

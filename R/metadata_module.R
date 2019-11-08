@@ -1,11 +1,11 @@
 #' @title   metadataUI and metadata
 #' @description  A shiny Module that deals with metadata
 #' @param id shiny id
-#' @importFrom shinydashboard box tabBox
 #' @import shiny
-#' @import DT
+#' @importFrom shinydashboard tabBox
+#' @importFrom DT dataTableOutput DTOutput
 metadataUI <- function(id) {
-  # Create a namespace function using the provided id
+  
   ns <- NS(id)
   
   fluidRow(
@@ -17,7 +17,7 @@ metadataUI <- function(id) {
                            actionButton(ns("delete_column"), label = "delete column"),
                            br(),
                            br(),
-                           div(style = 'overflow-x: scroll', DTOutput(ns("pData"))),
+                           div(style = 'overflow-x: scroll', DT::DTOutput(ns("pData"))),
                            br(),
                            actionButton(ns("apply"), label = "apply"),
                            downloadButton(ns("download_meta")),
@@ -63,13 +63,14 @@ metadataUI <- function(id) {
 #' @param input shiny input
 #' @param output shiny output
 #' @param session shiny session
-#' @return a reactivevalues object with values "df_files", "flow_set_imported" and "gates_flowCore"
-#' @import flowWorkspace
-#' @import readxl
-#' @import flowCore
+#' @param rval A reactive values object
+#' @return The updated reactiveValues object \code{rval}
 #' @import shiny
-#' @import DT
-#' @export
+#' @importFrom flowWorkspace pData gs_get_pop_paths
+#' @importFrom tools file_ext
+#' @importFrom readxl read_excel
+#' @importFrom utils read.csv write.table
+#' @importFrom DT renderDataTable renderDT dataTableProxy editData replaceData
 #' @rdname importUI
 metadata <- function(input, output, session, rval) {
   
@@ -124,10 +125,10 @@ metadata <- function(input, output, session, rval) {
                   "tab" = "\t",
                   "space" = " ")
     
-    if(file_ext(input$file_meta$datapath) %in% c("txt", "csv")){
-      rval_mod$df_meta_imported <- read.csv(input$file_meta$datapath, sep = sep, header = TRUE, quote = "\"", fill = TRUE, stringsAsFactors = FALSE)
-    }else if(file_ext(input$file_meta$datapath) %in% c("xls", "xlsx")){
-      rval_mod$df_meta_imported <- read_excel(input$file_meta$datapath)
+    if(tools::file_ext(input$file_meta$datapath) %in% c("txt", "csv")){
+      rval_mod$df_meta_imported <- utils::read.csv(input$file_meta$datapath, sep = sep, header = TRUE, quote = "\"", fill = TRUE, stringsAsFactors = FALSE)
+    }else if(tools::file_ext(input$file_meta$datapath) %in% c("xls", "xlsx")){
+      rval_mod$df_meta_imported <- readxl::read_excel(input$file_meta$datapath)
     }
     
     
@@ -210,7 +211,7 @@ metadata <- function(input, output, session, rval) {
       if(length(colnames(pdata))>1){
         pData(flow_set_filter) <- pdata[idx_match, ]
       }else{
-        phenoData(flow_set_filter)$name <- pdata[idx_match, ]
+        pData(flow_set_filter)$name <- pdata[idx_match, ]
       }
       
       fs <- flow_set_filter
@@ -221,7 +222,7 @@ metadata <- function(input, output, session, rval) {
                                                   desc = lapply(1:length(fs), function(x){description(fs[[x]])}),
                                                   name = input$fs_name, 
                                                   parent = rval$flow_set_selected,
-                                                  gates = rval$gates_flowCore[setdiff(getNodes(rval$gating_set), "root")],
+                                                  gates = rval$gates_flowCore[setdiff(gs_get_pop_paths(rval$gating_set), "root")],
                                                   spill = rval$df_spill,
                                                   transformation = rval$transformation,
                                                   trans_parameters = rval$trans_parameters)
@@ -301,38 +302,34 @@ metadata <- function(input, output, session, rval) {
     }
   })
   
-  output$pData <- renderDT({validate(need(rval$pdata, "No metadata")); rval$pdata},
+  # edit metadata information
+  output$pData <- DT::renderDT({validate(need(rval$pdata, "No metadata")); rval$pdata},
                             rownames = FALSE,
                             selection = 'none',
                             editable = 'cell',
                             server = TRUE )
-                            #list(target = 'row', disable = list(columns = c(1))) )
 
-  proxy = dataTableProxy('pData')
+  proxy = DT::dataTableProxy('pData')
+  
   observeEvent(input$pData_cell_edit, {
     info = input$pData_cell_edit
     info$col <- info$col + 1
-    str(info)  # check what info looks like (a data frame of 3 columns)
-    rval$pdata <<- editData(rval$pdata, info)
-    replaceData(proxy, rval$pdata, resetPaging = FALSE)  # important
-    # the above steps can be merged into a single editData() call; see examples below
+    rval$pdata <<- DT::editData(rval$pdata, info)
+    DT::replaceData(proxy, rval$pdata, resetPaging = FALSE)  
   })
   
-  
-  
-  
+
   output$meta <- DT::renderDataTable({
     validate(
       need(rval_mod$df_meta_imported, "No meta data imported")
     )
     as.data.frame(rval_mod$df_meta_imported)
-    #rval_mod$df_meta_imported
   })
   
   output$download_meta <- downloadHandler(
     filename = "metadata.txt",
     content = function(file) {
-      write.table(rval$pdata, file = file, row.names = FALSE, quote = FALSE, sep = "\t")
+      utils::write.table(rval$pdata, file = file, row.names = FALSE, quote = FALSE, sep = "\t")
     }
   )
   
