@@ -7,7 +7,7 @@
 #' @importFrom shinydashboard box
 #' @import shiny
 simpleDisplayUI <- function(id, nrow = 1, size = 400, save = TRUE){
-  
+
   ns <- NS(id)
 
   tagList(
@@ -68,9 +68,6 @@ simpleDisplay <- function(input, output, session, plot_list, params = reactiveVa
     rval_plot$nrow_facet <- 1
     rval_plot$nrow <- 1
     rval_plot$ncol <- 1
-
-    print("class(plot_list())")
-    print(class(plot_list()))
     
      if(class(plot_list())[1] == "list"){
        
@@ -83,7 +80,7 @@ simpleDisplay <- function(input, output, session, plot_list, params = reactiveVa
               p <- plot_list()[[1]]
               if("facet" %in% names(p)){
                 facet_layout <- p$facet$compute_layout(p, p$facet$params)
-                #print(facet_layout)
+                
                 if(!is.null(facet_layout)){
                   rval_plot$ncol_facet <- max(facet_layout$COL)
                   rval_plot$nrow_facet <- max(facet_layout$ROW)
@@ -125,6 +122,8 @@ simpleDisplay <- function(input, output, session, plot_list, params = reactiveVa
    })
   
   output$plot_display  <- renderPlot({
+    ns <- session$ns
+    session$resetBrush(ns("plot_brush"))
     plot_display()
   })
 

@@ -1,9 +1,10 @@
 
-
 ####################################################################################################
-# Parse workspace and gates from xml files
+# Parse workspace and gates from xml files (flowJO workspace files)
 ####################################################################################################
 
+#' Return the name and ID of a SampleNode section
+#' @param x a xml document
 #' @import xml2
 parseSampleNodes <- function(x){
   name <- xml_text(xml_find_all(x, ".//@name"))[1]
@@ -11,6 +12,8 @@ parseSampleNodes <- function(x){
   return(list("name" = name, "sampleID" = sampleID))
 }
 
+#' Return the name and IDs of samples in a  GroupNode section
+#' @param x a xml document
 #' @import xml2
 parseGroupNodes <- function(x){
   name <- xml_text(xml_find_all(x, ".//@name"))[1]
@@ -18,56 +21,8 @@ parseGroupNodes <- function(x){
   return(list("name" = name, "sampleID" = sampleID))
 }
 
-#' @import xml2
-parseGate <- function(x){
-  res <- list()
-  
-  name <- xml_text( xml_find_all(xml_parent(x), ".//@name")[1] )
-  
-  if( xml_name( xml_parent(xml_parent(xml_parent(x))) ) == "Population"){
-    parent <- xml_text(xml_find_all( xml_parent(xml_parent(xml_parent(x))), ".//@name")[1])
-  }else{
-    parent <- "root"
-  }
-  
-  # find all parent gates recursively
-  all_parents <- find_all_parent_gates(x)
-  
-  if(length(all_parents)>0){
-    parent_long <- paste("/",paste(all_parents, collapse = "/"), sep = "")
-  }else{
-    parent_long <- "root"
-  }
-  
-  name_long <- paste("/",paste(c(all_parents, name), collapse = "/"), sep = "")
-
-  type <- xml_name(xml_child(x))
-  dim <- xml_text(xml_find_all(xml_find_all(x, ".//gating:dimension"), ".//@data-type:name"))
-  res <- c(res, list("name" = name, 
-                     "parent" =  parent, 
-                     "name_long" = name_long, 
-                     "parent_long" = parent_long, 
-                     "type" = type, 
-                     "dim" = dim))
-  
-  if(type == "RectangleGate"){
-    min <- xml_double(xml_find_all(x, ".//@gating:min"))
-    max <- xml_double(xml_find_all(x, ".//@gating:max"))
-    m <- rbind(min, max)
-    colnames(m) <- dim
-    res <- c(res, list("boundaries" = m))
-  }
-  if(type == "PolygonGate" ){
-    vertexes <- xml_double(xml_find_all(xml_find_all(x, ".//gating:vertex"), ".//@data-type:value"))
-    polygon <- matrix(vertexes, nrow = 2)
-    polygon <- t(polygon)
-    colnames(polygon) <- res[["dim"]]
-    res <- c(res, list("polygon" = polygon))
-  }
-  return(res)
-}
-
-#' find all parent gates recursively
+#' find all parent gates of a given Gate section, recursively
+#' @param x a xml document
 #' @import xml2
 find_all_parent_gates <- function(x){
   all_parents <- NULL
@@ -86,6 +41,9 @@ find_all_parent_gates <- function(x){
   return(all_parents)
 }
 
+#' Extract all gates from a flowJO workspace
+#' @param ws_path path to the workspace
+#' @param group Names of the sample groups to be considered
 #' @import xml2
 #' @importFrom flowCore rectangleGate polygonGate
 get_gates_from_ws <- function(ws_path, group = NULL){
@@ -153,6 +111,96 @@ get_gates_from_ws <- function(ws_path, group = NULL){
   
 }
 
+#' Return relevant info from a Gate section
+#' @param x a xml document
+#' @import xml2
+parseGate <- function(x){
+  res <- list()
+  
+  name <- xml_text( xml_find_all(xml_parent(x), ".//@name")[1] )
+  
+  if( xml_name( xml_parent(xml_parent(xml_parent(x))) ) == "Population"){
+    parent <- xml_text(xml_find_all( xml_parent(xml_parent(xml_parent(x))), ".//@name")[1])
+  }else{
+    parent <- "root"
+  }
+  
+  # find all parent gates recursively
+  all_parents <- find_all_parent_gates(x)
+  
+  if(length(all_parents)>0){
+    parent_long <- paste("/",paste(all_parents, collapse = "/"), sep = "")
+  }else{
+    parent_long <- "root"
+  }
+  
+  name_long <- paste("/",paste(c(all_parents, name), collapse = "/"), sep = "")
+  
+  type <- xml_name(xml_child(x))
+  dim <- xml_text(xml_find_all(xml_find_all(x, ".//gating:dimension"), ".//@data-type:name"))
+  res <- c(res, list("name" = name, 
+                     "parent" =  parent, 
+                     "name_long" = name_long, 
+                     "parent_long" = parent_long, 
+                     "type" = type, 
+                     "dim" = dim))
+  
+  if(type == "RectangleGate"){
+    min <- xml_double(xml_find_all(x, ".//@gating:min"))
+    max <- xml_double(xml_find_all(x, ".//@gating:max"))
+    m <- rbind(min, max)
+    colnames(m) <- dim
+    res <- c(res, list("boundaries" = m))
+  }
+  if(type == "PolygonGate" ){
+    vertexes <- xml_double(xml_find_all(xml_find_all(x, ".//gating:vertex"), ".//@data-type:value"))
+    polygon <- matrix(vertexes, nrow = 2)
+    polygon <- t(polygon)
+    colnames(polygon) <- res[["dim"]]
+    res <- c(res, list("polygon" = polygon))
+  }
+  return(res)
+}
+
+
+####################################################################################################
+# Transformations
+####################################################################################################
+
+#' @importFrom flowWorkspace flowJoTrans flow_trans
+flowJo_biexp_inverse_trans <- function (..., n = 6, equal.space = FALSE){
+  trans <- flowWorkspace::flowJoTrans(..., inverse = TRUE)
+  inv <- flowWorkspace::flowJoTrans(...)
+  flow_trans(name = "flowJo_biexp_inverse", trans.fun = trans, inverse.fun = inv, 
+             n = n, equal.space = equal.space)
+}
+
+#' Scaled hyperbolic arc-sine function
+#' @param b scale
+#' @param inverse use inverse function?
+asinh_transform <- function(b=5, inverse = FALSE){ 
+  if(inverse){
+    function(x){b*sinh(x)} 
+  }else{
+    function(x){asinh(x/b)} 
+  }
+}
+
+#' Scaled hyperbolic arc-sine transformation
+#' @importFrom flowWorkspace flow_trans
+asinh_trans <- function (..., n = 6, equal.space = FALSE){
+  trans <- asinh_transform(...)
+  inv <- asinh_transform(..., inverse = TRUE)
+  flow_trans(name = "asinh", trans.fun = trans, inverse.fun = inv, 
+             n = n, equal.space = equal.space)
+}
+
+####################################################################################################
+# Gating
+####################################################################################################
+
+#' Return coordinates of flowCore gate.
+#' @param gate a flowCore gate either from class "polygonGate", "rectangleGate" or "ellipsoidGate"
 get_gate_coordinates <- function(gate){
   
   polygon <- NULL
@@ -181,38 +229,11 @@ get_gate_coordinates <- function(gate){
   
 }
 
-####################################################################################################
-# Transformations
-####################################################################################################
-
-#' @importFrom flowWorkspace flowJoTrans flow_trans
-flowJo_biexp_inverse_trans <- function (..., n = 6, equal.space = FALSE){
-  trans <- flowWorkspace::flowJoTrans(..., inverse = TRUE)
-  inv <- flowWorkspace::flowJoTrans(...)
-  flow_trans(name = "flowJo_biexp_inverse", trans.fun = trans, inverse.fun = inv, 
-             n = n, equal.space = equal.space)
-}
-
-asinh_transform <- function(b=5, inverse = FALSE){ 
-  if(inverse){
-    function(x){b*sinh(x)} 
-  }else{
-    function(x){asinh(x/b)} 
-  }
-}
-
-#' @importFrom flowWorkspace flow_trans
-asinh_trans <- function (..., n = 6, equal.space = FALSE){
-  trans <- asinh_transform(...)
-  inv <- asinh_transform(..., inverse = TRUE)
-  flow_trans(name = "asinh", trans.fun = trans, inverse.fun = inv, 
-             n = n, equal.space = equal.space)
-}
-
-####################################################################################################
-# Gating
-####################################################################################################
-
+#' Return coordinates of points along an ellipse defined by its covariance matrix and its center
+#' @param cov covariance matrix
+#' @param mean coordinates of the center of the ellipse
+#' @param n number of points to return along the ellipse
+#' @return a data.frame with point cordinates
 ellipse_path <- function(cov, mean, n = 100){
   
   eg <- eigen(cov)
@@ -237,6 +258,10 @@ ellipse_path <- function(cov, mean, n = 100){
   return(df)
 }
 
+#' Return all descendants from a set of nodes in a tree
+#' @param named_list a list representing a tree. It must be named according to tree node names and 
+#' each of its element must have a field 'parent' containing the name of its parent node.
+#' @param names Names of the nodes for which all descendants must be returned
 get_all_descendants <- function(named_list, names){
   
   parents <- sapply(named_list, function(x){x$parent}) 
@@ -250,6 +275,10 @@ get_all_descendants <- function(named_list, names){
   
 }
 
+#' Return all ancestors from a set of nodes in a tree
+#' @param named_list a list representing a tree. It must be named according to tree node names and 
+#' each of its element must have a field 'parent' containing the name of its parent node.
+#' @param names Names of the nodes for which all ancestors must be returned
 get_all_ancestors <- function(named_list, names){
   
   parents <- sapply(named_list, function(x){x$parent}) 
@@ -263,6 +292,11 @@ get_all_ancestors <- function(named_list, names){
   
 }
 
+#' Build a gating hierarchy from a GatingSet
+#' @param gs a GatingSet
+#' @return a named list representing the gating hierarchy. 
+#' Each element has a field 'gate' with a flowCore filter object 
+#' and a field 'parent' with the name of its parent gate.
 #' @importFrom flowWorkspace gs_get_pop_paths gh_pop_get_gate gs_pop_get_parent
 get_gates_from_gs <- function(gs){
   
@@ -279,7 +313,11 @@ get_gates_from_gs <- function(gs){
   return(gates)
 }
 
-
+#' Add gates from a gating hierarchy to a GatingSet
+#' @param gs a GatingSet
+#' @param gates a named list representing the gating hierarchy. 
+#' Each element must have a field 'gate' with a flowCore filter object 
+#' and a field 'parent' with the name of its parent gate.
 #' @importFrom flowWorkspace gs_get_pop_paths gs_pop_add recompute colnames
 add_gates_flowCore <- function(gs, gates){
   
@@ -331,10 +369,18 @@ add_gates_flowCore <- function(gs, gates){
   return(gs)
 }
 
+
+#' Transform gates coordinates and modify names of parameters.
+#' @param gates a named list representing the gating hierarchy.
+#' @param transformation A list of trans objects. 
+#' Each element must be named after a parameter and contain the transfomation to apply for this parameter.
+#' @param pattern pattern to be replaced in the names of gate coordinates
+#' @param replacement Character string that is to replace 'pattern' in in the names of gate coordinates
+#' @param time_step value of the time step used to transform gates with the 'Time' parameter.
 #' @importFrom flowCore polygonGate rectangleGate
 transform_gates <- function(gates,
                             transformation = NULL, 
-                            pattern = "[\\<|\\>]", 
+                            pattern = "[\\<|\\>]",
                             replacement = "",
                             time_step = as.numeric(description(ff)[["$TIMESTEP"]]) ){
   
@@ -1439,7 +1485,7 @@ format_plot <- function(p,
   xvar <- NULL
   yvar <- NULL
   
-  print(names(p$mapping))
+  #print(names(p$mapping))
   
   if("x" %in% names(p$mapping)){
     if("quosure" %in% class(p$mapping$x)){

@@ -114,13 +114,17 @@ transform <- function(input, output, session, rval) {
       plot_params$color_var <- NULL
       plot_params$use_all_cells <- FALSE
       rval_mod$init <- FALSE
-    }else{
-      plot_params <- reactiveValues()
     }
     
   })
   
-  observe({
+  observeEvent(input$parameters_table_rows_selected, {
+    
+    #reset plot parameters (only non null parameters will be updated)
+    for(var in names(reactiveValuesToList(plot_params))){
+      plot_params[[var]] <- NULL
+    }
+    
     if(length(input$parameters_table_rows_selected)>0){
     plot_params$xvar <- rval$parameters$name_long[input$parameters_table_rows_selected[1]]
       if(length(input$parameters_table_rows_selected)>1){

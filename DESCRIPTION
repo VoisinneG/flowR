@@ -9,6 +9,7 @@ Encoding: UTF-8
 Imports:
   shiny,
   shinydashboard,
+  shinyjs,
   openCyto,
   flowWorkspace,
   flowCore,
@@ -38,6 +39,9 @@ Imports:
   data.table,
   forcats,
   ggrepel,
+  dplyr,
+  methods,
+  reshape2,
   FlowSOM,
   Rphenograph,
   ClusterX

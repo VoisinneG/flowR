@@ -111,13 +111,17 @@ compensation <- function(input, output, session, rval) {
       plot_params$color_var <- NULL
       plot_params$use_all_cells <- FALSE
       rval_mod$init <- FALSE
-    }else{
-      plot_params <- reactiveValues()
     }
     
   })
 
-  observe({
+  observeEvent(c(input$xvar_comp, input$yvar_comp, input$show_all_channels), {
+    
+    #reset plot parameters (only non null parameters will be updated)
+    for(var in names(reactiveValuesToList(plot_params))){
+      plot_params[[var]] <- NULL
+    }
+    
     if(input$show_all_channels){
       channels <- rval$parameters$name_long[match(colnames(rval$df_spill), rval$parameters$name)]
       plot_params$xvar <- setdiff(channels, input$yvar_comp)

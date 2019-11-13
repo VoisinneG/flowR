@@ -1,4 +1,4 @@
-#' @title   importUI and import
+#' @title importUI and import
 #' @description  A shiny Module that imports data and builds flow-sets
 #' @param id shiny id
 #' @importFrom shinydashboard box
@@ -14,7 +14,11 @@ importUI <- function(id) {
                width = NULL, height = NULL,
                fileInput(inputId = ns("files"),
                          label = "Choose files",
-                         multiple = TRUE)
+                         multiple = TRUE),
+           ),
+           box(title = "Example dataset",
+             width = NULL, height = NULL,
+             actionButton(ns("import_gvhd"), "import dataset (GvHD)")
            )
            # box(title = "Options",
            #     width = NULL, height = NULL,
@@ -236,7 +240,7 @@ import <- function(input, output, session) {
         myTrans <- lapply(params, function(x){scales::identity_trans()})
         names(myTrans) <- params
         
-        rval$gates_flowCore <- transform_gates(gates = gates, 
+        rval$gates_flowCore <- transform_gates(gates = gates,
                                                pattern = pattern,
                                                replacement = replacement,
                                                transformation = myTrans, 
@@ -317,10 +321,10 @@ import <- function(input, output, session) {
         rval$flow_set_list[[input$fs_name]] <- list(flow_set = fs,
                                                     spill = NULL,
                                                     metadata = pData(fs),
-                                                    par = lapply(1:length(fs), function(x){parameters(fs[[x]])}),
-                                                    desc = lapply(1:length(fs), function(x){description(fs[[x]])}),
-                                                    spill = NULL,
-                                                    parameters = NULL,
+                                                    #par = lapply(1:length(fs), function(x){parameters(fs[[x]])}),
+                                                    #desc = lapply(1:length(fs), function(x){description(fs[[x]])}),
+                                                    #spill = NULL,
+                                                    #parameters = NULL,
                                                     transformation = NULL,
                                                     trans_parameters = NULL,
                                                     gates = list(),
@@ -331,6 +335,26 @@ import <- function(input, output, session) {
       
   })
 
+  observeEvent(input$import_gvhd, {
+    
+    data("GvHD", package = "flowCore")
+    assign("fs", GvHD)
+    
+    rval$flow_set_list[["GvHD"]] <- list(flow_set = fs,
+                                                spill = NULL,
+                                                metadata = pData(fs),
+                                                #par = lapply(1:length(fs), function(x){parameters(fs[[x]])}),
+                                                #desc = lapply(1:length(fs), function(x){description(fs[[x]])}),
+                                                #spill = NULL,
+                                                #parameters = NULL,
+                                                transformation = NULL,
+                                                trans_parameters = NULL,
+                                                gates = list(),
+                                                name = "GvHD", 
+                                                parent = NULL)
+    rval$flow_set_selected <- "GvHD"
+    
+  })
   
   output$files_table <- DT::renderDT({
     validate(

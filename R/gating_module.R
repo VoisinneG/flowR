@@ -5,7 +5,7 @@
 #' @importFrom shinydashboard box tabBox
 #' @importFrom DT DTOutput
 gatingUI <- function(id) {
-
+  
   ns <- NS(id)
   
   fluidRow(
@@ -130,15 +130,13 @@ gating <- function(input, output, session, rval) {
       plot_params$color_var <- NULL
       plot_params$use_all_cells <- FALSE
       rval_mod$init <- FALSE
-      
-    }else{
-      plot_params <- reactiveValues()
     }
 
   })
   
   # Calling other modules
-  res <- callModule(plotGatingSet, "plot_module", rval, plot_params, simple_plot = TRUE, show_gates = TRUE, polygon_gate = gate)
+  res <- callModule(plotGatingSet, "plot_module", rval, plot_params, 
+                    simple_plot = TRUE, show_gates = TRUE, polygon_gate = gate)
   res_display <- callModule(simpleDisplay, "simple_display_module", res$plot)
   
   plot_all_gates <- callModule(plotGatingHierarchy, "plot_hierarchy_module", rval, plot_params = plot_params_gh)
@@ -197,6 +195,7 @@ gating <- function(input, output, session, rval) {
         gate$y <- y
       }
     }
+    
   })
   
   #reset polygon upon mouse double click on main plot
@@ -264,7 +263,11 @@ gating <- function(input, output, session, rval) {
 
         gate$x <- NULL
         gate$y <- NULL
-        
+
+        #reset plot parameters (only non null parameters will be updated)
+        for(var in names(reactiveValuesToList(plot_params))){
+          plot_params[[var]] <- NULL
+        }
         plot_params$gate <- gate_name
       }
     }
@@ -290,7 +293,11 @@ gating <- function(input, output, session, rval) {
       
       flowWorkspace::Rm(target_gate, rval$gating_set)
       flowWorkspace::recompute(rval$gating_set)
-      
+
+      #reset plot parameters (only non null parameters will be updated)
+      for(var in names(reactiveValuesToList(plot_params))){
+        plot_params[[var]] <- NULL
+      }
       plot_params$gate <- "root"
       
     }
@@ -342,13 +349,21 @@ gating <- function(input, output, session, rval) {
   
   #Update plot parameters to show defining gate
   observeEvent(input$show_gate, {
+    
+    print(res$params$gate)
+    
     if(res$params$gate != "root"){
 
       rval$gate <- rval$gates_flowCore[[res$params$gate]]$gate
       gate_params <- names(rval$gate@parameters)
 
       params <- rval$parameters$name_long[match(gate_params, rval$parameters$name)]
-
+      
+      #reset plot parameters (only non null parameters will be updated)
+      for(var in names(reactiveValuesToList(plot_params))){
+        plot_params[[var]] <- NULL
+      }
+      
       if(length(params) > 0){
         plot_params$xvar <- params[1]
       }
@@ -360,7 +375,7 @@ gating <- function(input, output, session, rval) {
       gate$y <- NULL
 
       plot_params$gate <- rval$gates_flowCore[[res$params$gate]]$parent
-
+      
     }
 
   })
@@ -396,7 +411,6 @@ gating <- function(input, output, session, rval) {
     
     plot_params$selected_subsets <- names(gates)
     
-
     gR = methods::new("graphNEL", nodes = union("root", names(gates)), edgemode = "directed")
 
     for(i in 1:length(gates)){

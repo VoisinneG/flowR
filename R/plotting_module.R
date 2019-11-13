@@ -71,11 +71,8 @@ plotting <- function(input, output, session, rval) {
       plot_params$use_all_cells <- TRUE
       rval_mod$init <- FALSE
       
-    }else{
-      plot_params <- reactiveValues()
     }
-    
-    
+
   })
   
   res <- callModule(plotGatingSet, "plot_module", rval, plot_params, 
