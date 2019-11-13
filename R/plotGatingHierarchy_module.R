@@ -1,5 +1,6 @@
 #' @title plotGatingHierarchy
 #' @description  A shiny Module to plot a gating hierarchy
+#' @param input shiny input
 #' @param output shiny output
 #' @param session shiny session
 #' @param rval A reactiveValues object
@@ -7,16 +8,12 @@
 #' @return A list of plots
 #' @import shiny
 plotGatingHierarchy <- function(input, output, session, rval, plot_params = reactiveValues() ){
-  
-  `%then%` <- shiny:::`%OR%`
 
   plot_all_gates <- reactive({
     
-    validate(
-      need(rval$gating_set, "Empty gating set") %then%
-      need(setdiff(names(rval$gates_flowCore), "root"), "No gates to display") %then%
-      need(plot_params$samples, "Please select a sample")
-    )
+    validate(need(rval$gating_set, "Empty gating set"))
+    validate(need(setdiff(names(rval$gates_flowCore), "root"), "No gates to display"))
+    validate(need(plot_params$samples, "Please select a sample"))
 
     if(plot_params$plot_type == "histogram") plot_params$plot_type <- "hexagonal"
     

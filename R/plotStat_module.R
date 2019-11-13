@@ -68,8 +68,6 @@ plotStatInput <- function(id) {
 #' @rdname plotStatUI
 plotStat <- function(input, output, session, rval) {
   
-  `%then%` <- shiny:::`%OR%`
-  
   rval_plot <- reactiveValues()
   rval_mod <- reactiveValues()
   selected <- callModule(selection, "selection_module", rval)
@@ -119,9 +117,7 @@ plotStat <- function(input, output, session, rval) {
   
   output$stat_options <- renderUI({
 
-    validate(
-      need(rval$plot_var, "No plotting parameters")
-    )
+    validate(need(rval$plot_var, "No plotting parameters"))
 
     if( ! input$stat_function %in% c("cell count", "percentage") ){
       ns <- session$ns
@@ -148,9 +144,7 @@ plotStat <- function(input, output, session, rval) {
 
   observe({
     
-    validate(
-      need(rval$pdata, "No metadata available")
-    )
+    validate(need(rval$pdata, "No metadata available"))
 
     facet_var_default <- "name"
     color_var_default <- "subset"
@@ -217,11 +211,10 @@ plotStat <- function(input, output, session, rval) {
   })
 
   data_plot_stat <- reactive({
-    validate(
-      need(rval$gating_set, "Empty gating set") %then%
-        need(selected$samples, "Please select samples") %then%
-        need(selected$gate, "Please select subsets")
-    )
+    
+    validate(need(rval$gating_set, "Empty gating set"))
+    validate(need(selected$samples, "Please select samples"))
+    validate(need(selected$gate, "Please select subsets"))
 
     df <- get_data_gs(gs = rval$gating_set,
                       sample = selected$samples,
@@ -235,13 +228,10 @@ plotStat <- function(input, output, session, rval) {
   
   plot_statistics <- eventReactive(input$update, {
     
-    validate(
-      need(rval$gating_set, "Empty gating set") %then%
-        need(selected$samples, "Please select samples") %then%
-        need(selected$gate, "Please select subsets")
-        
-    )
-    
+    validate(need(rval$gating_set, "Empty gating set"))
+    validate(need(selected$samples, "Please select samples"))
+    validate(need(selected$gate, "Please select subsets"))
+
     if(!input$stat_function %in% c("cell count", "percentage")){
       validate(need(input$yvar, "Please select y variables"))
     }

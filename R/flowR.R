@@ -1,3 +1,4 @@
+utils::globalVariables(c("df", "xvar", "yvar", "x", "y"))
 
 ####################################################################################################
 # Parse workspace and gates from xml files (flowJO workspace files)
@@ -187,6 +188,9 @@ asinh_transform <- function(b=5, inverse = FALSE){
 }
 
 #' Scaled hyperbolic arc-sine transformation
+#' @param ... arguments passed to \code{asinh_transform()}
+#' @param n desired number of breaks (see \code{flow_trans()})
+#' @param equal.space whether breaks at equal-spaced intervals (see \code{flow_trans()})
 #' @importFrom flowWorkspace flow_trans
 asinh_trans <- function (..., n = 6, equal.space = FALSE){
   trans <- asinh_transform(...)
@@ -217,12 +221,11 @@ get_gate_coordinates <- function(gate){
     colnames(polygon) <- names(gate@min)
     
   }else if(class(gate) == "ellipsoidGate"){
-    cov <- gate_int@cov
-    mean <- gate_int@mean
+    cov <- gate@cov
+    mean <- gate@mean
     polygon <- ellipse_path(cov = cov, mean = mean)
   }else{
     warning("gate format not supported")
-    break
   }
   
   return(polygon)
@@ -376,13 +379,13 @@ add_gates_flowCore <- function(gs, gates){
 #' Each element must be named after a parameter and contain the transfomation to apply for this parameter.
 #' @param pattern pattern to be replaced in the names of gate coordinates
 #' @param replacement Character string that is to replace 'pattern' in in the names of gate coordinates
-#' @param time_step value of the time step used to transform gates with the 'Time' parameter.
+#' @param time_step value of the time step used to transform gates with the 'Time' parameter. Ignored if NULL.
 #' @importFrom flowCore polygonGate rectangleGate
 transform_gates <- function(gates,
                             transformation = NULL, 
                             pattern = "[\\<|\\>]",
                             replacement = "",
-                            time_step = as.numeric(description(ff)[["$TIMESTEP"]]) ){
+                            time_step = NULL ){
   
   # transform gate coordinates
   
@@ -407,7 +410,10 @@ transform_gates <- function(gates,
           for(j in 1:length(colnames(polygon))){
             polygon[,j] <- transformation[[colnames(polygon)[j]]]$transform(polygon[,j])
             if(colnames(polygon)[j] == "Time"){
-              polygon[,j] <- polygon[,j]/time_step
+              if(!is.null(time_step)){
+                polygon[,j] <- polygon[,j]/time_step
+              }
+              
             }
           }
         }
@@ -474,6 +480,10 @@ transform_gates <- function(gates,
 # Getting data
 ####################################################################################################
 
+#' Return statistics for all subsets ans samples in a GatingSet
+#' @param gs a GatingSet
+#' @param spill spillover matrix. If NULL, uncompensated data is used for gating
+#' @param filter a filter object applied before computing statistics. Ignored if NULL.
 #' @importFrom flowCore Subset
 #' @importFrom flowWorkspace GatingSet gs_pop_get_count_fast
 getPopStatsPlus <- function(gs, spill = NULL, filter = NULL){
@@ -503,23 +513,22 @@ getPopStatsPlus <- function(gs, spill = NULL, filter = NULL){
   df_root$Parent <- NA
   df_root$ParentCount <- NA
   
-  # df_root <- df
-  # df_root <- df_root[df_root$Parent == "root", ]
-  # 
-  # df_root$Population <- df_root$Parent
-  # df_root$Count <- df_root$ParentCount
-  # df_root$Parent <- NA
-  # df_root$ParentCount <- NA
-  # 
-  # name <- unique(df_root$name)
-  # idx <- match(name, df_root$name)
-  # 
-  # df_merge <- rbind(df, df_root[idx, ])
-  
   df_merge <- rbind(df, df_root)
   df_merge
 }
 
+#' Return data from a GatingSet
+#' @param gs a GatingSet
+#' @param sample Names of samples from the GatingSet 
+#' (as returned by \code{pData(gs)$name})
+#' @param subset Names of subsets from the GatingSet 
+#' (as returned by \code{gs_get_pop_paths(gs)})
+#' @param Ncells number of cells to sample from the GatingSet
+#' @param spill spillover matrix. If NULL, uncompensated data is used for gating. 
+#' Uncompensated data is returned if parameter 'return_comp_data' is TRUE.
+#' @param return_comp_data logical. Should compensated data be returned ?
+#' @param updateProgress function used in shiny to update a progress bar
+#' @return a data.frame
 #' @importFrom flowWorkspace colnames GatingSet gh_pop_get_indices pData
 #' @importFrom flowCore compensate
 get_data_gs <- function(gs,
@@ -629,14 +638,11 @@ get_data_gs <- function(gs,
 #' @description  Add metadata columns
 #' @param df data.frame with a column \code{name} used to map metadata.
 #' Metadata should also contain a column \code{name}
+#' @param metadata a data.frame containing metadata associated to samples. 
+#' Must have a column \code{name} used for mapping.
 #' @return a data.frame with additional columns
-#' @export
 add_columns_from_metadata <- function(df,
                                       metadata
-                                      #color_var = NULL, 
-                                      #facet_vars = "name",
-                                      #group_var = "name",
-                                      #yridges_var = NULL
                                       ){
 
   
@@ -756,7 +762,7 @@ compute_stats <- function(df = NULL,
                          "percentage" = "perc_parent")
       
       df_pop_stat <- as.data.frame(getPopStatsPlus(gs, spill = spill))
-      df_pop_stat <- dplyr::rename(df_pop_stat, subset = Population)
+      df_pop_stat <- dplyr::rename(df_pop_stat, subset = "Population")
       df_pop_stat[['perc_parent']] <- df_pop_stat$Count / df_pop_stat$ParentCount * 100
       df_cast <- df_pop_stat[c("name", "subset", variable)]
       
@@ -764,32 +770,28 @@ compute_stats <- function(df = NULL,
                            df_cast$subset %in% unique(as.character(df$subset)), ]
       
     }
-    
-    
-    #df_cast <- df[df$name %in% sample & df$subset %in% subset, ]
-    
-    # idx <- which(as.character(df$name) %in% sample & as.character(df$subset) %in% subset)
-    # print(idx)
-    # if(length(idx)>0){
-    #   df_cast <- df[idx, ]
-    # }else{
-    #   df_cast <- NULL
-    # }
-    
-    
-    # trans_name <- NULL
-    # yvar <- switch(stat_function,
-    #                "cell count" = "Count",
-    #                "percentage" = "perc_parent")
-    # id.vars <- c("name", "subset")
-    
-    
   }
   
   return(df_cast)
   
 }
 
+#' Return data used for plotting a GatingSet
+#' @param gs a GatingSet
+#' @param df data.frame with columns \code{name} and \code{subset} 
+#' containing sample and subset names respectively and
+#' columns with plot variables. 
+#' Ignored if \code{NULL}. 
+#' Otherwise supersedes parameters 'gs', 'sample', 'spill', 'metadata'.
+#' @param sample Names of samples from the GatingSet 
+#' (as returned by \code{pData(gs)$name})
+#' @param subset Names of subsets from the GatingSet
+#' (as returned by \code{gs_get_pop_paths(gs)})
+#' @param Ncells number of cells to sample from the GatingSet
+#' @param spill spillover matrix. If NULL, uncompensated data is returned and used for gating.
+#' @param metadata a data.frame containing metadata associated to samples.
+#' Must have a column \code{name} used for mapping.
+#' @return a data.frame
 get_plot_data <- function(gs,
                           df=NULL, 
                           sample,
@@ -830,7 +832,15 @@ get_plot_data <- function(gs,
 # Plotting
 ####################################################################################################
 
-
+#' Generates a plot from data
+#' @param df data.frame with plot data (as returned by \code{get_plot_data})
+#' @param plot_type Name of the type of plot to generate. 
+#' Available types are 'hexagonal', 'histogram', 'dots', 'contour' (for single cell data) and 
+#' 'heatmap', 'bar', 'tile', 'pca' (for aggregated data). 
+#' The plot function corresponding to a given plot type must have the same name 
+#' as the plot type with the preffix 'plot_' (for instance 'plot_hexagonal()')
+#' @param plot_args list of arguments passed to the plot function
+#' @return a plot (plot class depends on the plot function)
 call_plot_function <- function(df,
                          plot_type,
                          plot_args = list()
@@ -847,6 +857,13 @@ call_plot_function <- function(df,
 ####################################################################################################
 # Generate plot for data with single cell resolution (plotGatingSetInput_module)
 
+#' Generates a hexagonal heatmap of 2d bin counts (see ggplot2::geom_hex)
+#' @param args list of arguments. 
+#' Mandatory arguments are the data.frame 'df', x and y plot variables 'xvar' and 'yvar'.
+#' Other arguments can include :
+#' 'bins' (numeric, number of bins, passed to 'ggplot2::geom_hex'), 
+#' 'use_log10_count' (logical, bin counts will be transfromed using log10),
+#' 'option' (character, name of the viridis palette)
 #' @import ggplot2
 #' @importFrom viridis scale_fill_viridis
 plot_hexagonal <- function(args = list()){
@@ -874,6 +891,19 @@ plot_hexagonal <- function(args = list()){
   p
 }
 
+#' Generates an histogram or a density plot
+#' @param args list of arguments. 
+#' Mandatory arguments are the data.frame 'df', x plot variable 'xvar'.
+#' Other arguments can include :
+#' 'color_var' (variable used for the aesthetic 'color'),
+#' 'group_var' (variable used for the aesthetic 'group'),
+#' 'smooth' (logical. Should a density plot be generated?),
+#' 'ridges' (logical. Ignored if 'smooth' is FALSE. Shift different density plots according to 'yridges_var'),
+#' 'yridges_var' (Ignored if 'ridges' is FALSE. variable used for the aesthetic 'y' in 'geom_density_ridges')
+#' 'norm_density' (logical. Set maximal y value to 1?)
+#' 'bins' (variable used for the aesthetic 'bins'. 
+#' If 'smooth' is TRUE, the inverse of 'bins' is used as the value for the bandwidth parameter 'bw')
+#' 'alpha' (variable used for the aesthetic 'alpha')
 #' @import ggplot2
 #' @importFrom ggridges geom_density_ridges
 plot_histogram <- function(args = list()){
@@ -1021,16 +1051,6 @@ plot_dots <-function(args = list()){
                              data = df_stat,
                              fill = "white")
   }
-  
-  
-  #if(!is.null(color_var)){
-      # p <- p + geom_point(mapping =  aes_string(colour = color_var),
-      #                     alpha = alpha, 
-      #                     size = size)
-  # }else{
-  #   p <- p + geom_point(alpha = alpha, 
-  #                       size = size)
-  # }
   
   return(p)
   
@@ -1223,7 +1243,6 @@ plot_heatmap <-function(args = list()){
   return(p)
 }
 
-
 #' @import ggplot2
 #' @importFrom reshape2 melt
 plot_bar <-function(args = list()){
@@ -1385,8 +1404,9 @@ plot_pca <-function(args = list()){
 ####################################################################################################
 
 #' @import ggplot2
+#' @importFrom grDevices rgb
 #' @importFrom ggrepel geom_label_repel
-add_polygon_layer <-function(p,
+add_polygon_layer <- function(p,
                              polygon = NULL,
                              label = NULL){
   
@@ -1406,7 +1426,7 @@ add_polygon_layer <-function(p,
         p <- p +  geom_label_repel(data = df_label, force = 4,
                                    mapping = aes(x=x, y=y), 
                                    label = label, 
-                                   fill = rgb(1,1,1,0.85), 
+                                   fill = grDevices::rgb(1,1,1,0.85), 
                                    color = "red", 
                                    nudge_y = 0, 
                                    nudge_x =0, 
@@ -1755,16 +1775,20 @@ plot_stat <- function(df = NULL,
   return( list(plot = p, data = df_stat) )
 }
 
-#' Plot all gates for a given sample of a gating set
+#' Plot all gates for a given sample of a GatingSet
 #' @description  Plot all gates for a given sample of a gating set
 #' @param df data.frame with columns \code{name} and \code{subset} 
 #' containing sample and subset names respectively and
-#' columns with plot variables. Ignored if \code{NULL}
-#' @param gs a gating set
+#' columns with plot variables. Ignored if \code{NULL}. 
+#' Otherwise supersedes parameters 'gs', 'sample', 'spill', 'metadata'.
+#' @param gs a GatingSet
 #' @param sample sample names
-#' @param selected_subsets subset names
+#' @param Ncells number of cells to sample from the GatingSet
+#' @param selected_subsets subset names. if NULL, all gates are drawn.
 #' @param spill spillover matrix. If NULL, uncompensated data is used both for gating and plotting.
-#' @param ... parameters passed to \code{plot_gs()}
+#' @param plot_type name of the plot type
+#' @param plot_args  list of plot parameters passed to \code{plot_gs()}
+#' @param options  list of plot format options passed to \code{plot_format()}
 #' @return a list of ggplot objects
 #' @importFrom flowWorkspace gs_get_pop_paths gs_pop_get_parent gs_pop_get_children
 plot_gh <- function( gs, 
@@ -1874,8 +1898,20 @@ plot_gh <- function( gs,
   return(plist)
 }
 
+#' Plot a gate from a GatingSet
+#' @param gate_name name of the gate
+#' @param df a data.frame with plot data resulting from a call of \code{get_plot_data}. 
+#' Supersedes parameters 'gs', 'sample', 'spill', 'metadata'
+#' @param gs a GatingSet
+#' @param sample Set of samples from 'gs'
+#' @param spill compensation 
+#' @param metadata a data.frame containing metadata associated to samples.
+#' Must have a column \code{name} used for mapping.
+#' @param plot_type name of the plot type
+#' @param plot_args  list of plot parameters passed to \code{plot_gs()}
+#' @param options  list of plot format options passed to \code{plot_format()}
 #' @importFrom flowWorkspace gh_pop_get_gate
-plot_gate <- function(gate,
+plot_gate <- function(gate_name,
                      df = NULL,
                      gs,
                      sample = NULL,
@@ -1885,7 +1921,7 @@ plot_gate <- function(gate,
                      plot_args = list(),
                      options = list()){
   
-  gate <- flowWorkspace::gh_pop_get_gate(gs[[1]], gate)
+  gate <- flowWorkspace::gh_pop_get_gate(gs[[1]], gate_name)
   
   polygon <- get_gate_coordinates(gate)
   subset <- flowWorkspace::gs_pop_get_parent(gs,  gate_name)
@@ -1915,7 +1951,10 @@ plot_gate <- function(gate,
 
 
 
-
+#' scale column of a data frame
+#' @param df a data.frame
+#' @param id.vars Names of df's columns that should not be scaled
+#' @return a data.frame
 scale_values <- function(df, id.vars = NULL){
   
   if(is.null(id.vars)){
@@ -1942,9 +1981,10 @@ scale_values <- function(df, id.vars = NULL){
 #' @param transformation  Named list of \code{trans} objects. 
 #' List names should correspond to variable names.
 #' @param y_trans default \code{trans} object to be used if \code{transformation} is NULL.
-#' @param perplexity t-SNE perplexity parameter
-#' @param dims Number of dimensions
+#' @param perplexity t-SNE perplexity parameter (passed to \code{Rtsne:Rstne()})
+#' @param dims Number of dimensions (passed to \code{Rtsne:Rstne()})
 #' @param method Name of the method used. Either "tSNE" or "umap"
+#' @param check_duplicates logical. Checks whether duplicates are present (passed to \code{Rtsne:Rstne()})
 #' @return a data.frame with additionnal columns : 
 #' "tSNE1" and "tSNE2" for method 'tSNE', "UMAP1" and "UMAP2" for method 'umap'
 #' @importFrom Rtsne Rtsne
@@ -2045,7 +2085,10 @@ dim_reduction <- function(df,
 #' @param y_trans default \code{trans} object to be used if \code{transformation} is NULL.
 #' @param dc ClusterX dc parameter
 #' @param alpha ClusterX alpha parameter
-#' @param method Name of the method used. Either "ClusterX" or "Rphenograph".
+#' @param method Name of the method used. Either "FlowSOM", "ClusterX", "Rphenograph".
+#' @param k integer; number of nearest neighbours (passed to \code{Rphenograph()})
+#' @param k_meta Maximum number of clusters to try out (passed to \code{FlowSOM::MetaClustering()})
+#' @param scale logical; Scale values before building SOM (for method 'FlowSOM' only)
 #' @return a data.frame with the additionnal column "cluster"
 #' @importFrom FlowSOM BuildSOM BuildMST MetaClustering
 #' @importFrom Rphenograph Rphenograph

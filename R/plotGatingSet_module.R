@@ -1,5 +1,5 @@
-#' @title plotGatingSetInput and plotGatingSet
-#' @description  A shiny Module to build plots from a gating set
+#' @title plotGatingSetInput
+#' @description  A shiny Module (ui function) to build plots from a gating set
 #' @param id shiny id
 #' @param simple_plot logical, disable a number of plot options
 #' @param auto_update Should plot update be automatic? 
@@ -70,6 +70,8 @@ plotGatingSetInput <- function(id, simple_plot = TRUE, auto_update = TRUE) {
 
 
 #' plotGatingSet server function
+#' @title plotGatingSet
+#' @description  A shiny module (server function) to build plots from a gating set
 #' @param input shiny input
 #' @param output shiny output
 #' @param session shiny session
@@ -83,7 +85,6 @@ plotGatingSetInput <- function(id, simple_plot = TRUE, auto_update = TRUE) {
 #' @return a list containing the plot and the corresponding plot parameters
 #' @importFrom flowWorkspace gs_pop_get_children gh_pop_get_gate gs_get_pop_paths
 #' @import shiny
-#' @rdname plotGatingSetInput
 plotGatingSet <- function(input, output, session, 
                           rval, 
                           plot_params = reactiveValues(), 
@@ -91,8 +92,6 @@ plotGatingSet <- function(input, output, session,
                           auto_update = TRUE,
                           show_gates = FALSE,
                           polygon_gate = NULL) {
-  
-  `%then%` <- shiny:::`%OR%`
   
   rval_plot <- reactiveValues(show_gates = FALSE,
                               norm = TRUE,
@@ -172,11 +171,9 @@ plotGatingSet <- function(input, output, session,
   # Define and initialize plot variables
   
   observe({
-    
     validate(need(rval$plot_var, "No plotting variables"))
     updateSelectInput(session, "xvar", choices = rval$plot_var, selected = rval$plot_var[1])
     updateSelectInput(session, "yvar", choices = rval$plot_var, selected = rval$plot_var[2]) 
-    
   })
   
   observe({
@@ -429,13 +426,11 @@ plotGatingSet <- function(input, output, session,
   # Get plot data
   data_plot_focus <- eventReactive(params_update_data(), {
     
-    validate(
-      need(rval$gating_set, "Empty gating set") %then%
-        need(selected$samples, "Please select samples") %then%
-        need(all(selected$samples %in% pData(rval$gating_set)$name), "Samples not found in gating set") %then%
-        need(selected$gate, "Please select subsets")
-    )
-    
+    validate(need(rval$gating_set, "Empty gating set"))
+    validate(need(selected$samples, "Please select samples"))
+    validate(need(all(selected$samples %in% pData(rval$gating_set)$name), "Samples not found in gating set"))
+    validate(need(selected$gate, "Please select subsets"))
+
     Ncells <- 30000
     if(rval_plot$use_all_cells){
       Ncells <- NULL

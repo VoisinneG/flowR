@@ -49,8 +49,6 @@ subsampleUI <- function(id) {
 #' @rdname subsampleUI
 subsample <- function(input, output, session, rval) {
   
-  `%then%` <- shiny:::`%OR%`
-  
   selected <- callModule(selection, "selection_module", rval)
   
   rval_mod <- reactiveValues( flow_set_subsample = NULL )
@@ -78,9 +76,7 @@ subsample <- function(input, output, session, rval) {
       ))
     }
     
-    validate(
-      need(length(selected$samples)>0, "No sample selected")
-    )
+    validate(need(length(selected$samples)>0, "No sample selected"))
     
    
     if( input$fs_name %in% names(rval$flow_set_list) ){
@@ -104,9 +100,7 @@ subsample <- function(input, output, session, rval) {
       ))
     }
     
-    validate(
-      need(selected$gate, "No subset selected")
-    )
+    validate(need(selected$gate, "No subset selected"))
     
     #sample = rval$pdata$name[input$sub_sample_table_rows_selected]
     
@@ -127,9 +121,7 @@ subsample <- function(input, output, session, rval) {
       ))
     }
     
-    validate(
-      need(length(rval_mod$df_sample)>0, "No cells in selection")
-    )
+    validate(need(length(rval_mod$df_sample)>0, "No cells in selection"))
     
     fs <- build_flowset_from_df(rval_mod$df_sample, 
                                 origin = rval$flow_set_list[[rval$flow_set_selected]])

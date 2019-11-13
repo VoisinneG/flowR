@@ -59,6 +59,7 @@ clusterUI <- function(id) {
 #' @importFrom DT renderDT datatable
 #' @importFrom FlowSOM UpdateNodeSize PlotPies PlotStars PlotMarker
 #' @importFrom scales identity_trans log10_trans
+#' @importFrom graphics plot.new
 #' @rdname clusterUI
 cluster <- function(input, output, session, rval) {
   
@@ -305,7 +306,7 @@ cluster <- function(input, output, session, rval) {
     }
     
     
-    plot.new()
+    graphics::plot.new()
     
     if(input$fSOM_plot_type == "pies"){
       FlowSOM::PlotPies(fSOM,

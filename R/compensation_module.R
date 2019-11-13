@@ -78,7 +78,6 @@ compensationUI <- function(id) {
   
 }
 
-
 #' compensation server function
 #' @param input shiny input
 #' @param output shiny output
@@ -91,7 +90,8 @@ compensationUI <- function(id) {
 #' @importFrom plotly renderPlotly event_data
 #' @importFrom DT renderDT
 #' @importFrom utils read.table
-#' @rdname transformUI
+#' @importFrom  stats median
+#' @rdname compensationUI
 compensation <- function(input, output, session, rval) {
 
   plot_params <- reactiveValues()
@@ -157,7 +157,7 @@ compensation <- function(input, output, session, rval) {
         desc <- flowCore::description(fs[[i]])
         if("SPILL" %in% names(desc)){
           df <- as.data.frame(desc[["SPILL"]])
-          is_identity <- sum(apply(X=df, MARGIN = 1, FUN = function(x){sum(x==0) == (length(x)-1)})) == dim(df)[1]
+          is_identity <- sum(apply(df, MARGIN = 1, FUN = function(x){sum(x==0) == (length(x)-1)})) == dim(df)[1]
           if(!is_identity){
             rval$df_spill <- df
             row.names(rval$df_spill) <- colnames(rval$df_spill)
@@ -214,7 +214,7 @@ compensation <- function(input, output, session, rval) {
                           subset = input$gate_pos,
                           spill = NULL)
     df_pos <- df_pos[names(df_pos) %in% rval$flow_set@colnames]
-    pos_values <- apply(df_pos, MARGIN = 2, FUN = median,  na.rm = TRUE)
+    pos_values <- apply(df_pos, MARGIN = 2, FUN = stats::median,  na.rm = TRUE)
     pos_values <- pos_values[rval$flow_set@colnames]
     names(pos_values) <- rval$flow_set@colnames
     rval$pos_values[[input$fluo]] <- pos_values
@@ -227,7 +227,7 @@ compensation <- function(input, output, session, rval) {
                           spill = NULL)
     
     df_neg <- df_neg[names(df_neg) %in% rval$flow_set@colnames]
-    neg_values <- apply(df_neg, MARGIN = 2, FUN = median, na.rm = TRUE)
+    neg_values <- apply(df_neg, MARGIN = 2, FUN = stats::median, na.rm = TRUE)
     neg_values <- neg_values[rval$flow_set@colnames]
     names(neg_values) <- rval$flow_set@colnames
     rval$neg_values[[input$fluo]] <- neg_values

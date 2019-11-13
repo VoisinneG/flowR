@@ -446,7 +446,7 @@ gating <- function(input, output, session, rval) {
     df <- df[df$name %in% res$params$samples, ]
     df[['% parent']] <- sprintf("%.1f", df$Count / df$ParentCount * 100)
     df <- df[, c("name", "Population", "Parent", "% parent", "Count", "ParentCount")] 
-    df <- dplyr::rename(df, subset = Population)
+    df <- dplyr::rename(df, subset = "Population")
     df <- df[df$subset %in% plot_params$selected_subsets, ]
     df
   })

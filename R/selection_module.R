@@ -1,6 +1,7 @@
 #' @title selectionInput and selection
 #' @description A shiny Module for selecting samples and gates
 #' @param id shiny id
+#' @param multiple_subset logical; allow selection of multiple subsets
 #' @importFrom shinydashboard box
 #' @import shiny
 selectionInput <- function(id, multiple_subset = TRUE) {
@@ -46,7 +47,6 @@ selectionInput <- function(id, multiple_subset = TRUE) {
 #' @rdname selectionInput
 selection <- function(input, output, session, rval, params = reactiveValues()) {
   
-  `%then%` <- shiny:::`%OR%`
   
   observe({
     validate(need(rval$gates_flowCore, "no gating set"))

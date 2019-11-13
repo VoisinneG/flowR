@@ -1,10 +1,10 @@
 Package: flowR
-Title: Annalyze flow cytometry data using R
+Title: R-shiny interface for the analysis of flow cytometry data
 Version: 0.3.7
 Date: 2019-06-19
 Author: Guillaume Voisinne
 Maintainer: Guillaume Voisinne <voisinne@ciml.univ-mrs.fr>
-Description: Annalyze flow cytometry data using R
+Description: An integration of tools to analyze flow cytometry data using R and shiny.
 Encoding: UTF-8
 Imports:
   shiny,
@@ -40,6 +40,7 @@ Imports:
   forcats,
   ggrepel,
   dplyr,
+  magrittr,
   methods,
   reshape2,
   FlowSOM,
@@ -53,4 +54,4 @@ License: file LICENSE
 RoxygenNote: 6.1.1
 biocViews:
 Depends:
-  R (>= 2.10)
+  R (>= 3.5.0)

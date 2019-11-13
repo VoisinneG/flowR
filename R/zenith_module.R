@@ -1,3 +1,5 @@
+utils::globalVariables(c("A", "B", "C", "Z", "sdA", "sdB", "sdC", "sdZ"))
+
 #' @title zenithUI and zenith
 #' @description  A shiny Module that analyse cell metabolism using the ZeNITH method
 #' @param id shiny id
@@ -101,6 +103,8 @@ zenithUI <- function(id) {
 #' @importFrom flowWorkspace gs_get_pop_paths
 #' @importFrom reshape2 melt dcast
 #' @importFrom dplyr rename arrange mutate
+#' @importFrom magrittr %>%
+#' @importFrom stats sd
 #' @importFrom DT datatable renderDT
 #' @import ggplot2
 #' @export
@@ -197,7 +201,7 @@ zenith <- function(input, output, session, rval) {
     df_melt2$variable[df_melt2$variable %in% paste0(input$Z_sample, "_value")] <- "Z"
     
     df_mean <- reshape2::dcast(df_melt2, subset ~ variable, mean)
-    df_sd <- reshape2::dcast(df_melt2, subset ~ variable, sd)
+    df_sd <- reshape2::dcast(df_melt2, subset ~ variable, stats::sd)
     names(df_sd) <- paste0("sd", names(df_sd))
     
     df_mean <- cbind(df_mean, df_sd[-1])
@@ -215,11 +219,11 @@ zenith <- function(input, output, session, rval) {
     df[["ymin"]] <-  df[["mean_score_gluc_dep"]] -  df[["sd_score_gluc_dep"]]
     df[["ymax"]] <-  df[["mean_score_gluc_dep"]] +  df[["sd_score_gluc_dep"]]
     df[["subset"]] <- factor(df[["subset"]], levels = input$gate)
-    p <- ggplot(df, aes(x=subset, y=mean_score_gluc_dep, color = subset, fill = subset)) +
+    p <- ggplot(df, aes_string(x="subset", y="mean_score_gluc_dep", color = "subset", fill = "subset")) +
       geom_col(alpha = 0.5)
     
     if(input$show_error_bar){
-      p <- p + geom_errorbar(mapping = aes(ymin = ymin, ymax = ymax), width = 0.25)
+      p <- p + geom_errorbar(mapping = aes_string(ymin = "ymin", ymax = "ymax"), width = 0.25)
     }
     
     
@@ -235,11 +239,11 @@ zenith <- function(input, output, session, rval) {
     df[["ymax"]] <-  df[["mean_score_mito_dep"]] +  df[["sd_score_mito_dep"]]
     df[["subset"]] <- factor(df[["subset"]], levels = input$gate)
     
-    p <- ggplot(df, aes(x=subset, y=mean_score_mito_dep, color = subset, fill = subset)) + 
+    p <- ggplot(df, aes_string(x="subset", y="mean_score_mito_dep", color = "subset", fill = "subset")) + 
       geom_col(alpha = 0.5)
     
     if(input$show_error_bar){
-      p <- p + geom_errorbar(mapping = aes(ymin = ymin, ymax = ymax), width = 0.25)
+      p <- p + geom_errorbar(mapping = aes_string(ymin = "ymin", ymax = "ymax"), width = 0.25)
     }
     
     if(input$set_y_lim){

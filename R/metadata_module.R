@@ -71,7 +71,7 @@ metadataUI <- function(id) {
 #' @importFrom readxl read_excel
 #' @importFrom utils read.csv write.table
 #' @importFrom DT renderDT dataTableProxy editData replaceData
-#' @rdname importUI
+#' @rdname metadataUI
 metadata <- function(input, output, session, rval) {
   
   rval_mod <- reactiveValues()

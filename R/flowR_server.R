@@ -1,4 +1,8 @@
 #' flowR server function
+#' @param input shiny input
+#' @param output shiny output
+#' @param session shiny session
+#' @param user_module_name name of a user shiny module (server function) to integrate to the app
 #' @import shiny
 #' @importFrom flowCore fsApply each_col
 #' @importFrom flowWorkspace gs_get_pop_paths

@@ -1,3 +1,5 @@
+utils::globalVariables("GvHD")
+
 #' @title importUI and import
 #' @description  A shiny Module that imports data and builds flow-sets
 #' @param id shiny id
@@ -50,11 +52,11 @@ importUI <- function(id) {
 #' @import shiny
 #' @importFrom flowWorkspace pData
 #' @importFrom flowCore fsApply
-#' @importFrom CytoML open_flowjo_xml open_diva_xml flowjo_to_gatingset fj_ws_get_sample_groups
+#' @importFrom CytoML open_flowjo_xml open_diva_xml flowjo_to_gatingset fj_ws_get_sample_groups diva_get_sample_groups
 #' @importFrom ncdfFlow read.ncdfFlowSet
 #' @importFrom DT renderDT
 #' @importFrom tools file_ext
-#' @importFrom utils read.table
+#' @importFrom utils read.table data
 #' @rdname importUI
 import <- function(input, output, session) {
   
@@ -92,7 +94,7 @@ import <- function(input, output, session) {
         ws <- try( CytoML::open_diva_xml(rval_mod$df_files$datapath[input$files_table_rows_selected[1]]),
                    silent = TRUE)
         if(class(ws) != "try-error"){
-          groups <- unique(CytoML::diva_ws_get_sample_groups(ws)$specimen)
+          groups <- unique(CytoML::diva_get_sample_groups(ws)$specimen)
         }
       }
       
@@ -316,7 +318,7 @@ import <- function(input, output, session) {
                                           emptyValue=FALSE, 
                                           truncate_max_range = TRUE )
         
-        phenoData(fs)$name <- rval_mod$df_files$name[input$files_table_rows_selected]
+        pData(fs)$name <- rval_mod$df_files$name[input$files_table_rows_selected]
         
         rval$flow_set_list[[input$fs_name]] <- list(flow_set = fs,
                                                     spill = NULL,
@@ -337,7 +339,7 @@ import <- function(input, output, session) {
 
   observeEvent(input$import_gvhd, {
     
-    data("GvHD", package = "flowCore")
+    utils::data("GvHD", package = "flowCore")
     assign("fs", GvHD)
     
     rval$flow_set_list[["GvHD"]] <- list(flow_set = fs,
