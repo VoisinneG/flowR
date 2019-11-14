@@ -69,7 +69,9 @@ plotting <- function(input, output, session, rval) {
       plot_params$group_var <- NULL
       plot_params$gate <- "root"
       plot_params$use_all_cells <- TRUE
-      rval_mod$init <- FALSE
+      #rval_mod$init <- FALSE
+      
+      print(reactiveValuesToList(plot_params))
       
     }
 

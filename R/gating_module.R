@@ -286,7 +286,6 @@ gating <- function(input, output, session, rval) {
       if(length(child_gates)==0){
         child_gates <- NULL
       }
-      print(child_gates)
       
       idx_delete <- which( names(rval$gates_flowCore) %in% c(target_gate, child_gates) )
       rval$gates_flowCore <- rval$gates_flowCore[-idx_delete]

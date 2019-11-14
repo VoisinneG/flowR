@@ -158,7 +158,7 @@ plotGatingSet <- function(input, output, session,
     }else if (input$plot_type == 'hexagonal'){
       vars <- c("show_gates", "bins", "option")
     }else if (input$plot_type == 'dots'){
-      vars <- c("show_gates","alpha", "size", "show_label")
+      vars <- c("show_gates","alpha", "size", "show_label", "option")
     }else if (input$plot_type == 'contour'){
       vars <- c("show_gates", "show_outliers",  "bins", "alpha", "size")
     }
@@ -391,16 +391,18 @@ plotGatingSet <- function(input, output, session,
   # Control update of formatted plot
   params_update_plot_format <- reactive({
     
-    validate(need(rval$apply_trans, "No transformation options defined"))
+    validate(need("apply_trans" %in% names(rval), "No transformation options defined"))
     
     if(!auto_update){
       input$update_plot
     }else{
       update_params <- rval_mod$count_raw
-      var_update <- c("facet_var", 
+      var_update <- c("facet_var",
+                      "color_var",
                       "theme",
                       "legend",
-                      "legend.position")
+                      "legend.position",
+                      "option")
       var_update <- var_update[var_update %in% names(rval_plot)]
       for(var in var_update){
         update_params <- c(update_params, rval_plot[[var]])
@@ -497,7 +499,7 @@ plotGatingSet <- function(input, output, session,
           }else if(split_var() == "xvar"){
             plot_args[["xvar"]] <- xvar[i]
           }else if(split_var() == "yvar"){
-            plot_args[["yvar"]] <- xvar[i]
+            plot_args[["yvar"]] <- yvar[i]
           }
 
           rval_mod$plot_list[[i]] <- call_plot_function(df=df,
@@ -513,6 +515,8 @@ plotGatingSet <- function(input, output, session,
   ##########################################################################################################3
   # Format plot
   observeEvent(params_update_plot_format(),  {
+    
+    print("format")
     
     axis_labels <- rval$parameters$name_long
     if(!is.null(axis_labels)){
@@ -534,7 +538,8 @@ plotGatingSet <- function(input, output, session,
                     transformation = transformation,
                     axis_labels = axis_labels,
                     facet_var = facet_var,
-                    legend.position = rval_plot[["legend.position"]])
+                    legend.position = rval_plot[["legend.position"]],
+                    option = rval_plot[["option"]])
     
     plist <- lapply( rval_mod$plot_list, 
                      function(p){
@@ -577,7 +582,7 @@ plotGatingSet <- function(input, output, session,
     
     rval_mod$plot_list <- plist
     
-    
+
   })
   
   ##########################################################################################################3
@@ -609,7 +614,6 @@ plotGatingSet <- function(input, output, session,
                         }
                         return(p)
                       })
-      
       plist
       
   })

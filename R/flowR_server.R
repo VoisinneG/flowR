@@ -60,6 +60,7 @@ flowR_server <- function(session, input, output, user_module_name = NULL) {
   
   observeEvent(input$apply_trans, {
     rval$apply_trans <- input$apply_trans
+    
   })
   
   observeEvent(input$apply_comp, {
@@ -82,23 +83,31 @@ flowR_server <- function(session, input, output, user_module_name = NULL) {
     rval$flow_set_selected <- input$flow_set
     rval$flow_set <- rval$flow_set_list[[input$flow_set]]$flow_set
     
-    if(length(rval$gates_flowCore) == 0){
-      rval$gates_flowCore <- rval$flow_set_list[[input$flow_set]]$gates
-      print("gates updated")
-      print(rval$gates_flowCore)
-    }
-    if(is.null(rval$df_spill)){
+    # if(length(rval$gates_flowCore) == 0){
+    #   rval$gates_flowCore <- rval$flow_set_list[[input$flow_set]]$gates
+    #   print("gates updated")
+    #   print(rval$gates_flowCore)
+    # }
+    
+    
+    rval$gates_flowCore <- rval$flow_set_list[[input$flow_set]]$gates
+      
+    #if(is.null(rval$df_spill)){
       rval$df_spill <- rval$flow_set_list[[input$flow_set]]$spill
-    }
-    if(is.null(rval$transformation)){
+    #}
+    
+    #if(is.null(rval$transformation)){
       rval$transformation <- rval$flow_set_list[[input$flow_set]]$transformation
-    }
-    if(is.null(rval$trans_parameters)){
+    #}
+      
+    #if(is.null(rval$trans_parameters)){
       rval$trans_parameters <- rval$flow_set_list[[input$flow_set]]$trans_parameters
-    }
-    if(is.null(rval$pdata)){
+    #}
+    
+    #if(is.null(rval$pdata)){
       rval$pdata <- rval$flow_set_list[[input$flow_set]]$metadata
-    }
+    #}
+    
     #if(is.null(rval$parameters)){
      rval$parameters <- NULL #rval$flow_set_list[[input$flow_set]]$parameters
     #}
@@ -133,7 +142,41 @@ flowR_server <- function(session, input, output, user_module_name = NULL) {
   # })
   
  
+  ##################################################################################################
+  # Updating spillover matrix for all related flow sets (in the same tree)
+  ##################################################################################################
   
+  observeEvent(c(rval$df_spill, 
+                 rval$gates_flowCore, 
+                 rval$transformation, 
+                 rval$trans_parameters, 
+                 rval$pdata) , {
+    
+    validate(need(rval$flow_set_list, "No flow-sets available"))
+    validate(need(rval$flow_set_selected, "No flow-set selected"))
+    
+    # print("flow-sets")
+    # print(rval$flow_set_selected)
+    # print(get_all_descendants(rval$flow_set_list, rval$flow_set_selected))
+    # print(get_all_ancestors(rval$flow_set_list, rval$flow_set_selected))
+    
+    items_to_update <- union(rval$flow_set_selected,
+                             union(get_all_descendants(rval$flow_set_list, rval$flow_set_selected),
+                                   get_all_ancestors(rval$flow_set_list, rval$flow_set_selected)))
+    items_to_update <- intersect(items_to_update, names(rval$flow_set_list))
+    
+    #print("updating spill")
+    #print(items_to_update)
+    
+    for(i in 1:length(items_to_update)){
+      rval$flow_set_list[[items_to_update[i]]]$gates <- rval$gates_flowCore
+      rval$flow_set_list[[items_to_update[i]]]$spill <- rval$df_spill
+      rval$flow_set_list[[items_to_update[i]]]$transformation <- rval$transformation
+      rval$flow_set_list[[items_to_update[i]]]$trans_parameters <- rval$trans_parameters
+      rval$flow_set_list[[items_to_update[i]]]$metadata <- rval$pdata
+    }
+    
+  })
   
   ##########################################################################################################
   # Output value boxes

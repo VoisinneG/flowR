@@ -1,7 +1,7 @@
 utils::globalVariables(c("df", "xvar", "yvar", "x", "y"))
 
 ####################################################################################################
-# Parse workspace and gates from xml files (flowJO workspace files)
+# Parse workspace and gates from xml files (.wsp flowJO workspace files)
 ####################################################################################################
 
 #' Return the name and ID of a SampleNode section
@@ -179,7 +179,7 @@ flowJo_biexp_inverse_trans <- function (..., n = 6, equal.space = FALSE){
 #' Scaled hyperbolic arc-sine function
 #' @param b scale
 #' @param inverse use inverse function?
-asinh_transform <- function(b=5, inverse = FALSE){ 
+asinh_transform <- function(b=5, inverse = FALSE){
   if(inverse){
     function(x){b*sinh(x)} 
   }else{
@@ -859,11 +859,11 @@ call_plot_function <- function(df,
 
 #' Generates a hexagonal heatmap of 2d bin counts (see ggplot2::geom_hex)
 #' @param args list of arguments. 
-#' Mandatory arguments are the data.frame 'df', x and y plot variables 'xvar' and 'yvar'.
+#' Mandatory arguments : a data.frame 'df', x and y plot variables 'xvar' and 'yvar'.
 #' Other arguments can include :
-#' 'bins' (numeric, number of bins, passed to 'ggplot2::geom_hex'), 
-#' 'use_log10_count' (logical, bin counts will be transfromed using log10),
-#' 'option' (character, name of the viridis palette)
+#' 'bins' : numeric, number of bins, passed to 'ggplot2::geom_hex()'
+#' 'use_log10_count' : logical, transform bin counts using log10
+#' 'option' : name of the viridis palette
 #' @import ggplot2
 #' @importFrom viridis scale_fill_viridis
 plot_hexagonal <- function(args = list()){
@@ -893,17 +893,17 @@ plot_hexagonal <- function(args = list()){
 
 #' Generates an histogram or a density plot
 #' @param args list of arguments. 
-#' Mandatory arguments are the data.frame 'df', x plot variable 'xvar'.
+#' Mandatory arguments : a data.frame 'df', x plot variable 'xvar'.
 #' Other arguments can include :
-#' 'color_var' (variable used for the aesthetic 'color'),
-#' 'group_var' (variable used for the aesthetic 'group'),
-#' 'smooth' (logical. Should a density plot be generated?),
-#' 'ridges' (logical. Ignored if 'smooth' is FALSE. Shift different density plots according to 'yridges_var'),
-#' 'yridges_var' (Ignored if 'ridges' is FALSE. variable used for the aesthetic 'y' in 'geom_density_ridges')
-#' 'norm_density' (logical. Set maximal y value to 1?)
-#' 'bins' (variable used for the aesthetic 'bins'. 
-#' If 'smooth' is TRUE, the inverse of 'bins' is used as the value for the bandwidth parameter 'bw')
-#' 'alpha' (variable used for the aesthetic 'alpha')
+#' 'color_var' : variable used for the aesthetic 'color'
+#' 'group_var' : variable used for the aesthetic 'group'
+#' 'smooth' : logical. Should a density plot be generated?
+#' 'ridges': logical. Ignored if 'smooth' is FALSE. Shift different density plots according to 'yridges_var'
+#' 'yridges_var' : variable used for the aesthetic 'y' in 'geom_density_ridges'. Ignored if 'ridges' is FALSE. 
+#' 'norm_density' : logical. Set maximal y value to 1?
+#' 'bins' : number of bins.
+#' (If 'smooth' is TRUE, the inverse of 'bins' is used as the value for the bandwidth parameter 'bw')
+#' 'alpha' : transparency (between 0 and 1)
 #' @import ggplot2
 #' @importFrom ggridges geom_density_ridges
 plot_histogram <- function(args = list()){
@@ -989,6 +989,17 @@ plot_histogram <- function(args = list()){
   
 }
 
+#' Generates a dot plot
+#' @param args list of arguments. 
+#' Mandatory arguments : a data.frame 'df', x and y plot variable 'xvar' and 'yvar'.
+#' Other arguments can include :
+#' 'color_var' : variable used for the aesthetic 'color'
+#' 'group_var' : variable used for the aesthetic 'group'
+#' 'alpha' : dot transparency (between 0 and 1)
+#' 'size' : dot size
+#' 'show_label' : logical; add labels for each group (as defined by 'id.vars')
+#' 'id.vars' : variable defining groups for which a label should be displayed 
+#' (superseded by 'color_var' and 'group_var')
 #' @import ggplot2
 #' @importFrom ggrepel geom_label_repel
 plot_dots <-function(args = list()){
@@ -998,7 +1009,6 @@ plot_dots <-function(args = list()){
   show_label <- FALSE
   color_var <- NULL
   group_var <- NULL
-  bins <- 100
   alpha <- 0.1
   size <- 0.1
   
@@ -1056,6 +1066,17 @@ plot_dots <-function(args = list()){
   
 }
 
+#' Generates a contour plot
+#' @param args list of arguments. 
+#' Mandatory arguments : a data.frame 'df', x and y plot variable 'xvar' and 'yvar'.
+#' Other arguments can include :
+#' 'color_var' : variable used for the aesthetic 'color'
+#' 'group_var' : variable used for the aesthetic 'group'
+#' 'show_outliers' : logical; Display all cells in the background
+#' 'fill' : fill parameter for contour plot (passed to 'ggplot2::stat_density_2d()')
+#' 'bins' : number of grid points in each direction. (passed as parameter 'n' to 'ggplot2::geom_density_2d()')
+#' 'alpha' : contour line transparency (between 0 and 1). If 'show_outliers' is TRUE, used to set outliers dot transparency.
+#' 'size' : contour line size. If 'show_outliers' is TRUE, used to set outliers dot size.
 #' @import ggplot2
 plot_contour <-function(args = list()){
   
@@ -1063,7 +1084,7 @@ plot_contour <-function(args = list()){
 
   color_var <- NULL
   group_var <- NULL
-  fill <- NA
+  
   bins <- 10
   alpha <- 0.75
   size <- 0.2
@@ -1078,10 +1099,6 @@ plot_contour <-function(args = list()){
       color_var <- NULL
     }
   }
-  
-  # if(!is.null(color_var)){
-  #   if(! color_var %in% c("subset", "name")) color_var <- NULL
-  # }
   
   if(!is.null(color_var)){
     color_var <- as.name(color_var)
@@ -1105,66 +1122,50 @@ plot_contour <-function(args = list()){
                          group = group_var))
 
 
-
+  
   if(show_outliers){
     p <- p + geom_point(size = size, alpha = alpha)
     size <- 0.1
     alpha <- 1
-    fill <- "white"
   }
   
   
   
    if(!is.null(color_var)){
-    #p <- p + stat_density2d(aes_string(alpha='..level..', fill='..level..'),
     
-     p <- p + stat_density2d(aes_string(colour = color_var, group = group_var),
-                             fill = fill,
-                             size=0,
-                             geom="polygon",
-                             bins=bins
-     ) 
+     if(show_outliers){
+       p <- p + stat_density2d(aes_string(colour = color_var, group = group_var),
+                               fill = "white",
+                               size=0,
+                               geom="polygon",
+                               n=bins
+       )
+     }
      
     p <- p + geom_density2d(aes_string(colour = color_var, group = group_var),
                             size=size,
                             alpha= alpha,
-                            bins=bins
+                            n=bins
     )
       
-    
-    
-    #scale_fill_gradient(low = "yellow", high = "red")
    }else{
-     
-     p <- p + stat_density2d(aes_string(group = group_var),
-                             fill = fill,
-                             size=0,
-                             geom="polygon",
-                             bins=bins
-     )
+     if(show_outliers){
+       p <- p + stat_density2d(aes_string(group = group_var),
+                               fill = "white",
+                               size=0,
+                               geom="polygon",
+                               n=bins
+       )
+     }
      
      p <- p + geom_density2d(aes_string(group = group_var),
                              color = "black",
                              size=size,
                              alpha= alpha,
-                             bins=bins
+                             n=bins
      )
-     
-    
     
   }
-
-  # pb <- ggplot_build(p)
-  # 
-  # exp <- 1
-  # xyscales = lapply(pb$data[[1]][,c("x","y")], function(var) {
-  #   rng = range(var)
-  #   rng + c(-exp*diff(rng), exp*diff(rng))
-  # })
-  # 
-  # print(xyscales)
-  # p <- p + scale_x_continuous(limits=xyscales[[1]]) +
-  #   scale_y_continuous(limits=xyscales[[2]])
 
   return(p)
 }
@@ -1173,7 +1174,16 @@ plot_contour <-function(args = list()){
 # Generate plot for aggregated data (plotStatInput_module)
 ####################################################################################################
 
-
+#' Generates a heatmap
+#' @param args list of arguments. 
+#' Mandatory argument : a data.frame or a matrix 'df'
+#' Other arguments can include :
+#' 'stat_var' : names of numeric columns to include in the heatmap
+#' 'group_var' : name of the column used to order x coordinates
+#' 'cluster_y' : logical; cluster y axis variables
+#' 'cluster_x' : logical; cluster x axis variables
+#' 'show.legend' : logical; show legend
+#' 'option' : name of the viridis palette
 #' @importFrom viridis viridis
 #' @importFrom pheatmap pheatmap
 plot_heatmap <-function(args = list()){
@@ -1185,6 +1195,7 @@ plot_heatmap <-function(args = list()){
   cluster_y <- FALSE
   cluster_x <- FALSE
   show.legend <- TRUE
+  option <- "viridis"
   
   for(var in names(args)){
     assign(var, args[[var]])
@@ -1231,7 +1242,7 @@ plot_heatmap <-function(args = list()){
   print(annotation)
   
   p <- pheatmap(df_plot, show_colnames = FALSE, 
-                color = viridis(16),
+                color = viridis(16, option = option),
                 labels_col = labels_col,
                 scale = "none",
                 annotation_col = annotation,
@@ -1243,6 +1254,14 @@ plot_heatmap <-function(args = list()){
   return(p)
 }
 
+#' Generates a bar plot
+#' @param args list of arguments. 
+#' Mandatory argument : a data.frame 'df'
+#' Other arguments can include :
+#' 'stat_var' : names of numeric columns to include in the plot
+#' 'group_var' : name of the column used to define x axis groups
+#' 'color_var' : name of the column used for the aesthetic 'color' in 'ggplot2::geom_point()'
+#' 'show.legend' : logical; show legend
 #' @import ggplot2
 #' @importFrom reshape2 melt
 plot_bar <-function(args = list()){
@@ -1294,6 +1313,14 @@ plot_bar <-function(args = list()){
   
 }
 
+#' Generates a tile plot
+#' @param args list of arguments. 
+#' Mandatory argument : a data.frame 'df'
+#' Other arguments can include :
+#' 'stat_var' : names of numeric columns to include in the plot
+#' 'group_var' : name of the column used to define x axis groups
+#' 'show.legend' : logical; show legend
+#' 'option' : name of the viridis palette
 #' @import ggplot2
 #' @importFrom viridis scale_fill_viridis
 #' @importFrom reshape2 melt
@@ -1303,6 +1330,7 @@ plot_tile <-function(args = list()){
   stat_var <- NULL
   group_var <- NULL
   show.legend <- TRUE
+  option <- "viridis"
   
   for(var in names(args)){
     assign(var, args[[var]])
@@ -1328,12 +1356,23 @@ plot_tile <-function(args = list()){
   
   p <- ggplot(df_melt, aes_string(x = group_var, y = "variable", fill = "value")) +
     geom_tile(show.legend = show.legend) +
-    scale_fill_viridis()
+    scale_fill_viridis(option = option)
   
   return(p)
   
 }
 
+#' Perform a PCA and plot the result
+#' @param args list of arguments. 
+#' Mandatory argument : a data.frame 'df'
+#' Other arguments can include :
+#' 'stat_var' : names of numeric columns used to perform the PCA.
+#' All numeric variables are used by default.
+#' 'PCx' : x axis variable ("PC1" by default)
+#' 'PCy' : y axis variable ("PC2" by default)
+#' 'color_var' : name of the column used to color points
+#' 'label_var' : name of the column used to label points
+#' 'scale' : logical; scale values by variable before performing the PCA
 #' @import ggplot2
 #' @importFrom ggrepel geom_text_repel
 #' @importFrom stats prcomp
@@ -1354,7 +1393,7 @@ plot_pca <-function(args = list()){
   
   df <- as.data.frame(df)
   
-  idx <- which(names(df) %in% c("name", "subset", annotation_vars))
+  idx <- which(names(df) %in% c("name", "subset", color_var, label_var))
   idx_annot <- idx
   
   df_stat <- df[-idx]
@@ -1368,8 +1407,6 @@ plot_pca <-function(args = list()){
   }else{
     stop("Not enough numeric variables to perform PCA")
   }
-  
-  
   
   rownames(df_stat) <- 1:dim(df_stat)[1]
   
@@ -1400,7 +1437,7 @@ plot_pca <-function(args = list()){
 
 
 ####################################################################################################
-# Add layers to plot
+# Add plot layers
 ####################################################################################################
 
 #' @import ggplot2
@@ -1493,12 +1530,29 @@ add_gate <- function(p, gate){
 # Format plot (legend, scale, labels ...)
 ####################################################################################################
 
+#' Format a ggplot object
+#' @param p a ggplot object
+#' @param options  list of plot format options. Names of options include:
+#' xlim : x-axis range
+#' ylim : y-axis range
+#' transformation : named list of trans objects 
+#' default_trans : default trans object (set to 'identity_trans()' by default). 
+#' Used only if 'transformation' is not an element of 'options'.
+#' axis_labels : named list with axis labels (each element should be named after a plot variable)
+#' color_var_name : name to display for color variable
+#' facet_var : names of the variables used for facetting plots along the x-axis
+#' facet_yvar : names of the variables used for facetting plots along the y-axis
+#' scales : control scaling across facets (passed to 'facet_grid()'), Set to "fixed" by default
+#' option : name of the viridis palette
+#' theme : name of the ggplot theme ("gray" by default)
+#' legend.position : legend position
 #' @import ggplot2
 #' @import viridis
 #' @import flowWorkspace
 #' @importFrom stats as.formula
 #' @importFrom rlang quo_get_expr
 #' @importFrom scales identity_trans
+#' @return a ggplot object
 format_plot <- function(p,
                         options = list()){
   
@@ -1531,12 +1585,8 @@ format_plot <- function(p,
   #facet scales
   scales <- "fixed"
   
-  # if(!is_null(color_var)){
-  #   if(color_var == "none"){
-  #     color_var <- NULL
-  #   }
-  # }
-  
+  #default viridis palette
+  option <- "viridis"
   
   ############################################################################33
   #default parameters
@@ -1549,10 +1599,6 @@ format_plot <- function(p,
   ############################################################################33
   #transformations
   
-  #transformation <- options$transformation
-  #if(is.null(transformation)){
-  
-  #}
   transformation <- list()
   
   for(var in names(options$transformation)){
@@ -1575,8 +1621,9 @@ format_plot <- function(p,
   
   if(!is.null(yvar)){
     if(length(yvar) == 1){
+      
       laby <- ifelse(yvar %in% names(options$axis_labels), options$axis_labels[[yvar]], yvar)
-      #laby <- ifelse(is.null(options$axis_labels[[yvar]]), yvar, options$axis_labels[[yvar]])
+      
       if(yvar %in% names(transformation)){
         p <- p + scale_y_continuous(name = laby, trans = transformation[[yvar]], limits = ylim) 
       }else if(is.numeric(p$data[[yvar]])){
@@ -1596,8 +1643,10 @@ format_plot <- function(p,
         if(is.null(color_var_name)){
           color_var_name <- color_var
         }
+        
         p <- p + scale_colour_viridis(trans = transformation[[color_var]],
-                                      name = color_var_name)
+                                      name = color_var_name,
+                                      option = option)
       }
     }
   }
@@ -1617,7 +1666,6 @@ format_plot <- function(p,
     
     print(paste(left_formula, "~", right_formula))
     formula_facet <- stats::as.formula(paste(left_formula, "~", right_formula))
-    
     
     p <- p + facet_grid(formula_facet,
                         labeller = label_both, 
@@ -1660,7 +1708,25 @@ format_plot <- function(p,
 # Main plot functions
 ####################################################################################################
 
+#' Plot a GatingSet
+#' @param df a data.frame with plot data resulting from a call of \code{get_plot_data}. 
+#' Supersedes parameters 'gs', 'sample', 'spill', 'metadata'
+#' @param gs a GatingSet
+#' @param sample Names of samples from the GatingSet 
+#' (as returned by \code{pData(gs)$name})
+#' @param subset Names of subsets from the GatingSet 
+#' (as returned by \code{gs_get_pop_paths(gs)})
+#' @param spill spillover matrix. If NULL, uncompensated data is used for gating and plotting.
+#' @param metadata a data.frame containing metadata associated to samples.
+#' Must have a column \code{name} used for mapping.
+#' @param plot_type name of the plot type
+#' @param plot_args  list of plot parameters passed to the plot function. 
+#' Plot parameters depend on the plot type selected.
+#' @param options  list of plot format options passed to \code{format_plot()}
+#' @param gate Names of the gates to add to the plot (if it is compatible with plot parameters).
+#' Ignored if NULL.
 #' @importFrom flowWorkspace gs_get_pop_paths pData gh_pop_get_gate
+#' @return a plot
 plot_gs <- function(gs,
                     df = NULL,
                     sample = NULL,
@@ -1670,7 +1736,7 @@ plot_gs <- function(gs,
                     plot_type = "hexagonal",
                     plot_args = list(),
                     options = list(),
-                    gate = NULL){
+                    gate_name = NULL){
   
   
   if(! "xvar" %in% names(plot_args)){
@@ -1707,23 +1773,51 @@ plot_gs <- function(gs,
   return(p)
 }
 
+#' Plot aggregated data from a GatingSet
+#' @param df a data.frame with plot data resulting from a call of \code{get_plot_data}. 
+#' Supersedes parameters 'gs', 'sample', 'spill'
+#' @param gs a GatingSet
+#' @param sample Names of samples from the GatingSet 
+#' (as returned by \code{pData(gs)$name})
+#' @param subset Names of subsets from the GatingSet 
+#' (as returned by \code{gs_get_pop_paths(gs)})
+#' @param spill spillover matrix. If NULL, uncompensated data is used for gating and plotting.
+#' @param metadata a data.frame containing metadata associated to samples.
+#' Must have a column \code{name} used for mapping.
+#' @param transformation A list of trans objects. 
+#' Each element must be named after a parameter and contain the transfomation to apply for this parameter.
+#' If NULL, the default transformation 'y_trans' is applied.
+#' @param stat_function Name of the function to be applied on transformed data for each sample and subset.
+#' @param y_trans Default trans object (set to 'identity_trans()' by default). 
+#' Used only if parameter 'transformation' is NULL. 
+#' @param apply_inverse logical; Apply inverse transformation before returning the data.
+#' @param yvar Names of the variables for which to compute statistics
+#' @param var_names Replace 'yvar' with custom names
+#' @param scale logical; Should data be scaled for each 'yvar' variable?
+#' @param plot_type name of the plot type
+#' @param plot_args  list of plot parameters passed to the plot function. 
+#' Plot parameters depend on the plot type selected.
+#' @param options  list of plot format options passed to \code{format_plot()}
 #' @importFrom flowWorkspace gs_get_pop_paths pData
+#' @importFrom scales identity_trans
+#' @return a list with a plot and the corresponding plot data
 plot_stat <- function(df = NULL,
-                        gs,
-                        sample = NULL,
-                        subset = NULL,
-                        spill = NULL,
-                        transformation=NULL,
-                        stat_function = "mean",
-                        y_trans = identity_trans(),
-                        apply_inverse = TRUE,
-                        yvar = NULL,
-                        var_names = NULL,
-                        metadata = NULL,
-                        scale = FALSE,
-                        plot_type = "heatmap",
-                        plot_args = list(),
-                        options = list() ){
+                      gs,
+                      sample = NULL,
+                      subset = NULL,
+                      spill = NULL,
+                      metadata = NULL,
+                      transformation=NULL,
+                      stat_function = "mean",
+                      y_trans = identity_trans(),
+                      apply_inverse = TRUE,
+                      yvar = NULL,
+                      var_names = NULL,
+                      scale = FALSE,
+                      plot_type = "heatmap",
+                      plot_args = list(),
+                      options = list() ){
+                        
   
   
   if(is.null(sample)) sample <- flowWorkspace::pData(gs)$name[1]
@@ -1748,7 +1842,8 @@ plot_stat <- function(df = NULL,
                       y_trans = y_trans,
                       apply_inverse = apply_inverse,
                       yvar = yvar,
-                      var_names = var_names)
+                      var_names = var_names,
+                      id.vars = c("name", "subset"))
   
   if(scale){
     df_stat <- scale_values(df_stat, id.vars = c("name", "subset"))
@@ -1788,7 +1883,7 @@ plot_stat <- function(df = NULL,
 #' @param spill spillover matrix. If NULL, uncompensated data is used both for gating and plotting.
 #' @param plot_type name of the plot type
 #' @param plot_args  list of plot parameters passed to \code{plot_gs()}
-#' @param options  list of plot format options passed to \code{plot_format()}
+#' @param options  list of plot format options passed to \code{format_plot()}
 #' @return a list of ggplot objects
 #' @importFrom flowWorkspace gs_get_pop_paths gs_pop_get_parent gs_pop_get_children
 plot_gh <- function( gs, 
@@ -1909,7 +2004,7 @@ plot_gh <- function( gs,
 #' Must have a column \code{name} used for mapping.
 #' @param plot_type name of the plot type
 #' @param plot_args  list of plot parameters passed to \code{plot_gs()}
-#' @param options  list of plot format options passed to \code{plot_format()}
+#' @param options  list of plot format options passed to \code{format_plot()}
 #' @importFrom flowWorkspace gh_pop_get_gate
 plot_gate <- function(gate_name,
                      df = NULL,
@@ -2067,10 +2162,6 @@ dim_reduction <- function(df,
   return(NULL)
   
 }
-
-
-
-
 
 ####################################################################################################
 # Clustering

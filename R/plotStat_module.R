@@ -93,6 +93,11 @@ plotStat <- function(input, output, session, rval) {
     x[["strip_text_angle"]] <- numericInput(ns("strip_text_angle"), label = "y strip text angle", value = 0)
     x[["cluster_x"]] <- checkboxInput(ns("cluster_x"), "cluster x variables", value = TRUE)
     x[["cluster_y"]] <- checkboxInput(ns("cluster_y"), "cluster y variables", value = TRUE)
+    x[["option"]] <- selectizeInput(ns("option"), 
+                                    multiple =FALSE,
+                                    label = "color palette", 
+                                    choices = c("viridis", "magma", "plasma",  "inferno", "cividis"), 
+                                    selected = "viridis")
     
     rval_mod$plot_options <- x
     
@@ -104,9 +109,9 @@ plotStat <- function(input, output, session, rval) {
     if(input$plot_type == 'bar'){
       vars <- c("legend", "theme", "scales", "scale_values", "max_scale", "expand_factor", "strip_text_angle")
     }else if (input$plot_type == 'tile'){
-      vars <- c("legend", "theme", "scale_values", "max_scale", "strip_text_angle" )
+      vars <- c("legend", "theme", "scale_values", "max_scale", "strip_text_angle", "option" )
     }else if (input$plot_type == 'heatmap'){
-      vars <- c("scale_values", "max_scale", "cluster_x", "cluster_y")
+      vars <- c("scale_values", "max_scale", "cluster_x", "cluster_y", "option")
     }else if (input$plot_type == 'pca'){
       vars <- c("scale_values")
       rval_mod$plot_options[["scale_values"]] <- checkboxInput(ns("scale_values"), "scale values by row", value = TRUE)

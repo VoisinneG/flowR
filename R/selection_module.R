@@ -53,7 +53,7 @@ selection <- function(input, output, session, rval, params = reactiveValues()) {
     updateSelectInput(session, "gate", choices = union("root", names(rval$gates_flowCore)), selected = "root")
   })
   
-  observe({
+  observeEvent(params$gate, {
     if("gate" %in% names(params)){
       if(!is.null(params$gate)){
         updateSelectInput(session, "gate", choices = union("root", names(rval$gates_flowCore)), selected = params$gate)
@@ -109,8 +109,10 @@ selection <- function(input, output, session, rval, params = reactiveValues()) {
                       selected = subsets_selected)
   })
   
-  observe({
+  observeEvent(params$samples, {
     if("samples" %in% names(params)){
+      print("check")
+      print(params$samples)
       if(!is.null(params$samples)){
         updateSelectInput(session, "samples", choices = rval$pdata$name, selected = params$samples)
       }

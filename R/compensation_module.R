@@ -172,33 +172,7 @@ compensation <- function(input, output, session, rval) {
   })
   
   
-  ##################################################################################################
-  # Updating comp matrix for all flow sets
-  ##################################################################################################
   
-  observeEvent(rval$df_spill, {
-    
-    validate(need(rval$flow_set_list, "No flow-sets available"))
-    validate(need(rval$flow_set_selected, "No flow-set selected"))
-    
-    # print("flow-sets")
-    # print(rval$flow_set_selected)
-    # print(get_all_descendants(rval$flow_set_list, rval$flow_set_selected))
-    # print(get_all_ancestors(rval$flow_set_list, rval$flow_set_selected))
-    
-    items_to_update <- union(rval$flow_set_selected,
-                                union(get_all_descendants(rval$flow_set_list, rval$flow_set_selected),
-                                      get_all_ancestors(rval$flow_set_list, rval$flow_set_selected)))
-    items_to_update <- intersect(items_to_update, names(rval$flow_set_list))
-    
-    #print("updating spill")
-    #print(items_to_update)
-    
-    for(i in 1:length(items_to_update)){
-      rval$flow_set_list[[items_to_update[i]]]$spill <- rval$df_spill
-    }
-    
-  })
   ##################################################################################################
   # Computing comp matrix
   ##################################################################################################
@@ -302,7 +276,7 @@ compensation <- function(input, output, session, rval) {
   observeEvent(input$set_spillover_matrix,{
     df <- as.data.frame(rval$df_spill_imported)
     row.names(df) <- colnames(df)
-    df <- df[row.names(df) %in% rval$flow_set@colnames, colnames(df) %in% rval$flow_set@colnames]
+    df <- df[row.names(df) %in% colnames(rval$flow_set), colnames(df) %in% colnames(rval$flow_set)]
     rval$df_spill <- df
     
   })
