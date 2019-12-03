@@ -4,9 +4,18 @@
 \alias{get_cluster}
 \title{Identify clusters}
 \usage{
-get_cluster(df, yvar, transformation = NULL,
-  y_trans = identity_trans(), dc = 3, alpha = 0.001, k = 100,
-  k_meta = 8, scale = FALSE, method = "FlowSOM")
+get_cluster(
+  df,
+  yvar,
+  transformation = NULL,
+  y_trans = identity_trans(),
+  dc = 3,
+  alpha = 0.001,
+  k = 100,
+  k_meta = 8,
+  scale = FALSE,
+  method = "FlowSOM"
+)
 }
 \arguments{
 \item{df}{a data.frame with only numeric variables.}
@@ -22,7 +31,13 @@ List names should correspond to variable names.}
 
 \item{alpha}{ClusterX alpha parameter}
 
-\item{method}{Name of the method used. Either "ClusterX" or "Rphenograph".}
+\item{k}{integer; number of nearest neighbours (passed to \code{Rphenograph()})}
+
+\item{k_meta}{Maximum number of clusters to try out (passed to \code{FlowSOM::MetaClustering()})}
+
+\item{scale}{logical; Scale values before building SOM (for method 'FlowSOM' only)}
+
+\item{method}{Name of the method used. Either "FlowSOM", "ClusterX", "Rphenograph".}
 }
 \value{
 a data.frame with the additionnal column "cluster"

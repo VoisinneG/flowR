@@ -4,10 +4,17 @@
 \alias{plotGatingHierarchy}
 \title{plotGatingHierarchy}
 \usage{
-plotGatingHierarchy(input, output, session, rval,
-  plot_params = reactiveValues())
+plotGatingHierarchy(
+  input,
+  output,
+  session,
+  rval,
+  plot_params = reactiveValues()
+)
 }
 \arguments{
+\item{input}{shiny input}
+
 \item{output}{shiny output}
 
 \item{session}{shiny session}

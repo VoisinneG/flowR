@@ -2,12 +2,26 @@
 % Please edit documentation in R/metadata_module.R
 \name{metadataUI}
 \alias{metadataUI}
+\alias{metadata}
 \title{metadataUI and metadata}
 \usage{
 metadataUI(id)
+
+metadata(input, output, session, rval)
 }
 \arguments{
 \item{id}{shiny id}
+
+\item{input}{shiny input}
+
+\item{output}{shiny output}
+
+\item{session}{shiny session}
+
+\item{rval}{A reactive values object}
+}
+\value{
+The updated reactiveValues object \code{rval}
 }
 \description{
 A shiny Module that deals with metadata

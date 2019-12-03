@@ -2,14 +2,9 @@
 % Please edit documentation in R/plotGatingSet_module.R
 \name{plotGatingSetInput}
 \alias{plotGatingSetInput}
-\alias{plotGatingSet}
-\title{plotGatingSetInput and plotGatingSet}
+\title{plotGatingSetInput}
 \usage{
 plotGatingSetInput(id, simple_plot = TRUE, auto_update = TRUE)
-
-plotGatingSet(input, output, session, rval,
-  plot_params = reactiveValues(), simple_plot = TRUE,
-  auto_update = TRUE, show_gates = FALSE, polygon_gate = NULL)
 }
 \arguments{
 \item{id}{shiny id}
@@ -18,29 +13,7 @@ plotGatingSet(input, output, session, rval,
 
 \item{auto_update}{Should plot update be automatic? 
 If FALSE, plot update is controlled by an action button.}
-
-\item{input}{shiny input}
-
-\item{output}{shiny output}
-
-\item{session}{shiny session}
-
-\item{rval}{A reactive values object}
-
-\item{plot_params}{A reactiveValues object with plot parameters}
-
-\item{show_gates}{Should gates with coordinates matching plot coordinates be displayed}
-
-\item{polygon_gate}{a reactiveValues object with polygon coordinates to be plotted as an additionnal layer}
-
-\item{simple_plot}{logical, disable a number of plot options}
-
-\item{auto_update}{Should plot update be automatic? 
-If FALSE, plot update is controlled by an action button.}
-}
-\value{
-a list containing the plot and the corresponding plot parameters
 }
 \description{
-A shiny Module to build plots from a gating set
+A shiny Module (ui function) to build plots from a gating set
 }

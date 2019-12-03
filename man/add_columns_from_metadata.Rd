@@ -9,6 +9,9 @@ add_columns_from_metadata(df, metadata)
 \arguments{
 \item{df}{data.frame with a column \code{name} used to map metadata.
 Metadata should also contain a column \code{name}}
+
+\item{metadata}{a data.frame containing metadata associated to samples. 
+Must have a column \code{name} used for mapping.}
 }
 \value{
 a data.frame with additional columns

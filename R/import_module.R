@@ -16,7 +16,7 @@ importUI <- function(id) {
                width = NULL, height = NULL,
                fileInput(inputId = ns("files"),
                          label = "Choose files",
-                         multiple = TRUE),
+                         multiple = TRUE)
            ),
            box(title = "Example dataset",
              width = NULL, height = NULL,

@@ -6,6 +6,15 @@
 \usage{
 flowR_server(session, input, output, user_module_name = NULL)
 }
+\arguments{
+\item{session}{shiny session}
+
+\item{input}{shiny input}
+
+\item{output}{shiny output}
+
+\item{user_module_name}{name of a user shiny module (server function) to integrate to the app}
+}
 \description{
 flowR server function
 }

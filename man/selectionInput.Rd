@@ -12,6 +12,8 @@ selection(input, output, session, rval, params = reactiveValues())
 \arguments{
 \item{id}{shiny id}
 
+\item{multiple_subset}{logical; allow selection of multiple subsets}
+
 \item{input}{shiny input}
 
 \item{output}{shiny output}

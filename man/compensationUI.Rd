@@ -2,12 +2,26 @@
 % Please edit documentation in R/compensation_module.R
 \name{compensationUI}
 \alias{compensationUI}
+\alias{compensation}
 \title{compensationUI and compensation}
 \usage{
 compensationUI(id)
+
+compensation(input, output, session, rval)
 }
 \arguments{
 \item{id}{shiny id}
+
+\item{input}{shiny input}
+
+\item{output}{shiny output}
+
+\item{session}{shiny session}
+
+\item{rval}{A reactive values object}
+}
+\value{
+The updated reactiveValues object \code{rval}
 }
 \description{
 A shiny Module that deals with compensation

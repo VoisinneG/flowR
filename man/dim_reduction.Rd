@@ -4,9 +4,17 @@
 \alias{dim_reduction}
 \title{Perform dimensionality reduction}
 \usage{
-dim_reduction(df, yvar, Ncells = NULL, transformation = NULL,
-  y_trans = log10_trans(), perplexity = 50, dims = 2,
-  method = "tSNE", check_duplicates = FALSE)
+dim_reduction(
+  df,
+  yvar,
+  Ncells = NULL,
+  transformation = NULL,
+  y_trans = log10_trans(),
+  perplexity = 50,
+  dims = 2,
+  method = "tSNE",
+  check_duplicates = FALSE
+)
 }
 \arguments{
 \item{df}{a data.frame with only numeric variables.}
@@ -21,11 +29,13 @@ List names should correspond to variable names.}
 
 \item{y_trans}{default \code{trans} object to be used if \code{transformation} is NULL.}
 
-\item{perplexity}{t-SNE perplexity parameter}
+\item{perplexity}{t-SNE perplexity parameter (passed to \code{Rtsne:Rstne()})}
 
-\item{dims}{Number of dimensions}
+\item{dims}{Number of dimensions (passed to \code{Rtsne:Rstne()})}
 
 \item{method}{Name of the method used. Either "tSNE" or "umap"}
+
+\item{check_duplicates}{logical. Checks whether duplicates are present (passed to \code{Rtsne:Rstne()})}
 }
 \value{
 a data.frame with additionnal columns : 
