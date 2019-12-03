@@ -3,6 +3,7 @@
 #' The name of the ui function should be made of the parameter 'user_module_name' with the suffix 'UI'.
 #' @import shiny
 #' @import shinydashboard
+#' @export
 flowR_ui <- function(user_module_name = NULL) {
   
   module_ui_name <- paste(user_module_name, "UI", sep = "")

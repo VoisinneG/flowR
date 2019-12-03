@@ -4,12 +4,9 @@
 \alias{build_flowset_from_df}
 \title{Build a flowSet from a data.frame}
 \usage{
-build_flowset_from_df(
-  df,
-  origin = NULL,
+build_flowset_from_df(df, origin = NULL,
   chanel_col = setdiff(names(df), c("name", "subset")),
-  sample_col = "name"
-)
+  sample_col = "name")
 }
 \arguments{
 \item{df}{data.frame with a column \code{sample_col} containing sample names and

@@ -7,13 +7,8 @@
 \usage{
 simpleDisplayUI(id, nrow = 1, size = 400, save = TRUE)
 
-simpleDisplay(
-  input,
-  output,
-  session,
-  plot_list,
-  params = reactiveValues(use_plotly = FALSE)
-)
+simpleDisplay(input, output, session, plot_list,
+  params = reactiveValues(use_plotly = FALSE))
 }
 \arguments{
 \item{id}{shiny id}
