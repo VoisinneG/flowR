@@ -2303,17 +2303,17 @@ build_flowset_from_df <- function(df,
       
       if(!is.null(origin)){
         
-        idx <- match(sample, pData(origin$flow_set)$name)
+        idx <- match(sample, pData(origin)$name)
         
         if(!is.na(idx)){
           
-          par <- parameters(origin$flow_set[[idx]])
+          par <- parameters(origin[[idx]])
           #par <- origin$par[[idx]]
           
           par@data$name <- as.character(par@data$name)
           par@data$desc <- as.character(par@data$desc)
           
-          desc <- description(origin$flow_set[[idx]])
+          desc <- description(origin[[idx]])
           #desc <- origin$desc[[idx]]
           new_par <- setdiff(chanel_col, par@data$name)
           npar <- length(par@data$name)
@@ -2345,8 +2345,8 @@ build_flowset_from_df <- function(df,
   
   if(length(ff_list)>0){
     fs_new <- flowSet(ff_list)
-    if(!is.null(origin)){
-      pdata <- data.frame(pData(origin$flow_set))
+    if("flowSet" %in% class(origin) ){
+      pdata <- data.frame(pData(origin))
       idx_match <- match(samples, pdata$name)
       if(length(colnames(pdata))>1){
         pData(fs_new) <- pdata[idx_match, ]

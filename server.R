@@ -1,2 +1,2 @@
 library(flowR)
-flowR::flowR_server
+flowR_server

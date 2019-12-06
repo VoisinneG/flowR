@@ -279,12 +279,16 @@ import <- function(input, output, session) {
         rval$flow_set_list <- res
         
         for(i in 1:length(res)){
-          fs <- build_flowset_from_df(df = res[[i]]$data, origin = res[[i]])
+          fs <- build_flowset_from_df(df = res[[i]]$data, origin = res[[i]]$flow_set)
           rval$flow_set_list[[i]]$flow_set <- fs
           print(names(rval$flow_set_list))
         }
         
         rval$flow_set_selected <- names(rval$flow_set_list)[[1]]
+        
+        print("IMPORT")
+        print(rval$flow_set_selected)
+        print(rval$flow_set_list[[rval$flow_set_selected]]$gates)
         
       }else if(file_ext(rval_mod$df_files$datapath[input$files_table_rows_selected[1]]) %in% c("csv", "txt")){
         

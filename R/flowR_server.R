@@ -76,13 +76,21 @@ flowR_server <- function(session, input, output, user_module_name = NULL) {
   })
   
   observeEvent(input$flow_set, {
-    
-    validate(
-      need(input$flow_set %in% names(rval$flow_set_list), "No flow set available")
-    )
-    
+    validate(need(input$flow_set %in% names(rval$flow_set_list), "No flow set available"))
+    print("INPUT")
     rval$flow_set_selected <- input$flow_set
-    rval$flow_set <- rval$flow_set_list[[input$flow_set]]$flow_set
+  })
+  
+  observeEvent(rval$flow_set_selected, {
+    
+    validate(need(rval$flow_set_selected %in% names(rval$flow_set_list), "No flow set available"))
+    print("OK flow set")
+    print(rval$flow_set_selected)
+    print( names(rval$flow_set_list) )
+    print( names(rval$flow_set_list[[rval$flow_set_selected]]) )
+    print( names(rval$flow_set_list[[rval$flow_set_selected]]$gates) )
+    
+    rval$flow_set <- rval$flow_set_list[[rval$flow_set_selected]]$flow_set
     
     # if(length(rval$gates_flowCore) == 0){
     #   rval$gates_flowCore <- rval$flow_set_list[[input$flow_set]]$gates
@@ -91,22 +99,24 @@ flowR_server <- function(session, input, output, user_module_name = NULL) {
     # }
     
     
-    rval$gates_flowCore <- rval$flow_set_list[[input$flow_set]]$gates
+    rval$gates_flowCore <- rval$flow_set_list[[rval$flow_set_selected]]$gates
       
+    print(rval$gates_flowCore)
+    
     #if(is.null(rval$df_spill)){
-      rval$df_spill <- rval$flow_set_list[[input$flow_set]]$spill
+      rval$df_spill <- rval$flow_set_list[[rval$flow_set_selected]]$spill
     #}
     
     #if(is.null(rval$transformation)){
-      rval$transformation <- rval$flow_set_list[[input$flow_set]]$transformation
+      rval$transformation <- rval$flow_set_list[[rval$flow_set_selected]]$transformation
     #}
       
     #if(is.null(rval$trans_parameters)){
-      rval$trans_parameters <- rval$flow_set_list[[input$flow_set]]$trans_parameters
+      rval$trans_parameters <- rval$flow_set_list[[rval$flow_set_selected]]$trans_parameters
     #}
     
     #if(is.null(rval$pdata)){
-      rval$pdata <- rval$flow_set_list[[input$flow_set]]$metadata
+      rval$pdata <- rval$flow_set_list[[rval$flow_set_selected]]$metadata
     #}
     
     #if(is.null(rval$parameters)){
@@ -147,8 +157,8 @@ flowR_server <- function(session, input, output, user_module_name = NULL) {
   # Updating spillover matrix for all related flow sets (in the same tree)
   ##################################################################################################
   
-  observeEvent(c(rval$df_spill, 
-                 rval$gates_flowCore, 
+  observeEvent(c(rval$df_spill,
+                 rval$gates_flowCore,
                  rval$transformation, 
                  rval$trans_parameters, 
                  rval$pdata) , {
@@ -166,15 +176,29 @@ flowR_server <- function(session, input, output, user_module_name = NULL) {
                                    get_all_ancestors(rval$flow_set_list, rval$flow_set_selected)))
     items_to_update <- intersect(items_to_update, names(rval$flow_set_list))
     
-    #print("updating spill")
-    #print(items_to_update)
+    print("updating")
+    print(items_to_update)
     
     for(i in 1:length(items_to_update)){
-      rval$flow_set_list[[items_to_update[i]]]$gates <- rval$gates_flowCore
-      rval$flow_set_list[[items_to_update[i]]]$spill <- rval$df_spill
-      rval$flow_set_list[[items_to_update[i]]]$transformation <- rval$transformation
-      rval$flow_set_list[[items_to_update[i]]]$trans_parameters <- rval$trans_parameters
-      rval$flow_set_list[[items_to_update[i]]]$metadata <- rval$pdata
+      if(!is.null(rval$gates_flowCore)){
+        if(length(rval$gates_flowCore)>0){
+          print(rval$gates_flowCore)
+          rval$flow_set_list[[items_to_update[i]]]$gates <- rval$gates_flowCore
+        }
+      }
+      if(!is.null(rval$df_spill)){
+        rval$flow_set_list[[items_to_update[i]]]$spill <- rval$df_spill
+      }
+      if(!is.null( rval$transformation)){
+        rval$flow_set_list[[items_to_update[i]]]$transformation <- rval$transformation
+      }
+      if(!is.null(rval$trans_parameters)){
+        rval$flow_set_list[[items_to_update[i]]]$trans_parameters <- rval$trans_parameters
+      }
+      if(!is.null(rval$pdata)){
+        rval$flow_set_list[[items_to_update[i]]]$metadata <- rval$pdata
+      }
+      
     }
     
   })
