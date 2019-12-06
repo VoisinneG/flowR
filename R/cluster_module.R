@@ -243,7 +243,7 @@ cluster <- function(input, output, session, rval) {
         df <- df_raw[res$keep, ]
       }
       
-      fs <- build_flowset_from_df(df = df, origin = rval$flow_set_list[[rval$flow_set_selected]])
+      fs <- build_flowset_from_df(df = df, origin = rval$flow_set_list[[rval$flow_set_selected]]$flow_set)
       rval_mod$flow_set_cluster <- fs
       
       # delete previous cluster gates

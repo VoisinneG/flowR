@@ -124,7 +124,7 @@ subsample <- function(input, output, session, rval) {
     validate(need(length(rval_mod$df_sample)>0, "No cells in selection"))
     
     fs <- build_flowset_from_df(rval_mod$df_sample, 
-                                origin = rval$flow_set_list[[rval$flow_set_selected]])
+                                origin = rval$flow_set_list[[rval$flow_set_selected]]$flow_set)
     
     rval_mod$flow_set_subsample <- fs
     

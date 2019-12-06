@@ -206,7 +206,7 @@ dimRed <- function(input, output, session, rval) {
       if(!is.null(rval_mod$df_dim_red)){
 
         fs <- build_flowset_from_df(df = df, 
-                                    origin = rval$flow_set_list[[rval$flow_set_selected]])
+                                    origin = rval$flow_set_list[[rval$flow_set_selected]]$flow_set)
         
         rval_mod$flow_set_dim_red <- fs
         

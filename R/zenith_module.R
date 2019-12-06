@@ -287,7 +287,7 @@ zenith <- function(input, output, session, rval) {
     df[["mean_score_mito_dep"]] <- df_metabo[["mean_score_mito_dep"]][match(df$subset, df_metabo$subset)]
     
     fs <- build_flowset_from_df(df, 
-                                origin = rval$flow_set_list[[rval$flow_set_selected]])
+                                origin = rval$flow_set_list[[rval$flow_set_selected]]$flow_set)
     
     rval$flow_set_list[[input$fs_name]] <- list(flow_set = fs, 
                                                 par = lapply(1:length(fs), function(x){parameters(fs[[x]])}),
