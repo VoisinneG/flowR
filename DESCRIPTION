@@ -1,6 +1,6 @@
 Package: flowR
 Title: R-shiny interface for the analysis of flow cytometry data
-Version: 0.4.1
+Version: 0.4.2
 Date: 2019-06-19
 Author: Guillaume Voisinne
 Maintainer: Guillaume Voisinne <voisinne@ciml.univ-mrs.fr>
