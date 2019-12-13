@@ -28,7 +28,7 @@ knitr::opts_chunk$set(echo = TRUE)
 </div>
 
 
-<a onclick="togglebis('foo');">Show-Hide</a>
+<a onclick="toggle('foo1');">Show-Hide</a>
 <div id = "foo1" class="content">
 
 <center>

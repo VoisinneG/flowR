@@ -14,7 +14,7 @@ gatingUI <- function(id) {
                actionButton(ns("show_gate"), label = "Show defining gate"),
                br(),
                br(),
-               plotGatingSetInput(id = ns("plot_module"), simple_plot = TRUE)
+               plotGatingSet2Input(id = ns("plot_module"), simple_plot = TRUE)
            ),
            tabBox(title = "Gates",
                   width = NULL, height = NULL,
@@ -135,7 +135,7 @@ gating <- function(input, output, session, rval) {
   })
   
   # Calling other modules
-  res <- callModule(plotGatingSet, "plot_module", rval, plot_params, 
+  res <- callModule(plotGatingSet2, "plot_module", rval, plot_params, 
                     simple_plot = TRUE, show_gates = TRUE, polygon_gate = gate)
   res_display <- callModule(simpleDisplay, "simple_display_module", res$plot)
   

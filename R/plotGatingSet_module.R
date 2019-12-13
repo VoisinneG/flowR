@@ -1,5 +1,5 @@
-#' @title plotGatingSetInput
-#' @description  A shiny Module (ui function) to build plots from a gating set
+#' @title plotGatingSetInput2
+#' @description  A shiny Module (ui function) to build plots from a GatingSet
 #' @param id shiny id
 #' @param simple_plot logical, disable a number of plot options
 #' @param auto_update Should plot update be automatic? 
@@ -20,7 +20,7 @@ plotGatingSetInput <- function(id, simple_plot = TRUE, auto_update = TRUE) {
     },
     box(collapsible = TRUE, collapsed = TRUE, width = NULL, height = NULL,
         title = "Sample/Subset",
-        selectionInput(ns("selection_module"), multiple_subset = !simple_plot)
+        selection2Input(ns("selection_module"), multiple_subset = !simple_plot)
     ),
     box(collapsible = TRUE, collapsed = FALSE, width = NULL, height = NULL,
         title ="Variables",
@@ -69,20 +69,38 @@ plotGatingSetInput <- function(id, simple_plot = TRUE, auto_update = TRUE) {
 }
 
 
-#' plotGatingSet server function
+#' plotGatingSet2 server function
 #' @title plotGatingSet
-#' @description  A shiny module (server function) to build plots from a gating set
+#' @description  A shiny module (server function) to build plots from a GatingSet
 #' @param input shiny input
 #' @param output shiny output
 #' @param session shiny session
-#' @param rval A reactive values object
-#' @param plot_params A reactiveValues object with plot parameters
-#' @param simple_plot logical, disable a number of plot options
+#' @param rval a reactivevalues object with the following elements :
+#' \describe{
+#'   \item{gating_set}{: a GatingSet object}
+#'}
+#' @param plot_params reactivevalues object used to initialize plot parameters 
+#' with elements (not mandatory):
+#' \describe{
+#'   \item{samples}{: initially selected samples}
+#'   \item{gate}{: initially selected subsets}
+#'  }
+#' @param simple_plot logical, disable a number of plot options 
+#' (such as faceting, multiple plots with different x, y or color variables)
 #' @param auto_update Should plot update be automatic? 
 #' If FALSE, plot update is controlled by an action button.
 #' @param show_gates Should gates with coordinates matching plot coordinates be displayed
-#' @param polygon_gate a reactiveValues object with polygon coordinates to be plotted as an additionnal layer
-#' @return a list containing the plot and the corresponding plot parameters
+#' @param polygon_gate a reactiveValues object with polygon coordinates to be plotted as an additionnal layer.
+#' Must conatain elements :
+#' \describe{
+#'   \item{x}{vector of x coordinates}
+#'   \item{y}{vector of y coordinates}
+#' }
+#' @return A reactivevalues object with the following elements :
+#' \describe{
+#'   \item{plot}{a plot or a list of plots}
+#'   \item{params}{plot parameters}
+#' }
 #' @importFrom flowWorkspace gs_pop_get_children gh_pop_get_gate gs_get_pop_paths
 #' @import shiny
 plotGatingSet <- function(input, output, session, 
@@ -114,11 +132,32 @@ plotGatingSet <- function(input, output, session,
   
   rval_mod <- reactiveValues(plot_list = list(), count_raw = 0, count_format = 0)
   
-  selected <- callModule(selection, "selection_module", rval, params = plot_params)
+  selected <- callModule(selection2, "selection_module", rval, params = plot_params)
 
   ################################################################################################################
+  
+  choices <- reactive({
+    validate(need(class(rval$gating_set) == "GatingSet", "input is not a GatingSet"))
+    
+    plot_var <- colnames(rval$gating_set)
+    extra_facet_var <- plot_var[plot_var %in% c("cluster", "bin")]
+    
+    if(length(extra_facet_var) == 0){
+      extra_facet_var <- NULL
+    }
+    
+    return( 
+      list(samples = pData(rval$gating_set)$name,
+           subsets = gs_get_pop_paths(rval$gating_set),
+           plot_var = plot_var,
+           meta_var = names(pData(rval$gating_set)),
+           extra_facet_var = extra_facet_var
+      )
+    )
+  })
+  
   # Define and initialize plot options
-  observeEvent(c(input$plot_type, names(rval$pdata)) , {
+  observeEvent(c(input$plot_type, choices()$meta_var) , {
     
     validate(need(rval$pdata, "No metadata available"))
     
@@ -134,7 +173,7 @@ plotGatingSet <- function(input, output, session,
     x[["yridges_var"]] <- selectizeInput(ns("yridges_var"), 
                                          multiple =FALSE,
                                          label = "y ridges variable", 
-                                         choices = c("subset", names(rval$pdata)), 
+                                         choices = c("subset", choices()$meta_var), 
                                          selected = rval_plot[["yridges_var"]])
     x[["bins"]] <- numericInput(ns("bins"), label = "number of bins", value = rval_plot[["bins"]])
     x[["alpha"]] <- numericInput(ns("alpha"), label = "alpha", value = rval_plot[["alpha"]])
@@ -171,15 +210,15 @@ plotGatingSet <- function(input, output, session,
   # Define and initialize plot variables
   
   observe({
-    validate(need(rval$plot_var, "No plotting variables"))
-    updateSelectInput(session, "xvar", choices = rval$plot_var, selected = rval$plot_var[1])
-    updateSelectInput(session, "yvar", choices = rval$plot_var, selected = rval$plot_var[2]) 
+    #validate(need(rval$plot_var, "No plotting variables"))
+    updateSelectInput(session, "xvar", choices = choices()$plot_var, selected = choices()$plot_var[1])
+    updateSelectInput(session, "yvar", choices = choices()$plot_var, selected = choices()$plot_var[2]) 
   })
   
   observe({
     
-    validate(need(rval$pdata, "No metadata available"))
-    validate(need(rval$plot_var, "No plotting variables"))
+    #validate(need(rval$pdata, "No metadata available"))
+    #validate(need(rval$plot_var, "No plotting variables"))
     
     ns <- session$ns
     x <- list()
@@ -187,7 +226,7 @@ plotGatingSet <- function(input, output, session,
     x[["group_var"]] <- selectizeInput(ns("group_var"), 
                                        multiple = !simple_plot,
                                        label = "group variable",
-                                       choices = c("none", "subset", names(rval$pdata)),
+                                       choices = c("none", "subset", choices()$meta_var),
                                        selected = rval_plot[["group_var"]])
     
     
@@ -195,28 +234,25 @@ plotGatingSet <- function(input, output, session,
       x[["color_var"]] <- selectizeInput(ns("color_var"), 
                                          multiple = !simple_plot,
                                          label = "color variable",
-                                         choices = c("none", "subset", names(rval$pdata)),
+                                         choices = c("none", "subset", choices()$meta_var),
                                          selected = rval_plot[["color_var"]])
     
     }else{
       x[["color_var"]] <- selectizeInput(ns("color_var"),
                                          multiple = !simple_plot,
                                          label = "color variable",
-                                         choices = c("none", "subset", names(rval$pdata), rval$plot_var),
+                                         choices = c("none", "subset", choices()$meta_var, choices()$plot_var),
                                          selected = rval_plot[["color_var"]])
     }
     
     if(!simple_plot){
       
-        extra_facet_var <- rval$parameters$name[rval$parameters$name %in% c("cluster", "bin")]
-        if(length(extra_facet_var) == 0){
-          extra_facet_var <- NULL
-        }
+
       
         x[["facet_var"]] <- selectizeInput(ns("facet_var"), 
                        multiple =TRUE,
                        label = "facet variables",
-                       choices = c("subset", names(rval$pdata), extra_facet_var),
+                       choices = c("subset", choices()$meta_var, choices()$extra_facet_var),
                        selected = rval_plot[["facet_var"]]
         )
         x[["split_variable"]] <- selectInput(ns("split_variable"),
@@ -281,12 +317,12 @@ plotGatingSet <- function(input, output, session,
                        "color variable" = "color_var",
                        "group variable" = "group_var")
     
-    choices <- rval$plot_var
+    choices <- choices()$plot_var
     if(var_name == "color_var"){
-      choices <- c("none", "subset", names(rval$pdata), rval$plot_var)
+      choices <- c("none", "subset", choices()$meta_var, choices()$plot_var)
     }
     if(var_name == "group_var"){
-      choices <- c("none", "subset", names(rval$pdata))
+      choices <- c("none", "subset", choices()$meta_var)
     }
     
     var_selected <- NULL
@@ -349,7 +385,7 @@ plotGatingSet <- function(input, output, session,
                          # rval$gating_set,
                          # rval$parameters,
                          rval$gates_flowCore,
-                         rval$plot_var,
+                         choices()$plot_var,
                          rval$pdata,
                          rval_plot$use_all_cells
       )

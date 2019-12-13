@@ -47,6 +47,7 @@ selectionInput <- function(id, multiple_subset = TRUE) {
 #' @rdname selectionInput
 selection <- function(input, output, session, rval, params = reactiveValues()) {
   
+  print(class(params))
   
   observe({
     validate(need(rval$gates_flowCore, "no gating set"))

@@ -1,0 +1,15 @@
+---
+title: "Definition of modules"
+output: html_document
+---
+
+
+## selection_module
+
+- select samples and subsets from a GatingSet
+- input : 
+  - a GatingSet
+  - initial values for samples and subsets
+- output selected samples and subsets
+
+## compensation_module
