@@ -1,7 +1,6 @@
 #' @title selection2Input and selection2
 #' @description A shiny Module for selecting samples and subsets from a GatingSet
 #' @param id shiny id
-#' @param multiple_subset logical; allow selection of multiple subsets
 #' @importFrom shinydashboard box
 #' @import shiny
 #' @examples 
@@ -21,7 +20,7 @@
 #'     observe({
 #'       gs <- load_gs("./inst/ext/gs")
 #'       rval$gating_set <- gs
-#'       params$samples <- pData(gs)$name[2]
+#'       params$sample <- pData(gs)$name[2]
 #'     })
 #'     
 #'     callModule(selection2, "selection_module", rval, params = params)
@@ -31,31 +30,19 @@
 #'   
 #' }
 #' }
-selection2Input <- function(id, multiple_subset = TRUE) {
+selection2Input <- function(id) {
   
   ns <- NS(id)
   
   tagList(
-    selectizeInput(ns("samples"),
-                   label = "samples",
+    selectizeInput(ns("sample"),
+                   label = "sample",
                    choices = NULL,
                    selected = NULL,
                    multiple = TRUE),
-    selectizeInput(ns("gate"),
-                   label = "subset",
-                   choices = NULL,
-                   selected = NULL,
-                   multiple = multiple_subset),
-    box(title = "Select using pattern", width = NULL, height = NULL, collapsible = TRUE, collapsed = TRUE,
-      textInput(ns("pattern"), "Pattern"),
-      checkboxInput(ns("use_reg_expr"), "Use as regular expression", TRUE),
-      actionButton(ns("select_samples"), "Select samples"),
-      if(multiple_subset){
-        tagList(
-          actionButton(ns("select_subsets"), "Select subsets"),
-          checkboxInput(ns("use_whole_path"), "Search in entire subset path")
-        )
-      }
+    uiOutput(ns("subset_input")),
+    box(title = "Select using a pattern", width = NULL, height = NULL, collapsible = TRUE, collapsed = TRUE,
+        patternSelectionInput(ns("pattern_module"))
     )
                   
   )
@@ -78,108 +65,88 @@ selection2Input <- function(id, multiple_subset = TRUE) {
 #' @param params reactivevalues object used to initialize selected samples 
 #' and subsets with elements (not mandatory) :
 #' \describe{
-#'   \item{samples}{: initially selected samples}
-#'   \item{gate}{: initially selected subsets}
+#'   \item{sample}{: initially selected samples}
+#'   \item{subset}{: initially selected subsets}
 #'  }
+#'@param multiple_subset logical; allow selection of multiple subsets
 #' @return a reactivevalues object with input values amongst which:
 #' \describe{
-#'   \item{samples}{: selected samples}
-#'   \item{gate}{: selected subsets}
+#'   \item{sample}{: selected samples}
+#'   \item{subset}{: selected subsets}
 #' }
 #' @import shiny
 #' @rdname selection2Input
-selection2 <- function(input, output, session, rval, params = reactiveValues()) {
+selection2 <- function(input, output, session, rval, params = reactiveValues(), multiple_subset = TRUE) {
   
-  # Get available samples and subsets from rval$gating_set
-  choices <- reactive({
-    validate(need(class(rval$gating_set) == "GatingSet", "input is not a GatingSet"))
-    return( 
-      list(samples = pData(rval$gating_set)$name,
-           subsets = gs_get_pop_paths(rval$gating_set)
-          )
+  
+  output$subset_input <- renderUI({
+    ns <- session$ns
+    selected <- choices$subset[1]
+    if("subset" %in% names(params)){
+      selected <- params$subset
+    }
+    tagList(
+      selectizeInput(ns("subset"),
+                   label = "subset",
+                   choices = choices$subset,
+                   selected = selected,
+                   multiple = multiple_subset)
     )
   })
   
-  # Default values
-  observe({
-    updateSelectInput(session, "gate", choices = choices()$subsets, selected = choices()$subsets[1])
-  })
+  # Get available samples and subsets from rval$gating_set
+  
+  choices <- reactiveValues()
+  choices_pattern <- reactiveValues()
   
   observe({
-    updateSelectInput(session, "samples", choices = choices()$samples, selected = choices()$samples[1])
+    validate(need(class(rval$gating_set) == "GatingSet", "input is not a GatingSet"))
+    choices$sample <- pData(rval$gating_set)$name
+    choices$subset <- gs_get_pop_paths(rval$gating_set)
+    if(multiple_subset){
+      choices_pattern$sample <- choices$sample
+      choices_pattern$subset <- choices$subset
+    }else{
+      choices_pattern$sample <- choices$sample
+    }
+  })
+  
+  # Default values
+  # observe({
+  #   updateSelectInput(session, "subset", choices = choices$subset, selected = choices$subset[1])
+  # })
+  
+  observe({
+    updateSelectInput(session, "sample", choices = choices$sample, selected = choices$sample[1])
   })
   
   # Initialization using params
-  observeEvent(params$gate, {
-    if("gate" %in% names(params)){
-      if(!is.null(params$gate)){
-        updateSelectInput(session, "gate", choices = choices()$subsets, selected = params$gate)
+  # observeEvent(params$subset, {
+  #   if("subset" %in% names(params)){
+  #     if(!is.null(params$subset)){
+  #       print(params$subset)
+  #       updateSelectInput(session, "subset", choices = choices$subset, selected = params$subset)
+  #     }
+  #   }
+  # })
+  
+  observeEvent(params$sample, {
+    if("sample" %in% names(params)){
+      if(!is.null(params$sample)){
+        updateSelectInput(session, "sample", choices = choices$sample, selected = params$sample)
       }
     }
   })
   
-  observeEvent(params$samples, {
-    if("samples" %in% names(params)){
-      if(!is.null(params$samples)){
-        updateSelectInput(session, "samples", choices = choices()$samples, selected = params$samples)
-      }
+  res <- callModule(patternSelection, "pattern_module", choices = choices_pattern)
+  
+  observe({
+    
+    if(!is.null(res$variable)){
+      print(res$variable)
+      updateSelectizeInput(session, res$variable, choices = choices[[res$variable]], selected = res$values)
     }
   })
-  
-  
-  
-  # Sample selection using a pattern
-  observeEvent(input$select_samples, {
-    samples_selected <- NULL
-    idx_selected <- try(grep(input$pattern, choices()$samples, fixed = !input$use_reg_expr), silent = TRUE)
-
-    if(class(idx_selected) == "try-error"){
-      showModal(modalDialog(
-        title = "Error",
-        print(idx_selected),
-        easyClose = TRUE,
-        footer = NULL
-      ))
-    }
-    
-    if(length(idx_selected)>0){
-      samples_selected <- choices()$samples[idx_selected]
-    }
-    updateSelectInput(session, 
-                      "samples", 
-                      choices = choices()$samples, 
-                      selected = samples_selected)
-  })
-  
-  # Subset selection using a pattern
-  observeEvent(input$select_subsets, {
-    subsets_selected <- NULL
-    if(input$use_whole_path){
-      idx_selected <- try(grep(input$pattern, choices()$subsets, fixed = !input$use_reg_expr), silent = TRUE)
-    }else{
-      idx_selected <- try(grep(input$pattern, basename(choices()$subsets), fixed = !input$use_reg_expr), silent = TRUE)
-    }
-    
-    
-    if(class(idx_selected) == "try-error"){
-      showModal(modalDialog(
-        title = "Error",
-        print(idx_selected),
-        easyClose = TRUE,
-        footer = NULL
-      ))
-    }
-    
-    if(length(idx_selected)>0){
-      subsets_selected <-  choices()$subsets[idx_selected]
-    }
-    
-    updateSelectInput(session, 
-                      "gate", 
-                      choices =  choices()$subsets, 
-                      selected = subsets_selected)
-  })
-  
   
   return(input)
   
@@ -190,27 +157,37 @@ selection2 <- function(input, output, session, rval, params = reactiveValues()) 
 # Tests
 ##################################################################################
 # 
-# library(shiny)
-# if (interactive()){
-# 
-#   ui <- fluidPage(
-#     selection2Input("selection_module", multiple_subset = FALSE)
-#   )
-# 
-#   server <- function(input, output, session) {
-# 
-#     rval <- reactiveValues()
-#     params <- reactiveValues()
-# 
-#     observe({
-#       gs <- load_gs("./inst/ext/gs")
-#       rval$gating_set <- gs
-#       params$samples <- pData(gs)$name[2]
-#     })
-# 
-#     callModule(selection2, "selection_module", rval, params = params)
-#   }
-# 
-#   shinyApp(ui, server)
-# 
-# }
+library(shiny)
+library(shinydashboard)
+library(flowWorkspace)
+
+if (interactive()){
+
+  ui <- dashboardPage(
+    header = dashboardHeader(title = "selection2"),
+    sidebar = dashboardSidebar(disable = TRUE),
+    body = dashboardBody(
+      fluidRow(
+        column(4, box(width = NULL, selection2Input("selection_module")))
+      )
+    )
+  )
+
+  server <- function(input, output, session) {
+
+    rval <- reactiveValues()
+    params <- reactiveValues()
+
+    observe({
+      gs <- load_gs("./inst/ext/gs")
+      rval$gating_set <- gs
+      params$sample <- pData(gs)$name[2]
+      params$subset <- gs_get_pop_paths(gs)[3]
+    })
+
+    callModule(selection2, "selection_module", rval, params = params, multiple_subset = TRUE)
+  }
+
+  shinyApp(ui, server)
+
+}

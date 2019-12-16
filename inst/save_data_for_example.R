@@ -1,11 +1,15 @@
 library(flowWorkspace)
 library(CytoML)
 library(openCyto)
+library(ncdfFlow)
 
-ws <- open_flowjo_xml(file = "./demo-data/JL04BMVLG-Valentin/Tumor-testFlowR.wsp")
+path <- "../flowR_utils/demo-data/JL04BMVLG-Valentin/"
+ws_file <- "Tumor-testFlowR.wsp"
+
+ws <- open_flowjo_xml(file = paste0(path, ws_file))
 groups <- fj_ws_get_sample_groups(ws)
 groups <- as.character(groups$groupName)
-gates <- get_gates_from_ws(ws_path = "./demo-data/JL04BMVLG-Valentin/Tumor-testFlowR.wsp", group = groups[1])
+gates <- get_gates_from_ws(ws_path = paste0(path, ws_file), group = groups[1])
 
 # not working to build flowSet
 #gs <- flowjo_to_gatingset(ws, execute = FALSE,  name = groups[1])
@@ -13,9 +17,9 @@ gates <- get_gates_from_ws(ws_path = "./demo-data/JL04BMVLG-Valentin/Tumor-testF
 #fs <- gs_pop_get_data(gs)
 
 # OK
-files <-  list.files("./demo-data/JL04BMVLG-Valentin/")
+files <-  list.files(path)
 files <- files[ grep("\\.fcs$", files) ]
-fs <- read.ncdfFlowSet(files = paste0("./demo-data/JL04BMVLG-Valentin/", files))
+fs <- read.ncdfFlowSet(files = paste0(path, files[1:2]))
 gs <- GatingSet(fs)
 
 # add gates
@@ -37,7 +41,6 @@ gs@transformation <- transformation
 save(fs, file = "./inst/ext/fs.rda")
 save_gs(gs, "./inst/ext/gs")
 save(spill, file = "./inst/ext/spill.rda")
-file.copy(from = "./demo-data/JL04BMVLG-Valentin/Tumor-testFlowR.wsp", to = "./inst/ext/workspace.wsp")
 
 ########################################
 gs <- load_gs("./inst/ext/gs")

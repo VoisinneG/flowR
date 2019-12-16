@@ -22,8 +22,8 @@
 #'     
 #'     observe({
 #'       gs <- load_gs("./inst/ext/gs")
-#'       choices$samples <- pData(gs)$name
-#'       choices$gate <- gs_get_pop_paths(gs)
+#'       choices$sample <- pData(gs)$name
+#'       choices$subset <- gs_get_pop_paths(gs)
 #'     })
 #'     
 #'     res <- callModule(patternSelection, "pattern_module", choices = choices)
@@ -76,7 +76,7 @@ patternSelection <- function(input, output, session, choices = reactiveValues())
   
   output$options <- renderUI({
     ns <- session$ns
-    if(input$var_name == 'gate'){
+    if(input$var_name == 'subset'){
       tagList(checkboxInput(ns("use_whole_path"), "Search in entire subset path", FALSE))
     }
   })
@@ -94,9 +94,12 @@ patternSelection <- function(input, output, session, choices = reactiveValues())
     selected_values <- NULL
 
     values <- choices[[input$var_name]]
-    if(!input$use_whole_path){
-      values <- basename(values)
+    if(input$var_name == 'subset'){
+      if(!input$use_whole_path){
+        values <- basename(values)
+      }
     }
+    
     
     idx_selected <- try(grep(input$pattern, values, fixed = !input$use_reg_expr), silent = TRUE)
     
@@ -107,14 +110,17 @@ patternSelection <- function(input, output, session, choices = reactiveValues())
         easyClose = TRUE,
         footer = NULL
       ))
+    }else{
+      if(length(idx_selected)>0){
+        selected_values <- choices[[input$var_name]][idx_selected]
+        rval_mod$values <- selected_values
+        rval_mod$variable <- input$var_name
+      }
     }
     
-    if(length(idx_selected)>0){
-      selected_values <- choices[[input$var_name]][idx_selected]
-    }
     
-    rval_mod$values <- selected_values
-    rval_mod$variable <- input$var_name
+    
+    
 
   })
   
@@ -127,37 +133,48 @@ patternSelection <- function(input, output, session, choices = reactiveValues())
 # Tests
 ##################################################################################
 # 
-# library(shiny)
-# 
-# if (interactive()){
-# 
-#   ui <- fluidPage(
-#     selectizeInput("selection",
-#                    label = "selected values",
-#                    choices = NULL, selected = NULL, multiple = TRUE),
-#     patternSelectionInput("pattern_module")
-#   )
-# 
-#   server <- function(input, output, session) {
-# 
-#     choices <- reactiveValues()
-# 
-#     observe({
-#       gs <- load_gs("./inst/ext/gs")
-#       choices$samples <- pData(gs)$name
-#       choices$gate <- gs_get_pop_paths(gs)
-#     })
-#     
-#     res <- callModule(patternSelection, "pattern_module", choices = choices)
-#     
-#     observe({
-#       if(!is.null(res$variable)){
-#         updateSelectizeInput(session, "selection", choices = choices[[res$variable]], selected = res$values)
-#       }
-#     })
-# 
-#   }
-# 
-#   shinyApp(ui, server)
-# 
-# }
+library(shiny)
+library(shinydashboard)
+
+if (interactive()){
+
+  ui <- dashboardPage(
+    header = dashboardHeader(title = "patternSelection"),
+    sidebar = dashboardSidebar(disable = TRUE),
+    body = dashboardBody(
+      fluidRow(
+        column(4, 
+               box(width = NULL,
+                   selectizeInput("selection",
+                                  label = "selected values",
+                                  choices = NULL, selected = NULL, multiple = TRUE)),
+               box(width = NULL, 
+                   patternSelectionInput("pattern_module"))
+               )
+      )
+    )
+  )
+
+  server <- function(input, output, session) {
+
+    choices <- reactiveValues()
+
+    observe({
+      gs <- load_gs("./inst/ext/gs")
+      choices$sample <- pData(gs)$name
+      choices$subset <- gs_get_pop_paths(gs)
+    })
+
+    res <- callModule(patternSelection, "pattern_module", choices = choices)
+
+    observe({
+      if(!is.null(res$variable)){
+        updateSelectizeInput(session, "selection", choices = choices[[res$variable]], selected = res$values)
+      }
+    })
+
+  }
+
+  shinyApp(ui, server)
+
+}
