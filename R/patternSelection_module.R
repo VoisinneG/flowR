@@ -3,6 +3,7 @@
 #' @param id shiny id
 #' @importFrom shinydashboard box
 #' @import shiny
+#' @export
 #' @examples 
 #' \dontrun{
 #' library(shiny)
@@ -69,6 +70,7 @@ patternSelectionInput <- function(id) {
 #'   \item{variable}{: selected variable}
 #' }
 #' @import shiny
+#' @export
 #' @rdname patternSelectionInput
 patternSelection <- function(input, output, session, choices = reactiveValues()) {
   

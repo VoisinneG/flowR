@@ -550,13 +550,13 @@ get_data_gs <- function(gs,
   gs_comp <- gs
   
   if(!is.null(spill)){
-    spill <- spill[row.names(spill) %in% flowWorkspace::colnames(gs), 
-                   colnames(spill) %in% flowWorkspace::colnames(gs)]
+    #spill <- spill[row.names(spill) %in% flowWorkspace::colnames(gs), 
+    #               colnames(spill) %in% flowWorkspace::colnames(gs)]
     gates <- get_gates_from_gs(gs)
     fs <- gs@data[idx]
-    spill_list <- lapply(1:length(idx), function(x){return(spill)})
-    names(spill_list) <- flowCore::pData(fs)$name
-    fs <- flowCore::compensate(fs, spill_list)
+    #spill_list <- lapply(1:length(idx), function(x){return(spill)})
+    #names(spill_list) <- flowCore::pData(fs)$name
+    fs <- flowCore::compensate(fs, spill[idx])
     gs_comp <- flowWorkspace::GatingSet(fs)
     gs_comp <- add_gates_flowCore(gs_comp, gates)
   }
@@ -873,9 +873,15 @@ plot_hexagonal <- function(args = list()){
   use_log10_count <- TRUE
   option <- "viridis"
   
+  if(length(unlist(args[c("xvar", "yvar")])) != 2 ){
+    return(NULL)
+  }
+  
   for(var in names(args)){
     assign(var, args[[var]])
   }
+  print(xvar)
+  print(yvar)
   
   p <- ggplot(df,
               aes_(x = as.name( xvar ), 
@@ -918,6 +924,10 @@ plot_histogram <- function(args = list()){
   norm_density <- TRUE
   bins <- 100
   alpha <- 0.1
+  
+  if(is.null(args["xvar"])){
+    return(NULL)
+  }
   
   for(var in names(args)){
     assign(var, args[[var]])
@@ -1012,6 +1022,10 @@ plot_dots <-function(args = list()){
   alpha <- 0.1
   size <- 0.1
   
+  if(length(unlist(args[c("xvar", "yvar")])) != 2 ){
+    return(NULL)
+  }
+  
   for(var in names(args)){
     assign(var, args[[var]])
   }
@@ -1089,6 +1103,10 @@ plot_contour <-function(args = list()){
   alpha <- 0.75
   size <- 0.2
   show_outliers <- FALSE
+  
+  if(length(unlist(args[c("xvar", "yvar")])) != 2 ){
+    return(NULL)
+  }
   
   for(var in names(args)){
     assign(var, args[[var]])
@@ -1197,6 +1215,10 @@ plot_heatmap <-function(args = list()){
   show.legend <- TRUE
   option <- "viridis"
   
+  if(is.null(args["df"])){
+    return(NULL)
+  }
+  
   for(var in names(args)){
     assign(var, args[[var]])
   }
@@ -1272,6 +1294,10 @@ plot_bar <-function(args = list()){
   color_var <- NULL
   show.legend <- TRUE
   
+  if(is.null(args["df"])){
+    return(NULL)
+  }
+  
   for(var in names(args)){
     assign(var, args[[var]])
   }
@@ -1332,6 +1358,10 @@ plot_tile <-function(args = list()){
   show.legend <- TRUE
   option <- "viridis"
   
+  if(is.null(args["df"])){
+    return(NULL)
+  }
+  
   for(var in names(args)){
     assign(var, args[[var]])
   }
@@ -1386,6 +1416,10 @@ plot_pca <-function(args = list()){
   color_var <- NULL
   label_var <- "name"
   scale <- FALSE
+  
+  if(is.null(args["df"])){
+    return(NULL)
+  }
   
   for(var in names(args)){
     assign(var, args[[var]])
@@ -1560,6 +1594,7 @@ format_plot <- function(p,
   yvar <- NULL
   
   #print(names(p$mapping))
+  print("OK")
   
   if("x" %in% names(p$mapping)){
     if("quosure" %in% class(p$mapping$x)){
@@ -1575,26 +1610,41 @@ format_plot <- function(p,
   
   xlim <- NULL
   ylim <- NULL
-  color_var <- p$plot_env$color_var
+  
+  color_var <- as.character(p$plot_env$color_var)
   
   facet_yvar <- NULL
   if(p$plot_env$plot_type == "bar"){
     facet_yvar <- "variable"
   }
   
-  #facet scales
-  scales <- "fixed"
-  
-  #default viridis palette
-  option <- "viridis"
-  
   ############################################################################33
   #default parameters
-  default_trans <- scales::identity_trans()
   
-  for(var in names(options)){
+  var_options <- c("xlim", "ylim", "transformation", "default_trans", 
+                   "axis_labels", "color_var_name", "facet_var", "facet_yvar",
+                   "scales", "option", "theme", "legend.position")
+  
+  for(var in intersect(names(options), var_options)){
     assign(var, options[[var]])
   }
+
+  #facet scales
+  if(is.null(options$scales)){
+    scales <- "fixed"
+  }
+  
+  #default viridis palette
+  if(is.null(options$option)){
+    option <- "viridis"
+  }
+
+  #default transformation
+  if(is.null(options$default_trans)){
+    default_trans <- scales::identity_trans()
+  }
+  
+  
   
   ############################################################################33
   #transformations
@@ -1636,24 +1686,22 @@ format_plot <- function(p,
   if(p$plot_env$plot_type == "dots"){
     
     if(!is.null(color_var)){
-      
-      color_var_name <- options$color_var_name
-      
-      if( as.character(color_var) %in% setdiff(names(transformation), "cluster")){
-        if(is.null(color_var_name)){
-          color_var_name <- color_var
-        }
+      if(length(color_var) == 1){
         
-        p <- p + scale_colour_viridis(trans = transformation[[color_var]],
-                                      name = color_var_name,
-                                      option = option)
+        label_color <- ifelse(color_var %in% names(options$axis_labels), options$axis_labels[[color_var]], color_var)
+        
+        if( as.character(color_var) %in% setdiff(names(transformation), "cluster")){
+          
+          p <- p + viridis::scale_colour_viridis(trans = transformation[[color_var]],
+                                        name = label_color,
+                                        option = option)
+        }
       }
     }
   }
-  
   ############################################################################33
   #facet
-  
+  print("OK")
   if(!is.null(options$facet_var) | !is.null(facet_yvar)){
     
     left_formula <- paste(facet_yvar, collapse = " + ")
@@ -1675,7 +1723,7 @@ format_plot <- function(p,
   
   ############################################################################
   #theme
-  
+  print("OK")
   if(length(unique(p$data$subset))==1){
     p <- p + ggtitle(unique(p$data$subset))
   }

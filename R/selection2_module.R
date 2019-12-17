@@ -3,6 +3,7 @@
 #' @param id shiny id
 #' @importFrom shinydashboard box
 #' @import shiny
+#' @export
 #' @examples 
 #' \dontrun{
 #' library(shiny)
@@ -75,6 +76,7 @@ selection2Input <- function(id) {
 #'   \item{subset}{: selected subsets}
 #' }
 #' @import shiny
+#' @export
 #' @rdname selection2Input
 selection2 <- function(input, output, session, rval, params = reactiveValues(), multiple_subset = TRUE) {
   
