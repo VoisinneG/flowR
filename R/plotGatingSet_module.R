@@ -20,7 +20,7 @@ plotGatingSetInput <- function(id, simple_plot = TRUE, auto_update = TRUE) {
     },
     box(collapsible = TRUE, collapsed = TRUE, width = NULL, height = NULL,
         title = "Sample/Subset",
-        selection2Input(ns("selection_module"), multiple_subset = !simple_plot)
+        selectionInput(ns("selection_module"), multiple_subset = !simple_plot)
     ),
     box(collapsible = TRUE, collapsed = FALSE, width = NULL, height = NULL,
         title ="Variables",
@@ -132,7 +132,7 @@ plotGatingSet <- function(input, output, session,
   
   rval_mod <- reactiveValues(plot_list = list(), count_raw = 0, count_format = 0)
   
-  selected <- callModule(selection2, "selection_module", rval, params = plot_params)
+  selected <- callModule(selection, "selection_module", rval, params = plot_params)
 
   ################################################################################################################
   
@@ -474,10 +474,11 @@ plotGatingSet <- function(input, output, session,
       Ncells <- NULL
     }
     
+    spill <- NULL
     df <- get_plot_data(gs = rval$gating_set,
                       sample = selected$samples,
                       subset = selected$gate,
-                      spill = rval$spill,
+                      spill = spill,
                       metadata = rval$pdata,
                       Ncells = Ncells)
     

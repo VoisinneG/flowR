@@ -1,9 +1,6 @@
 #' @title plotGatingSet2Input and plotGatingSet2
 #' @description  A shiny Module (ui function) to build plots from a GatingSet
 #' @param id shiny id
-#' @param simple_plot logical, disable a number of plot options
-#' @param auto_update Should plot update be automatic? 
-#' If FALSE, plot update is controlled by an action button.
 #' @import shiny
 #' @importFrom shinydashboard box
 #' @export
@@ -45,7 +42,8 @@
 #'     })
 #'     
 #'     res <- callModule(plotGatingSet2, "module",
-#'                       rval = rval,plot_params = plot_params)
+#'                       rval = rval,
+#'                       plot_params = plot_params)
 #'     
 #'     callModule(simpleDisplay, "simple_display_module", res$plot)
 #'     
@@ -99,6 +97,7 @@ plotGatingSet2Input <- function(id) {
 #' @param rval a reactivevalues object with the following elements :
 #' \describe{
 #'   \item{gating_set}{: a GatingSet object}
+#'}
 #' @param plot_params reactivevalues object used to initialize plot parameters. 
 #' Amongst others it can contain the following elements (not mandatory):
 #' \describe{
@@ -124,6 +123,8 @@ plotGatingSet2Input <- function(id) {
 #'   \item{x}{vector of x coordinates}
 #'   \item{y}{vector of y coordinates}
 #' }
+#' @param apply_trans logical; apply transformations defined in \code{rval$gating_set}
+#' @param apply_comp logical; apply compensation defined in \code{rval$gating_set}
 #' @return A reactivevalues object with the following elements :
 #' \describe{
 #'   \item{plot}{a plot or a list of plots}
@@ -166,6 +167,7 @@ plotGatingSet2 <- function(input, output, session,
   
   observe({
     rval_plot$xvar <- choices()$plot_var[1]
+    
     if(length(choices()$plot_var)>1){
       rval_plot$yvar <- choices()$plot_var[2]
     }else{
@@ -180,6 +182,18 @@ plotGatingSet2 <- function(input, output, session,
     if(length(idx_yvar)>0){
       rval_plot$yvar <- choices()$plot_var[idx_yvar]
     }
+    
+    
+    
+    for(var in intersect(names(plot_params), c("xvar", "yvar") )){
+      rval_plot[[var]] <- plot_params[[var]]
+      print( rval_plot[[var]] )
+    }
+    
+    print("xyvar")
+    print(rval_plot$xvar)
+    print(rval_plot$yvar)
+    
   })
   
   
@@ -313,10 +327,11 @@ plotGatingSet2 <- function(input, output, session,
   ######################################################################################
   # Define and initialize plot variables
   
-  observeEvent(input$plot_type, {
+  observeEvent(c(input$plot_type,  
+                 choices()$meta_var,  
+                 choices()$plot_var, 
+                 choices()$extra_facet_var), {
   
-    print("plot_var")
-    
     for(var in names(rval_input)){
       rval_plot[[var]] <- rval_input[[var]]
     }
@@ -375,7 +390,7 @@ plotGatingSet2 <- function(input, output, session,
   })
   
   output$plot_variables <- renderUI({
-    print("render_plot_var")
+    
     x <- rval_mod$plot_variables
     vars <- names(x)
     hidden_vars <- switch(input$plot_type,
@@ -387,8 +402,7 @@ plotGatingSet2 <- function(input, output, session,
     }
     
     vars <- setdiff(vars, hidden_vars)
-    print(vars)
-    
+
     tagList(rval_mod$plot_variables[vars])
   })
   
@@ -413,8 +427,8 @@ plotGatingSet2 <- function(input, output, session,
   # Control of plot parameters using 'plot_params'
   observe({
     
-    for(var in intersect( names(plot_params), c("xvar", 
-                                                "yvar", 
+    for(var in intersect( names(plot_params), c("xvar",
+                                                "yvar",
                                                 "color_var",
                                                 "group_var",
                                                 "facet_var") )){
@@ -440,14 +454,12 @@ plotGatingSet2 <- function(input, output, session,
   
   observe({
     
-    print("pattern plot_type")
     choices_color_var <- switch(input$plot_type,
                                 "dots" = c("none", "subset", choices()$meta_var, 
                                            choices()$plot_var),
                                 c("none", "subset", choices()$meta_var))
     
     for(var_name in c("x variable", "y variable", "color variable")){
-      print("pattern var name")
       choices_pattern[[var_name]] <- switch(var_name,
                                             "x variable" = choices()$plot_var,
                                             "y variable" = choices()$plot_var,
@@ -463,7 +475,6 @@ plotGatingSet2 <- function(input, output, session,
   observe({
     
     if(!is.null(res_pattern$variable)){
-      print("pattern variable")
       pattern_var <- switch(res_pattern$variable,
                             "x variable" = "xvar",
                             "y variable" = "yvar",
@@ -504,7 +515,7 @@ plotGatingSet2 <- function(input, output, session,
   # Control update of plot data
   
   params_update_data <- reactive({
-    print("update_data")
+    #print("update_data")
     if(!auto_update){
       input$update_plot
     }else{
@@ -533,7 +544,7 @@ plotGatingSet2 <- function(input, output, session,
   ######################################################################################3
   # Control update of raw plot
   params_update_plot_raw <- reactive({
-    print("update_raw")
+    #print("update_raw")
     if(!auto_update){
       input$update_plot
     }else{
@@ -565,7 +576,7 @@ plotGatingSet2 <- function(input, output, session,
   ######################################################################################3
   # Control update of formatted plot
   params_update_plot_format <- reactive({
-    print("update_format")
+    #print("update_format")
     
     if(!auto_update){
       input$update_plot
@@ -599,7 +610,7 @@ plotGatingSet2 <- function(input, output, session,
   # Get plot data
   data_plot_focus <- eventReactive(params_update_data(), {
     
-    print("data")
+    #print("data")
     
     validate(need(rval$gating_set, "Empty gating set"))
     validate(need(selected$sample, "Please select samples"))
@@ -622,7 +633,6 @@ plotGatingSet2 <- function(input, output, session,
                       metadata = choices()$metadata,
                       Ncells = Ncells)
     
-    print(head(df))
     return(df)
     
   })
@@ -631,7 +641,7 @@ plotGatingSet2 <- function(input, output, session,
   # Build raw plot
   observeEvent(c(params_update_plot_raw(),  data_plot_focus()), {
     
-    print("raw")
+    #print("raw")
     
     df <- data_plot_focus()
     rval_mod$plot_list <- list()
@@ -665,7 +675,7 @@ plotGatingSet2 <- function(input, output, session,
   # Format plot
   observeEvent(params_update_plot_format(),  {
     
-    print("format")
+    #print("format")
     
     axis_labels <- choices()$labels
     
@@ -690,27 +700,31 @@ plotGatingSet2 <- function(input, output, session,
    
     rval_mod$plot_list <- plist
     rval_mod$count_format <- rval_mod$count_format + 1
-    print("OK format")
+    #print("OK format")
   })
   
   ######################################################################################
   # Add gates corresponding to plot coordinates
   observeEvent(rval_mod$count_format, {
     
-    print("gate")
+    #print("gate")
     
     gate <- NULL
     
     if(show_gates){
-      if(selected$subset %in% choices()$subset){
-        child_gates <- flowWorkspace::gs_pop_get_children(rval$gating_set[[1]], 
-                                                          selected$subset)
-        if(length(child_gates) > 0){
-          gate <- child_gates
+      if(!is.null(selected$subset)){
+        if(selected$subset %in% choices()$subset){
+          child_gates <- flowWorkspace::gs_pop_get_children(rval$gating_set[[1]], 
+                                                            selected$subset)
+          if(length(child_gates) > 0){
+            gate <- child_gates
+          }
         }
       }
     }
     
+    print("gate")
+    print(gate)
     
     
     plist <- lapply( rval_mod$plot_list,
@@ -719,6 +733,7 @@ plotGatingSet2 <- function(input, output, session,
                          for(gate_name in setdiff(gate, "root")){
                            gate_int <- flowWorkspace::gh_pop_get_gate(rval$gating_set[[1]], 
                                                                       gate_name)
+                           print(gate_int)
                            p <- add_gate(p = p, gate = gate_int)
                          }
                        }
@@ -728,16 +743,16 @@ plotGatingSet2 <- function(input, output, session,
    
     rval_mod$plot_list <- plist
     rval_mod$count_gate <- rval_mod$count_gate + 1
-    print("OK gate")
+    #print("OK gate")
   })
   
   ######################################################################################
   # Add polygonal plot layer
   plot_gate <- reactive({
     
-    print("poly")
+    #print("poly")
 
-    print(rval_mod$count_gate)
+    
       gate <- NULL
       if(!is.null(rval_input$show_gates)){
         if(rval_input$show_gates){
@@ -801,23 +816,30 @@ if (interactive()){
       )
     )
   )
-  
+
   server <- function(input, output, session) {
 
     rval <- reactiveValues()
     plot_params <- reactiveValues()
 
     observe({
+      #utils::data("GvHD", package = "flowCore")
+      #rval$gating_set <- GatingSet(GvHD)
       gs <- load_gs("./inst/ext/gs")
       rval$gating_set <- gs
-      plot_params$plot_type <- "histogram"
+      plot_params$plot_type <- "hexagonal"
+      plot_params$xvar <- "FSC-A"
+      plot_params$yvar <- "UV-BUV496-A"
+      plot_params$subset <- gs_get_pop_paths(gs)[1]
     })
 
     res <- callModule(plotGatingSet2, "module",
-                      rval = rval,plot_params = plot_params)
-    
+                      rval = rval,
+                      plot_params = plot_params,
+                      show_gates = TRUE)
+
     callModule(simpleDisplay, "simple_display_module", res$plot)
-    
+
   }
 
   shinyApp(ui, server)

@@ -42,7 +42,8 @@ selection2Input <- function(id) {
                    selected = NULL,
                    multiple = TRUE),
     uiOutput(ns("subset_input")),
-    box(title = "Select using a pattern", width = NULL, height = NULL, collapsible = TRUE, collapsed = TRUE,
+    box(title = "Select using a pattern", width = NULL, height = NULL, 
+        collapsible = TRUE, collapsed = TRUE,
         patternSelectionInput(ns("pattern_module"))
     )
                   
@@ -78,7 +79,8 @@ selection2Input <- function(id) {
 #' @import shiny
 #' @export
 #' @rdname selection2Input
-selection2 <- function(input, output, session, rval, params = reactiveValues(), multiple_subset = TRUE) {
+selection2 <- function(input, output, session, 
+                       rval, params = reactiveValues(), multiple_subset = TRUE) {
   
   
   output$subset_input <- renderUI({
@@ -159,37 +161,37 @@ selection2 <- function(input, output, session, rval, params = reactiveValues(), 
 # Tests
 ##################################################################################
 # 
-library(shiny)
-library(shinydashboard)
-library(flowWorkspace)
-
-if (interactive()){
-
-  ui <- dashboardPage(
-    header = dashboardHeader(title = "selection2"),
-    sidebar = dashboardSidebar(disable = TRUE),
-    body = dashboardBody(
-      fluidRow(
-        column(4, box(width = NULL, selection2Input("selection_module")))
-      )
-    )
-  )
-
-  server <- function(input, output, session) {
-
-    rval <- reactiveValues()
-    params <- reactiveValues()
-
-    observe({
-      gs <- load_gs("./inst/ext/gs")
-      rval$gating_set <- gs
-      params$sample <- pData(gs)$name[2]
-      params$subset <- gs_get_pop_paths(gs)[3]
-    })
-
-    callModule(selection2, "selection_module", rval, params = params, multiple_subset = TRUE)
-  }
-
-  shinyApp(ui, server)
-
-}
+# library(shiny)
+# library(shinydashboard)
+# library(flowWorkspace)
+# 
+# if (interactive()){
+# 
+#   ui <- dashboardPage(
+#     header = dashboardHeader(title = "selection2"),
+#     sidebar = dashboardSidebar(disable = TRUE),
+#     body = dashboardBody(
+#       fluidRow(
+#         column(4, box(width = NULL, selection2Input("selection_module")))
+#       )
+#     )
+#   )
+# 
+#   server <- function(input, output, session) {
+# 
+#     rval <- reactiveValues()
+#     params <- reactiveValues()
+# 
+#     observe({
+#       gs <- load_gs("./inst/ext/gs")
+#       rval$gating_set <- gs
+#       params$sample <- pData(gs)$name[2]
+#       params$subset <- gs_get_pop_paths(gs)[3]
+#     })
+# 
+#     callModule(selection2, "selection_module", rval, params = params, multiple_subset = TRUE)
+#   }
+# 
+#   shinyApp(ui, server)
+# 
+# }

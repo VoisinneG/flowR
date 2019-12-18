@@ -47,11 +47,8 @@ plotting2 <- function(input, output, session, rval) {
     
     validate(need(class(rval$gating_set) == "GatingSet", "No GatingSet avaialable"))
 
-      plot_params$gate <- "root"
+      plot_params$subset <- "root"
       plot_params$plot_type <- "hexagonal"
-      plot_params$color_var <- NULL
-      plot_params$group_var <- NULL
-      plot_params$gate <- "root"
       plot_params$use_all_cells <- TRUE
 
   })
@@ -71,41 +68,43 @@ plotting2 <- function(input, output, session, rval) {
 ##################################################################################
 
 
-library(shiny)
-library(shinydashboard)
-library(flowWorkspace)
-library(flowCore)
-library(viridis)
-library(scales)
-library(ggplot2)
-library(ggrepel)
-library(plotly)
-library(ggridges)
-
-if (interactive()){
-  
-  ui <- dashboardPage(
-    dashboardHeader(title = "plotting2"),
-    sidebar = dashboardSidebar(disable = TRUE),
-    body = dashboardBody(
-      plotting2UI("module")
-    )
-  )
-  
-  server <- function(input, output, session) {
-    
-    rval <- reactiveValues()
-    plot_params <- reactiveValues()
-    
-    observe({
-      gs <- load_gs("./inst/ext/gs")
-      rval$gating_set <- gs
-    })
-    
-    res <- callModule(plotting2, "module", rval = rval)
-    
-  }
-  
-  shinyApp(ui, server)
-  
-}
+# library(shiny)
+# library(shinydashboard)
+# library(flowWorkspace)
+# library(flowCore)
+# library(viridis)
+# library(scales)
+# library(ggplot2)
+# library(ggrepel)
+# library(plotly)
+# library(ggridges)
+# 
+# if (interactive()){
+# 
+#   ui <- dashboardPage(
+#     dashboardHeader(title = "plotting2"),
+#     sidebar = dashboardSidebar(disable = TRUE),
+#     body = dashboardBody(
+#       plotting2UI("module")
+#     )
+#   )
+# 
+#   server <- function(input, output, session) {
+# 
+#     rval <- reactiveValues()
+#     plot_params <- reactiveValues()
+# 
+#     observe({
+#       utils::data("GvHD", package = "flowCore")
+#       rval$gating_set <- GatingSet(GvHD)
+#       #gs <- load_gs("./inst/ext/gs")
+#       #rval$gating_set <- gs
+#     })
+# 
+#     res <- callModule(plotting2, "module", rval = rval)
+# 
+#   }
+# 
+#   shinyApp(ui, server)
+# 
+# }

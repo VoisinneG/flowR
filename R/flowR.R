@@ -880,8 +880,6 @@ plot_hexagonal <- function(args = list()){
   for(var in names(args)){
     assign(var, args[[var]])
   }
-  print(xvar)
-  print(yvar)
   
   p <- ggplot(df,
               aes_(x = as.name( xvar ), 
@@ -1099,7 +1097,7 @@ plot_contour <-function(args = list()){
   color_var <- NULL
   group_var <- NULL
   
-  bins <- 10
+  bins <- 30
   alpha <- 0.75
   size <- 0.2
   show_outliers <- FALSE
@@ -1260,8 +1258,6 @@ plot_heatmap <-function(args = list()){
   if(dim(df_plot)[2]<2){
     cluster_x <- FALSE
   }
-  
-  print(annotation)
   
   p <- pheatmap(df_plot, show_colnames = FALSE, 
                 color = viridis(16, option = option),
@@ -1594,8 +1590,7 @@ format_plot <- function(p,
   yvar <- NULL
   
   #print(names(p$mapping))
-  print("OK")
-  
+
   if("x" %in% names(p$mapping)){
     if("quosure" %in% class(p$mapping$x)){
       xvar <- as.character(rlang::quo_get_expr(p$mapping$x))
@@ -1701,7 +1696,6 @@ format_plot <- function(p,
   }
   ############################################################################33
   #facet
-  print("OK")
   if(!is.null(options$facet_var) | !is.null(facet_yvar)){
     
     left_formula <- paste(facet_yvar, collapse = " + ")
@@ -1712,7 +1706,7 @@ format_plot <- function(p,
       }
     }
     
-    print(paste(left_formula, "~", right_formula))
+    #print(paste(left_formula, "~", right_formula))
     formula_facet <- stats::as.formula(paste(left_formula, "~", right_formula))
     
     p <- p + facet_grid(formula_facet,
@@ -1723,7 +1717,6 @@ format_plot <- function(p,
   
   ############################################################################
   #theme
-  print("OK")
   if(length(unique(p$data$subset))==1){
     p <- p + ggtitle(unique(p$data$subset))
   }
@@ -1811,9 +1804,9 @@ plot_gs <- function(gs,
   
   p <- format_plot(p, options = options)
   
-  if(!is.null(gate)){
-    for(gate_name in setdiff(gate, "root")){
-      g <- flowWorkspace::gh_pop_get_gate(gs[[1]], gate_name)
+  if(!is.null(gate_name)){
+    for(gateName in setdiff(gate_name, "root")){
+      g <- flowWorkspace::gh_pop_get_gate(gs[[1]], gateName)
       p <- add_gate(p, g)
     }
   }
@@ -1939,14 +1932,20 @@ plot_gh <- function( gs,
                       sample = NULL,
                       Ncells = NULL,
                       selected_subsets = NULL,
-                      spill = NULL,
-                      plot_type = "contour",
+                      spill = gs@compensation,
+                      transformation = gs@transformation,
+                      plot_type = "hexagonal",
                       plot_args = list(), 
                       options = list()){
   
   # if(length(sample) != 1){
   #   stop("length of idx must be equal to 1")
   # }
+  
+  if(!is.null(transformation)){
+    options$transformation <- transformation
+  }
+  
   if(is.null(sample)){sample = pData(gs)$name[1]}
   
   idx <- match(sample, pData(gs)$name)
@@ -2020,7 +2019,7 @@ plot_gh <- function( gs,
                                    gs=gs, 
                                    sample=sample, 
                                    subset = parent, 
-                                   gate = nodes_to_plot_parent[same_par], 
+                                   gate_name = nodes_to_plot_parent[same_par], 
                                    plot_type = plot_type,
                                    plot_args = plot_args,
                                    options = options)

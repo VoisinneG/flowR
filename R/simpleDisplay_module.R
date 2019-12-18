@@ -1,12 +1,59 @@
 #' @title simpleDisplayUI and simpleDisplay
 #' @description  A shiny Module to display and save plots
 #' @param id shiny id
-#' @param nrow number of rows in the layout
-#' @param size Initial size of a single plot (in pixels)
-#' @param save logical, add a box with a save button
-#' @importFrom shinydashboard box
 #' @import shiny
-simpleDisplayUI <- function(id, nrow = 1, size = 400, save = TRUE){
+#' @export
+#' @examples 
+#' \dontrun{
+#' library(shiny)
+#' library(shinydashboard)
+#' library(gridExtra)
+#' library(ggplot2)
+#' library(plotly)
+#' 
+#' if (interactive()){
+#' 
+#'   ui <- dashboardPage(
+#'     dashboardHeader(title = "simpleDisplay"),
+#'     sidebar = dashboardSidebar(disable = TRUE),
+#'     body = dashboardBody(
+#'       fluidRow(
+#'         column(12, box(width = NULL, simpleDisplayUI("simple_display_module")))
+#'       )
+#'     )
+#'   )
+#' 
+#'   server <- function(input, output, session) {
+#' 
+#'     params <- reactiveValues(top = "Iris", use_plotly = FALSE)
+#' 
+#'     plot_list <- reactive({
+#' 
+#'       plist <- list()
+#' 
+#'       plist[[1]] <- ggplot(iris, aes(x=Sepal.Length, y = Sepal.Width, color = Species)) +
+#'         geom_point(alpha = 0.5) +
+#'         facet_wrap(~Species)
+#' 
+#'        plist[[2]] <- ggplot(iris, aes(x=Species, y = Sepal.Length, fill = Species)) +
+#'          geom_col(alpha = 0.5)
+#' 
+#'       return(plist)
+#' 
+#'     })
+#' 
+#'     callModule(simpleDisplay, "simple_display_module", 
+#'                plot_list = plot_list, 
+#'                params = params,
+#'                size = 500)
+#' 
+#'   }
+#' 
+#'   shinyApp(ui, server)
+#' 
+#' }
+#'}
+simpleDisplayUI <- function(id){
 
   ns <- NS(id)
 
@@ -20,22 +67,11 @@ simpleDisplayUI <- function(id, nrow = 1, size = 400, save = TRUE){
     ),
     fluidRow(
       column(12,
-        box(title = "Display", width = 6, collapsible = TRUE, collapsed = TRUE,
-            numericInput(ns("nrow_split"), label = "Number of rows", value = nrow),
-            numericInput(ns("row_size"), label = "plot height (px)", value = size),
-            numericInput(ns("col_size"), label = "plot width (px)", value = size)
-            
-        ),
-        if(save){
-          tagList(
-            box(title = "Save", width = 6, collapsible = TRUE, collapsed = TRUE,
-                downloadButton(ns("download_plot"), "Save plot")
-            )
-          )
-        }
-        
-      )
+             uiOutput(ns("ui_options"))
+             )
+
     )
+    
   )
 }
 
@@ -44,24 +80,56 @@ simpleDisplayUI <- function(id, nrow = 1, size = 400, save = TRUE){
 #' @param input shiny input
 #' @param output shiny output
 #' @param session shiny session
-#' @param plot_list list of plots to display
-#' @param params a reactivevalues object with an option to display plotly objects
-#' @return A list containing the plot displayed and input parameters (these include events 
-#' describing user interaction with the plot)
-#' @import shiny
+#' @param plot_list a reactivevalues object containing a plot or a list of plots
+#' @param params reactivevalues object used to initialize plot parameters
+#' with the following elements (not mandatory):
+#' \describe{
+#'   \item{use_plotly}{: use plotly library to render an interactive plot}
+#'   \item{top}{: main title}
+#'  }
+#' @param nrow Initial number of rows in the layout
+#' @param size Initial size of a single plot (in pixels)
+#' @return a reactivevalues object with:
+#' \describe{
+#'   \item{plot}{: the plots displayed}
+#'   \item{params}{: input parameters. These include events describing user interaction 
+#'   with the plot such as:
+#'   \describe{
+#'     \item{plot_brush}{: plot brush events}
+#'     \item{plot_click}{: plot click events}
+#'     \item{plot_dblclick}{: plot double click events}
+#'   }
+#' }
 #' @importFrom gridExtra marrangeGrob
 #' @importFrom grDevices pdf dev.off
 #' @importFrom plotly plotlyOutput renderPlotly
+#' @export
 #' @rdname simpleDisplayUI
-simpleDisplay <- function(input, output, session, 
+simpleDisplay <- function(input, output, session,
                           plot_list, 
-                          params = reactiveValues(use_plotly = FALSE)) {
+                          params = reactiveValues(),
+                          nrow = 1, 
+                          size = 300) {
   
-  rval_plot <- reactiveValues(nrow = 1, 
+  rval_plot <- reactiveValues(nrow = 1,
                               ncol = 1, 
-                              facet_layout = NULL, 
                               ncol_facet = 1, 
-                              nrow_facet =1)
+                              nrow_facet = 1,
+                              use_plotly = FALSE,
+                              top = "")
+  
+  observe({
+    for(var in names(params)){
+      rval_plot[[var]] <- params[[var]]
+    }
+    if("show_title" %in% names(input)){
+      if(!input$show_title){
+        rval_plot$top <- ""
+      }
+    }
+    
+  })
+    
   
   plot_display <- reactive({
     
@@ -90,16 +158,23 @@ simpleDisplay <- function(input, output, session,
             }
             
             if(n > 1){
+              rval_plot$use_plotly <- FALSE
               rval_plot$nrow <- min(n, input$nrow_split)
               rval_plot$ncol <- ceiling(n/rval_plot$nrow)
               
-              g <- gridExtra::marrangeGrob(plot_list(), 
+              g <- try(gridExtra::marrangeGrob(plot_list(), 
                                            nrow = rval_plot$nrow, 
                                            ncol = rval_plot$ncol, 
-                                           top = "")
+                                           top = rval_plot$top),
+                       silent = TRUE)
+                       
+                       
               g
             }else if(n == 1){
-              plot_list()[[1]]
+              
+                plot_list()[[1]]
+              
+              
             }else{
               plot_list()
             }
@@ -135,17 +210,30 @@ simpleDisplay <- function(input, output, session,
   output$plot_display_ly  <- renderPlotly({
     plot_display()
   })
-
+  
+  output$ui_options <- renderUI({
+    ns <- session$ns
+    
+    if(!rval_plot$use_plotly){
+      tagList(
+        box(title = "Display", width = 6, collapsible = TRUE, collapsed = TRUE,
+            numericInput(ns("nrow_split"), label = "Number of rows", value = nrow),
+            numericInput(ns("row_size"), label = "plot height (px)", value = size),
+            numericInput(ns("col_size"), label = "plot width (px)", value = size),
+            checkboxInput(ns("show_title"), label = "show title", value = TRUE)
+        ),
+        box(title = "Save", width = 6, collapsible = TRUE, collapsed = TRUE,
+            downloadButton(ns("download_plot"), "Save plot")
+        )
+      )
+    }
+  })
+  
   output$ui_plot <- renderUI({
     ns <- session$ns
     
-    if(params$use_plotly){
-      div( style = 'overflow-x: scroll',
-           plotlyOutput(ns("plot_display_ly"), 
-                      height = rval_plot$nrow * rval_plot$nrow_facet * input$row_size, 
-                      width = rval_plot$ncol * rval_plot$ncol_facet * input$col_size
-           )
-      )
+    if(rval_plot$use_plotly){
+           plotlyOutput(ns("plot_display_ly"), height = size)
     }else{
       div( style = 'overflow-x: scroll',
            plotOutput(ns("plot_display"), 
@@ -182,48 +270,50 @@ simpleDisplay <- function(input, output, session,
 ##################################################################################
 # Tests
 ##################################################################################
-
-library(shiny)
-library(shinydashboard)
-library(gridExtra)
-library(ggplot2)
-library(plotly)
-
-if (interactive()){
-  
-  ui <- dashboardPage(
-    dashboardHeader(title = "simpleDisplay"),
-    sidebar = dashboardSidebar(disable = TRUE),
-    body = dashboardBody(
-      fluidRow(
-        column(12, box(width = NULL, simpleDisplayUI("simple_display_module")))
-      )
-    )
-  )
-  
-  server <- function(input, output, session) {
-    
-    rval <- reactiveValues()
-    plot_params <- reactiveValues()
-    
-    plot_list <- reactive({
-      
-      plist <- list()
-      
-      plist[[1]] <- ggplot(iris, aes(x=Sepal.Length, y = Sepal.Width, color = Species)) +
-        geom_point(alpha = 0.5)
-      
-      plist[[2]] <- ggplot(iris, aes(x=Species, y = Sepal.Length, fill = Species)) +
-        geom_col(alpha = 0.5)
-      
-      return(plist)
-      
-    })
-    
-    callModule(simpleDisplay, "simple_display_module", plot_list)
-    
-  }
-  
-  shinyApp(ui, server)
-  
-}
+# library(shiny)
+# library(shinydashboard)
+# library(gridExtra)
+# library(ggplot2)
+# library(plotly)
+# 
+# if (interactive()){
+# 
+#   ui <- dashboardPage(
+#     dashboardHeader(title = "simpleDisplay"),
+#     sidebar = dashboardSidebar(disable = TRUE),
+#     body = dashboardBody(
+#       fluidRow(
+#         column(12, box(width = NULL, simpleDisplayUI("simple_display_module")))
+#       )
+#     )
+#   )
+# 
+#   server <- function(input, output, session) {
+# 
+#     params <- reactiveValues(top = "Iris", use_plotly = FALSE)
+# 
+#     plot_list <- reactive({
+# 
+#       plist <- list()
+# 
+#       plist[[1]] <- ggplot(iris, aes(x=Sepal.Length, y = Sepal.Width, color = Species)) +
+#         geom_point(alpha = 0.5) +
+#         facet_wrap(~Species)
+# 
+#        plist[[2]] <- ggplot(iris, aes(x=Species, y = Sepal.Length, fill = Species)) +
+#          geom_col(alpha = 0.5)
+# 
+#       return(plist)
+# 
+#     })
+# 
+#     callModule(simpleDisplay, "simple_display_module", 
+#                plot_list = plot_list, 
+#                params = params,
+#                size = 500)
+# 
+#   }
+# 
+#   shinyApp(ui, server)
+# 
+# }

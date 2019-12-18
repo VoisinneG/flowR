@@ -40,7 +40,7 @@ flowR_ui <- function(user_module_name = NULL) {
               gatingUI(id = "gating_module")
       ),
       tabItem(tabName = "Plot_tab",
-              plottingUI(id = "plotting_module")
+              plotting2UI(id = "plotting_module")
       ),
       tabItem(tabName = "Stat_tab",
               statsUI(id = "stats_module")
