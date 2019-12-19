@@ -35,7 +35,7 @@ plotting2UI <- function(id) {
 #' \describe{
 #'   \item{gating_set}{: a GatingSet object}
 #' }
-#' @return NULL
+#' @return The updated reactiveValues object \code{rval}
 #' @import shiny
 #' @rdname plottingUI
 plotting2 <- function(input, output, session, rval) {
@@ -53,13 +53,14 @@ plotting2 <- function(input, output, session, rval) {
 
   })
   
-  res <- callModule(plotGatingSet2, "plot_module", rval, plot_params, 
+  res <- callModule(plotGatingSet2, "plot_module", rval, plot_params,
                     simple_plot = FALSE, 
-                    auto_update = FALSE)
+                    auto_update = FALSE
+                    )
   
   callModule(simpleDisplay, "simple_display_module", res$plot)
   
-  return(NULL)
+  return(rval)
 }
 
 

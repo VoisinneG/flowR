@@ -6,6 +6,8 @@
 #' @param rval a reactivevalues object with the following elements :
 #' \describe{
 #'   \item{gating_set}{: a GatingSet object}
+#'   \item{apply_trans}{: logical; apply transformations defined in \code{rval$gating_set}}
+#'   \item{apply_comp}{: logical; apply compensation defined in \code{rval$gating_set}}
 #' }
 #' @param apply_trans logical; apply transformations defined in \code{rval$gating_set}
 #' @param apply_comp logical; apply compensation defined in \code{rval$gating_set}
@@ -74,8 +76,6 @@
 #'}
 plotGatingHierarchy2 <- function(input, output, session,
                                  rval,
-                                 apply_trans = TRUE,
-                                 apply_comp = TRUE,
                                  plot_params = reactiveValues() ){
   
   rval_plot <- reactiveValues()
@@ -141,14 +141,18 @@ plotGatingHierarchy2 <- function(input, output, session,
     
     axis_labels <- choices()$labels
 
-    transformation <- NULL
-    if(apply_trans){
-      transformation <- choices()$transformation
+    transformation <- choices()$transformation
+    if(!is.null(rval$apply_trans)){
+      if(!rval$apply_trans){
+        transformation <- NULL
+      }
     }
     
-    spill <- NULL
-    if(apply_comp){
-      spill <- choices()$compensation
+    spill <- choices()$compensation
+    if(!is.null(rval$apply_comp)){
+      if(!rval$apply_comp){
+        spill <- NULL
+      }
     }
     
     Ncells <- 30000
@@ -184,51 +188,51 @@ plotGatingHierarchy2 <- function(input, output, session,
 # Tests
 ##################################################################################
 # 
-library(shiny)
-library(shinydashboard)
-library(flowWorkspace)
-library(flowCore)
-library(viridis)
-library(scales)
-library(ggplot2)
-library(ggrepel)
-library(plotly)
-library(ggridges)
-
-if (interactive()){
-
-  ui <- dashboardPage(
-    dashboardHeader(title = "plotGatingHierarchy2"),
-    sidebar = dashboardSidebar(disable = TRUE),
-    body = dashboardBody(
-      fluidRow(
-        column(12, box(width = NULL, simpleDisplayUI("simple_display_module")))
-      )
-    )
-  )
-
-  server <- function(input, output, session) {
-
-    rval <- reactiveValues()
-    plot_params <- reactiveValues()
-    display_params <- reactiveValues()
-
-    observe({
-      gs <- load_gs("./inst/ext/gs")
-      rval$gating_set <- gs
-      plot_params$sample <- pData(gs)$name
-      plot_params$plot_type <- "hexagonal"
-      display_params$top <- paste(plot_params$sample, collapse = " + ")
-    })
-
-    plot_all_gates <- callModule(plotGatingHierarchy2, "module",
-                      rval = rval,
-                      plot_params = plot_params)
-
-    callModule(simpleDisplay, "simple_display_module", plot_list = plot_all_gates, params = display_params)
-
-  }
-
-  shinyApp(ui, server)
-
-}
+# library(shiny)
+# library(shinydashboard)
+# library(flowWorkspace)
+# library(flowCore)
+# library(viridis)
+# library(scales)
+# library(ggplot2)
+# library(ggrepel)
+# library(plotly)
+# library(ggridges)
+# 
+# if (interactive()){
+# 
+#   ui <- dashboardPage(
+#     dashboardHeader(title = "plotGatingHierarchy2"),
+#     sidebar = dashboardSidebar(disable = TRUE),
+#     body = dashboardBody(
+#       fluidRow(
+#         column(12, box(width = NULL, simpleDisplayUI("simple_display_module")))
+#       )
+#     )
+#   )
+# 
+#   server <- function(input, output, session) {
+# 
+#     rval <- reactiveValues()
+#     plot_params <- reactiveValues()
+#     display_params <- reactiveValues()
+# 
+#     observe({
+#       gs <- load_gs("./inst/ext/gs")
+#       rval$gating_set <- gs
+#       plot_params$sample <- pData(gs)$name
+#       plot_params$plot_type <- "hexagonal"
+#       display_params$top <- paste(plot_params$sample, collapse = " + ")
+#     })
+# 
+#     plot_all_gates <- callModule(plotGatingHierarchy2, "module",
+#                       rval = rval,
+#                       plot_params = plot_params)
+# 
+#     callModule(simpleDisplay, "simple_display_module", plot_list = plot_all_gates, params = display_params)
+# 
+#   }
+# 
+#   shinyApp(ui, server)
+# 
+# }

@@ -98,9 +98,10 @@ gating2UI <- function(id) {
 #' @rdname gatingUI
 gating2 <- function(input, output, session, rval) {
   
+  
   plot_params <- reactiveValues() # parameters controlling the main plot
   plot_params_gh <- reactiveValues() # parameters controlling the gating hierarchy plot
-  gate <- reactiveValues() # polygon gate represented on plot
+  gate <- reactiveValues(x = NULL, y = NULL) # polygon gate represented on plot
   rval_mod <- reactiveValues() # a local (module specific) reactiveValues object
   
   #Plot initialization
@@ -108,7 +109,13 @@ gating2 <- function(input, output, session, rval) {
     
     if(class(rval$gating_set)=="GatingSet"){
       rval$gates_flowCore <- get_gates_from_gs(rval$gating_set)
-      rval$transformation <- rval$gating_set@transformation
+      if(!setequal(names(rval$gating_set@transformation), colnames(rval$gating_set))){
+        transformation <- lapply(colnames(rval$gating_set), function(x){return(identity_trans())})
+        names(transformation) <- colnames(rval$gating_set)
+        rval$gating_set@transformation <- transformation
+      }else{
+        rval$transformation <- rval$gating_set@transformation
+      }
     }
       
   })
@@ -116,9 +123,9 @@ gating2 <- function(input, output, session, rval) {
   # Call modules
   res <- callModule(plotGatingSet2, "plot_module", 
                     rval=rval, 
-                    plot_params=plot_params, 
+                    plot_params=plot_params,
                     simple_plot = TRUE, 
-                    show_gates = TRUE, 
+                    show_gates = TRUE,
                     polygon_gate = gate)
   
   res_display <- callModule(simpleDisplay, "simple_display_module", plot_list = res$plot)
@@ -152,9 +159,6 @@ gating2 <- function(input, output, session, rval) {
   #update polygon coordinates upon mouse click on main plot
   observeEvent(res_display$params$plot_click, {
     
-    #xvar <- rval$parameters$name[match(res$params$xvar, rval$parameters$name_long)]
-    #yvar <- rval$parameters$name[match(res$params$yvar, rval$parameters$name_long)]
-    
     xvar <- res$params$xvar
     yvar <- res$params$yvar
     
@@ -175,8 +179,6 @@ gating2 <- function(input, output, session, rval) {
     brush <- res_display$params$plot_brush
     
     if (!is.null(brush)) {
-      #xvar <- rval$parameters$name[match(res$params$xvar, rval$parameters$name_long)]
-      #yvar <- rval$parameters$name[match(res$params$yvar, rval$parameters$name_long)]
       
       xvar <- res$params$xvar
       yvar <- res$params$yvar
@@ -239,9 +241,6 @@ gating2 <- function(input, output, session, rval) {
         polygon <- polygon[hpts, ]
         polygon <- as.matrix(polygon)
         
-        #var_names <- c(rval$parameters$name[match(res$params$xvar, rval$parameters$name_long)],
-        #               rval$parameters$name[match(res$params$yvar, rval$parameters$name_long)])
-        
         var_names <- c(res$params$xvar, res$params$yvar)
           
         names(var_names)<-NULL
@@ -260,6 +259,7 @@ gating2 <- function(input, output, session, rval) {
         
         flowWorkspace::gs_pop_add(rval$gating_set, poly_gate, parent = res$params$subset)
         flowWorkspace::recompute(rval$gating_set)
+        rval$update_gs <- rval$update_gs + 1
         
         #updateSelectInput(session, "gate_to_delete", choices = setdiff(flowWorkspace::gs_get_pop_paths(rval$gating_set), "root"))
 
@@ -267,9 +267,10 @@ gating2 <- function(input, output, session, rval) {
         gate$y <- NULL
 
         #reset plot parameters (only non null parameters will be updated)
-        #for(var in names(reactiveValuesToList(plot_params))){
+        # for(var in names(reactiveValuesToList(plot_params))){
         #  plot_params[[var]] <- NULL
-        #}
+        # }
+        
         plot_params$subset <- gate_name
       }
     }
@@ -296,9 +297,9 @@ gating2 <- function(input, output, session, rval) {
       flowWorkspace::recompute(rval$gating_set)
 
       #reset plot parameters (only non null parameters will be updated)
-      #for(var in names(reactiveValuesToList(plot_params))){
+      # for(var in names(reactiveValuesToList(plot_params))){
       #  plot_params[[var]] <- NULL
-      #}
+      # }
       
       plot_params$subset <- "root"
       
@@ -359,15 +360,10 @@ gating2 <- function(input, output, session, rval) {
       rval$gate <- rval$gates_flowCore[[res$params$subset]]$gate
       gate_params <- names(rval$gate@parameters)
 
-      print("gate_params")
-      print(gate_params)
-      
-      #params <- rval$parameters$name_long[match(gate_params, rval$parameters$name)]
-      
       #reset plot parameters (only non null parameters will be updated)
-      #for(var in names(reactiveValuesToList(plot_params))){
+      # for(var in names(reactiveValuesToList(plot_params))){
       #  plot_params[[var]] <- NULL
-      #}
+      # }
       
       if(length(gate_params) > 0){
         plot_params$xvar <- gate_params[1]
@@ -446,8 +442,16 @@ gating2 <- function(input, output, session, rval) {
   #Output Download functions
   
   pop_stats <- reactive({
-    validate(need(rval$gating_set, "No gating set available"))
-    df <- getPopStatsPlus(rval$gating_set, spill = rval$df_spill)
+    validate(need(class(rval$gating_set)=="GatingSet", "No GatingSet available"))
+    
+    spill <- rval$gating_set@compensation
+    if(!is.null(rval$apply_comp)){
+      if(!rval$apply_comp){
+        spill <- NULL
+      }
+    }
+    
+    df <- getPopStatsPlus(rval$gating_set, spill = spill)
     df <- df[df$name %in% res$params$sample, ]
     df[['% parent']] <- sprintf("%.1f", df$Count / df$ParentCount * 100)
     df <- df[, c("name", "Population", "Parent", "% parent", "Count", "ParentCount")] 
@@ -476,44 +480,44 @@ gating2 <- function(input, output, session, rval) {
 # Tests
 ##################################################################################
 
-library(shiny)
-library(shinydashboard)
-library(flowWorkspace)
-library(flowCore)
-library(viridis)
-library(scales)
-library(ggplot2)
-library(ggrepel)
-library(plotly)
-library(ggridges)
-
-if (interactive()){
-
-  ui <- dashboardPage(
-    dashboardHeader(title = "plotting2"),
-    sidebar = dashboardSidebar(disable = TRUE),
-    body = dashboardBody(
-      gating2UI("module")
-    )
-  )
-
-  server <- function(input, output, session) {
-
-    rval <- reactiveValues()
-    plot_params <- reactiveValues()
-
-    observe({
-      #utils::data("GvHD", package = "flowCore")
-      #rval$gating_set <- GatingSet(GvHD)
-      gs <- load_gs("./inst/ext/gs")
-      rval$gating_set <- gs
-    })
-
-    res <- callModule(gating2, "module", rval = rval)
-
-  }
-
-  shinyApp(ui, server)
-
-}
+# library(shiny)
+# library(shinydashboard)
+# library(flowWorkspace)
+# library(flowCore)
+# library(viridis)
+# library(scales)
+# library(ggplot2)
+# library(ggrepel)
+# library(plotly)
+# library(ggridges)
+# 
+# if (interactive()){
+# 
+#   ui <- dashboardPage(
+#     dashboardHeader(title = "plotting2"),
+#     sidebar = dashboardSidebar(disable = TRUE),
+#     body = dashboardBody(
+#       gating2UI("module")
+#     )
+#   )
+# 
+#   server <- function(input, output, session) {
+# 
+#     rval <- reactiveValues()
+#     plot_params <- reactiveValues()
+# 
+#     observe({
+#       #utils::data("GvHD", package = "flowCore")
+#       #rval$gating_set <- GatingSet(GvHD)
+#       gs <- load_gs("./inst/ext/gs")
+#       rval$gating_set <- gs
+#     })
+# 
+#     res <- callModule(gating2, "module", rval = rval)
+# 
+#   }
+# 
+#   shinyApp(ui, server)
+# 
+# }
 

@@ -82,13 +82,22 @@ selection2Input <- function(id) {
 selection2 <- function(input, output, session, 
                        rval, params = reactiveValues(), multiple_subset = TRUE) {
   
+  choices <- reactiveValues()
+  choices_pattern <- reactiveValues()
+  
   
   output$subset_input <- renderUI({
     ns <- session$ns
     selected <- choices$subset[1]
+    
     if("subset" %in% names(params)){
-      selected <- params$subset
+      if(!is.null(params$subset)){
+        if(params$subset %in% choices$subset){
+          selected <- params$subset
+        }
+      }
     }
+    
     tagList(
       selectizeInput(ns("subset"),
                    label = "subset",
@@ -99,11 +108,10 @@ selection2 <- function(input, output, session,
   })
   
   # Get available samples and subsets from rval$gating_set
-  
-  choices <- reactiveValues()
-  choices_pattern <- reactiveValues()
-  
   observe({
+    
+    rval$update_gs
+    
     validate(need(class(rval$gating_set) == "GatingSet", "input is not a GatingSet"))
     choices$sample <- pData(rval$gating_set)$name
     choices$subset <- gs_get_pop_paths(rval$gating_set)
@@ -113,26 +121,13 @@ selection2 <- function(input, output, session,
     }else{
       choices_pattern$sample <- choices$sample
     }
+    
   })
   
   # Default values
-  # observe({
-  #   updateSelectInput(session, "subset", choices = choices$subset, selected = choices$subset[1])
-  # })
-  
   observe({
     updateSelectInput(session, "sample", choices = choices$sample, selected = choices$sample[1])
   })
-  
-  # Initialization using params
-  # observeEvent(params$subset, {
-  #   if("subset" %in% names(params)){
-  #     if(!is.null(params$subset)){
-  #       print(params$subset)
-  #       updateSelectInput(session, "subset", choices = choices$subset, selected = params$subset)
-  #     }
-  #   }
-  # })
   
   observeEvent(params$sample, {
     if("sample" %in% names(params)){
@@ -172,6 +167,8 @@ selection2 <- function(input, output, session,
 #     sidebar = dashboardSidebar(disable = TRUE),
 #     body = dashboardBody(
 #       fluidRow(
+#         actionButton("switch", "switch GatingSet"),
+#         actionButton("add_gate", "add gate"),
 #         column(4, box(width = NULL, selection2Input("selection_module")))
 #       )
 #     )
@@ -182,9 +179,22 @@ selection2 <- function(input, output, session,
 #     rval <- reactiveValues()
 #     params <- reactiveValues()
 # 
+#     observeEvent(input$switch, {
+#       data("GvHD")
+#       rval$gating_set <- GatingSet(GvHD)
+#     })
+#     
+#     observeEvent(input$add_gate, {
+#       filter1 <- rectangleGate(gate = data.frame('SSC-A' = c(1,2), check.names = FALSE), 
+#                                filterId =  as.character(rval$update_gs))
+#       flowWorkspace::gs_pop_add(rval$gating_set, filter1, parent= "root")
+#       #rval$update_gs <- rval$update_gs + 1
+#     })
+#     
 #     observe({
 #       gs <- load_gs("./inst/ext/gs")
 #       rval$gating_set <- gs
+#       #rval$update_gs <- 0
 #       params$sample <- pData(gs)$name[2]
 #       params$subset <- gs_get_pop_paths(gs)[3]
 #     })

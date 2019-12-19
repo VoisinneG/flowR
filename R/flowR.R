@@ -495,10 +495,7 @@ getPopStatsPlus <- function(gs, spill = NULL, filter = NULL){
   }
   
   if(!is.null(spill)){
-    spill <- spill[row.names(spill) %in% colnames(gs), colnames(spill) %in% colnames(gs)]
-    spill_list <- lapply(1:length(fs), function(x){return(spill)})
-    names(spill_list) <- sampleNames(fs)
-    fs <- compensate(fs, spill_list)
+    fs <- compensate(fs, spill)
   }
   
   gs_comp <- flowWorkspace::GatingSet(fs)

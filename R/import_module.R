@@ -58,14 +58,14 @@ importUI <- function(id) {
 #' @importFrom tools file_ext
 #' @importFrom utils read.table data
 #' @rdname importUI
-import <- function(input, output, session) {
+import <- function(input, output, session, rval) {
   
   rval_mod <- reactiveValues(df_files = NULL)
   
-  rval <- reactiveValues(flow_set_list = list(),
-                         gates_flowCore = list(),
-                         count = 0
-                         )
+  # rval <- reactiveValues(flow_set_list = list(),
+  #                        gates_flowCore = list(),
+  #                        count = 0
+  #                        )
   
   observeEvent(input$files, {
     validate(
@@ -358,6 +358,7 @@ import <- function(input, output, session) {
                                                 gates = list(),
                                                 name = "GvHD", 
                                                 parent = NULL)
+    #rval$gating_set <- GatingSet(fs)
     rval$flow_set_selected <- "GvHD"
     
   })
