@@ -62,7 +62,7 @@ plotGatingSet2Input <- function(id) {
         title = "Sample/Subset",
         selection2Input(ns("selection_module"))
     ),
-    box(collapsible = TRUE, collapsed = FALSE, width = NULL, height = NULL,
+    box(collapsible = TRUE, collapsed = TRUE, width = NULL, height = NULL,
         title ="Variables",
         uiOutput(ns("plot_variables")),
         uiOutput(ns("ui_pattern"))
@@ -335,6 +335,8 @@ plotGatingSet2 <- function(input, output, session,
     #   rval_plot[[var]] <- rval_input[[var]]
     # }
     
+    validate(need(input$plot_type, "Not plot type selected"))
+                   
     ns <- session$ns
     
     color_var_choices <- switch(input$plot_type,
@@ -452,6 +454,8 @@ plotGatingSet2 <- function(input, output, session,
   choices_pattern <- reactiveValues()
   
   observe({
+    
+    validate(need(input$plot_type, "Not plot type selected"))
     
     choices_color_var <- switch(input$plot_type,
                                 "dots" = c("none", "subset", choices()$meta_var, 

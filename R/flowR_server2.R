@@ -8,12 +8,16 @@
 #' @importFrom flowWorkspace gs_get_pop_paths
 #' @importFrom shinydashboard renderValueBox
 #' @export
-flowR_server2 <- function(session, input, output, module_names = NULL) {
+flowR_server2 <- function(session, input, output, modules = NULL) {
   
   rval <- reactiveValues(update_gs = 0, # useful to force execution of 
                          #observe environment (for instance after updating a GatingSet with gs_pop_add()
                          gating_set = NULL,
-                         flow_set_list = list()
+                         flow_set_list = list(),
+                         list_module_server_function = list(),
+                         tab_elements = list(),
+                         menu_elements = list(),
+                         modules = NULL
                          )
   
   observe({
@@ -22,20 +26,72 @@ flowR_server2 <- function(session, input, output, module_names = NULL) {
   })
   
   
-  list_module_server_function <- list()
-  
-  for(i in 1:length(module_names)){
-    mod_name <- module_names[i]
-    
-    list_module_server_function[[i]] <- function(...){
-      do.call(mod_name, list(...) )
+  observe({
+    if(is.null(modules)){
+      rval$modules <- c("import")
+    }else{
+      rval$modules <- modules
     }
+  })
+  
+  output$body <- renderUI({
+    tagList(
+      textOutput("flow_set_name"),
+      br(),
+      fluidRow(
+        valueBoxOutput("progressBox", width = 3),
+        valueBoxOutput("progressBox2", width = 3),
+        valueBoxOutput("progressBox3", width = 3),
+        valueBoxOutput("progressBox4", width = 3),
+      ),
+      do.call(tabItems, rval$tab_elements)
+    )
+  })
+  
+  output$menu <- renderMenu({
+    sidebarMenu(id = "menu",
+                tagList(rval$menu_elements),
+                menuItem("General controls",
+                         tabName = "General_tab",
+                         startExpanded = FALSE,
+                         icon = icon("check-circle"),
+                         checkboxInput("apply_comp", "apply compensation", TRUE),
+                         checkboxInput("apply_trans", "apply transformation", TRUE),
+                         selectInput("flow_set", "Select flow set", choices = NULL, selected = NULL),
+                         br()
+                )
+    )
+  })
+  
+  observeEvent(rval$modules, {
     
-    rval <- callModule(list_module_server_function[[i]], 
-                       id = paste(mod_name, "module", sep="_"),
-                       rval = rval)
+    for( mod_name in rval$modules ){
+      
+      print("build_app")
+      print(mod_name)
+      
+      mod_name_ui <- paste(mod_name, "UI", sep="")
+        
+      rval$list_module_server_function[[mod_name]] <- function(...){
+        do.call(mod_name, list(...) )
+      }
+      
+      rval <- callModule(rval$list_module_server_function[[mod_name]], 
+                         id = paste(mod_name, "module", sep="_"),
+                         rval = rval)
+      
+      rval$tab_elements[[mod_name]] <- tabItem(tabName = paste(mod_name, "tab", sep="_"),
+                                               do.call(mod_name_ui, list(id = paste(mod_name, "module", sep="_") )))
+      
+      rval$menu_elements[[mod_name]] <- menuItem(mod_name,
+                                                 tabName = paste(mod_name, "tab", sep="_"), 
+                                                 startExpanded = FALSE,
+                                                 icon = icon("check-circle"))
+    }
+    rval$tab_elements <- unname(rval$tab_elements)
     
-  }
+  })
+  
  
   ##########################################################################################################
   # General controls

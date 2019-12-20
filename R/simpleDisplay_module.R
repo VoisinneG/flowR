@@ -94,10 +94,11 @@ simpleDisplayUI <- function(id){
 #'   \item{plot}{: the plots displayed}
 #'   \item{params}{: input parameters. These include events describing user interaction 
 #'   with the plot such as:
-#'   \describe{
-#'     \item{plot_brush}{: plot brush events}
-#'     \item{plot_click}{: plot click events}
-#'     \item{plot_dblclick}{: plot double click events}
+#'     \describe{
+#'       \item{plot_brush}{: plot brush events}
+#'       \item{plot_click}{: plot click events}
+#'       \item{plot_dblclick}{: plot double click events}
+#'     }
 #'   }
 #' }
 #' @importFrom gridExtra marrangeGrob
@@ -230,6 +231,10 @@ simpleDisplay <- function(input, output, session,
   })
   
   output$ui_plot <- renderUI({
+    
+    validate(need(plot_display(), "No plot to display"))
+    validate(need(input$row_size, "No input selected"))
+    
     ns <- session$ns
     
     if(rval_plot$use_plotly){

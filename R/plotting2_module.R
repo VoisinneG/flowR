@@ -3,6 +3,7 @@
 #' @param id shiny id
 #' @importFrom shinydashboard box tabBox
 #' @import shiny
+#' @export
 plotting2UI <- function(id) {
   
   ns <- NS(id)
@@ -37,6 +38,7 @@ plotting2UI <- function(id) {
 #' }
 #' @return The updated reactiveValues object \code{rval}
 #' @import shiny
+#' @export
 #' @rdname plottingUI
 plotting2 <- function(input, output, session, rval) {
 

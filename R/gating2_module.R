@@ -4,6 +4,7 @@
 #' @import shiny
 #' @importFrom shinydashboard box tabBox
 #' @importFrom DT DTOutput
+#' @export
 gating2UI <- function(id) {
   
   ns <- NS(id)
@@ -95,6 +96,7 @@ gating2UI <- function(id) {
 #' @importFrom DT datatable renderDT
 #' @importFrom dplyr rename
 #' @importFrom utils write.table
+#' @export
 #' @rdname gatingUI
 gating2 <- function(input, output, session, rval) {
   
