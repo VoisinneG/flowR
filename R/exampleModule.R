@@ -69,16 +69,16 @@ exampleModule <- function(input, output, session, stringsAsFactors=TRUE) {
 # Run example
 ##################################################################################
 
- library(shiny)
- library(DT)
- if (interactive()){
- ui <- fluidPage(
-   exampleModuleUI("module"),
-   DTOutput("data_table")
- )
- server <- function(input, output, session) {
-   data <- callModule(exampleModule,"module")
-   output$data_table <- renderDT({data()})
- }
- shinyApp(ui, server)
- }
+ # library(shiny)
+ # library(DT)
+ # if (interactive()){
+ # ui <- fluidPage(
+ #   exampleModuleUI("module"),
+ #   DTOutput("data_table")
+ # )
+ # server <- function(input, output, session) {
+ #   data <- callModule(exampleModule,"module")
+ #   output$data_table <- renderDT({data()})
+ # }
+ # shinyApp(ui, server)
+ # }
