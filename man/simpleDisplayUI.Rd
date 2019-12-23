@@ -3,7 +3,7 @@
 \name{simpleDisplayUI}
 \alias{simpleDisplayUI}
 \alias{simpleDisplay}
-\title{simpleDisplayUI and simpleDisplay}
+\title{A shiny Module to display and save plots}
 \usage{
 simpleDisplayUI(id)
 
@@ -55,6 +55,8 @@ a reactivevalues object with:
 }
 \description{
 A shiny Module to display and save plots
+
+display server function
 }
 \examples{
 \dontrun{

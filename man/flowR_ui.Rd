@@ -2,14 +2,10 @@
 % Please edit documentation in R/flowR_ui.R
 \name{flowR_ui}
 \alias{flowR_ui}
-\title{FlowR UI function}
+\title{flowR app main ui function}
 \usage{
-flowR_ui(user_module_name = NULL)
-}
-\arguments{
-\item{user_module_name}{name of a user shiny module (ui function) to integrate to the app.
-The name of the ui function should be made of the parameter 'user_module_name' with the suffix 'UI'.}
+flowR_ui()
 }
 \description{
-FlowR UI function
+flowR app main ui function
 }

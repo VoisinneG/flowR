@@ -1,9 +1,9 @@
-#' @title   subsampleUI and subsample
-#' @description  A shiny Module that deals with subsampling
+#' Subsample data from a GatingSet
 #' @param id shiny id
 #' @importFrom shinydashboard tabBox valueBoxOutput
 #' @import shiny
-subsampleUI <- function(id) {
+#' @export
+SubsampleUI <- function(id) {
   
   ns <- NS(id)
   
@@ -37,7 +37,7 @@ subsampleUI <- function(id) {
 }
 
 
-#' subsample server function
+#' Subsample module server function
 #' @param input shiny input
 #' @param output shiny output
 #' @param session shiny session
@@ -46,8 +46,9 @@ subsampleUI <- function(id) {
 #' @importFrom flowWorkspace gs_get_pop_paths
 #' @import shiny
 #' @importFrom shinydashboard renderValueBox
+#' @export
 #' @rdname subsampleUI
-subsample <- function(input, output, session, rval) {
+Subsample <- function(input, output, session, rval) {
   
   selected <- callModule(selection, "selection_module", rval)
   

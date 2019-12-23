@@ -1,9 +1,9 @@
-#' @title   flowsetsUI and flowsets
-#' @description  A shiny module dealing with flow-sets and their hierarchy
+#' Manage and visualize flow-sets and their hierarchy
 #' @param id shiny id
 #' @importFrom shinydashboard box
 #' @import shiny
-flowsetsUI <- function(id) {
+#' @export
+FlowsetsUI <- function(id) {
   
   ns <- NS(id)
   
@@ -27,7 +27,7 @@ flowsetsUI <- function(id) {
   
 }
 
-#' import server function
+#' Flowsets module server function
 #' @param input shiny input
 #' @param output shiny output
 #' @param session shiny session
@@ -38,8 +38,9 @@ flowsetsUI <- function(id) {
 #' @importFrom graph addEdge
 #' @importFrom Rgraphviz renderGraph layoutGraph
 #' @importFrom methods new
-#' @rdname flowsetsUI
-flowsets <- function(input, output, session, rval) {
+#' @export
+#' @rdname FlowsetsUI
+Flowsets <- function(input, output, session, rval) {
   
   observeEvent( c(names(rval$flow_set_list), rval$flow_set_selected), {
     updateSelectInput(session, "flow_set", choices = names(rval$flow_set_list), selected = rval$flow_set_selected)

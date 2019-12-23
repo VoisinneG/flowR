@@ -1,2 +1,2 @@
 library(flowR)
-flowR_server2
+flowR_server

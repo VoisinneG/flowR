@@ -1,5 +1,4 @@
-#' Select shiny modules (ui)
-#' @description A shiny module to search and select other modules
+#' Search, select and load other modules
 #' @param id shiny id
 #' @importFrom shinydashboard box tabBox
 #' @import shiny
@@ -37,8 +36,7 @@ ModulesUI <- function(id) {
 }
 
 
-#' Select shiny modules (server)
-#' @description A shiny module to search and select other modules
+#' server function for the shiny module Modules
 #' @param input shiny input
 #' @param output shiny output
 #' @param session shiny session
@@ -48,6 +46,7 @@ ModulesUI <- function(id) {
 #' }
 #' @return The updated reactiveValues object \code{rval}
 #' @import shiny
+#' @rdname ModulesUI
 #' @export
 Modules <- function(input, output, session, rval) {
 
@@ -63,8 +62,9 @@ Modules <- function(input, output, session, rval) {
   observe({
     
       updateSelectizeInput(session, "mod_selection",
-                           choices = union(rval_mod$df_module_info$module, rval$modules),
-                           selected = rval$modules)
+                           choices = union(rval_mod$df_module_info$module, 
+                                           names(rval$menu_elements)),
+                           selected = names(rval$menu_elements))
     
   })
   
@@ -107,9 +107,10 @@ Modules <- function(input, output, session, rval) {
               description <- sapply(1:length(mod_name), function(x){
                 idx_server_fonction <- grep(paste0("^", mod_name[x], " "), module_info)
                 idx_ui_fonction <- grep(paste0("^", mod_ui_name[x], " "), module_info)
-                if(length(idx_server_fonction)>0 & length(idx_ui_fonction)>0){
-                  paste(module_info[idx_server_fonction[1]], 
-                        module_info[idx_ui_fonction[1]], sep = "/")
+                if(length(idx_ui_fonction)>0){
+                  module_info[idx_ui_fonction[1]]
+                }else if(length(idx_server_fonction)>0){
+                  module_info[idx_server_fonction[1]]
                 }else{
                   NA
                 }

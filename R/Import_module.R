@@ -1,12 +1,12 @@
 utils::globalVariables("GvHD")
 
-#' @title importUI and import
-#' @description  A shiny Module that imports data and builds flow-sets
+#' Import data and build a GatingSet
 #' @param id shiny id
 #' @importFrom shinydashboard box
 #' @importFrom DT DTOutput
 #' @import shiny
-importUI <- function(id) {
+#' @export
+ImportUI <- function(id) {
 
   ns <- NS(id)
   
@@ -44,7 +44,7 @@ importUI <- function(id) {
   
 }
 
-#' import server function
+#' Import module server function
 #' @param input shiny input
 #' @param output shiny output
 #' @param session shiny session
@@ -57,15 +57,11 @@ importUI <- function(id) {
 #' @importFrom DT renderDT
 #' @importFrom tools file_ext
 #' @importFrom utils read.table data
-#' @rdname importUI
-import <- function(input, output, session, rval) {
+#' @export
+#' @rdname ImportUI
+Import <- function(input, output, session, rval) {
   
   rval_mod <- reactiveValues(df_files = NULL)
-  
-  # rval <- reactiveValues(flow_set_list = list(),
-  #                        gates_flowCore = list(),
-  #                        count = 0
-  #                        )
   
   observeEvent(input$files, {
     validate(

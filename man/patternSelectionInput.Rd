@@ -3,7 +3,7 @@
 \name{patternSelectionInput}
 \alias{patternSelectionInput}
 \alias{patternSelection}
-\title{patternSelectionInput and patternSelection}
+\title{Select variables based on pattern (or a regular expression)}
 \usage{
 patternSelectionInput(id)
 
@@ -28,7 +28,9 @@ a reactivevalues object with:
 }
 }
 \description{
-A shiny Module for selecting variables based on pattern
+Select variables based on pattern (or a regular expression)
+
+patternSelection module server function
 }
 \examples{
 \dontrun{

@@ -1,5 +1,4 @@
-#' @title patternSelectionInput and patternSelection
-#' @description A shiny Module for selecting variables based on pattern
+#' Select variables based on pattern (or a regular expression)
 #' @param id shiny id
 #' @importFrom shinydashboard box
 #' @import shiny
@@ -59,7 +58,7 @@ patternSelectionInput <- function(id) {
 }
 
 
-#' patternSelection server function
+#' patternSelection module server function
 #' @param input shiny input
 #' @param output shiny output
 #' @param session shiny session

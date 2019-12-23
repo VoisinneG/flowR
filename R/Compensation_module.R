@@ -1,11 +1,12 @@
-#' @title compensationUI and compensation
+#' @title CompensationUI and Compensation
 #' @description  A shiny Module that deals with compensation
 #' @param id shiny id
 #' @import shiny
 #' @importFrom shinydashboard box tabBox
 #' @importFrom plotly plotlyOutput
 #' @importFrom DT DTOutput
-compensationUI <- function(id) {
+#' @export
+CompensationUI <- function(id) {
   # Create a namespace function using the provided id
   ns <- NS(id)
   
@@ -78,7 +79,7 @@ compensationUI <- function(id) {
   
 }
 
-#' compensation server function
+#' Compensation server function
 #' @param input shiny input
 #' @param output shiny output
 #' @param session shiny session
@@ -91,8 +92,9 @@ compensationUI <- function(id) {
 #' @importFrom DT renderDT
 #' @importFrom utils read.table
 #' @importFrom  stats median
-#' @rdname compensationUI
-compensation <- function(input, output, session, rval) {
+#' @export
+#' @rdname CompensationUI
+Compensation <- function(input, output, session, rval) {
 
   plot_params <- reactiveValues()
   rval_mod <- reactiveValues(init = TRUE)

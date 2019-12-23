@@ -1,17 +1,16 @@
-#' @title   plotting2UI and plotting2
-#' @description  A shiny Module to build, display and save plots from a gating set
+#' Build, display and save plots from a gating set
 #' @param id shiny id
 #' @importFrom shinydashboard box tabBox
 #' @import shiny
 #' @export
-plotting2UI <- function(id) {
+PlottingUI <- function(id) {
   
   ns <- NS(id)
   
   fluidRow(
     column(width = 4,
            box(width = NULL, height = NULL, title = "Parameters",
-               plotGatingSet2Input(id = ns("plot_module"))
+               plotGatingSetInput(id = ns("plot_module"))
            )
     ),
     column(width = 8,
@@ -28,7 +27,7 @@ plotting2UI <- function(id) {
 }
 
 
-#' ploting2 server function
+#' Plotting module server function
 #' @param input shiny input
 #' @param output shiny output
 #' @param session shiny session
@@ -40,7 +39,7 @@ plotting2UI <- function(id) {
 #' @import shiny
 #' @export
 #' @rdname plottingUI
-plotting2 <- function(input, output, session, rval) {
+Plotting <- function(input, output, session, rval) {
 
   plot_params <- reactiveValues()
   #rval_mod <- reactiveValues(init = TRUE)
@@ -55,7 +54,7 @@ plotting2 <- function(input, output, session, rval) {
 
   })
   
-  res <- callModule(plotGatingSet2, "plot_module", rval, plot_params,
+  res <- callModule(plotGatingSet, "plot_module", rval, plot_params,
                     simple_plot = FALSE, 
                     auto_update = FALSE
                     )
@@ -85,10 +84,10 @@ plotting2 <- function(input, output, session, rval) {
 # if (interactive()){
 # 
 #   ui <- dashboardPage(
-#     dashboardHeader(title = "plotting2"),
+#     dashboardHeader(title = "plotting"),
 #     sidebar = dashboardSidebar(disable = TRUE),
 #     body = dashboardBody(
-#       plotting2UI("module")
+#       plottingUI("module")
 #     )
 #   )
 # 
@@ -104,7 +103,7 @@ plotting2 <- function(input, output, session, rval) {
 #       #rval$gating_set <- gs
 #     })
 # 
-#     res <- callModule(plotting2, "module", rval = rval)
+#     res <- callModule(plotting, "module", rval = rval)
 # 
 #   }
 # 

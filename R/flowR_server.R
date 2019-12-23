@@ -1,60 +1,122 @@
-#' flowR server function
+#' flowR app main server function
 #' @param input shiny input
 #' @param output shiny output
 #' @param session shiny session
-#' @param user_module_name name of a user shiny module (server function) to integrate to the app
+#' @param modules Names of a shiny modules (server function) to integrate to the app.
+#' The name of the ui function should be made of the name of the module's server function 
+#' with the suffix 'UI'. In addition, the module should take the reactiveValues object 'rval' 
+#' as input and return it as an output.
 #' @import shiny
 #' @importFrom flowCore fsApply each_col
 #' @importFrom flowWorkspace gs_get_pop_paths
 #' @importFrom shinydashboard renderValueBox
 #' @export
-flowR_server <- function(session, input, output, user_module_name = NULL) {
+flowR_server <- function(session, input, output, modules = NULL) {
   
-  rval <- reactiveValues()
-  gate <- reactiveValues(x = NULL, y = NULL)
+  rval <- reactiveValues(update_gs = 0, # useful to force execution of 
+                         #observe environment (for instance after updating a GatingSet with gs_pop_add()
+                         gating_set = NULL,
+                         flow_set_list = list(),
+                         list_module_server_function = list(),
+                         tab_elements = list(),
+                         menu_elements = list(),
+                         modules = NULL
+                         )
   
-  # Import module
-  rval <- callModule(import, "import_module")
-  
-  # Metadata module
-  rval <- callModule(metadata, "metadata_module", rval)
-
-  # Transform module
-  rval <- callModule(transform, "transform_module", rval)
-  
-  # Compensation module
-  rval <- callModule(compensation, "compensation_module", rval)
-  
-  # Gating module
-  rval <- callModule(gating, "gating_module", rval)
-  
-  # Subsample module
-  rval <- callModule(subsample, "subsample_module", rval)
-  
-  # Dimensionality reduction module
-  rval <- callModule(dimRed, "dim_reduction_module", rval)
-  
-  # Clustering module
-  rval <- callModule(cluster, "cluster_module", rval)
-  
-  # Plot module
-  callModule(plotting2, "plotting_module", rval)
-  
-  # stats module
-  rval <- callModule(stats, "stats_module", rval)
-    
-  # flow-set module
-  rval <- callModule(flowsets, "flowsets_module", rval)
+  observe({
+    #gs <- load_gs("./inst/ext/gs")
+    #rval$gating_set <- gs
+    data("GvHD", package = "flowCore")
+    rval$gating_set <- GatingSet(GvHD)
+  })
   
   ##########################################################################################################
-  # Add user-defined module
-  module_server_function <- function(...){
-    do.call(user_module_name, list(...) )
-  }
+  # Build ui based on selected modules
   
-  if(!is.null(user_module_name)){
-   rval <- callModule(module_server_function, "user_module", rval)
-  }
+  observe({
+    default_modules <- c("Import", "Gating", "Plotting", "Subsample")
+    if(is.null(modules)){
+      rval$modules <- default_modules
+    }else{
+      rval$modules <- modules
+    }
+  })
+  
+  output$body <- renderUI({
+    tagList(
+      textOutput("flow_set_name"),
+      br(),
+      fluidRow(
+        valueBoxOutput("progressBox", width = 3),
+        valueBoxOutput("progressBox2", width = 3),
+        valueBoxOutput("progressBox3", width = 3),
+        valueBoxOutput("progressBox4", width = 3),
+      ),
+      do.call(tabItems, rval$tab_elements)
+    )
+  })
+  
+  output$menu <- renderMenu({
+    sidebarMenu(id = "menu",
+                tagList(rval$menu_elements),
+                menuItem("General controls",
+                         tabName = "General_tab",
+                         startExpanded = FALSE,
+                         icon = icon("check-circle"),
+                         checkboxInput("apply_comp", "apply compensation", TRUE),
+                         checkboxInput("apply_trans", "apply transformation", TRUE),
+                         selectInput("flow_set", "Select flow set", choices = NULL, selected = NULL),
+                         br()
+                )
+    )
+  })
+  
+  observeEvent(rval$modules, {
+    
+    modules <- union(rval$modules, "Modules")
+    rval$menu_elements <- list()
+    rval$tab_elements <- list()
+    
+    for( mod_name in modules ){
+
+        mod_name_ui <- paste(mod_name, "UI", sep="")
+        
+        rval$list_module_server_function[[mod_name]] <- function(...){
+          do.call(mod_name, list(...) )
+        }
+        
+        test_module <- try(callModule(rval$list_module_server_function[[mod_name]], 
+                           id = paste(mod_name, "module", sep="_"),
+                           rval = rval),
+                    silent = TRUE)
+        
+        if(class(test_module) == "try-error"){
+          showModal(modalDialog(
+            title = paste("Error calling shiny module", mod_name),
+            print(test_module),
+            easyClose = TRUE,
+            footer = NULL
+          ))
+        }else{
+          rval <- callModule(rval$list_module_server_function[[mod_name]], 
+                             id = paste(mod_name, "module", sep="_"),
+                             rval = rval)
+            
+          rval$tab_elements[[mod_name]] <- tabItem(tabName = paste(mod_name, "tab", sep="_"),
+                                                   do.call(mod_name_ui, list(id = paste(mod_name, "module", sep="_") )))
+          
+          rval$menu_elements[[mod_name]] <- menuItem(mod_name,
+                                                     tabName = paste(mod_name, "tab", sep="_"), 
+                                                     startExpanded = FALSE,
+                                                     icon = icon("check-circle"))
+        }
+      
+    }
+    
+    rval$tab_elements <- unname(rval$tab_elements)
+
+  })
+  
  
   ##########################################################################################################
   # General controls
@@ -216,6 +278,7 @@ flowR_server <- function(session, input, output, user_module_name = NULL) {
   
   output$progressBox2 <- renderValueBox({
     ngates <- 0
+    print(rval$update_gs)
     if(!is.null(rval$gating_set)){
       ngates <- length(setdiff(flowWorkspace::gs_get_pop_paths(rval$gating_set), "root"))
     }
@@ -250,8 +313,10 @@ flowR_server <- function(session, input, output, user_module_name = NULL) {
   })
   
   output$flow_set_name <- renderText({
-    if(nchar(rval$flow_set_selected)>0){
-      paste("Flow-set : ", rval$flow_set_selected)
+    if(!is.null(rval$flow_set_selected)){
+      if(nchar(rval$flow_set_selected)>0){
+        paste("Flow-set : ", rval$flow_set_selected)
+      }
     }else{
       NULL
     }

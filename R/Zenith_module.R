@@ -1,12 +1,12 @@
 utils::globalVariables(c("A", "B", "C", "Z", "sdA", "sdB", "sdC", "sdZ"))
 
-#' @title zenithUI and zenith
-#' @description  A shiny Module that analyse cell metabolism using the ZeNITH method
+#' Analyse cell metabolism using the ZeNITH method
 #' @param id shiny id
 #' @import shiny
 #' @importFrom shinydashboard box tabBox
 #' @importFrom DT DTOutput
-zenithUI <- function(id) {
+#' @export
+ZenithUI <- function(id) {
 
   ns <- NS(id)
   
@@ -93,7 +93,7 @@ zenithUI <- function(id) {
 }
 
 
-#' zenith server function
+#' Zenith module server function
 #' @param input shiny input
 #' @param output shiny output
 #' @param session shiny session
@@ -108,8 +108,8 @@ zenithUI <- function(id) {
 #' @importFrom DT datatable renderDT
 #' @import ggplot2
 #' @export
-#' @rdname zenithUI
-zenith <- function(input, output, session, rval) {
+#' @rdname ZenithUI
+Zenith <- function(input, output, session, rval) {
   
   observe({
     validate(need(rval$plot_var, "No variables available"))

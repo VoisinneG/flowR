@@ -3,6 +3,7 @@
 #' @param id shiny id
 #' @importFrom shinydashboard box tabBox
 #' @import shiny
+#' @export
 plotStatInput <- function(id) {
 
   ns <- NS(id)
@@ -65,6 +66,7 @@ plotStatInput <- function(id) {
 #' @return a list containing the plot, the plot data, and the corresponding plot parameters
 #' @import shiny
 #' @importFrom scales identity_trans log10_trans
+#' @export
 #' @rdname plotStatUI
 plotStat <- function(input, output, session, rval) {
   

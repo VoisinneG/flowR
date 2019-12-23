@@ -1,10 +1,10 @@
-#' @title   statsUI and stats
-#' @description  A shiny Module to build, display and save plots from a gating set with data aggregation
+#' Compute and visualize sample/subset statistics from a GatingSet
 #' @param id shiny id
 #' @importFrom shinydashboard box tabBox
 #' @import shiny
 #' @importFrom  DT DTOutput
-statsUI <- function(id) {
+#' @export
+StatsUI <- function(id) {
   
   ns <- NS(id)
   
@@ -36,7 +36,7 @@ statsUI <- function(id) {
 }
 
 
-#' stats server function
+#' Stats module server function
 #' @param input shiny input
 #' @param output shiny output
 #' @param session shiny session
@@ -45,8 +45,9 @@ statsUI <- function(id) {
 #' @import shiny
 #' @importFrom DT renderDT datatable
 #' @importFrom utils write.table
-#' @rdname statsUI
-stats <- function(input, output, session, rval) {
+#' @export
+#' @rdname StatsUI
+Stats <- function(input, output, session, rval) {
 
   rval_mod <- reactiveValues(use_plotly = FALSE)
   

@@ -1,10 +1,10 @@
-#' @title clusterUI and cluster
-#' @description  A shiny Module for cluster identification
+#' Identify clusters
 #' @param id shiny id
 #' @importFrom shinydashboard tabBox
 #' @import shiny
 #' @importFrom DT DTOutput
-clusterUI <- function(id) {
+#' @export
+ClusteringUI <- function(id) {
   
   ns <- NS(id)
   
@@ -47,7 +47,7 @@ clusterUI <- function(id) {
 }
 
 
-#' cluster server function
+#' Clustering module server function
 #' @param input shiny input
 #' @param output shiny output
 #' @param session shiny session
@@ -60,8 +60,9 @@ clusterUI <- function(id) {
 #' @importFrom FlowSOM UpdateNodeSize PlotPies PlotStars PlotMarker
 #' @importFrom scales identity_trans log10_trans
 #' @importFrom graphics plot.new
-#' @rdname clusterUI
-cluster <- function(input, output, session, rval) {
+#' @export
+#' @rdname ClusteringUI
+Clustering <- function(input, output, session, rval) {
   
   selected <- callModule(selection, "selection_module", rval)
   

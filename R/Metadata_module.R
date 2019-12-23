@@ -1,10 +1,10 @@
-#' @title   metadataUI and metadata
-#' @description  A shiny Module that deals with metadata
+#' Import, export and edit metadata associated with a GatingSet
 #' @param id shiny id
 #' @import shiny
 #' @importFrom shinydashboard tabBox
 #' @importFrom DT DTOutput DTOutput
-metadataUI <- function(id) {
+#' @export
+MetadataUI <- function(id) {
   
   ns <- NS(id)
   
@@ -59,7 +59,7 @@ metadataUI <- function(id) {
 }
 
 
-#' metadata server function
+#' metadata module server function
 #' @param input shiny input
 #' @param output shiny output
 #' @param session shiny session
@@ -71,8 +71,9 @@ metadataUI <- function(id) {
 #' @importFrom readxl read_excel
 #' @importFrom utils read.csv write.table
 #' @importFrom DT renderDT dataTableProxy editData replaceData
-#' @rdname metadataUI
-metadata <- function(input, output, session, rval) {
+#' @export
+#' @rdname MetadataUI
+Metadata <- function(input, output, session, rval) {
   
   rval_mod <- reactiveValues()
 

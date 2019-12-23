@@ -1,11 +1,10 @@
-#' @title   gating2UI and gating2
-#' @description  A shiny Module that deals with gating
+#' Edit, visualize and show statistics from a gating hierarchy
 #' @param id shiny id
 #' @import shiny
 #' @importFrom shinydashboard box tabBox
 #' @importFrom DT DTOutput
 #' @export
-gating2UI <- function(id) {
+GatingUI <- function(id) {
   
   ns <- NS(id)
   
@@ -16,7 +15,7 @@ gating2UI <- function(id) {
                actionButton(ns("show_gate"), label = "Show defining gate"),
                br(),
                br(),
-               plotGatingSet2Input(id = ns("plot_module"))
+               plotGatingSetInput(id = ns("plot_module"))
            ),
            tabBox(title = "Gates",
                   width = NULL, height = NULL,
@@ -80,7 +79,7 @@ gating2UI <- function(id) {
 }
 
 
-#' gating server function
+#' Gating module server function
 #' @param input shiny input
 #' @param output shiny output
 #' @param session shiny session
@@ -97,8 +96,8 @@ gating2UI <- function(id) {
 #' @importFrom dplyr rename
 #' @importFrom utils write.table
 #' @export
-#' @rdname gatingUI
-gating2 <- function(input, output, session, rval) {
+#' @rdname GatingUI
+Gating <- function(input, output, session, rval) {
   
   
   plot_params <- reactiveValues() # parameters controlling the main plot
@@ -123,7 +122,7 @@ gating2 <- function(input, output, session, rval) {
   })
   
   # Call modules
-  res <- callModule(plotGatingSet2, "plot_module", 
+  res <- callModule(plotGatingSet, "plot_module", 
                     rval=rval, 
                     plot_params=plot_params,
                     simple_plot = TRUE, 
@@ -132,7 +131,7 @@ gating2 <- function(input, output, session, rval) {
   
   res_display <- callModule(simpleDisplay, "simple_display_module", plot_list = res$plot)
   
-  plot_all_gates <- callModule(plotGatingHierarchy2, "plot_hierarchy_module", 
+  plot_all_gates <- callModule(plotGatingHierarchy, "plot_hierarchy_module", 
                                rval = rval, plot_params = plot_params_gh)
   
   callModule(simpleDisplay, "simple_display_module_2", 
@@ -515,7 +514,7 @@ gating2 <- function(input, output, session, rval) {
 #       rval$gating_set <- gs
 #     })
 # 
-#     res <- callModule(gating2, "module", rval = rval)
+#     res <- callModule(gating, "module", rval = rval)
 # 
 #   }
 # 

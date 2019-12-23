@@ -1,5 +1,4 @@
-#' @title simpleDisplayUI and simpleDisplay
-#' @description  A shiny Module to display and save plots
+#' A shiny Module to display and save plots
 #' @param id shiny id
 #' @import shiny
 #' @export

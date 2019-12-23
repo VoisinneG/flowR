@@ -2,9 +2,9 @@
 % Please edit documentation in R/flowR_server.R
 \name{flowR_server}
 \alias{flowR_server}
-\title{flowR server function}
+\title{flowR app main server function}
 \usage{
-flowR_server(session, input, output, user_module_name = NULL)
+flowR_server(session, input, output, modules = NULL)
 }
 \arguments{
 \item{session}{shiny session}
@@ -13,8 +13,11 @@ flowR_server(session, input, output, user_module_name = NULL)
 
 \item{output}{shiny output}
 
-\item{user_module_name}{name of a user shiny module (server function) to integrate to the app}
+\item{modules}{Names of a shiny modules (server function) to integrate to the app.
+The name of the ui function should be made of the name of the module's server function 
+with the suffix 'UI'. In addition, the module should take the reactiveValues object 'rval' 
+as input and return it as an output.}
 }
 \description{
-flowR server function
+flowR app main server function
 }

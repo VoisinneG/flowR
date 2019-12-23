@@ -4,10 +4,10 @@
 \alias{run_flowR}
 \title{Run flowR GUI}
 \usage{
-run_flowR(module_name = NULL, shiny.maxRequestSize = 1000)
+run_flowR(modules = NULL, shiny.maxRequestSize = 1000)
 }
 \arguments{
-\item{module_name}{name of shiny module to include in the GUI}
+\item{modules}{names of shiny modules (server functions) to include in the GUI}
 
 \item{shiny.maxRequestSize}{file size limit (in MB)}
 }

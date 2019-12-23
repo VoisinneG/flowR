@@ -19,13 +19,68 @@ plotGatingHierarchy(
 
 \item{session}{shiny session}
 
-\item{rval}{A reactiveValues object}
+\item{rval}{a reactivevalues object with the following elements :
+\describe{
+  \item{gating_set}{: a GatingSet object}
+  \item{apply_trans}{: logical; apply transformations defined in \code{rval$gating_set}}
+  \item{apply_comp}{: logical; apply compensation defined in \code{rval$gating_set}}
+}}
 
 \item{plot_params}{A reactiveValues object with plot parameters}
+
+\item{apply_trans}{logical; apply transformations defined in \code{rval$gating_set}}
+
+\item{apply_comp}{logical; apply compensation defined in \code{rval$gating_set}}
 }
 \value{
 A list of plots
 }
 \description{
 A shiny Module to plot a gating hierarchy
+}
+\examples{
+\dontrun{
+library(shiny)
+library(shinydashboard)
+library(flowWorkspace)
+library(flowCore)
+
+if (interactive()){
+
+  ui <- dashboardPage(
+    dashboardHeader(title = "plotGatingHierarchy"),
+    sidebar = dashboardSidebar(disable = TRUE),
+    body = dashboardBody(
+      fluidRow(
+        column(12, box(width = NULL, simpleDisplayUI("simple_display_module")))
+      )
+    )
+  )
+
+  server <- function(input, output, session) {
+
+    rval <- reactiveValues()
+    plot_params <- reactiveValues()
+    display_params <- reactiveValues()
+    
+    observe({
+      gs <- load_gs("./inst/ext/gs")
+      rval$gating_set <- gs
+      plot_params$sample <- pData(gs)$name
+      plot_params$plot_type <- "hexagonal"
+      display_params$top <- paste(plot_params$sample, collapse = " + ") 
+    })
+
+    plot_all_gates <- callModule(plotGatingHierarchy, "module",
+                      rval = rval,
+                      plot_params = plot_params)
+
+    callModule(simpleDisplay, "simple_display_module", plot_list = plot_all_gates, params = display_params)
+
+  }
+
+  shinyApp(ui, server)
+
+}
+}
 }

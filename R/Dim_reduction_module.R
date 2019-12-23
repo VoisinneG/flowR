@@ -1,10 +1,10 @@
-#' @title dimRedUI and dimRed
-#' @description  A shiny Module that deals with dimensionality reduction
+#' Dimensionality reduction
 #' @param id shiny id
 #' @import shiny
 #' @importFrom shinydashboard tabBox valueBoxOutput
 #' @importFrom DT DTOutput
-dimRedUI <- function(id) {
+#' @export
+Dim_reductionUI <- function(id) {
   # Create a namespace function using the provided id
   ns <- NS(id)
   
@@ -49,7 +49,7 @@ dimRedUI <- function(id) {
 }
 
 
-#' dim_reduction server function
+#' Dim_reduction module  server function
 #' @param input shiny input
 #' @param output shiny output
 #' @param session shiny session
@@ -60,8 +60,9 @@ dimRedUI <- function(id) {
 #' @importFrom shinydashboard renderValueBox
 #' @importFrom DT renderDT datatable
 #' @importFrom scales identity_trans log10_trans
-#' @rdname dim_reductionUI
-dimRed <- function(input, output, session, rval) {
+#' @export
+#' @rdname Dim_reductionUI
+Dim_reduction <- function(input, output, session, rval) {
   
   selected <- callModule(selection, "selection_module", rval)
   

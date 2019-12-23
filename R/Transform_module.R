@@ -1,10 +1,10 @@
-#' @title   transformUI and transform
-#' @description  A shiny Module that deals with data transformation and parameters description
+#' Edit flow parameter transformation and description
 #' @param id shiny id
 #' @importFrom shinydashboard tabBox
 #' @import shiny
 #' @importFrom DT DTOutput
-transformUI <- function(id) {
+#' @export
+TransformUI <- function(id) {
   
   ns <- NS(id)
   
@@ -54,7 +54,7 @@ transformUI <- function(id) {
 }
 
 
-#' transform server function
+#' Transform module server function
 #' @param input shiny input
 #' @param output shiny output
 #' @param session shiny session
@@ -65,8 +65,9 @@ transformUI <- function(id) {
 #' @importFrom scales log_trans identity_trans
 #' @importFrom flowCore parameters description
 #' @importFrom DT renderDT dataTableProxy editData replaceData
-#' @rdname transformUI
-transform <- function(input, output, session, rval) {
+#' @export
+#' @rdname TransformUI
+Transform <- function(input, output, session, rval) {
 
   rval_mod <- reactiveValues(init = TRUE)
   
