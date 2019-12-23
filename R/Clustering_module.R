@@ -13,7 +13,7 @@ ClusteringUI <- function(id) {
              tabBox(title = "",
                     width = NULL, height = NULL,
                     tabPanel("Sample/Subset",
-                             selectionInput(ns("selection_module"), multiple_subset = TRUE)
+                             selectionInput(ns("selection_module"))
                     ),
                     tabPanel("Variables",
                              div(style = 'overflow-x: scroll', DT::DTOutput(ns("clustering_variables_table")))
@@ -95,7 +95,7 @@ Clustering <- function(input, output, session, rval) {
       tabBox(title = "FlowSOM",
              width = NULL, height = NULL,
              tabPanel("Plot",
-                      simpleDisplayUI(ns("simple_display_module"), save = FALSE)
+                      simpleDisplayUI(ns("simple_display_module"))
                       #plotOutput(ns("plot_fSOM"))
              ),
              tabPanel("Options",

@@ -11,7 +11,6 @@ plot_gh(
   Ncells = NULL,
   selected_subsets = NULL,
   spill = gs@compensation,
-  transformation = gs@transformation,
   plot_type = "hexagonal",
   plot_args = list(),
   options = list()

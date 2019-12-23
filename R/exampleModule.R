@@ -36,7 +36,7 @@ exampleModuleUI <- function(id) {
 #' @param input shiny input
 #' @param output shiny output
 #' @param session shiny session
-#'
+#' @param stringsAsFactors logical; Convert strings to factors
 #' @importFrom utils read.csv
 #' @return A reactive function returning the imported file
 #' @rdname exampleModuleUI

@@ -67,10 +67,10 @@ CompensationUI <- function(id) {
            tabBox(title = "",
                   width = NULL, height = NULL,
                   tabPanel(title = "Plot",
-                           simpleDisplayUI(ns("simple_display_module"), nrow = 2, size = 200)
+                           simpleDisplayUI(ns("simple_display_module"))
                   ),
                   tabPanel(title = "Parameters",
-                           plotGatingSetInput(id = ns("plot_module"), simple_plot = FALSE)
+                           plotGatingSetInput(id = ns("plot_module"))
                   )
            )
            
@@ -134,7 +134,7 @@ Compensation <- function(input, output, session, rval) {
   })
   
   res <- callModule(plotGatingSet, "plot_module", rval, plot_params, simple_plot = FALSE)
-  callModule(simpleDisplay, "simple_display_module", res$plot)
+  callModule(simpleDisplay, "simple_display_module", res$plot, nrow = 2, size = 200 )
   
   ##########################################################################################################
   # Observe functions for compensation

@@ -52,7 +52,7 @@ Stats <- function(input, output, session, rval) {
   rval_mod <- reactiveValues(use_plotly = FALSE)
   
   res <- callModule(plotStat, "plotStat_module", rval)
-  callModule(simpleDisplay, "simple_display_module", res$plot, params =  rval_mod)
+  callModule(simpleDisplay, "simple_display_module", plot_list = res$plot, params =  rval_mod)
 
   observe({
     if("plot_type" %in% names(res$params)){

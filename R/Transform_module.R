@@ -45,7 +45,7 @@ TransformUI <- function(id) {
                   simpleDisplayUI(ns("simple_display_module"))
                ),
                tabPanel(title = "Parameters",
-                 plotGatingSetInput(id = ns("plot_module"), simple_plot = TRUE)
+                 plotGatingSetInput(id = ns("plot_module"))
                )
            )
     )

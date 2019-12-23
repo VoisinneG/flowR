@@ -9,8 +9,6 @@
 #'   \item{apply_trans}{: logical; apply transformations defined in \code{rval$gating_set}}
 #'   \item{apply_comp}{: logical; apply compensation defined in \code{rval$gating_set}}
 #' }
-#' @param apply_trans logical; apply transformations defined in \code{rval$gating_set}
-#' @param apply_comp logical; apply compensation defined in \code{rval$gating_set}
 #' @param plot_params reactivevalues object used to define plot parameters. 
 #' Amongst others it can contain the following elements (not mandatory):
 #' \describe{
@@ -61,7 +59,8 @@
 #'                       rval = rval,
 #'                       plot_params = plot_params)
 #' 
-#'     callModule(simpleDisplay, "simple_display_module", plot_list = plot_all_gates, params = display_params)
+#'     callModule(simpleDisplay, "simple_display_module", 
+#'                plot_list = plot_all_gates, params = display_params)
 #' 
 #'   }
 #' 

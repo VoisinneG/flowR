@@ -2,13 +2,29 @@
 % Please edit documentation in R/Subsample_module.R
 \name{SubsampleUI}
 \alias{SubsampleUI}
+\alias{Subsample}
 \title{Subsample data from a GatingSet}
 \usage{
 SubsampleUI(id)
+
+Subsample(input, output, session, rval)
 }
 \arguments{
 \item{id}{shiny id}
+
+\item{input}{shiny input}
+
+\item{output}{shiny output}
+
+\item{session}{shiny session}
+
+\item{rval}{A reactive values object}
+}
+\value{
+The updated reactiveValues object \code{rval}
 }
 \description{
 Subsample data from a GatingSet
+
+Subsample module server function
 }

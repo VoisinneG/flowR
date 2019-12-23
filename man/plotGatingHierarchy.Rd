@@ -27,10 +27,6 @@ plotGatingHierarchy(
 }}
 
 \item{plot_params}{A reactiveValues object with plot parameters}
-
-\item{apply_trans}{logical; apply transformations defined in \code{rval$gating_set}}
-
-\item{apply_comp}{logical; apply compensation defined in \code{rval$gating_set}}
 }
 \value{
 A list of plots
@@ -75,7 +71,8 @@ if (interactive()){
                       rval = rval,
                       plot_params = plot_params)
 
-    callModule(simpleDisplay, "simple_display_module", plot_list = plot_all_gates, params = display_params)
+    callModule(simpleDisplay, "simple_display_module", 
+               plot_list = plot_all_gates, params = display_params)
 
   }
 

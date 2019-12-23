@@ -30,7 +30,8 @@
 #'     
 #'     observe({
 #'       if(!is.null(res$variable)){
-#'         updateSelectizeInput(session, "selection", choices = choices[[res$variable]], selected = res$values)
+#'         updateSelectizeInput(session, "selection", 
+#'           choices = choices[[res$variable]], selected = res$values)
 #'       }
 #'     })
 #'     

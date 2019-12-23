@@ -17,6 +17,8 @@ exampleModule(input, output, session, stringsAsFactors = TRUE)
 \item{output}{shiny output}
 
 \item{session}{shiny session}
+
+\item{stringsAsFactors}{logical; Convert strings to factors}
 }
 \value{
 A reactive function returning the imported file

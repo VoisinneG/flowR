@@ -13,7 +13,7 @@ Dim_reductionUI <- function(id) {
            tabBox(title = "",
                   width = NULL, height = NULL,
                   tabPanel("Sample/Subset",
-                           selectionInput(ns("selection_module"), multiple_subset = TRUE)
+                           selectionInput(ns("selection_module"))
                   ),
                   tabPanel("Variables",
                            checkboxInput(ns("select_all"), "Select all", value = FALSE),

@@ -38,8 +38,8 @@ PlottingUI <- function(id) {
 #' @return The updated reactiveValues object \code{rval}
 #' @import shiny
 #' @export
-#' @rdname plottingUI
-Plotting <- function(input, output, session, rval) {
+#' @rdname PlottingUI
+Plotting <- function(input, output, session, rval){
 
   plot_params <- reactiveValues()
   #rval_mod <- reactiveValues(init = TRUE)
@@ -68,8 +68,6 @@ Plotting <- function(input, output, session, rval) {
 ##################################################################################
 # Tests
 ##################################################################################
-
-
 # library(shiny)
 # library(shinydashboard)
 # library(flowWorkspace)
@@ -87,7 +85,7 @@ Plotting <- function(input, output, session, rval) {
 #     dashboardHeader(title = "plotting"),
 #     sidebar = dashboardSidebar(disable = TRUE),
 #     body = dashboardBody(
-#       plottingUI("module")
+#       PlottingUI("module")
 #     )
 #   )
 # 
@@ -103,7 +101,7 @@ Plotting <- function(input, output, session, rval) {
 #       #rval$gating_set <- gs
 #     })
 # 
-#     res <- callModule(plotting, "module", rval = rval)
+#     res <- callModule(Plotting, "module", rval = rval)
 # 
 #   }
 # 

@@ -41,7 +41,7 @@ Plot parameters depend on the plot type selected.}
 
 \item{options}{list of plot format options passed to \code{format_plot()}}
 
-\item{gate}{Names of the gates to add to the plot (if it is compatible with plot parameters).
+\item{gate_name}{Names of the gates to add to the plot (if it is compatible with plot parameters).
 Ignored if NULL.}
 }
 \value{

@@ -46,6 +46,7 @@ ModulesUI <- function(id) {
 #' }
 #' @return The updated reactiveValues object \code{rval}
 #' @import shiny
+#' @importFrom utils sessionInfo
 #' @rdname ModulesUI
 #' @export
 Modules <- function(input, output, session, rval) {

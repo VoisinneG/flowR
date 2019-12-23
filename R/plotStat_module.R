@@ -14,7 +14,7 @@ plotStatInput <- function(id) {
     br(),
     box(collapsible = TRUE, collapsed = TRUE, width = NULL, height = NULL,
         title = "Sample/Subset",
-        selectionInput(ns("selection_module"), multiple_subset = TRUE)
+        selectionInput(ns("selection_module"))
     ),
     box(collapsible = TRUE, collapsed = FALSE, width = NULL, height = NULL,
         title ="Stat",

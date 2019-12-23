@@ -2,13 +2,32 @@
 % Please edit documentation in R/Plotting_module.R
 \name{PlottingUI}
 \alias{PlottingUI}
+\alias{Plotting}
 \title{Build, display and save plots from a gating set}
 \usage{
 PlottingUI(id)
+
+Plotting(input, output, session, rval)
 }
 \arguments{
 \item{id}{shiny id}
+
+\item{input}{shiny input}
+
+\item{output}{shiny output}
+
+\item{session}{shiny session}
+
+\item{rval}{reactivevalues object with the following elements :
+\describe{
+  \item{gating_set}{: a GatingSet object}
+}}
+}
+\value{
+The updated reactiveValues object \code{rval}
 }
 \description{
 Build, display and save plots from a gating set
+
+Plotting module server function
 }

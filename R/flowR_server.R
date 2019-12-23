@@ -26,7 +26,7 @@ flowR_server <- function(session, input, output, modules = NULL) {
   observe({
     #gs <- load_gs("./inst/ext/gs")
     #rval$gating_set <- gs
-    data("GvHD", package = "flowCore")
+    data("GvHD", package = "flowCore", envir = environment() )
     rval$gating_set <- GatingSet(GvHD)
   })
   

@@ -5,6 +5,7 @@ utils::globalVariables(c("A", "B", "C", "Z", "sdA", "sdB", "sdC", "sdZ"))
 #' @import shiny
 #' @importFrom shinydashboard box tabBox
 #' @importFrom DT DTOutput
+#' @importFrom plotly plotlyOutput
 #' @export
 ZenithUI <- function(id) {
 

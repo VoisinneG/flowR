@@ -12,7 +12,7 @@ SubsampleUI <- function(id) {
            tabBox(title = "",
                   width = NULL, height = NULL,
                   tabPanel("Sample/Subset",
-                    selectionInput(ns("selection_module"), multiple_subset = TRUE)
+                    selectionInput(ns("selection_module"))
                   ),
                   tabPanel("Compute",
                            numericInput(ns("ncells_per_sample"), "Number of cells / subset / sample", 1000),
@@ -47,7 +47,7 @@ SubsampleUI <- function(id) {
 #' @import shiny
 #' @importFrom shinydashboard renderValueBox
 #' @export
-#' @rdname subsampleUI
+#' @rdname SubsampleUI
 Subsample <- function(input, output, session, rval) {
   
   selected <- callModule(selection, "selection_module", rval)

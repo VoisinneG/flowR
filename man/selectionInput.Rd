@@ -61,7 +61,7 @@ library(shiny)
 if (interactive()){
   
   ui <- fluidPage(
-    selectionInput("selection_module", multiple_subset = FALSE)
+    selectionInput("selection_module")
   )
   
   server <- function(input, output, session) {

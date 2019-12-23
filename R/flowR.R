@@ -1761,7 +1761,7 @@ format_plot <- function(p,
 #' @param plot_args  list of plot parameters passed to the plot function. 
 #' Plot parameters depend on the plot type selected.
 #' @param options  list of plot format options passed to \code{format_plot()}
-#' @param gate Names of the gates to add to the plot (if it is compatible with plot parameters).
+#' @param gate_name Names of the gates to add to the plot (if it is compatible with plot parameters).
 #' Ignored if NULL.
 #' @importFrom flowWorkspace gs_get_pop_paths pData gh_pop_get_gate
 #' @return a plot
@@ -1930,18 +1930,9 @@ plot_gh <- function( gs,
                       Ncells = NULL,
                       selected_subsets = NULL,
                       spill = gs@compensation,
-                      transformation = gs@transformation,
                       plot_type = "hexagonal",
                       plot_args = list(), 
                       options = list()){
-  
-  # if(length(sample) != 1){
-  #   stop("length of idx must be equal to 1")
-  # }
-  
-  if(!is.null(transformation)){
-    options$transformation <- transformation
-  }
   
   if(is.null(sample)){sample = pData(gs)$name[1]}
   

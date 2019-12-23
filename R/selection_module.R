@@ -9,7 +9,7 @@
 #' if (interactive()){
 #'   
 #'   ui <- fluidPage(
-#'     selectionInput("selection_module", multiple_subset = FALSE)
+#'     selectionInput("selection_module")
 #'   )
 #'   
 #'   server <- function(input, output, session) {
@@ -79,7 +79,8 @@ selectionInput <- function(id) {
 #' @export
 #' @rdname selectionInput
 selection <- function(input, output, session, 
-                       rval, params = reactiveValues(), multiple_subset = TRUE) {
+                      rval, params = reactiveValues(), 
+                      multiple_subset = TRUE) {
   
   choices <- reactiveValues()
   choices_pattern <- reactiveValues()

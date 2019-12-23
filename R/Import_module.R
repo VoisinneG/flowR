@@ -48,7 +48,11 @@ ImportUI <- function(id) {
 #' @param input shiny input
 #' @param output shiny output
 #' @param session shiny session
-#' @return a reactivevalues object
+#' @param rval a reactivevalues object (can be empty)
+#' @return The input reactivevalues object 'rval' with updated elements :
+#' \describe{
+#'   \item{gating_set_list}{list of GatingSet objects loaded}
+#' }
 #' @import shiny
 #' @importFrom flowWorkspace pData
 #' @importFrom flowCore fsApply

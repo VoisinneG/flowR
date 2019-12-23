@@ -17,9 +17,14 @@ Import(input, output, session, rval)
 \item{output}{shiny output}
 
 \item{session}{shiny session}
+
+\item{rval}{a reactivevalues object (can be empty)}
 }
 \value{
-a reactivevalues object
+The input reactivevalues object 'rval' with updated elements :
+\describe{
+  \item{gating_set_list}{list of GatingSet objects loaded}
+}
 }
 \description{
 Import data and build a GatingSet
