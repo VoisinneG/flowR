@@ -1,4 +1,4 @@
-#' Identify clusters
+#' Automatic cluster identification
 #' @param id shiny id
 #' @importFrom shinydashboard tabBox
 #' @import shiny

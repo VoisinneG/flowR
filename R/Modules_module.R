@@ -1,4 +1,4 @@
-#' Search, select and load other modules
+#' Search, select and load modules
 #' @param id shiny id
 #' @importFrom shinydashboard box tabBox
 #' @import shiny
@@ -10,7 +10,6 @@ ModulesUI <- function(id) {
   fluidRow(
     column(width = 4,
            box(width = NULL, height = NULL, title = "Module selection",
-               #plotGatingSet2Input(id = ns("plot_module"))
                selectizeInput(ns("mod_selection"), 
                               "Selected modules", 
                               choices = NULL, 
@@ -58,15 +57,11 @@ Modules <- function(input, output, session, rval) {
     updateSelectizeInput(session, "packages", choices = packages, selected = NULL)
   })
   
-  
-  
   observe({
-    
       updateSelectizeInput(session, "mod_selection",
                            choices = union(rval_mod$df_module_info$module, 
                                            names(rval$menu_elements)),
                            selected = names(rval$menu_elements))
-    
   })
   
   observeEvent(input$apply, {
@@ -109,9 +104,9 @@ Modules <- function(input, output, session, rval) {
                 idx_server_fonction <- grep(paste0("^", mod_name[x], " "), module_info)
                 idx_ui_fonction <- grep(paste0("^", mod_ui_name[x], " "), module_info)
                 if(length(idx_ui_fonction)>0){
-                  module_info[idx_ui_fonction[1]]
+                  format_info(module_info[idx_ui_fonction[1]])
                 }else if(length(idx_server_fonction)>0){
-                  module_info[idx_server_fonction[1]]
+                  format_info(module_info[idx_server_fonction[1]])
                 }else{
                   NA
                 }
@@ -122,7 +117,7 @@ Modules <- function(input, output, session, rval) {
             }
             df_info_list[[pack]] <- data.frame(package = rep(pack, length(mod_name)), 
                                                module = mod_name, 
-                                               "functions" = paste(mod_name, mod_ui_name, sep = "/"),
+                                               #"functions" = paste(mod_name, mod_ui_name, sep = "/"),
                                                description = description)
             print(description)
           }else{
@@ -166,40 +161,51 @@ get_package_functions_info <- function(package_name){
   return(pack_info)
 }
 
+#' Suppresses the function name from its description as 
+#' returned by 'get_package_functions_info()'
+#' @param info a character string
+#' @return a character string
+format_info <- function(info){
+  s <- regexpr(" +", info)
+  s <- substr(info, start = s + attr(s, "match.length"), stop = nchar(info))
+  return(s)
+}
+
 ##################################################################################
 # Tests
 ##################################################################################
 # 
 # 
-# library(shiny)
-# library(shinydashboard)
-# library(flowR)
-# 
-# if (interactive()){
-# 
-#   ui <- dashboardPage(
-#     dashboardHeader(title = "Modules"),
-#     sidebar = dashboardSidebar(disable = TRUE),
-#     body = dashboardBody(
-#       ModulesUI("module")
-#     )
-#   )
-# 
-#   server <- function(input, output, session) {
-# 
-#     rval <- reactiveValues()
-# 
-#     # observe({
-#     #   utils::data("GvHD", package = "flowCore")
-#     #   rval$gating_set <- GatingSet(GvHD)
-#     #   #gs <- load_gs("./inst/ext/gs")
-#     #   #rval$gating_set <- gs
-#     # })
-# 
-#     res <- callModule(Modules, "module", rval = rval)
-# 
-#   }
-# 
-#   shinyApp(ui, server)
-# 
-# }
+library(shiny)
+library(shinydashboard)
+library(flowR)
+library(DT)
+
+if (interactive()){
+
+  ui <- dashboardPage(
+    dashboardHeader(title = "Modules"),
+    sidebar = dashboardSidebar(disable = TRUE),
+    body = dashboardBody(
+      ModulesUI("module")
+    )
+  )
+
+  server <- function(input, output, session) {
+
+    rval <- reactiveValues()
+
+    # observe({
+    #   utils::data("GvHD", package = "flowCore")
+    #   rval$gating_set <- GatingSet(GvHD)
+    #   #gs <- load_gs("./inst/ext/gs")
+    #   #rval$gating_set <- gs
+    # })
+
+    res <- callModule(Modules, "module", rval = rval)
+
+  }
+
+  shinyApp(ui, server)
+
+}

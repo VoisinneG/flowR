@@ -1,5 +1,4 @@
-#' @title CompensationUI and Compensation
-#' @description  A shiny Module that deals with compensation
+#' Edit compensation matrices associated with a GatingSet
 #' @param id shiny id
 #' @import shiny
 #' @importFrom shinydashboard box tabBox

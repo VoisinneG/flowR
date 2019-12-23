@@ -1,4 +1,4 @@
-#' Dimensionality reduction
+#' Perform dimensionality reduction using t-SNE or UMAP
 #' @param id shiny id
 #' @import shiny
 #' @importFrom shinydashboard tabBox valueBoxOutput

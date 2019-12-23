@@ -1,4 +1,4 @@
-#' Subsample data from a GatingSet
+#' Subsample a GatingSet
 #' @param id shiny id
 #' @importFrom shinydashboard tabBox valueBoxOutput
 #' @import shiny
