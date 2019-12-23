@@ -2,7 +2,7 @@
 % Please edit documentation in R/plotGatingSet_module.R
 \name{plotGatingSetInput}
 \alias{plotGatingSetInput}
-\title{plotGatingSetInput}
+\title{plotGatingSetInput2}
 \usage{
 plotGatingSetInput(id, simple_plot = TRUE, auto_update = TRUE)
 }
@@ -15,5 +15,5 @@ plotGatingSetInput(id, simple_plot = TRUE, auto_update = TRUE)
 If FALSE, plot update is controlled by an action button.}
 }
 \description{
-A shiny Module (ui function) to build plots from a gating set
+A shiny Module (ui function) to build plots from a GatingSet
 }

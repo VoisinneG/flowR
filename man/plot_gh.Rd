@@ -4,9 +4,18 @@
 \alias{plot_gh}
 \title{Plot all gates for a given sample of a GatingSet}
 \usage{
-plot_gh(gs, df = NULL, sample = NULL, Ncells = NULL,
-  selected_subsets = NULL, spill = NULL, plot_type = "contour",
-  plot_args = list(), options = list())
+plot_gh(
+  gs,
+  df = NULL,
+  sample = NULL,
+  Ncells = NULL,
+  selected_subsets = NULL,
+  spill = gs@compensation,
+  transformation = gs@transformation,
+  plot_type = "hexagonal",
+  plot_args = list(),
+  options = list()
+)
 }
 \arguments{
 \item{gs}{a GatingSet}

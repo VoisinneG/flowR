@@ -4,9 +4,17 @@
 \alias{dim_reduction}
 \title{Perform dimensionality reduction}
 \usage{
-dim_reduction(df, yvar, Ncells = NULL, transformation = NULL,
-  y_trans = log10_trans(), perplexity = 50, dims = 2,
-  method = "tSNE", check_duplicates = FALSE)
+dim_reduction(
+  df,
+  yvar,
+  Ncells = NULL,
+  transformation = NULL,
+  y_trans = log10_trans(),
+  perplexity = 50,
+  dims = 2,
+  method = "tSNE",
+  check_duplicates = FALSE
+)
 }
 \arguments{
 \item{df}{a data.frame with only numeric variables.}

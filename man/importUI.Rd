@@ -7,7 +7,7 @@
 \usage{
 importUI(id)
 
-import(input, output, session)
+import(input, output, session, rval)
 }
 \arguments{
 \item{id}{shiny id}
