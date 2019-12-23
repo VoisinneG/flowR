@@ -1,10 +1,10 @@
 ^.*\.Rproj$
 ^\.Rproj\.user$
 ^rsconnect/.*
-^doc/.*
 #^R/zenith_module.R
 ^R/not_used/
 ^server\.R$
 ^ui\.R$
 ^demo-data
 ^Manuscript
+^doc

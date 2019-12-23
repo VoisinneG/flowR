@@ -21,7 +21,7 @@ get_data_gs(
 (as returned by \code{pData(gs)$name})}
 
 \item{subset}{Names of subsets from the GatingSet 
-(as returned by \code{flowWorkspace::\link[flowWorkspace]gs_get_pop_paths(gs)})}
+(as returned by \code{flowWorkspace::gs_get_pop_paths(gs)})}
 
 \item{Ncells}{number of cells to sample from the GatingSet}
 
