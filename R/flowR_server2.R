@@ -21,8 +21,10 @@ flowR_server2 <- function(session, input, output, modules = NULL) {
                          )
   
   observe({
-    gs <- load_gs("./inst/ext/gs")
-    rval$gating_set <- gs
+    #gs <- load_gs("./inst/ext/gs")
+    #rval$gating_set <- gs
+    data("GvHD", package = "flowCore")
+    rval$gating_set <- GatingSet(GvHD)
   })
   
   
@@ -65,7 +67,10 @@ flowR_server2 <- function(session, input, output, modules = NULL) {
   
   observeEvent(rval$modules, {
     
-    for( mod_name in rval$modules ){
+    rval$tab_elements <- list()
+    rval$menu_elements <- list()
+    
+    for( mod_name in union(c("Modules", "import"), rval$modules) ){
       
       print("build_app")
       print(mod_name)
