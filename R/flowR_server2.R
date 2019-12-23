@@ -29,8 +29,9 @@ flowR_server2 <- function(session, input, output, modules = NULL) {
   
   
   observe({
+    default_modules <- c("import", "gating2, ploting2", "subsample")
     if(is.null(modules)){
-      rval$modules <- c("import")
+      rval$modules <- default_modules
     }else{
       rval$modules <- modules
     }
@@ -67,33 +68,40 @@ flowR_server2 <- function(session, input, output, modules = NULL) {
   
   observeEvent(rval$modules, {
     
-    rval$tab_elements <- list()
+    modules <- union("Modules", rval$modules)
     rval$menu_elements <- list()
+    rval$tab_elements <- list()
     
-    for( mod_name in union(c("Modules", "import"), rval$modules) ){
+    for( mod_name in modules ){
       
       print("build_app")
       print(mod_name)
       
-      mod_name_ui <- paste(mod_name, "UI", sep="")
+      if(! mod_name %in% names(rval$menu_elements)){
         
-      rval$list_module_server_function[[mod_name]] <- function(...){
-        do.call(mod_name, list(...) )
+        mod_name_ui <- paste(mod_name, "UI", sep="")
+        
+        rval$list_module_server_function[[mod_name]] <- function(...){
+          do.call(mod_name, list(...) )
+        }
+        
+        rval <- callModule(rval$list_module_server_function[[mod_name]], 
+                           id = paste(mod_name, "module", sep="_"),
+                           rval = rval)
+        
+        rval$tab_elements[[mod_name]] <- tabItem(tabName = paste(mod_name, "tab", sep="_"),
+                                                 do.call(mod_name_ui, list(id = paste(mod_name, "module", sep="_") )))
+        
+        rval$menu_elements[[mod_name]] <- menuItem(mod_name,
+                                                   tabName = paste(mod_name, "tab", sep="_"), 
+                                                   startExpanded = FALSE,
+                                                   icon = icon("check-circle"))
       }
       
-      rval <- callModule(rval$list_module_server_function[[mod_name]], 
-                         id = paste(mod_name, "module", sep="_"),
-                         rval = rval)
-      
-      rval$tab_elements[[mod_name]] <- tabItem(tabName = paste(mod_name, "tab", sep="_"),
-                                               do.call(mod_name_ui, list(id = paste(mod_name, "module", sep="_") )))
-      
-      rval$menu_elements[[mod_name]] <- menuItem(mod_name,
-                                                 tabName = paste(mod_name, "tab", sep="_"), 
-                                                 startExpanded = FALSE,
-                                                 icon = icon("check-circle"))
     }
+    
     rval$tab_elements <- unname(rval$tab_elements)
+    #rval$menu_elements <- rval$menu_elements[modules]
     
   })
   

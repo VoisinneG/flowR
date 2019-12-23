@@ -519,7 +519,7 @@ getPopStatsPlus <- function(gs, spill = NULL, filter = NULL){
 #' @param sample Names of samples from the GatingSet 
 #' (as returned by \code{pData(gs)$name})
 #' @param subset Names of subsets from the GatingSet 
-#' (as returned by \code{flowWorkspace::\link[flowWorkspace]gs_get_pop_paths(gs)})
+#' (as returned by \code{flowWorkspace::gs_get_pop_paths(gs)})
 #' @param Ncells number of cells to sample from the GatingSet
 #' @param spill spillover matrix. If NULL, uncompensated data is used for gating. 
 #' Uncompensated data is returned if parameter 'return_comp_data' is TRUE.

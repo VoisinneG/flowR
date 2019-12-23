@@ -2,7 +2,7 @@
 ^\.Rproj\.user$
 ^rsconnect/.*
 #^R/zenith_module.R
-^R/not_used/
+^R/not_used
 ^server\.R$
 ^ui\.R$
 ^demo-data

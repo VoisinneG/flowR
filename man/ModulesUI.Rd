@@ -2,30 +2,13 @@
 % Please edit documentation in R/Modules_module.R
 \name{ModulesUI}
 \alias{ModulesUI}
-\alias{Modules}
-\title{ModulesUI and Modules}
+\title{Select shiny modules (ui)}
 \usage{
 ModulesUI(id)
-
-Modules(input, output, session, rval)
 }
 \arguments{
 \item{id}{shiny id}
-
-\item{input}{shiny input}
-
-\item{output}{shiny output}
-
-\item{session}{shiny session}
-
-\item{rval}{reactivevalues object with the following elements :
-\describe{
-  \item{gating_set}{: a GatingSet object}
-}}
-}
-\value{
-The updated reactiveValues object \code{rval}
 }
 \description{
-A shiny module to select shiny modules
+A shiny module to search and select other modules
 }

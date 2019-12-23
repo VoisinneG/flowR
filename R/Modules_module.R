@@ -1,5 +1,5 @@
-#' @title   ModulesUI and Modules
-#' @description  A shiny module to select shiny modules
+#' Select shiny modules (ui)
+#' @description A shiny module to search and select other modules
 #' @param id shiny id
 #' @importFrom shinydashboard box tabBox
 #' @import shiny
@@ -10,15 +10,10 @@ ModulesUI <- function(id) {
   
   fluidRow(
     column(width = 4,
-           box(width = NULL, height = NULL, title = "Selection",
+           box(width = NULL, height = NULL, title = "Module selection",
                #plotGatingSet2Input(id = ns("plot_module"))
-               selectizeInput(ns("packages"), 
-                              "Packages", 
-                              choices = NULL, 
-                              selected = NULL, 
-                              multiple = TRUE),
                selectizeInput(ns("mod_selection"), 
-                              "Select modules", 
+                              "Selected modules", 
                               choices = NULL, 
                               selected = NULL, 
                               multiple = TRUE),
@@ -26,9 +21,14 @@ ModulesUI <- function(id) {
            )
     ),
     column(width = 8,
-           box(title = "Module description",
-                  width = NULL, height = NULL,
-                  DTOutput(ns("mod_description"))
+           box(title = "Search for modules",
+               width = NULL, height = NULL,
+               selectizeInput(ns("packages"), 
+                              "Select Packages", 
+                              choices = NULL, 
+                              selected = NULL, 
+                              multiple = TRUE),
+              DTOutput(ns("mod_description"))
            )
     )
     
@@ -37,7 +37,8 @@ ModulesUI <- function(id) {
 }
 
 
-#' Modules server function
+#' Select shiny modules (server)
+#' @description A shiny module to search and select other modules
 #' @param input shiny input
 #' @param output shiny output
 #' @param session shiny session
@@ -48,7 +49,6 @@ ModulesUI <- function(id) {
 #' @return The updated reactiveValues object \code{rval}
 #' @import shiny
 #' @export
-#' @rdname ModulesUI
 Modules <- function(input, output, session, rval) {
 
   rval_mod <- reactiveValues(modules = NULL, df_module_info = NULL, packages = NULL)
@@ -58,12 +58,14 @@ Modules <- function(input, output, session, rval) {
     updateSelectizeInput(session, "packages", choices = packages, selected = NULL)
   })
   
+  
+  
   observe({
-    if(!is.null(rval_mod$df_module_info$module)){
+    
       updateSelectizeInput(session, "mod_selection",
-                           choices = rval_mod$df_module_info$module,
-                           selected = rval_mod$df_module_info$module[1])
-    }
+                           choices = union(rval_mod$df_module_info$module, rval$modules),
+                           selected = rval$modules)
+    
   })
   
   observeEvent(input$apply, {
@@ -90,45 +92,44 @@ Modules <- function(input, output, session, rval) {
         if(length(idx_ui)>0){
           mod_ui_name <- pack_objs[idx_ui]
           mod_name <- unlist(strsplit(mod_ui_name, split = "UI"))
-        }
-        print(mod_ui_name)
-        
-        mod_is_valid <- sapply(1:length(mod_name), function(x){
-          !is.na(match( mod_name[x], pack_objs ))})
-        
-        print(mod_name)
-        print(mod_is_valid)
-        print(sum(mod_is_valid)>0)
-        
-        if(sum(mod_is_valid)>0){
-          mod_ui_name <- mod_ui_name[mod_is_valid]
-          mod_name <- mod_name[mod_is_valid]
           
-          info <- library(help = pack, character.only = TRUE)
-          module_info <- info$info[[2]]
-          if(length(module_info)>0){
-            description <- sapply(1:length(mod_name), function(x){
-              idx_server_fonction <- grep(paste0("^", mod_name[x], " "), module_info)
-              idx_ui_fonction <- grep(paste0("^", mod_ui_name[x], " "), module_info)
-              if(length(idx_server_fonction)>0 & length(idx_ui_fonction)>0){
-                paste(module_info[idx_server_fonction[1]], 
-                      module_info[idx_ui_fonction[1]], sep = "/")
-              }else{
-                NA
-              }
-            })
+          mod_is_valid <- sapply(1:length(mod_name), function(x){
+            !is.na(match( mod_name[x], pack_objs ))})
+          
+          if(sum(mod_is_valid)>0){
             
+            mod_ui_name <- mod_ui_name[mod_is_valid]
+            mod_name <- mod_name[mod_is_valid]
+
+            module_info <- get_package_functions_info(package_name = pack)
+           
+            if(length(module_info)>0){
+              description <- sapply(1:length(mod_name), function(x){
+                idx_server_fonction <- grep(paste0("^", mod_name[x], " "), module_info)
+                idx_ui_fonction <- grep(paste0("^", mod_ui_name[x], " "), module_info)
+                if(length(idx_server_fonction)>0 & length(idx_ui_fonction)>0){
+                  paste(module_info[idx_server_fonction[1]], 
+                        module_info[idx_ui_fonction[1]], sep = "/")
+                }else{
+                  NA
+                }
+              })
+              
+            }else{
+              description <- rep(NA, length(mod_name))
+            }
+            df_info_list[[pack]] <- data.frame(package = rep(pack, length(mod_name)), 
+                                               module = mod_name, 
+                                               "functions" = paste(mod_name, mod_ui_name, sep = "/"),
+                                               description = description)
+            print(description)
           }else{
-            description <- rep(NA, length(mod_name))
+            df_info_list[[pack]] <- NULL
           }
-          df_info_list[[pack]] <- data.frame(package = rep(pack, length(mod_name)), 
-                                             module = mod_name, 
-                                             modules = paste(mod_name, mod_ui_name, sep = "/"),
-                                             description = description)
-          print(description)
-        }else{
-          df_info_list[[pack]] <- NULL
+          
         }
+       
+        
         
       }
     }
@@ -144,6 +145,24 @@ Modules <- function(input, output, session, rval) {
   return(rval)
 }
 
+#' get description of package's functions
+#' @param package_name Name of the package
+#' @return A vector with the description of the functions in the package 
+get_package_functions_info <- function(package_name){
+  info <- library(help = package_name, character.only = TRUE)
+  pack_info <- info$info[[2]]
+  idx_blank <- grep("^ ", pack_info)
+  if(length(idx_blank)>0){
+    pack_info[idx_blank] <- sapply(pack_info[idx_blank], function(x){
+      substr(x, 
+             start = regexpr("[^ ]", x), 
+             stop = nchar(x))
+    })
+  }
+  pack_info[idx_blank-1] <- paste(pack_info[idx_blank-1], pack_info[idx_blank])
+  pack_info <- pack_info[-idx_blank]
+  return(pack_info)
+}
 
 ##################################################################################
 # Tests
