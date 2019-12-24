@@ -28,3 +28,11 @@ a flowSet
 \description{
 Build a flowSet from a data.frame
 }
+\examples{
+\dontrun{
+utils::data("GvHD", package = "flowCore")
+gs <- GatingSet(GvHD)
+df <- get_data_gs(gs = gs, sample = pData(gs)$name[1:3], subset = "root", Ncells = 1000)
+fs <- build_flowset_from_df(df = df, origin = gs@data)
+pData(fs)}
+}

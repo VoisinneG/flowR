@@ -3,7 +3,7 @@
 \name{CompensationUI}
 \alias{CompensationUI}
 \alias{Compensation}
-\title{CompensationUI and Compensation}
+\title{Edit compensation matrices associated with a GatingSet}
 \usage{
 CompensationUI(id)
 
@@ -24,5 +24,7 @@ Compensation(input, output, session, rval)
 The updated reactiveValues object \code{rval}
 }
 \description{
-A shiny Module that deals with compensation
+Edit compensation matrices associated with a GatingSet
+
+Compensation server function
 }

@@ -3,7 +3,7 @@
 \name{ModulesUI}
 \alias{ModulesUI}
 \alias{Modules}
-\title{Search, select and load other modules}
+\title{Search, select and load modules}
 \usage{
 ModulesUI(id)
 
@@ -27,7 +27,7 @@ Modules(input, output, session, rval)
 The updated reactiveValues object \code{rval}
 }
 \description{
-Search, select and load other modules
+Search, select and load modules
 
 server function for the shiny module Modules
 }

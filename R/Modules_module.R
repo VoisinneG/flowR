@@ -21,7 +21,7 @@ ModulesUI <- function(id) {
     column(width = 8,
            box(title = "Search for modules",
                width = NULL, height = NULL,
-               selectizeInput(ns("packages"), 
+               selectizeInput(ns("packages"),
                               "Select Packages", 
                               choices = NULL, 
                               selected = NULL, 
@@ -51,10 +51,11 @@ ModulesUI <- function(id) {
 Modules <- function(input, output, session, rval) {
 
   rval_mod <- reactiveValues(modules = NULL, df_module_info = NULL, packages = NULL)
+  packages <- names(sessionInfo()$otherPkgs)
   
   observe({
-    packages <- names(sessionInfo()$otherPkgs)
-    updateSelectizeInput(session, "packages", choices = packages, selected = NULL)
+    print("update_package")
+    updateSelectizeInput(session, "packages", choices = packages, selected = "flowR")
   })
   
   observe({
@@ -176,36 +177,36 @@ format_info <- function(info){
 ##################################################################################
 # 
 # 
-library(shiny)
-library(shinydashboard)
-library(flowR)
-library(DT)
-
-if (interactive()){
-
-  ui <- dashboardPage(
-    dashboardHeader(title = "Modules"),
-    sidebar = dashboardSidebar(disable = TRUE),
-    body = dashboardBody(
-      ModulesUI("module")
-    )
-  )
-
-  server <- function(input, output, session) {
-
-    rval <- reactiveValues()
-
-    # observe({
-    #   utils::data("GvHD", package = "flowCore")
-    #   rval$gating_set <- GatingSet(GvHD)
-    #   #gs <- load_gs("./inst/ext/gs")
-    #   #rval$gating_set <- gs
-    # })
-
-    res <- callModule(Modules, "module", rval = rval)
-
-  }
-
-  shinyApp(ui, server)
-
-}
+# library(shiny)
+# library(shinydashboard)
+# library(flowR)
+# library(DT)
+# 
+# if (interactive()){
+# 
+#   ui <- dashboardPage(
+#     dashboardHeader(title = "Modules"),
+#     sidebar = dashboardSidebar(disable = TRUE),
+#     body = dashboardBody(
+#       ModulesUI("module")
+#     )
+#   )
+# 
+#   server <- function(input, output, session) {
+# 
+#     rval <- reactiveValues()
+# 
+#     # observe({
+#     #   utils::data("GvHD", package = "flowCore")
+#     #   rval$gating_set <- GatingSet(GvHD)
+#     #   #gs <- load_gs("./inst/ext/gs")
+#     #   #rval$gating_set <- gs
+#     # })
+# 
+#     res <- callModule(Modules, "module", rval = rval)
+# 
+#   }
+# 
+#   shinyApp(ui, server)
+# 
+# }

@@ -354,8 +354,6 @@ Gating <- function(input, output, session, rval) {
   #Update plot parameters to show defining gate
   observeEvent(input$show_gate, {
     
-    print(res$params$subset)
-    
     if(res$params$subset != "root"){
 
       rval$gate <- rval$gates_flowCore[[res$params$subset]]$gate

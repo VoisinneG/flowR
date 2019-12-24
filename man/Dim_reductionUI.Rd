@@ -3,7 +3,7 @@
 \name{Dim_reductionUI}
 \alias{Dim_reductionUI}
 \alias{Dim_reduction}
-\title{Dimensionality reduction}
+\title{Perform dimensionality reduction using t-SNE or UMAP}
 \usage{
 Dim_reductionUI(id)
 
@@ -24,7 +24,7 @@ Dim_reduction(input, output, session, rval)
 The updated reactiveValues object \code{rval}
 }
 \description{
-Dimensionality reduction
+Perform dimensionality reduction using t-SNE or UMAP
 
 Dim_reduction module  server function
 }

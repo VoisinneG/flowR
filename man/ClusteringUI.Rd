@@ -3,7 +3,7 @@
 \name{ClusteringUI}
 \alias{ClusteringUI}
 \alias{Clustering}
-\title{Identify clusters}
+\title{Automatic cluster identification}
 \usage{
 ClusteringUI(id)
 
@@ -24,7 +24,7 @@ Clustering(input, output, session, rval)
 The updated reactiveValues object \code{rval}
 }
 \description{
-Identify clusters
+Automatic cluster identification
 
 Clustering module server function
 }

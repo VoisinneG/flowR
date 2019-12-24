@@ -2316,6 +2316,13 @@ get_cluster <- function(df,
 #' @param sample_col Name of df's column containing sample names
 #' @return a flowSet
 #' @importFrom flowCore pData description parameters flowFrame flowSet
+#' @examples
+#' \dontrun{
+#' utils::data("GvHD", package = "flowCore")
+#' gs <- GatingSet(GvHD)
+#' df <- get_data_gs(gs = gs, sample = pData(gs)$name[1:3], subset = "root", Ncells = 1000)
+#' fs <- build_flowset_from_df(df = df, origin = gs@data)
+#' pData(fs)}
 build_flowset_from_df <- function(df,
                                   origin = NULL,
                                   chanel_col = setdiff(names(df), c("name", "subset")), 

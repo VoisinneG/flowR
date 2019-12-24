@@ -3,7 +3,7 @@
 \name{SubsampleUI}
 \alias{SubsampleUI}
 \alias{Subsample}
-\title{Subsample data from a GatingSet}
+\title{Subsample a GatingSet}
 \usage{
 SubsampleUI(id)
 
@@ -18,13 +18,57 @@ Subsample(input, output, session, rval)
 
 \item{session}{shiny session}
 
-\item{rval}{A reactive values object}
+\item{rval}{reactivevalues object with the following elements :
+\describe{
+  \item{gating_set}{: a GatingSet object}
+}}
 }
 \value{
-The updated reactiveValues object \code{rval}
+The input reactivevalues object 'rval' with updated elements :
+\describe{
+  \item{gating_set_list}{list of GatingSet objects loaded}
+  \item{gating_set}{selected GatingSet}
+  \item{gating_set_selected}{Name of the selected GatingSet}
+}
 }
 \description{
-Subsample data from a GatingSet
+Subsample a GatingSet
 
 Subsample module server function
+}
+\examples{
+\dontrun{
+library(shiny)
+library(shinydashboard)
+library(flowWorkspace)
+library(flowCore)
+
+if (interactive()){
+  
+  ui <- dashboardPage(
+    dashboardHeader(title = "Subsample"),
+    sidebar = dashboardSidebar(disable = TRUE),
+    body = dashboardBody(
+      fluidRow(
+        column(12, box(width = NULL, SubsampleUI("module")))
+      )
+    )
+  )
+  
+  server <- function(input, output, session) {
+    
+    rval <- reactiveValues()
+    
+    observe({
+      utils::data("GvHD", package = "flowCore")
+      rval$gating_set <- GatingSet(GvHD)
+    })
+    
+    rval <- callModule(Subsample, "module", rval = rval)
+    
+  }
+  
+  shinyApp(ui, server)
+  
+}}
 }

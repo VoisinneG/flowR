@@ -179,16 +179,9 @@ plotGatingSet <- function(input, output, session,
       rval_plot$yvar <- choices()$plot_var[idx_yvar]
     }
     
-    
-    print(reactiveValuesToList(plot_params))
     for(var in intersect(names(plot_params), c("xvar", "yvar") )){
       rval_plot[[var]] <- plot_params[[var]]
-      print( rval_plot[[var]] )
     }
-    
-    print("xyvar")
-    print(rval_plot$xvar)
-    print(rval_plot$yvar)
     
   })
   
@@ -726,10 +719,6 @@ plotGatingSet <- function(input, output, session,
       }
     }
     
-    print("gate")
-    print(gate)
-    
-    
     plist <- lapply( rval_mod$plot_list,
                      function(p){
                        if(!is.null(gate)){
@@ -746,15 +735,14 @@ plotGatingSet <- function(input, output, session,
    
     rval_mod$plot_list <- plist
     rval_mod$count_gate <- rval_mod$count_gate + 1
-    print("OK gate")
+    #print("OK gate")
   })
   
   ######################################################################################
   # Add polygonal plot layer
   plot_gate <- reactive({
     
-    print("poly")
-
+    #print("poly")
     
       gate <- NULL
       if(!is.null(rval_input$show_gates)){

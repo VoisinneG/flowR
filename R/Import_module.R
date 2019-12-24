@@ -6,6 +6,35 @@ utils::globalVariables("GvHD")
 #' @importFrom DT DTOutput
 #' @import shiny
 #' @export
+#' @examples
+#' \dontrun{
+#' library(shiny)
+#' library(shinydashboard)
+#' 
+#' if (interactive()){
+#'   
+#'   ui <- dashboardPage(
+#'     dashboardHeader(title = "Import"),
+#'     sidebar = dashboardSidebar(disable = TRUE),
+#'     body = dashboardBody(
+#'       fluidRow(
+#'         column(4, box(width = NULL, verbatimTextOutput("info"))),
+#'         column(8, box(width = NULL, ImportUI("module")))
+#'       )
+#'     )
+#'   )
+#'   
+#'   server <- function(input, output, session) {
+#'     rval <- reactiveValues()
+#'     rval <- callModule(Import, "module", rval = rval)
+#'     output$info <- renderPrint({
+#'       print(rval$gating_set_list)
+#'     })
+#'   }
+#'   
+#'   shinyApp(ui, server)
+#'   
+#' }}
 ImportUI <- function(id) {
 
   ns <- NS(id)
@@ -22,13 +51,9 @@ ImportUI <- function(id) {
              width = NULL, height = NULL,
              actionButton(ns("import_gvhd"), "import dataset (GvHD)")
            )
-           # box(title = "Options",
-           #     width = NULL, height = NULL,
-           #    checkboxInput(ns("apply_biexp_inverse"), "apply inverse biexponential on gate coordinates")
-           # )
     ),
     column(width = 6,
-           box(title = "Flow-set",
+           box(title = "GatingSet",
                width = NULL, height = NULL,
                div(style = 'overflow-x: scroll', DT::DTOutput(ns("files_table"))),
                br(),
@@ -36,7 +61,7 @@ ImportUI <- function(id) {
                               choices = NULL,
                               selected = NULL,
                               multiple = FALSE),
-               textInput(ns("fs_name"), "Flow-set name", "import"),
+               textInput(ns("gs_name"), "GatingSet name", "import"),
                actionButton(ns("load"), label = "Load selected files")
            )
     )
@@ -51,7 +76,13 @@ ImportUI <- function(id) {
 #' @param rval a reactivevalues object (can be empty)
 #' @return The input reactivevalues object 'rval' with updated elements :
 #' \describe{
-#'   \item{gating_set_list}{list of GatingSet objects loaded}
+#'   \item{gating_set_list}{a named list with each element containing :}
+#'   \describe{
+#'     \item{gating_set}{: a GatingSet objects}
+#'     \item{parent}{: the name of its parent GatingSet}
+#'   }
+#'   \item{gating_set}{selected GatingSet}
+#'   \item{gating_set_selected}{Name of the selected GatingSet}
 #' }
 #' @import shiny
 #' @importFrom flowWorkspace pData
@@ -114,17 +145,16 @@ Import <- function(input, output, session, rval) {
   
   observeEvent(input$load, {
     
-    rval$pdata <- NULL
-    rval$df_spill <- NULL
-    rval$transformation <- NULL
-    rval$trans_parameters <- NULL
-    rval$parameters <- NULL
-    
     validate(
       need(length(input$files_table_rows_selected)>0, "Please select a file to load")
     )
     
-    if( input$fs_name %in% names(rval$flow_set_list) ){
+    print("OK")
+    print(input$gs_name)
+    print(names(rval$gating_set_list))
+    print("OK2")
+    
+    if( input$gs_name %in% names(rval$gating_set_list) ){
       showModal(modalDialog(
         title = "Name already exists",
         paste("Please choose another name", sep=""),
@@ -133,7 +163,8 @@ Import <- function(input, output, session, rval) {
       ))
     }
     
-    validate(need(! input$fs_name %in% names(rval$flow_set_list), "Name already exists" ))
+    validate(need(! input$gs_name %in% names(rval$gating_set_list), "Name already exists" ))
+    print("OK3")
     
     # Create a Progress object
     progress <- shiny::Progress$new(min = 0, max = 1)
@@ -197,35 +228,6 @@ Import <- function(input, output, session, rval) {
         # time_step is needed to transform gates containing the parameter "Time"
         time_step <- as.numeric(description(ff)[["$TIMESTEP"]])
         
-        # # Parameters with a DISPLAY = LOG have been transformed with flowJo_biexp_trans().
-        # # We need to apply the inverse transfrom for such parameters
-        # 
-        # display <- unlist(sapply(rownames(parameters(ff)@data), FUN = function(x){
-        #   kw <- substr(x, start = 2, stop = nchar(x))
-        #   kw <- paste(kw, "DISPLAY", sep = "")
-        #   disp <- ff@description[[kw]]
-        #   if(is.null(disp)){
-        #     disp <- "NA"
-        #   }
-        #   return(disp)
-        # }))
-        # names(display) <- NULL
-        # 
-        # trans.log <- identity_trans()
-        # # if(input$apply_biexp_inverse){
-        # #   trans.log <- flowJo_biexp_inverse_trans()
-        # # }else{
-        # #   trans.log <- identity_trans()
-        # # }
-        # 
-        # myTrans <- lapply(display, function(x){
-        #   switch(x,
-        #          "LOG" = trans.log,
-        #          scales::identity_trans())
-        # })
-        
-        
-        
         params <- parameters(ff)$name
         
         pattern <- NULL
@@ -242,7 +244,7 @@ Import <- function(input, output, session, rval) {
         myTrans <- lapply(params, function(x){scales::identity_trans()})
         names(myTrans) <- params
         
-        rval$gates_flowCore <- transform_gates(gates = gates,
+        gates <- transform_gates(gates = gates,
                                                pattern = pattern,
                                                replacement = replacement,
                                                transformation = myTrans, 
@@ -255,40 +257,30 @@ Import <- function(input, output, session, rval) {
         names_imported <- flowCore::fsApply(fs, function(x){description(x)[["FILENAME"]]})
         names_imported <- basename(names_imported)
         idx_match <- match(names_imported, rval_mod$df_files$name)
-        fs <- ncdfFlow::read.ncdfFlowSet( rval_mod$df_files$datapath[idx_match], truncate_max_range = TRUE )
+        
+        fs <- ncdfFlow::read.ncdfFlowSet(rval_mod$df_files$datapath[idx_match], 
+                                         truncate_max_range = TRUE )
+        
         flowWorkspace::pData(fs)$name <- rval_mod$df_files$name[idx_match]
-
-        rval$flow_set_list[[input$fs_name]] <- list(flow_set = fs,
-                                                    spill = NULL,
-                                                    metadata = pData(fs),
-                                                    par = lapply(1:length(fs), function(x){parameters(fs[[x]])}),
-                                                    desc = lapply(1:length(fs), function(x){description(fs[[x]])}),
-                                                    spill = NULL,
-                                                    parameters = NULL,
-                                                    transformation = NULL,
-                                                    trans_parameters = NULL,
-                                                    gates = rval$gates_flowCore,
-                                                    name = input$fs_name, 
-                                                    parent = NULL)
-        rval$flow_set_selected <- input$fs_name
+        
+        gs <- GatingSet(fs)
+        add_gates_flowCore(gs, gates)
+        rval$gating_set_list[[input$gs_name]] <- list(gating_set = gs,
+                                                      parent = NULL)
+        rval$gating_set_selected <- input$gs_name
         
       }else if(file_ext(rval_mod$df_files$datapath[input$files_table_rows_selected[1]]) == "rda"){
         
         res_name <- load(rval_mod$df_files$datapath[input$files_table_rows_selected[1]])
         res <- get(res_name)
-        rval$flow_set_list <- res
+        rval$gating_set_list <- res
         
         for(i in 1:length(res)){
           fs <- build_flowset_from_df(df = res[[i]]$data, origin = res[[i]]$flow_set)
-          rval$flow_set_list[[i]]$flow_set <- fs
-          print(names(rval$flow_set_list))
+          rval$gating_set_list[[i]]$flow_set <- fs
         }
         
-        rval$flow_set_selected <- names(rval$flow_set_list)[[1]]
-        
-        print("IMPORT")
-        print(rval$flow_set_selected)
-        print(rval$flow_set_list[[rval$flow_set_selected]]$gates)
+        rval$gating_set_selected <- names(rval$gating_set_list)[[1]]
         
       }else if(file_ext(rval_mod$df_files$datapath[input$files_table_rows_selected[1]]) %in% c("csv", "txt")){
         
@@ -300,21 +292,11 @@ Import <- function(input, output, session, rval) {
         df$name <- basename(rval_mod$df_files$datapath[input$files_table_rows_selected[1]])
         df$subset <- "root"
         fs <- build_flowset_from_df(df)
-
-        rval$flow_set_list[[input$fs_name]] <- list(flow_set = fs,
-                                                    spill = NULL,
-                                                    metadata = pData(fs),
-                                                    par = lapply(1:length(fs), function(x){parameters(fs[[x]])}),
-                                                    desc = lapply(1:length(fs), function(x){description(fs[[x]])}),
-                                                    spill = NULL,
-                                                    parameters = NULL,
-                                                    transformation = NULL,
-                                                    trans_parameters = NULL,
-                                                    gates = list(),
-                                                    name = input$fs_name, 
-                                                    parent = NULL)
+        gs <- GatingSet(fs)
+        rval$gating_set_list[[input$gs_name]] <- list(gating_set = gs,
+                                                      parent = NULL)
+        rval$gating_set_selected <- input$gs_name
         
-        rval$flow_set_selected <- input$fs_name
         
       }else{
         
@@ -323,44 +305,23 @@ Import <- function(input, output, session, rval) {
                                           truncate_max_range = TRUE )
         
         pData(fs)$name <- rval_mod$df_files$name[input$files_table_rows_selected]
-        
-        rval$flow_set_list[[input$fs_name]] <- list(flow_set = fs,
-                                                    spill = NULL,
-                                                    metadata = pData(fs),
-                                                    #par = lapply(1:length(fs), function(x){parameters(fs[[x]])}),
-                                                    #desc = lapply(1:length(fs), function(x){description(fs[[x]])}),
-                                                    #spill = NULL,
-                                                    #parameters = NULL,
-                                                    transformation = NULL,
-                                                    trans_parameters = NULL,
-                                                    gates = list(),
-                                                    name = input$fs_name, 
+        gs <- GatingSet(fs)
+        rval$gating_set_list[[input$gs_name]] <- list(gating_set = gs,
                                                     parent = NULL)
-        rval$flow_set_selected <- input$fs_name
+        rval$gating_set_selected <- input$gs_name
       }
-      
+    
+    print("OK4")
   })
 
   observeEvent(input$import_gvhd, {
     
     utils::data("GvHD", package = "flowCore")
-    assign("fs", GvHD)
-    
-    rval$flow_set_list[["GvHD"]] <- list(flow_set = fs,
-                                                spill = NULL,
-                                                metadata = pData(fs),
-                                                #par = lapply(1:length(fs), function(x){parameters(fs[[x]])}),
-                                                #desc = lapply(1:length(fs), function(x){description(fs[[x]])}),
-                                                #spill = NULL,
-                                                #parameters = NULL,
-                                                transformation = NULL,
-                                                trans_parameters = NULL,
-                                                gates = list(),
-                                                name = "GvHD", 
-                                                parent = NULL)
-    #rval$gating_set <- GatingSet(fs)
-    rval$flow_set_selected <- "GvHD"
-    
+    gs <- GatingSet(GvHD)
+    rval$gating_set_list[["GvHD"]] <- list(gating_set = gs,
+                                                  parent = NULL)
+    rval$gating_set_selected <- "GvHD"
+  
   })
   
   output$files_table <- DT::renderDT({
@@ -376,3 +337,39 @@ Import <- function(input, output, session, rval) {
   return(rval)
   
 }
+
+##################################################################################
+# Tests
+##################################################################################
+# 
+# library(shiny)
+# library(shinydashboard)
+# 
+# if (interactive()){
+# 
+#   ui <- dashboardPage(
+#     dashboardHeader(title = "Import"),
+#     sidebar = dashboardSidebar(disable = TRUE),
+#     body = dashboardBody(
+#       fluidRow(
+#         column(4, box(width = NULL, verbatimTextOutput("info"))),
+#         column(8, box(width = NULL, ImportUI("module")))
+#       )
+#     )
+#   )
+# 
+#   server <- function(input, output, session) {
+# 
+#     rval <- reactiveValues()
+# 
+#     rval <- callModule(Import, "module", rval = rval)
+# 
+#     output$info <- renderPrint({
+#       print(rval$gating_set_list)
+#     })
+# 
+#   }
+# 
+#   shinyApp(ui, server)
+# 
+# }

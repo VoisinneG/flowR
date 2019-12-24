@@ -23,11 +23,47 @@ Import(input, output, session, rval)
 \value{
 The input reactivevalues object 'rval' with updated elements :
 \describe{
-  \item{gating_set_list}{list of GatingSet objects loaded}
+  \item{gating_set_list}{a named list with each element containing :}
+  \describe{
+    \item{gating_set}{: a GatingSet objects}
+    \item{parent}{: the name of its parent GatingSet}
+  }
+  \item{gating_set}{selected GatingSet}
+  \item{gating_set_selected}{Name of the selected GatingSet}
 }
 }
 \description{
 Import data and build a GatingSet
 
 Import module server function
+}
+\examples{
+\dontrun{
+library(shiny)
+library(shinydashboard)
+
+if (interactive()){
+  
+  ui <- dashboardPage(
+    dashboardHeader(title = "Import"),
+    sidebar = dashboardSidebar(disable = TRUE),
+    body = dashboardBody(
+      fluidRow(
+        column(4, box(width = NULL, verbatimTextOutput("info"))),
+        column(8, box(width = NULL, ImportUI("module")))
+      )
+    )
+  )
+  
+  server <- function(input, output, session) {
+    rval <- reactiveValues()
+    rval <- callModule(Import, "module", rval = rval)
+    output$info <- renderPrint({
+      print(rval$gating_set_list)
+    })
+  }
+  
+  shinyApp(ui, server)
+  
+}}
 }
