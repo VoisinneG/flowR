@@ -1,8 +1,36 @@
 #' Search, select and load modules
 #' @param id shiny id
-#' @importFrom shinydashboard box tabBox
+#' @importFrom shinydashboard box
+#' @importFrom DT DTOutput
 #' @import shiny
 #' @export
+#' @examples 
+#' \dontrun{
+#' library(shiny)
+#' library(shinydashboard)
+#' library(flowR)
+#' library(DT)
+#' 
+#' if (interactive()){
+#'   
+#'   ui <- dashboardPage(
+#'     dashboardHeader(title = "Modules"),
+#'     sidebar = dashboardSidebar(disable = TRUE),
+#'     body = dashboardBody(
+#'       ModulesUI("module")
+#'     )
+#'   )
+#'   
+#'   server <- function(input, output, session) {
+#'     rval <- reactiveValues(menu_elements = list("Modules" = NULL))
+#'     rval <- callModule(Modules, "module", rval = rval)
+#'   }
+#'   
+#'   shinyApp(ui, server)
+#'   
+#' }
+#' }
+
 ModulesUI <- function(id) {
   
   ns <- NS(id)
@@ -26,7 +54,8 @@ ModulesUI <- function(id) {
                               choices = NULL, 
                               selected = NULL, 
                               multiple = TRUE),
-              DTOutput(ns("mod_description"))
+              DTOutput(ns("mod_description")),
+              actionButton(ns("add_modules"), "add selected modules")
            )
     )
     
@@ -42,26 +71,30 @@ ModulesUI <- function(id) {
 #' @param rval reactivevalues object with the following elements :
 #' \describe{
 #'   \item{gating_set}{: a GatingSet object}
+#'   \item{menu_elements}{: Named list. Names should correspond to the names of available modules.}
 #' }
-#' @return The updated reactiveValues object \code{rval}
+#' @return The input reactivevalues object 'rval' with updated elements :
+#' \describe{
+#'   \item{modules}{: names of selected modules}
+#' }
 #' @import shiny
 #' @importFrom utils sessionInfo
+#' @importFrom DT renderDT
 #' @rdname ModulesUI
 #' @export
 Modules <- function(input, output, session, rval) {
 
-  rval_mod <- reactiveValues(modules = NULL, df_module_info = NULL, packages = NULL)
-  packages <- names(sessionInfo()$otherPkgs)
+  rval_mod <- reactiveValues(modules = NULL, df_module_info = NULL, packages = NULL, choices = NULL)
+  packages <- c(names(sessionInfo()$otherPkgs), ".GlobalEnv")
   
   observe({
     print("update_package")
-    updateSelectizeInput(session, "packages", choices = packages, selected = "flowR")
+    updateSelectizeInput(session, "packages", choices = packages, selected = c("flowR", ".GlobalEnv"))
   })
   
   observe({
       updateSelectizeInput(session, "mod_selection",
-                           choices = union(rval_mod$df_module_info$module, 
-                                           names(rval$menu_elements)),
+                           choices = rval_mod$choices,
                            selected = names(rval$menu_elements))
   })
   
@@ -74,13 +107,25 @@ Modules <- function(input, output, session, rval) {
   observe({
     
     df_info_list <- list()
-    for(pack in c(input$packages, "local_env")){
-      if(pack == "local_env"){
-        mod_ui_name <- ls()[grep("UI$", ls())]
-        mod_name <- strsplit(mod_ui_name, split = "UI")
-        df_info_list[[pack]] <- data.frame(package = rep(pack, length(mod_name)), 
-                                           module = mod_name, 
-                                           description = rep(NA, length(mod_name)))
+    for(pack in input$packages){
+      if(pack == ".GlobalEnv"){
+        pack_objs <- ls(envir=.GlobalEnv)
+        if(length(pack_objs)>0){
+          mod_ui_name <- pack_objs[grep("UI$", pack_objs)]
+          if(length(mod_ui_name)>0){
+            mod_name <- unlist(strsplit(mod_ui_name, split = "UI"))
+            mod_is_valid <- sapply(1:length(mod_name), function(x){
+              !is.na(match( mod_name[x], pack_objs ))})
+            if(sum(mod_is_valid)>0){
+              mod_name <- mod_name[mod_is_valid]
+              df_info_list[[pack]] <- data.frame(package = rep(pack, length(mod_name)), 
+                                                 module = mod_name, 
+                                                 description = rep(NA, length(mod_name)))
+            }
+          }
+          
+        }
+        
       }else{
         info <- library(help = pack, character.only = TRUE)
         pack_objs <- ls(paste0("package:", pack))
@@ -116,11 +161,9 @@ Modules <- function(input, output, session, rval) {
             }else{
               description <- rep(NA, length(mod_name))
             }
-            df_info_list[[pack]] <- data.frame(package = rep(pack, length(mod_name)), 
-                                               module = mod_name, 
-                                               #"functions" = paste(mod_name, mod_ui_name, sep = "/"),
+            df_info_list[[pack]] <- data.frame(package = rep(pack, length(mod_name)),
+                                               module = mod_name,
                                                description = description)
-            print(description)
           }else{
             df_info_list[[pack]] <- NULL
           }
@@ -133,11 +176,18 @@ Modules <- function(input, output, session, rval) {
     }
     
     rval_mod$df_module_info <- do.call(rbind, df_info_list)
-
+    rval_mod$choices <- union(rval_mod$choices, rval_mod$df_module_info$module)
+    
   })
   
   output$mod_description <- renderDT({
     DT::datatable(rval_mod$df_module_info, rownames = FALSE)
+  })
+  
+  observeEvent(input$add_modules, {
+    new_modules <- rval_mod$df_module_info$module[input$mod_description_rows_selected]
+    updateSelectizeInput(session, "mod_selection",
+                         selected = union(new_modules, input$mod_selection))
   })
   
   return(rval)
@@ -176,7 +226,6 @@ format_info <- function(info){
 # Tests
 ##################################################################################
 # 
-# 
 # library(shiny)
 # library(shinydashboard)
 # library(flowR)
@@ -193,18 +242,8 @@ format_info <- function(info){
 #   )
 # 
 #   server <- function(input, output, session) {
-# 
-#     rval <- reactiveValues()
-# 
-#     # observe({
-#     #   utils::data("GvHD", package = "flowCore")
-#     #   rval$gating_set <- GatingSet(GvHD)
-#     #   #gs <- load_gs("./inst/ext/gs")
-#     #   #rval$gating_set <- gs
-#     # })
-# 
-#     res <- callModule(Modules, "module", rval = rval)
-# 
+#     rval <- reactiveValues(menu_elements = list("Modules" = NULL))
+#     rval <- callModule(Modules, "module", rval = rval)
 #   }
 # 
 #   shinyApp(ui, server)

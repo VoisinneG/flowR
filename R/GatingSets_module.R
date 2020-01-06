@@ -74,6 +74,7 @@ GatingSetsUI <- function(id) {
 #'     \item{gating_set}{: a GatingSet objects}
 #'     \item{parent}{: the name of its parent GatingSet}
 #'   }
+#'}
 #' @return The reactive values object \code{rval} with updated elements :
 #' \describe{
 #'   \item{gating_set_list}{a named list with each element containing :}
@@ -93,7 +94,9 @@ GatingSetsUI <- function(id) {
 GatingSets <- function(input, output, session, rval) {
   
   observeEvent( c(names(rval$gating_set_list), rval$gating_set_selected), {
-    updateSelectInput(session, "gating_set", choices = names(rval$gating_set_list), selected = rval$gating_set_selected)
+    updateSelectInput(session, "gating_set", 
+                      choices = names(rval$gating_set_list), 
+                      selected = rval$gating_set_selected)
   })
   
   observeEvent(input$gating_set, {
@@ -102,7 +105,8 @@ GatingSets <- function(input, output, session, rval) {
   
   observeEvent(input$delete, {
     validate(need(input$gating_set, "no GatingSet selected"))
-    idx <- which(names(rval$gating_set_list) == input$gating_set | sapply(rval$gating_set_list, function(x){x$parent}) ==  input$gating_set)
+    idx <- which(names(rval$gating_set_list) == input$gating_set | 
+                   sapply(rval$gating_set_list, function(x){x$parent}) ==  input$gating_set)
     rval$gating_set_list <- rval$gating_set_list[-idx]
   })
   
@@ -115,16 +119,18 @@ GatingSets <- function(input, output, session, rval) {
     for(i in 1:length(rval$gating_set_list)){
       
       if(!is.null(rval$gating_set_list[[i]]$parent)){
-        
-        gR = graph::addEdge(rval$gating_set_list[[i]]$parent,  names(rval$gating_set_list)[i], gR)
-        
+        if(rval$gating_set_list[[i]]$parent %in% names(rval$gating_set_list) ){
+          gR = graph::addEdge(rval$gating_set_list[[i]]$parent,  names(rval$gating_set_list)[i], gR)
+        }else{
+          gR = graph::addEdge(names(rval$gating_set_list)[i],  names(rval$gating_set_list)[i], gR)
+        }
       }else{
         gR = graph::addEdge(names(rval$gating_set_list)[i],  names(rval$gating_set_list)[i], gR)
       }
     }
     
     Rgraphviz::renderGraph(Rgraphviz::layoutGraph(gR, 
-                            attrs=list(node=list(fixedsize = FALSE,
+                            attrs=list(node=list(fixedsize = TRUE,
                                                  fillcolor = "gray",
                                                  fontsize = 12,
                                                  shape = "ellipse")
@@ -212,7 +218,7 @@ GatingSets <- function(input, output, session, rval) {
 ##################################################################################
 # Tests
 ##################################################################################
-
+# 
 # library(shiny)
 # library(shinydashboard)
 # library(flowCore)
@@ -232,12 +238,13 @@ GatingSets <- function(input, output, session, rval) {
 #   server <- function(input, output, session) {
 # 
 #     rval <- reactiveValues()
-#     
+# 
 #     observe({
 #       utils::data("GvHD", package = "flowCore")
 #       gs <- GatingSet(GvHD)
 #       rval$gating_set_list <- list( GvHD = list(gating_set = gs, parent = NULL),
 #                                     subset = list(gating_set = gs, parent = "GvHD"))
+#       rval$gating_set_list <- list( GvHD = list(gating_set = gs, parent = NULL) )
 #     })
 # 
 #     rval <- callModule(GatingSets, "module", rval = rval)

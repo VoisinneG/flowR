@@ -273,14 +273,19 @@ Import <- function(input, output, session, rval) {
         
         res_name <- load(rval_mod$df_files$datapath[input$files_table_rows_selected[1]])
         res <- get(res_name)
-        rval$gating_set_list <- res
-        
-        for(i in 1:length(res)){
-          fs <- build_flowset_from_df(df = res[[i]]$data, origin = res[[i]]$flow_set)
-          rval$gating_set_list[[i]]$flow_set <- fs
+
+        for(name in names(res)){
+          fs <- build_flowset_from_df(df = res[[name]]$data, origin = res[[name]]$flow_set)
+          gs <- GatingSet(fs)
+          add_gates_flowCore(gs = gs, gates = res[[name]]$gates)
+          parent <- NULL
+          if(res[[name]]$parent  %in% names(res)){
+            parent <- res[[name]]$parent
+          }
+          rval$gating_set_list[[name]] <- list(gating_set = gs, parent = parent)
         }
         
-        rval$gating_set_selected <- names(rval$gating_set_list)[[1]]
+        rval$gating_set_selected <- names(res)[1]
         
       }else if(file_ext(rval_mod$df_files$datapath[input$files_table_rows_selected[1]]) %in% c("csv", "txt")){
         

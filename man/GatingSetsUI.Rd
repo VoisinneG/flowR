@@ -17,6 +17,15 @@ GatingSets(input, output, session, rval)
 \item{output}{shiny output}
 
 \item{session}{shiny session}
+
+\item{rval}{a reactivevalues object with elements :
+\describe{
+  \item{gating_set_list}{a named list with each element containing :}
+  \describe{
+    \item{gating_set}{: a GatingSet objects}
+    \item{parent}{: the name of its parent GatingSet}
+  }
+}}
 }
 \value{
 The reactive values object \code{rval} with updated elements :

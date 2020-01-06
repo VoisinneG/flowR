@@ -14,10 +14,9 @@
 flowR_server <- function(session, input, output, modules = NULL) {
   
   rval <- reactiveValues(update_gs = 0, # useful to force execution of 
-                         #observe environment (for instance after updating a GatingSet with gs_pop_add()
+                         #observe environments (for instance after updating a GatingSet with gs_pop_add() )
                          gating_set = NULL,
                          gating_set_list = list(),
-                         list_module_server_function = list(),
                          tab_elements = list(),
                          menu_elements = list(),
                          modules = NULL
@@ -74,24 +73,22 @@ flowR_server <- function(session, input, output, modules = NULL) {
 
         mod_name_ui <- paste(mod_name, "UI", sep="")
         
-        rval$list_module_server_function[[mod_name]] <- function(...){
-          do.call(mod_name, list(...) )
-        }
+        module_server_function <-function(...){do.call(mod_name, list(...) )}
+        module_id <- paste(mod_name, "module", sep="_")
+        module_tab_name <- paste(mod_name, "tab", sep="_")
         
+        rval <- callModule(module_server_function, 
+                           id = module_id,
+                           rval = rval)
         
-          rval <- callModule(rval$list_module_server_function[[mod_name]], 
-                             id = paste(mod_name, "module", sep="_"),
-                             rval = rval)
-            
-          rval$tab_elements[[mod_name]] <- tabItem(tabName = paste(mod_name, "tab", sep="_"),
-                                                   do.call(mod_name_ui, list(id = paste(mod_name, "module", sep="_") )))
-          
-          rval$menu_elements[[mod_name]] <- menuItem(mod_name,
-                                                     tabName = paste(mod_name, "tab", sep="_"), 
-                                                     startExpanded = FALSE,
-                                                     icon = icon("check-circle"))
+        rval$tab_elements[[mod_name]] <- tabItem(tabName = module_tab_name,
+                                                 do.call(mod_name_ui, 
+                                                         list(id = module_id)))
         
-      
+        rval$menu_elements[[mod_name]] <- menuItem(mod_name,
+                                                   tabName = module_tab_name, 
+                                                   startExpanded = FALSE,
+                                                   icon = icon("check-circle"))
     }
     
   })
@@ -113,7 +110,9 @@ flowR_server <- function(session, input, output, modules = NULL) {
   # observe and reactive functions
   
   observeEvent( c(names(rval$gating_set_list), rval$gating_set_selected), {
-    updateSelectInput(session, "gating_set", choices = names(rval$gating_set_list), selected = rval$gating_set_selected)
+    updateSelectInput(session, "gating_set", 
+                      choices = names(rval$gating_set_list), 
+                      selected = rval$gating_set_selected)
   })
   
   observeEvent(input$gating_set, {
@@ -125,27 +124,11 @@ flowR_server <- function(session, input, output, modules = NULL) {
       rval$gating_set <- NULL
     }
     else{
-      rval$gating_set <- rval$gating_set_list[[rval$gating_set_selected]]$gating_set
-      rval$trans_parameters <- rval$gating_set_list[[rval$gating_set_selected]]$trans_parameters
+      gs_name <- rval$gating_set_selected
+      rval$gating_set <- rval$gating_set_list[[gs_name]]$gating_set
+      rval$trans_parameters <- rval$gating_set_list[[gs_name]]$trans_parameters
     }
-    
-    
-    
-    # fs <- rval$gating_set@data
-    # rval$Ncells_tot <- sum( sapply(1:length(fs), function(x){dim(fs[[x]]@exprs)[1]}) )
-    # 
-    # params <- parameters(fs[[1]])$name
-    # 
-    # min_val <- as.data.frame(fsApply(fs, each_col, min, na.rm = TRUE))
-    # min_val_all <- apply(min_val, 2, min)
-    # max_val <- as.data.frame(fsApply(fs, each_col, max,  na.rm = TRUE))
-    # max_val_all <- apply(max_val, 2, max)
-    # 
-    # rval$data_range <- lapply(params, function(x){
-    #   c(min_val_all[[x]] , max_val_all[[x]])
-    # })
-    # names(rval$data_range) <- params
-    
+  
   })
   
  
@@ -204,7 +187,7 @@ flowR_server <- function(session, input, output, modules = NULL) {
   
   output$progressBox <- renderValueBox({
     Nsamples <- 0
-    print(rval$update_gs)
+    rval$update_gs
     if(!is.null(rval$gating_set)){
       Nsamples <- length(pData(rval$gating_set)$name)
     }
@@ -216,7 +199,7 @@ flowR_server <- function(session, input, output, modules = NULL) {
   
   output$progressBox2 <- renderValueBox({
     ngates <- 0
-    print(rval$update_gs)
+    rval$update_gs
     if(!is.null(rval$gating_set)){
       ngates <- length(setdiff(flowWorkspace::gs_get_pop_paths(rval$gating_set), "root"))
     }
@@ -229,7 +212,7 @@ flowR_server <- function(session, input, output, modules = NULL) {
   
   output$progressBox3 <- renderValueBox({
     ncells <- 0
-    print(rval$update_gs)
+    rval$update_gs
     if(!is.null(rval$gating_set)){
       fs <- rval$gating_set@data
       ncells <- sum( sapply(1:length(fs), function(x){dim(fs[[x]]@exprs)[1]}) )
@@ -242,6 +225,7 @@ flowR_server <- function(session, input, output, modules = NULL) {
   
   output$progressBox4 <- renderValueBox({
     nparams <- 0
+    rval$update_gs
     if(!is.null(rval$gating_set)){
       nparams <- length(colnames(rval$gating_set))
     }

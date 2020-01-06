@@ -197,7 +197,7 @@ Subsample <- function(input, output, session, rval) {
     
 
     rval$gating_set_list[[input$gs_name]] <- list(gating_set = rval_mod$gs_subsample,
-                                                  parent = rval$gating_set@name)
+                                                  parent = rval$gating_set_selected)
     rval$gating_set_selected <- input$gs_name
     
   })

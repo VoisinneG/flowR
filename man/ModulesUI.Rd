@@ -21,13 +21,44 @@ Modules(input, output, session, rval)
 \item{rval}{reactivevalues object with the following elements :
 \describe{
   \item{gating_set}{: a GatingSet object}
+  \item{menu_elements}{: Named list. Names should correspond to the names of available modules.}
 }}
 }
 \value{
-The updated reactiveValues object \code{rval}
+The input reactivevalues object 'rval' with updated elements :
+\describe{
+  \item{modules}{: names of selected modules}
+}
 }
 \description{
 Search, select and load modules
 
 server function for the shiny module Modules
+}
+\examples{
+\dontrun{
+library(shiny)
+library(shinydashboard)
+library(flowR)
+library(DT)
+
+if (interactive()){
+  
+  ui <- dashboardPage(
+    dashboardHeader(title = "Modules"),
+    sidebar = dashboardSidebar(disable = TRUE),
+    body = dashboardBody(
+      ModulesUI("module")
+    )
+  )
+  
+  server <- function(input, output, session) {
+    rval <- reactiveValues(menu_elements = list("Modules" = NULL))
+    rval <- callModule(Modules, "module", rval = rval)
+  }
+  
+  shinyApp(ui, server)
+  
+}
+}
 }
