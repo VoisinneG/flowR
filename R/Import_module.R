@@ -278,6 +278,9 @@ Import <- function(input, output, session, rval) {
           fs <- build_flowset_from_df(df = res[[name]]$data, origin = res[[name]]$flow_set)
           gs <- GatingSet(fs)
           add_gates_flowCore(gs = gs, gates = res[[name]]$gates)
+          gs@compensation <- res[[name]]$compensation
+          gs@transformation <- res[[name]]$transformation
+          rval$trans_parameters <- res[[name]]$trans_parameters
           parent <- NULL
           if(res[[name]]$parent  %in% names(res)){
             parent <- res[[name]]$parent

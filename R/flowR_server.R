@@ -34,42 +34,58 @@ flowR_server <- function(session, input, output, modules = NULL) {
     }
   })
   
+  observe({
+    rval$modules <- union(rval$modules, "Modules")
+  })
+  
   output$body <- renderUI({
-    tagList(
-      textOutput("gating_set_name"),
-      br(),
-      fluidRow(
-        valueBoxOutput("progressBox", width = 3),
-        valueBoxOutput("progressBox2", width = 3),
-        valueBoxOutput("progressBox3", width = 3),
-        valueBoxOutput("progressBox4", width = 3),
-      ),
-      do.call(tabItems, unname(rval$tab_elements))
-    )
+    if(all(rval$modules %in% names(rval$tab_elements))){
+      tagList(
+        textOutput("gating_set_name"),
+        br(),
+        fluidRow(
+          valueBoxOutput("progressBox", width = 3),
+          valueBoxOutput("progressBox2", width = 3),
+          valueBoxOutput("progressBox3", width = 3),
+          valueBoxOutput("progressBox4", width = 3),
+        ),
+        do.call(tabItems, unname(rval$tab_elements[rval$modules]))
+      )
+    }else{
+      tagList(list())
+    }
+    
   })
   
   output$menu <- renderMenu({
-    sidebarMenu(id = "menu",
-                tagList(rval$menu_elements),
-                menuItem("General controls",
-                         tabName = "General_tab",
-                         startExpanded = FALSE,
-                         icon = icon("check-circle"),
-                         checkboxInput("apply_comp", "apply compensation", TRUE),
-                         checkboxInput("apply_trans", "apply transformation", TRUE),
-                         selectInput("gating_set", "Select GatingSet", choices = NULL, selected = NULL),
-                         br()
-                )
-    )
+    if(all(rval$modules %in% names(rval$menu_elements))){
+      sidebarMenu(id = "menu",
+                  tagList(rval$menu_elements[rval$modules]),
+                  menuItem("General controls",
+                           tabName = "General_tab",
+                           startExpanded = FALSE,
+                           icon = icon("check-circle"),
+                           checkboxInput("apply_comp", "apply compensation", TRUE),
+                           checkboxInput("apply_trans", "apply transformation", TRUE),
+                           selectInput("gating_set", "Select GatingSet", choices = NULL, selected = NULL),
+                           br()
+                  )
+      )
+    }else{
+      
+      NULL
+    }
   })
   
   observeEvent(rval$modules, {
     
-    modules <- union(rval$modules, "Modules")
-    rval$menu_elements <- list()
-    rval$tab_elements <- list()
+    #modules <- union(rval$modules, "Modules")
+    #rval$menu_elements <- list()
+    #rval$tab_elements <- list()
     
-    for( mod_name in modules ){
+    modules_to_update <- union("Modules", setdiff(rval$modules, names(rval$menu_elements)))
+    
+    for( mod_name in modules_to_update ){
 
         mod_name_ui <- paste(mod_name, "UI", sep="")
         

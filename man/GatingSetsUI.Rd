@@ -20,19 +20,19 @@ GatingSets(input, output, session, rval)
 
 \item{rval}{a reactivevalues object with elements :
 \describe{
-  \item{gating_set_list}{a named list with each element containing :}
+  \item{gating_set_list}{a named list with each element being itself a list with:}
   \describe{
-    \item{gating_set}{: a GatingSet objects}
+    \item{gating_set}{: a GatingSet}
     \item{parent}{: the name of its parent GatingSet}
   }
 }}
 }
 \value{
-The reactive values object \code{rval} with updated elements :
+The reactivevalues object \code{rval} with updated elements :
 \describe{
-  \item{gating_set_list}{a named list with each element containing :}
+  \item{gating_set_list}{a named list with each element being itself a list with:}
   \describe{
-    \item{gating_set}{: a GatingSet objects}
+    \item{gating_set}{: a GatingSet}
     \item{parent}{: the name of its parent GatingSet}
   }
   \item{gating_set_selected}{Name of the selected GatingSet}

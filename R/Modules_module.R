@@ -22,7 +22,7 @@
 #'   )
 #'   
 #'   server <- function(input, output, session) {
-#'     rval <- reactiveValues(menu_elements = list("Modules" = NULL))
+#'     rval <- reactiveValues(modules = c("Import"))
 #'     rval <- callModule(Modules, "module", rval = rval)
 #'   }
 #'   
@@ -71,7 +71,7 @@ ModulesUI <- function(id) {
 #' @param rval reactivevalues object with the following elements :
 #' \describe{
 #'   \item{gating_set}{: a GatingSet object}
-#'   \item{menu_elements}{: Named list. Names should correspond to the names of available modules.}
+#'   \item{modules}{: Names of pre-selected modules}
 #' }
 #' @return The input reactivevalues object 'rval' with updated elements :
 #' \describe{
@@ -85,22 +85,22 @@ ModulesUI <- function(id) {
 Modules <- function(input, output, session, rval) {
 
   rval_mod <- reactiveValues(modules = NULL, df_module_info = NULL, packages = NULL, choices = NULL)
-  packages <- c(names(sessionInfo()$otherPkgs), ".GlobalEnv")
+  
   
   observe({
-    print("update_package")
-    updateSelectizeInput(session, "packages", choices = packages, selected = c("flowR", ".GlobalEnv"))
+    rval_mod$packages <- c(names(sessionInfo()$otherPkgs), ".GlobalEnv")
+    updateSelectizeInput(session, "packages", choices = rval_mod$packages, selected = c("flowR", ".GlobalEnv"))
   })
   
   observe({
       updateSelectizeInput(session, "mod_selection",
                            choices = rval_mod$choices,
-                           selected = names(rval$menu_elements))
+                           selected = rval$modules)
   })
   
   observeEvent(input$apply, {
     if(!is.null(input$mod_selection)){
-      rval$modules <- input$mod_selection
+      rval$modules <- union(input$mod_selection, "Modules")
     }
   })
   
@@ -242,7 +242,7 @@ format_info <- function(info){
 #   )
 # 
 #   server <- function(input, output, session) {
-#     rval <- reactiveValues(menu_elements = list("Modules" = NULL))
+#     rval <- reactiveValues(modules = c("Import"))
 #     rval <- callModule(Modules, "module", rval = rval)
 #   }
 # 
