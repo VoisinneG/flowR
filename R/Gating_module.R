@@ -64,11 +64,25 @@ GatingUI <- function(id) {
                   ),
                   tabPanel(title = "Stats",
                            br(),
-                           downloadButton(ns("download_data")),
+                           downloadButton(ns("download_data"), label = "Download Stats"),
                            br(),
                            br(),
                            div(style = 'overflow-x: scroll', DT::DTOutput(ns("pop_stats"))),
                            br() 
+                  ),
+                  tabPanel(title = "Import/Export",
+                           br(),
+                           downloadButton(ns("export_gh"), label = "Export Gating Hierarchy"),
+                           br(),
+                           br(),
+                           fileInput(inputId = ns("import_gh"),
+                                     label = "Import Gating Hierarchy",
+                                     multiple = FALSE),
+                           textInput(ns("pattern"), label = "Pattern", value  = "[\\<|\\>]"),
+                           textInput(ns("replacement"), label = "Replacement", value  = ""),
+                           numericInput(ns("time_step"), label = "Time step", value = 1),
+                           verbatimTextOutput(ns("import_gh_summary")),
+                           actionButton(ns("apply_gh"), label = "Apply Gating Hierarchy")
                   )
                   
            )
@@ -86,7 +100,7 @@ GatingUI <- function(id) {
 #' @param rval A reactive values object
 #' @return The updated reactiveValues object \code{rval}
 #' @import shiny
-#' @importFrom flowWorkspace gs_pop_add Rm setNode recompute gs_get_pop_paths
+#' @importFrom flowWorkspace gs_pop_add gs_pop_remove setNode recompute gs_get_pop_paths
 #' @importFrom flowCore polygonGate
 #' @importFrom graph addEdge
 #' @importFrom Rgraphviz renderGraph layoutGraph
@@ -104,6 +118,7 @@ Gating <- function(input, output, session, rval) {
   plot_params_gh <- reactiveValues() # parameters controlling the gating hierarchy plot
   gate <- reactiveValues(x = NULL, y = NULL) # polygon gate represented on plot
   display_params <- reactiveValues()
+  rval_mod <- reactiveValues()
   
   #reset reacivevalues object when GatingSet has been updated
   observeEvent(rval$update_gs, {
@@ -111,23 +126,9 @@ Gating <- function(input, output, session, rval) {
     gate <- reactiveValues(x = NULL, y = NULL)
     plot_params_gh <- reactiveValues()
     display_params <- reactiveValues()
+    rval_mod <- reactiveValues()
   })
-  
-  #Plot initialization
-  observe({
-    
-    if(class(rval$gating_set)=="GatingSet"){
-      rval$gates_flowCore <- get_gates_from_gs(rval$gating_set)
-      if(!setequal(names(rval$gating_set@transformation), colnames(rval$gating_set))){
-        transformation <- lapply(colnames(rval$gating_set), function(x){return(identity_trans())})
-        names(transformation) <- colnames(rval$gating_set)
-        rval$gating_set@transformation <- transformation
-      }else{
-        rval$transformation <- rval$gating_set@transformation
-      }
-    }
-      
-  })
+
   
   # Call modules
   res <- callModule(plotGatingSet, "plot_module", 
@@ -254,35 +255,26 @@ Gating <- function(input, output, session, rval) {
         polygon <- as.matrix(polygon)
         
         var_names <- c(res$params$xvar, res$params$yvar)
-          
-        names(var_names)<-NULL
+        names(var_names) <- NULL
         colnames(polygon) <- var_names
         
         poly_gate <- flowCore::polygonGate(.gate = polygon, filterId=input$gate_name)
         rval$gate <- poly_gate
         
-        if(res$params$subset != "root"){
-          gate_name <- paste(res$params$subset, "/", input$gate_name, sep = "")
-        }else{
-          gate_name <- paste("/", input$gate_name, sep = "")
-        }
+        # if(res$params$subset != "root"){
+        #   gate_name <- paste(res$params$subset, "/", input$gate_name, sep = "")
+        # }else{
+        #   gate_name <- paste("/", input$gate_name, sep = "")
+        # }
           
-        rval$gates_flowCore[[gate_name]] <- list(gate = poly_gate, parent = res$params$subset)
-        
+
         flowWorkspace::gs_pop_add(rval$gating_set, poly_gate, parent = res$params$subset)
         flowWorkspace::recompute(rval$gating_set)
         rval$update_gs <- rval$update_gs + 1
         
-        #updateSelectInput(session, "gate_to_delete", choices = setdiff(flowWorkspace::gs_get_pop_paths(rval$gating_set), "root"))
-
         gate$x <- NULL
         gate$y <- NULL
 
-        #reset plot parameters (only non null parameters will be updated)
-        # for(var in names(reactiveValuesToList(plot_params))){
-        #  plot_params[[var]] <- NULL
-        # }
-        
         plot_params$subset <- gate_name
       }
     }
@@ -295,35 +287,25 @@ Gating <- function(input, output, session, rval) {
       
       idx_gh <- which( flowWorkspace::gs_get_pop_paths(rval$gating_set) == input$gate_to_delete )
       target_gate <- flowWorkspace::gs_get_pop_paths(rval$gating_set)[idx_gh]
-      
-      child_gates <- get_all_descendants(rval$gates_flowCore, target_gate)
-      #child_gates <- getChildren(rval$gating_set[[1]], target_gate)
-      if(length(child_gates)==0){
-        child_gates <- NULL
-      }
-      
-      idx_delete <- which( names(rval$gates_flowCore) %in% c(target_gate, child_gates) )
-      rval$gates_flowCore <- rval$gates_flowCore[-idx_delete]
-      
-      flowWorkspace::Rm(target_gate, rval$gating_set)
+
+      flowWorkspace::gs_pop_remove(gs = rval$gating_set, node = target_gate)
       flowWorkspace::recompute(rval$gating_set)
       rval$update_gs <- rval$update_gs + 1
-      
-      #reset plot parameters (only non null parameters will be updated)
-      # for(var in names(reactiveValuesToList(plot_params))){
-      #  plot_params[[var]] <- NULL
-      # }
-      
+
       plot_params$subset <- "root"
       
     }
     
   })
   
-  observeEvent(rval$gates_flowCore, {
-    validate(need(rval$gates_flowCore, "no gating set"))
-    updateSelectInput(session, "gate_to_delete", choices = names(rval$gates_flowCore))
+  observe({
+    rval$update_gs
+    validate(need(class(rval$gating_set)=="GatingSet", "no gating set"))
+    gates <- setdiff(gs_get_pop_paths(rval$gating_set), "root")
+    updateSelectInput(session, "gate_to_delete", choices = gates)
+    updateSelectInput(session, "gate_to_rename", choices = gates)
   })
+
   
   #Rename selected gate, update rval$gates_flowCore and rval$gating_set
   observeEvent(input$rename_gate, {
@@ -336,46 +318,21 @@ Gating <- function(input, output, session, rval) {
       flowWorkspace::setNode(rval$gating_set, target_gate, input$new_name)
       rval$update_gs <- rval$update_gs + 1
       
-      idx <- which( names(rval$gates_flowCore) == input$gate_to_rename )
-
-      parent_name <- dirname(input$gate_to_rename)
-      if(parent_name == "/"){
-        parent_name <- ""
-      }
-
-
-      names(rval$gates_flowCore)[idx] <- paste(parent_name, input$new_name, sep = "/")
-      rval$gates_flowCore[[idx]]$gate@filterId <- input$new_name
-
-      child_gates <- get_all_descendants(rval$gates_flowCore, input$gate_to_rename)
-      new_name <- paste(parent_name, input$new_name, sep = "/")
-      for(child in child_gates){
-        rval$gates_flowCore[[child]]$parent <- gsub(input$gate_to_rename, new_name, rval$gates_flowCore[[child]]$parent, fixed = TRUE)
-        idx <- which(names(rval$gates_flowCore) == child)
-        names(rval$gates_flowCore)[idx] <- gsub(input$gate_to_rename, new_name, names(rval$gates_flowCore)[idx], fixed = TRUE)
-      }
-      
     }
     
   })
 
-  observeEvent(rval$gates_flowCore, {
-    validate(need(rval$gates_flowCore, "no gating set"))
-    updateSelectInput(session, "gate_to_rename", choices = names(rval$gates_flowCore))
-  })
-  
   #Update plot parameters to show defining gate
   observeEvent(input$show_gate, {
     
     if(res$params$subset != "root"){
-
-      rval$gate <- rval$gates_flowCore[[res$params$subset]]$gate
+      
+      gates <- get_gates_from_gs(gs = rval$gating_set)
+      rval$gate <- gates[[res$params$subset]]$gate
+      
+      plot_params$subset <- gates[[res$params$subset]]$parent
+      
       gate_params <- names(rval$gate@parameters)
-
-      #reset plot parameters (only non null parameters will be updated)
-      # for(var in names(reactiveValuesToList(plot_params))){
-      #  plot_params[[var]] <- NULL
-      # }
       
       if(length(gate_params) > 0){
         plot_params$xvar <- gate_params[1]
@@ -387,8 +344,6 @@ Gating <- function(input, output, session, rval) {
       gate$x <- NULL
       gate$y <- NULL
 
-      plot_params$subset <- rval$gates_flowCore[[res$params$subset]]$parent
-      
     }
 
   })
@@ -425,7 +380,7 @@ Gating <- function(input, output, session, rval) {
   })
   
   observe({
-    plot_params$selected_subsets <- names(gate_list())
+    plot_params_gh$selected_subsets <- names(gate_list())
   })
   
   output$tree <- renderPlot({
@@ -475,7 +430,7 @@ Gating <- function(input, output, session, rval) {
     df[['% parent']] <- sprintf("%.1f", df$Count / df$ParentCount * 100)
     df <- df[, c("name", "Population", "Parent", "% parent", "Count", "ParentCount")] 
     df <- dplyr::rename(df, subset = "Population")
-    df <- df[df$subset %in% plot_params$selected_subsets, ]
+    df <- df[df$subset %in% plot_params_gh$selected_subsets, ]
     df
   })
   
@@ -490,6 +445,72 @@ Gating <- function(input, output, session, rval) {
     }
   )
   
+  ##########################################################################################################
+  #Import/Export Gating Hierarchy
+  
+  output$export_gh <- downloadHandler(
+    filename = "gates.rda",
+    content = function(file) {
+      gates <- get_gates_from_gs(rval$gating_set)
+      save(gates, file=file)
+    }
+  )
+  
+  observeEvent(input$import_gh, {
+    validate(
+      need(input$import_gh$datapath, "Please select a file")
+    )
+    file_path <- input$import_gh$datapath
+    if(file_ext(file_path) %in% c("wsp") ){
+      rval_mod$gating_hierarchy <- get_gates_from_ws(ws_path = file_path)
+    }else if(file_ext(file_path) %in% c("rda", "Rda") ){
+      res_name <- load(file_path)
+      res <- get(res_name)
+      if(class(res) == "list"){
+        if("gate" %in% names(res[[1]])){
+          rval_mod$gating_hierarchy <- res
+        }
+      }
+    }
+  })
+  
+  output$import_gh_summary <- renderPrint({
+    print(paste(length(rval_mod$gating_hierarchy), "gates imported"))
+    print(rval_mod$gating_hierarchy)
+  })
+  
+  observe({
+    validate(need(class(rval$gating_set)=="GatingSet", "No GatingSet available"))
+    ff <- rval$gating_set@data[[1]]
+    time_step <- as.numeric(description(ff)[["$TIMESTEP"]])
+    updateNumericInput(session, "time_step", value = time_step)
+  })
+  
+  
+  observeEvent(input$apply_gh, {
+    validate(need(length(rval_mod$gating_hierarchy)>0, "No gating hierarchy to apply"))
+    
+    old_gates <- gs_pop_get_children(obj = rval$gating_set[[1]], y = "root")
+    #print(old_gates)
+    for(gate in old_gates){
+        flowWorkspace::gs_pop_remove(gs = rval$gating_set, node = gate)
+    }
+    #print("OK remove")
+    #print(gs_get_pop_paths(rval$gating_set))
+    new_gates <- rval_mod$gating_hierarchy
+    new_gates <- transform_gates(gates = new_gates, 
+                                 transformation = NULL,
+                                 pattern = input$pattern, 
+                                 replacement = input$replacement,
+                                 time_step = input$time_step)
+    
+    add_gates_flowCore(gs = rval$gating_set, gates = new_gates)
+    #print("OK add")
+    #print(gs_get_pop_paths(rval$gating_set))
+    rval$update_gs <- rval$update_gs + 1
+
+  })
+    
   return(rval)
   
   

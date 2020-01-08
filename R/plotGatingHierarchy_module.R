@@ -100,6 +100,7 @@ plotGatingHierarchy <- function(input, output, session,
   ######################################################################################
   # get parameters from GatingSet
   choices <- reactive({
+    
     validate(need(class(rval$gating_set) == "GatingSet", "Input is not a GatingSet"))
     
     plot_var <- parameters(rval$gating_set@data[[1]])$name
@@ -129,7 +130,7 @@ plotGatingHierarchy <- function(input, output, session,
   })
   
   plot_all_gates <- reactive({
-    
+    rval$update_gs
     validate(need(class(rval$gating_set) == "GatingSet", "Input is not a GatingSet"))
     validate(need(setdiff(gs_get_pop_paths(rval$gating_set), "root"), "No gates to display"))
     

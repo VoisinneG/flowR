@@ -62,17 +62,18 @@ get_gates_from_ws <- function(ws_path, group = NULL){
   sample_info <- lapply(SampleNodes , parseSampleNodes)
   sample_info <- data.frame( do.call(rbind, sample_info ) )
   #print(sample_info)
-  
+
   if(is.null(group)){
-    group_selected <- group_info$name[1]
+    group_selected <- unlist(group_info$name)[1]
   }else{
     group_selected <- group
   }
+
   
   # get Gates for first sample in group
-  sampleID <- group_info$sampleID[[which(group_info$name == group_selected)]][1]
+  sampleID <- group_info$sampleID[[which(unlist(group_info$name) == group_selected)]][1]
   if(length(sampleID) > 0){
-    SampleNode <- SampleNodes[ which( sample_info$sampleID == sampleID) ]
+    SampleNode <- SampleNodes[ which(unlist(sample_info$sampleID) == sampleID) ]
   }else{
     stop("Could not find sample in group")
   }
@@ -405,19 +406,16 @@ transform_gates <- function(gates,
           colnames(polygon) <- gsub(pattern = pattern, replacement = replacement, colnames(polygon))
         }
         
-        
-        if(!is.null(transformation)){
-          for(j in 1:length(colnames(polygon))){
+        for(j in 1:length(colnames(polygon))){
+          if(colnames(polygon)[j] %in% names(transformation)){
             polygon[,j] <- transformation[[colnames(polygon)[j]]]$transform(polygon[,j])
-            if(colnames(polygon)[j] == "Time"){
-              if(!is.null(time_step)){
-                polygon[,j] <- polygon[,j]/time_step
-              }
-              
+          }
+          if(colnames(polygon)[j] == "Time"){
+            if(!is.null(time_step)){
+              polygon[,j] <- polygon[,j]/time_step
             }
           }
         }
-        
         
         trans_gate <- flowCore::polygonGate(.gate = polygon, filterId=g$gate@filterId)
       }
