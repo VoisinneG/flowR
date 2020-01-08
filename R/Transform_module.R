@@ -133,7 +133,7 @@ Transform <- function(input, output, session, rval) {
   
   #get parameters information from flow set
   observe({
-    
+    rval$update_gs
     validate(need(class(rval$gating_set) == "GatingSet", "No GatingSet available"))
     
     ff <- rval$gating_set@data[[1]]
@@ -142,7 +142,6 @@ Transform <- function(input, output, session, rval) {
     
     desc <- as.character(params$desc)
     name <- as.character(params$name)
-    
     
     display <- unlist(sapply(rownames(params@data), FUN = function(x){
       kw <- substr(x, start = 2, stop = nchar(x))
@@ -163,25 +162,9 @@ Transform <- function(input, output, session, rval) {
                                       minRange = params@data$minRange,
                                       maxRange = params@data$maxRange,
                                       stringsAsFactors = FALSE)
-    #plot_params$xvar <- name[1]
-    #plot_params$yvar <- name[2]
+
   })
-  
-  
-  # observe({
-  #   validate(need(rval$parameters, "no parameters"))
-  #   desc <- as.character(rval$parameters$desc)
-  #   name <- as.character(rval$parameters$name)
-  #   name_long <- name
-  #   name_long[!is.na(desc)] <- paste(name[!is.na(desc)], " (", desc[!is.na(desc)], ")", sep = "")
-  #   rval$parameters$name_long <- name_long
-  # })
-  # 
-  # observeEvent(rval$parameters, {
-  #   validate(need(rval$parameters, "No parameters"))
-  #   rval$plot_var <- rval$parameters$name_long
-  #   names(rval$plot_var) <- NULL
-  # })
+
   
   # Initialization of transformation for new parameters
   observe({
@@ -323,6 +306,12 @@ Transform <- function(input, output, session, rval) {
     if(info$col == 2){
       rval_mod$parameters <<- editData(rval_mod$parameters, info)
       replaceData(proxy, rval_mod$parameters, resetPaging = FALSE)
+      
+      for(i in 1:length(rval$gating_set)){
+        rval$gating_set@data[[i]]@parameters$desc <- rval_mod$parameters$desc
+      }
+      rval$update_gs <- rval$update_gs + 1 
+      
     }
   })
   

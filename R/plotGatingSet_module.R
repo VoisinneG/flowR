@@ -219,6 +219,7 @@ plotGatingSet <- function(input, output, session,
   ######################################################################################
   # get parameters from GatingSet
   choices <- reactive({
+    rval$update_gs
     validate(need(class(rval$gating_set) == "GatingSet", "input is not a GatingSet"))
     
     plot_var <- parameters(rval$gating_set@data[[1]])$name
@@ -226,6 +227,7 @@ plotGatingSet <- function(input, output, session,
     validate(need(length(plot_var)>0, "No variables in GatingSet"))
     
     desc <- parameters(rval$gating_set@data[[1]])$desc
+    
     labels <- sapply(1:length(plot_var), function(x){
       if(is.na(desc[x])){
         plot_var[x]

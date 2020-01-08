@@ -10,36 +10,44 @@ GatingUI <- function(id) {
   
   fluidRow(
     column(width = 4,
-           box(width = NULL, height = NULL, title = "Parameters", 
-               collapsible = TRUE, collapsed = FALSE,
+           box(title = "Gates", width = NULL, height = NULL, collapsible = TRUE, collapsed = FALSE,
                actionButton(ns("show_gate"), label = "Show defining gate"),
                br(),
                br(),
+               box(title = "Select",width = NULL, height = NULL, collapsible = TRUE, collapsed = TRUE,
+                   selectInput(ns("gate_selection"), 
+                               label = "Select gate", 
+                               choices = NULL, 
+                               selected = NULL),
+               ),
+               box(title = "Add",width = NULL, height = NULL, collapsible = TRUE, collapsed = TRUE,
+                   textInput(ns("gate_name"), label = "Enter gate name", value = ""),
+                   actionButton(ns("create_gate"), "create gate"),
+                   actionButton(ns("reset_gate"), "reset gate")
+               ),
+               box(title = "Delete",width = NULL, height = NULL, collapsible = TRUE, collapsed = TRUE,
+                   selectInput(ns("gate_to_delete"), 
+                               label = "Select gate", 
+                               choices = NULL, 
+                               selected = NULL),
+                   actionButton(ns("delete_gate"), "Delete")
+               ),
+               box(title = "Rename",width = NULL, height = NULL, collapsible = TRUE, collapsed = TRUE,
+                   selectInput(ns("gate_to_rename"), 
+                               label = "Select gate", 
+                               choices = NULL, 
+                               selected = NULL),
+                   textInput(ns("new_name"), label = "Enter new name", value = ""),
+                   actionButton(ns("rename_gate"), "rename gate")
+               )
+                  
+                   
+           ),
+           box(width = NULL, height = NULL, title = "Parameters", 
+               collapsible = TRUE, collapsed = FALSE,
                plotGatingSetInput(id = ns("plot_module"))
            ),
-           tabBox(title = "Gates",
-                  width = NULL, height = NULL,
-                  tabPanel("Add",
-                           textInput(ns("gate_name"), label = "Enter gate name", value = ""),
-                           actionButton(ns("create_gate"), "create gate"),
-                           actionButton(ns("reset_gate"), "reset gate")
-                  ),
-                  tabPanel("Delete",
-                           selectInput(ns("gate_to_delete"), 
-                                       label = "Select gate", 
-                                       choices = NULL, 
-                                       selected = NULL),
-                           actionButton(ns("delete_gate"), "Delete")
-                  ),
-                  tabPanel("Rename",
-                           selectInput(ns("gate_to_rename"), 
-                                       label = "Select gate", 
-                                       choices = NULL, 
-                                       selected = NULL),
-                           textInput(ns("new_name"), label = "Enter new name", value = ""),
-                           actionButton(ns("rename_gate"), "rename gate")
-                  )
-           ),
+           
            box(title = "Message_gate",
                width = NULL, height = NULL,
                verbatimTextOutput(ns("message_gate"))
@@ -138,7 +146,7 @@ Gating <- function(input, output, session, rval) {
                     show_gates = TRUE,
                     polygon_gate = gate)
   
-  res_display <- callModule(simpleDisplay, "simple_display_module", plot_list = res$plot)
+  res_display <- callModule(simpleDisplay, "simple_display_module", plot_list = res$plot, size = 350)
   
   plot_all_gates <- callModule(plotGatingHierarchy, "plot_hierarchy_module", 
                                rval = rval, 
@@ -148,6 +156,10 @@ Gating <- function(input, output, session, rval) {
              plot_list = plot_all_gates,
              nrow = 2, size = 200,
              params = display_params)
+  
+  
+  ##########################################################################################################
+  # Observe functions
   
   #Passing plot parameters to the gating hierarchy plot
   observe({
@@ -165,6 +177,22 @@ Gating <- function(input, output, session, rval) {
     display_params$top <- paste(res$params$sample, collapse = " + ")
   })
   
+  observe({
+    rval$update_gs
+    validate(need(class(rval$gating_set)=="GatingSet", "no gating set"))
+    gates <- gs_get_pop_paths(rval$gating_set)
+    updateSelectInput(session, "gate_to_delete", choices = setdiff(gates, "root"))
+    updateSelectInput(session, "gate_to_rename", choices = setdiff(gates, "root"))
+    updateSelectInput(session, "gate_selection", choices = gates)
+  })
+  
+  observeEvent(input$gate_selection, {
+    plot_params$subset <- input$gate_selection
+  })
+  
+  observe({
+    updateSelectInput(session, "gate_selection", selected = res$params$subset)
+  })
   
   ##########################################################################################################
   # Observe functions for gating
@@ -175,11 +203,18 @@ Gating <- function(input, output, session, rval) {
     xvar <- res$params$xvar
     yvar <- res$params$yvar
     
-    gate$x <- c(gate$x, rval$transformation[[xvar]]$inverse(
-      res_display$params$plot_click$x))
-    gate$y <- c(gate$y, rval$transformation[[yvar]]$inverse(
-      res_display$params$plot_click$y))
+    x_coord <- res_display$params$plot_click$x
+    if(xvar %in% names(rval$gating_set@transformation)){
+      x_coord <- rval$gating_set@transformation[[xvar]]$inverse(x_coord)
+    }
+    gate$x <- c(gate$x, x_coord)
     
+    y_coord <- res_display$params$plot_click$y
+    if(yvar %in% names(rval$gating_set@transformation)){
+      y_coord <- rval$gating_set@transformation[[yvar]]$inverse(y_coord)
+    }
+    gate$y <- c(gate$y, y_coord)
+
     idx <- grDevices::chull(gate$x, gate$y)
 
     gate$x <- gate$x[idx]
@@ -196,18 +231,31 @@ Gating <- function(input, output, session, rval) {
       xvar <- res$params$xvar
       yvar <- res$params$yvar
       
-      x <- try(rval$transformation[[xvar]]$inverse(
-        c(brush$xmin, brush$xmax, brush$xmax, brush$xmin)), silent = TRUE)
-      
-      y <- try(rval$transformation[[yvar]]$inverse(
-        c(brush$ymin, brush$ymin, brush$ymax, brush$ymax)), silent = TRUE)
-      
-      if(class(x) != "try-error"){
-        gate$x <- x
+      x_coord <- c(brush$xmin, brush$xmax, brush$xmax, brush$xmin)
+      if(xvar %in% names(rval$gating_set@transformation)){
+        x_coord <- rval$gating_set@transformation[[xvar]]$inverse(x_coord)
       }
-      if(class(y) != "try-error"){
-        gate$y <- y
+      gate$x <- x_coord
+      
+      y_coord <- c(brush$ymin, brush$ymin, brush$ymax, brush$ymax)
+      if(yvar %in% names(rval$gating_set@transformation)){
+        y_coord <- rval$gating_set@transformation[[yvar]]$inverse(y_coord)
       }
+      gate$y <- y_coord
+      
+      # x <- try(rval$transformation[[xvar]]$inverse(
+      #   c(brush$xmin, brush$xmax, brush$xmax, brush$xmin)), silent = TRUE)
+      # 
+      # y <- try(rval$transformation[[yvar]]$inverse(
+      #   c(brush$ymin, brush$ymin, brush$ymax, brush$ymax)), silent = TRUE)
+      # 
+      # if(class(x) != "try-error"){
+      #   gate$x <- x
+      # }
+      # if(class(y) != "try-error"){
+      #   gate$y <- y
+      # }
+      
     }
     
   })
@@ -298,14 +346,6 @@ Gating <- function(input, output, session, rval) {
     
   })
   
-  observe({
-    rval$update_gs
-    validate(need(class(rval$gating_set)=="GatingSet", "no gating set"))
-    gates <- setdiff(gs_get_pop_paths(rval$gating_set), "root")
-    updateSelectInput(session, "gate_to_delete", choices = gates)
-    updateSelectInput(session, "gate_to_rename", choices = gates)
-  })
-
   
   #Rename selected gate, update rval$gates_flowCore and rval$gating_set
   observeEvent(input$rename_gate, {
