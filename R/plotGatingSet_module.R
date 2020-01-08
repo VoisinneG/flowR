@@ -35,8 +35,8 @@
 #'     plot_params <- reactiveValues()
 #'     
 #'     observe({
-#'       gs <- load_gs("./inst/ext/gs")
-#'       rval$gating_set <- gs
+#'       utils::data("GvHD", package = "flowCore")
+#'       rval$gating_set <- GatingSet(GvHD)
 #'       plot_params$plot_type <- "histogram"
 #'     })
 #'     
@@ -160,14 +160,20 @@ plotGatingSet <- function(input, output, session,
                               split_var = "xvar",
                               show_label = FALSE,
                               show_outliers = FALSE)
-
+  
+  ######################################################################################
+  # Initialization of f plot parameters
+  
   observe({
+    rval_plot$sample <- choices()$sample[1]
+    rval_plot$subset <- choices()$subset[1]
+    
     rval_plot$xvar <- choices()$plot_var[1]
     
     if(length(choices()$plot_var)>1){
       rval_plot$yvar <- choices()$plot_var[2]
     }else{
-      rval_plot$yvar <- choices()$plot_var[2]
+      rval_plot$yvar <- choices()$plot_var[1]
     }
     
     idx_xvar <- grep("FSC-A", choices()$plot_var)
@@ -179,12 +185,30 @@ plotGatingSet <- function(input, output, session,
       rval_plot$yvar <- choices()$plot_var[idx_yvar]
     }
     
-    for(var in intersect(names(plot_params), c("xvar", "yvar") )){
-      rval_plot[[var]] <- plot_params[[var]]
+    for(var in names(plot_params) ){
+      if(var %in% c("xvar", "yvar")){
+        if(plot_params[[var]] %in% choices()$plot_var){
+          rval_plot[[var]] <- plot_params[[var]]
+        }
+      }else{
+        rval_plot[[var]] <- plot_params[[var]]
+      }
     }
     
   })
   
+  
+  observe({
+    
+    if("plot_type" %in% names(plot_params)){
+      updateCheckboxInput(session, "plot_type", value = plot_params[["plot_type"]])
+    }
+    
+    if("use_all_cells" %in% names(plot_params)){
+      updateCheckboxInput(session, "use_all_cells", value = plot_params[["use_all_cells"]])
+    }
+    
+  })
   
   ######################################################################################
   # Sample and subset selection module
@@ -412,33 +436,8 @@ plotGatingSet <- function(input, output, session,
     }
   })
   
-
   ###############################   End Build UI  #####################################
 
-  
-  ######################################################################################
-  # Control of plot parameters using 'plot_params'
-  observe({
-    
-    for(var in intersect( names(plot_params), c("xvar",
-                                                "yvar",
-                                                "color_var",
-                                                "group_var",
-                                                "facet_var") )){
-      rval_plot[[var]] <- plot_params[[var]]
-      
-    }
-    
-    if("plot_type" %in% names(plot_params)){
-      updateCheckboxInput(session, "plot_type", value = plot_params[["plot_type"]])
-    }
-    
-    if("use_all_cells" %in% names(plot_params)){
-      updateCheckboxInput(session, "use_all_cells", value = plot_params[["use_all_cells"]])
-    }
-    
-  })
-  
   ######################################################################################
   # Select plot variables using a pattern
   
@@ -497,8 +496,12 @@ plotGatingSet <- function(input, output, session,
     for(var in names(input)){
         rval_input[[var]] <- input[[var]]
     }
-    rval_input$subset <- selected$subset
-    rval_input$sample <- selected$sample
+    if(!is.null( selected$subset )){
+      rval_input$subset <- selected$subset
+    }
+    if(!is.null( selected$sample )){
+      rval_input$sample <- selected$sample
+    }
   })
 
   ######################################################################################
@@ -514,8 +517,8 @@ plotGatingSet <- function(input, output, session,
     if(!auto_update){
       input$update_plot
     }else{
-      update_params <- c(selected$sample,
-                         selected$subset,
+      update_params <- c(rval_input$sample,
+                         rval_input$subset,
                          #rval$spill,
                          #rval$flow_set_selected,
                          # rval$gating_set,
@@ -603,15 +606,22 @@ plotGatingSet <- function(input, output, session,
     
     #print("data")
     
-    validate(need(rval$gating_set, "Empty gating set"))
-    validate(need(selected$sample, "Please select samples"))
-    validate(need(all(selected$sample %in% pData(rval$gating_set)$name), "Samples not found in gating set"))
-    validate(need(selected$subset, "Please select subsets"))
-
+    validate(need(rval$gating_set, "Empty GatingSet"))
+    validate(need(rval_input$sample, "Please select samples"))
+    validate(need(all(rval_input$sample %in% pData(rval$gating_set)$name), 
+                  "All samples not found in GatingSet"))
+    validate(need(rval_input$subset, "Please select subsets"))
+    validate(need(all(rval_input$subset %in% gs_get_pop_paths(rval$gating_set)), 
+                  "All subsets not found in GatingSet"))
+   
+    
     Ncells <- 30000
-    if(rval_input$use_all_cells){
-      Ncells <- NULL
+    if(!is.null(rval_input$use_all_cells)){
+      if(rval_input$use_all_cells){
+        Ncells <- NULL
+      }
     }
+    
     
     spill <- choices()$compensation
     if(!is.null(rval$apply_comp)){
@@ -621,8 +631,8 @@ plotGatingSet <- function(input, output, session,
     }
     
     df <- get_plot_data(gs = rval$gating_set,
-                      sample = selected$sample,
-                      subset = selected$subset,
+                      sample = rval_input$sample,
+                      subset = rval_input$subset,
                       spill = spill,
                       metadata = choices()$metadata,
                       Ncells = Ncells)
@@ -641,6 +651,8 @@ plotGatingSet <- function(input, output, session,
     rval_mod$plot_list <- list()
     
     validate(need(rval_input$xvar, "Please select x variable"))
+    validate(need(input$plot_type, "Please select plot type"))
+    
     if(input$plot_type != "histogram"){
       validate(need(rval_input$yvar, "Please select y variable"))
     }
@@ -708,10 +720,10 @@ plotGatingSet <- function(input, output, session,
     gate <- NULL
     
     if(show_gates){
-      if(!is.null(selected$subset)){
-        if(selected$subset %in% choices()$subset){
+      if(!is.null(rval_input$subset)){
+        if(rval_input$subset %in% choices()$subset){
           child_gates <- flowWorkspace::gs_pop_get_children(rval$gating_set[[1]], 
-                                                            selected$subset)
+                                                            rval_input$subset)
           if(length(child_gates) > 0){
             gate <- child_gates
           }
@@ -725,7 +737,7 @@ plotGatingSet <- function(input, output, session,
                          for(gate_name in setdiff(gate, "root")){
                            gate_int <- flowWorkspace::gh_pop_get_gate(rval$gating_set[[1]], 
                                                                       gate_name)
-                           print(gate_int)
+                           #print(gate_int)
                            p <- add_gate(p = p, gate = gate_int)
                          }
                        }
@@ -747,7 +759,7 @@ plotGatingSet <- function(input, output, session,
       gate <- NULL
       if(!is.null(rval_input$show_gates)){
         if(rval_input$show_gates){
-          gate <- selected$subset
+          gate <- rval_input$subset
         }
       }
 
@@ -802,7 +814,8 @@ plotGatingSet <- function(input, output, session,
 #     sidebar = dashboardSidebar(disable = TRUE),
 #     body = dashboardBody(
 #       fluidRow(
-#         column(4, box(width = NULL, plotGatingSet2Input("module"))),
+#         column(4, box(width = NULL, title = "Parameters", collapsible = TRUE, collapsed = TRUE,
+#                       plotGatingSetInput("module"))),
 #         column(8, box(width = NULL, simpleDisplayUI("simple_display_module")))
 #       )
 #     )
@@ -814,17 +827,24 @@ plotGatingSet <- function(input, output, session,
 #     plot_params <- reactiveValues()
 # 
 #     observe({
-#       #utils::data("GvHD", package = "flowCore")
-#       #rval$gating_set <- GatingSet(GvHD)
-#       gs <- load_gs("./inst/ext/gs")
+#       load("../flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
+#       fs <- build_flowset_from_df(df = res$cluster$data, origin = res$cluster$flow_set)
+#       gs <- GatingSet(fs)
+#       gs@transformation <- res$clustertransformation
+#       add_gates_flowCore(gs, res$cluster$gates)
 #       rval$gating_set <- gs
-#       plot_params$plot_type <- "hexagonal"
-#       plot_params$xvar <- "FSC-A"
-#       plot_params$yvar <- "UV-BUV496-A"
-#       plot_params$subset <- gs_get_pop_paths(gs)[1]
+#       #plot_params$sample <- pData(gs)$name
+#       #utils::data("GvHD", package = "flowCore")
+#       #gs <- GatingSet(GvHD)
+#       #rval$gating_set <- gs
+#       #plot_params$plot_type <- "histogram"
+#       #plot_params$xvar <- "FL2-H"
+#       #plot_params$yvar <- "FL4-H"
+#       #plot_params$sample <- pData(gs)$name[3]
+#       #plot_params$subset <- gs_get_pop_paths(gs)[1]
 #     })
 # 
-#     res <- callModule(plotGatingSet2, "module",
+#     res <- callModule(plotGatingSet, "module",
 #                       rval = rval,
 #                       plot_params = plot_params,
 #                       show_gates = TRUE)

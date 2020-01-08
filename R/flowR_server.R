@@ -26,7 +26,7 @@ flowR_server <- function(session, input, output, modules = NULL) {
   # Build ui based on selected modules
   
   observe({
-    default_modules <- c("Import", "Gating", "Plotting", "Subsample")
+    default_modules <- c("Import", "Transform", "Gating", "Plotting", "Subsample")
     if(is.null(modules)){
       rval$modules <- default_modules
     }else{
@@ -79,10 +79,6 @@ flowR_server <- function(session, input, output, modules = NULL) {
   
   observeEvent(rval$modules, {
     
-    #modules <- union(rval$modules, "Modules")
-    #rval$menu_elements <- list()
-    #rval$tab_elements <- list()
-    
     modules_to_update <- union("Modules", setdiff(rval$modules, names(rval$menu_elements)))
     
     for( mod_name in modules_to_update ){
@@ -129,10 +125,12 @@ flowR_server <- function(session, input, output, modules = NULL) {
     updateSelectInput(session, "gating_set", 
                       choices = names(rval$gating_set_list), 
                       selected = rval$gating_set_selected)
+    rval$update_gs <- rval$update_gs + 1
   })
   
   observeEvent(input$gating_set, {
     rval$gating_set_selected <- input$gating_set
+    rval$update_gs <- rval$update_gs + 1
   })
   
   observeEvent(rval$gating_set_selected, {
@@ -144,58 +142,73 @@ flowR_server <- function(session, input, output, modules = NULL) {
       rval$gating_set <- rval$gating_set_list[[gs_name]]$gating_set
       rval$trans_parameters <- rval$gating_set_list[[gs_name]]$trans_parameters
     }
+    rval$update_gs <- rval$update_gs + 1
   
   })
   
  
   ##################################################################################################
-  # Updating spillover matrix for all related flow sets (in the same tree)
+  # Updating related GatingSets (in the same tree)
   ##################################################################################################
   
-  # observeEvent(c(rval$df_spill,
-  #                rval$gates_flowCore,
-  #                rval$transformation, 
-  #                rval$trans_parameters, 
-  #                rval$pdata) , {
-  #   
-  #   validate(need(rval$flow_set_list, "No flow-sets available"))
-  #   validate(need(rval$flow_set_selected, "No flow-set selected"))
-  #   
+  # Update transformation
+  observeEvent(rval$gating_set, {
+    validate(need(class(rval$gating_set) == "GatingSet", "No GatingSet available"))
+    validate(need(rval$gating_set_list, "No list of GatingSets available"))
+    validate(need(rval$gating_set_selected, "No GatingSet selected"))
+    
+    items_to_update <- union(rval$gating_set_selected,
+                             union(get_all_descendants(rval$gating_set_list, rval$gating_set_selected),
+                                   get_all_ancestors(rval$gating_set_list, rval$gating_set_selected)))
+    items_to_update <- intersect(items_to_update, names(rval$gating_set_list))
+    print("update GatingSet list")
+    print(items_to_update)
+    for(i in 1:length(items_to_update)){
+      rval$gating_set_list[[items_to_update[i]]]$gating_set@transformation <- rval$gating_set@transformation
+      rval$gating_set_list[[items_to_update[i]]]$trans_parameters <- rval$trans_parameters
+    }
+  })
+  
+  # observeEvent(rval$update_gs , {
+  # 
+  #   validate(need(rval$gating_set_list, "No flow-sets available"))
+  #   validate(need(rval$gating_set_selected, "No flow-set selected"))
+  # 
   #   # print("flow-sets")
   #   # print(rval$flow_set_selected)
   #   # print(get_all_descendants(rval$flow_set_list, rval$flow_set_selected))
   #   # print(get_all_ancestors(rval$flow_set_list, rval$flow_set_selected))
-  #   
-  #   items_to_update <- union(rval$flow_set_selected,
-  #                            union(get_all_descendants(rval$flow_set_list, rval$flow_set_selected),
-  #                                  get_all_ancestors(rval$flow_set_list, rval$flow_set_selected)))
-  #   items_to_update <- intersect(items_to_update, names(rval$flow_set_list))
-  #   
+  # 
+  #   items_to_update <- union(rval$gating_set_selected,
+  #                            union(get_all_descendants(rval$gating_set_list, rval$gating_set_selected),
+  #                                  get_all_ancestors(rval$gating_set_list, rval$gating_set_selected)))
+  #   items_to_update <- intersect(items_to_update, names(rval$gating_set_list))
+  # 
   #   print("updating")
   #   print(items_to_update)
-  #   
+  # 
   #   for(i in 1:length(items_to_update)){
   #     if(!is.null(rval$gates_flowCore)){
   #       if(length(rval$gates_flowCore)>0){
-  #         print(rval$gates_flowCore)
-  #         rval$flow_set_list[[items_to_update[i]]]$gates <- rval$gates_flowCore
+  #         rval$gating_set_list[[items_to_update[i]]]$gates <- rval$gates_flowCore
   #       }
   #     }
-  #     if(!is.null(rval$df_spill)){
-  #       rval$flow_set_list[[items_to_update[i]]]$spill <- rval$df_spill
+  #     
+  #     if(!is.null(rval$gating_set@compensation)){
+  #       rval$gating_set_list[[items_to_update[i]]]@transformation <- rval$gating_set@compensation
   #     }
-  #     if(!is.null( rval$transformation)){
-  #       rval$flow_set_list[[items_to_update[i]]]$transformation <- rval$transformation
+  #     if(!is.null(rval$gating_set@transformation)){
+  #       rval$gating_set_list[[items_to_update[i]]]@transformation <- rval$gating_set@transformation
   #     }
   #     if(!is.null(rval$trans_parameters)){
-  #       rval$flow_set_list[[items_to_update[i]]]$trans_parameters <- rval$trans_parameters
+  #       rval$gating_set_list[[items_to_update[i]]]$trans_parameters <- rval$trans_parameters
   #     }
   #     if(!is.null(rval$pdata)){
-  #       rval$flow_set_list[[items_to_update[i]]]$metadata <- rval$pdata
+  #       rval$gating_set_list[[items_to_update[i]]]$metadata <- rval$pdata
   #     }
-  #     
+  # 
   #   }
-  #   
+  # 
   # })
   
   ##########################################################################################################

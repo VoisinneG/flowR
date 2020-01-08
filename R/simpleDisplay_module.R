@@ -141,10 +141,8 @@ simpleDisplay <- function(input, output, session,
      if(class(plot_list())[1] == "list"){
        
          n <- length(plot_list())
-         
          if(n>0){
           if("ggplot" %in% class(plot_list()[[1]]) ){
-            
             if(n > 0){
               p <- plot_list()[[1]]
               if("facet" %in% names(p)){
@@ -158,6 +156,7 @@ simpleDisplay <- function(input, output, session,
             }
             
             if(n > 1){
+              
               rval_plot$use_plotly <- FALSE
               rval_plot$nrow <- min(n, input$nrow_split)
               rval_plot$ncol <- ceiling(n/rval_plot$nrow)
@@ -167,8 +166,16 @@ simpleDisplay <- function(input, output, session,
                                            ncol = rval_plot$ncol, 
                                            top = rval_plot$top),
                        silent = TRUE)
-                       
-                       
+              
+              if(class(g)=="try-error"){
+                showModal(modalDialog(
+                  title = "Error",
+                  print(g),
+                  easyClose = TRUE,
+                  footer = NULL
+                ))
+              }         
+                      
               g
             }else if(n == 1){
               

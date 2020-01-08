@@ -169,7 +169,8 @@ plotGatingHierarchy <- function(input, output, session,
                   plot_type = rval_plot$plot_type,
                   plot_args = reactiveValuesToList(rval_plot),
                   options = options)
-    
+    #print(reactiveValuesToList(rval_plot))
+    #print(options)
     p
     
   })
@@ -196,7 +197,7 @@ plotGatingHierarchy <- function(input, output, session,
 # if (interactive()){
 # 
 #   ui <- dashboardPage(
-#     dashboardHeader(title = "plotGatingHierarchy2"),
+#     dashboardHeader(title = "plotGatingHierarchy"),
 #     sidebar = dashboardSidebar(disable = TRUE),
 #     body = dashboardBody(
 #       fluidRow(
@@ -212,14 +213,22 @@ plotGatingHierarchy <- function(input, output, session,
 #     display_params <- reactiveValues()
 # 
 #     observe({
-#       gs <- load_gs("./inst/ext/gs")
+#       #gs <- load_gs("./inst/ext/gs")
+#       load("../flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
+#       fs <- build_flowset_from_df(df = res$cluster$data)
+#       gs <- GatingSet(fs)
+#       add_gates_flowCore(gs, res$cluster$gates)
 #       rval$gating_set <- gs
 #       plot_params$sample <- pData(gs)$name
-#       plot_params$plot_type <- "hexagonal"
+#       print(gs_get_pop_paths(rval$gating_set))
+#       plot_params$sample <- "Z_037.fcs"
+#       plot_params$use_all_cells <- FALSE
+#       #plot_params$plot_type <- "hexagonal"
+#       plot_params$selected_subsets <- c("/HLA-DR_myeloid", "/HLA-DR_myeloid/Single_Cells", "/cluster1")
 #       display_params$top <- paste(plot_params$sample, collapse = " + ")
 #     })
 # 
-#     plot_all_gates <- callModule(plotGatingHierarchy2, "module",
+#     plot_all_gates <- callModule(plotGatingHierarchy, "module",
 #                       rval = rval,
 #                       plot_params = plot_params)
 # 

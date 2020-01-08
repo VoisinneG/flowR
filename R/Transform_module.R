@@ -8,7 +8,6 @@ TransformUI <- function(id) {
   
   ns <- NS(id)
   
-  
   fluidRow(
     
     column(width = 6,
@@ -31,7 +30,7 @@ TransformUI <- function(id) {
                            br()
                   ),
                   tabPanel(title = "Edit",
-                           "Edit table",
+                           "Edit table (column 'desc' only)",
                            br(),
                            br(),
                            div(style = 'overflow-x: scroll', DT::DTOutput(ns("parameters")))
@@ -69,7 +68,8 @@ TransformUI <- function(id) {
 #' @rdname TransformUI
 Transform <- function(input, output, session, rval) {
 
-  rval_mod <- reactiveValues(init = TRUE)
+  rval_mod <- reactiveValues(parameters = NULL)
+  plot_params <- reactiveValues()
   
   output$trans_param_ui <- renderUI({
     ns <- session$ns
@@ -93,43 +93,31 @@ Transform <- function(input, output, session, rval) {
       x[[1]] <- h5("Parameters")
       x[[2]] <- numericInput(ns("base_log"), label = "base", value = 10)
     }
-    
     tagList(x)
   })
   
-  plot_params <- reactiveValues()
-  
-  
-  
+
   observe({
-    
-    validate( need(rval$plot_var, "No plotting parameters"))
-    validate(need(rval$pdata, "No metadata available"))
-    
-    if(rval_mod$init){
-      plot_params$samples <- rval$pdata$name[1]
-      plot_params$gate <- "root"
-      plot_params$xvar <- rval$plot_var[1]
-      plot_params$yvar <- rval$plot_var[2]
+      
       plot_params$plot_type <- "histogram"
       plot_params$color_var <- NULL
       plot_params$use_all_cells <- FALSE
-      rval_mod$init <- FALSE
-    }
-    
   })
   
   observeEvent(input$parameters_table_rows_selected, {
-    
-    #reset plot parameters (only non null parameters will be updated)
-    for(var in names(reactiveValuesToList(plot_params))){
-      plot_params[[var]] <- NULL
-    }
-    
+
     if(length(input$parameters_table_rows_selected)>0){
-    plot_params$xvar <- rval$parameters$name_long[input$parameters_table_rows_selected[1]]
+      
+      #reset plot parameters (only non null parameters will be updated)
+      for(var in names(reactiveValuesToList(plot_params))){
+        plot_params[[var]] <- NULL
+      }
+      
+      plot_params$xvar <- rval_mod$parameters$name[input$parameters_table_rows_selected[1]]
       if(length(input$parameters_table_rows_selected)>1){
-        plot_params$yvar <- rval$parameters$name_long[input$parameters_table_rows_selected[2]]
+        plot_params$yvar <- rval_mod$parameters$name[input$parameters_table_rows_selected[2]]
+      }else{
+        plot_params$yvar <- rval_mod$parameters$name[1]
       }
     }
   })
@@ -144,98 +132,102 @@ Transform <- function(input, output, session, rval) {
   # Observe functions for data transformation
   
   #get parameters information from flow set
-  observeEvent(rval$flow_set, {
-    
-    validate(
-      need(rval$flow_set, "No flow set available")
-    )
-    
-    ff <- rval$flow_set[[1]]
-    
-    #if(is.null(rval$parameters) | !setequal(rval$parameters$name, parameters(ff)$name)){
-    if(is.null(rval$parameters)){
-      
-      params <- flowCore::parameters(ff)
-      
-      desc <- as.character(params$desc)
-      name <- as.character(params$name)
-     
-      
-      display <- unlist(sapply(rownames(params@data), FUN = function(x){
-        kw <- substr(x, start = 2, stop = nchar(x))
-        kw <- paste(kw, "DISPLAY", sep = "")
-        disp <- ff@description[[kw]]
-        if(is.null(disp)){
-          disp <- "NA"
-        }
-        return(disp)
-      }))
-      
-      names(display) <- params@data$name
-      
-      rval$parameters <- data.frame(name = name,
-                                    desc = desc,
-                                    display = display[match(name, names(display))],
-                                    range = params@data$range,
-                                    minRange = params@data$minRange,
-                                    maxRange = params@data$maxRange,
-                                    stringsAsFactors = FALSE)
-    }
-    
-  })
-  
-  
   observe({
-    validate(need(rval$parameters, "no parameters"))
-    desc <- as.character(rval$parameters$desc)
-    name <- as.character(rval$parameters$name)
-    name_long <- name
-    name_long[!is.na(desc)] <- paste(name[!is.na(desc)], " (", desc[!is.na(desc)], ")", sep = "")
-    rval$parameters$name_long <- name_long
+    
+    validate(need(class(rval$gating_set) == "GatingSet", "No GatingSet available"))
+    
+    ff <- rval$gating_set@data[[1]]
+    
+    params <- flowCore::parameters(ff)
+    
+    desc <- as.character(params$desc)
+    name <- as.character(params$name)
+    
+    
+    display <- unlist(sapply(rownames(params@data), FUN = function(x){
+      kw <- substr(x, start = 2, stop = nchar(x))
+      kw <- paste(kw, "DISPLAY", sep = "")
+      disp <- ff@description[[kw]]
+      if(is.null(disp)){
+        disp <- "NA"
+      }
+      return(disp)
+    }))
+    
+    names(display) <- params@data$name
+    
+    rval_mod$parameters <- data.frame(name = name,
+                                      desc = desc,
+                                      display = display[match(name, names(display))],
+                                      range = params@data$range,
+                                      minRange = params@data$minRange,
+                                      maxRange = params@data$maxRange,
+                                      stringsAsFactors = FALSE)
+    #plot_params$xvar <- name[1]
+    #plot_params$yvar <- name[2]
   })
   
-  observeEvent(rval$parameters, {
-    validate(need(rval$parameters, "No parameters"))
-    rval$plot_var <- rval$parameters$name_long
-    names(rval$plot_var) <- NULL
-  })
+  
+  # observe({
+  #   validate(need(rval$parameters, "no parameters"))
+  #   desc <- as.character(rval$parameters$desc)
+  #   name <- as.character(rval$parameters$name)
+  #   name_long <- name
+  #   name_long[!is.na(desc)] <- paste(name[!is.na(desc)], " (", desc[!is.na(desc)], ")", sep = "")
+  #   rval$parameters$name_long <- name_long
+  # })
+  # 
+  # observeEvent(rval$parameters, {
+  #   validate(need(rval$parameters, "No parameters"))
+  #   rval$plot_var <- rval$parameters$name_long
+  #   names(rval$plot_var) <- NULL
+  # })
   
   # Initialization of transformation for new parameters
   observe({
     
-    validate(
-      need(rval$parameters, "No parameters defined")
-    )
+    validate(need(class(rval$gating_set) == "GatingSet", "No GatingSet available"))
     
-    new_par <- setdiff(rval$parameters$name, names(rval$transformation))
-    idx_new <- match(new_par, rval$parameters$name)
+    transformation <- rval$gating_set@transformation
+    trans_parameters <- rval$trans_parameters
+    
+    new_par <- setdiff(colnames(rval$gating_set), names(transformation))
+    idx_new <- match(new_par, colnames(rval$gating_set))
     
     if(length(new_par)>0){
       for(i in 1:length(new_par)){
-        rval$transformation[[new_par[i]]] <- switch(rval$parameters$display[idx_new[i]],
+        transformation[[new_par[i]]] <- switch(rval_mod$parameters$display[idx_new[i]],
                                                     "LOG" = flowWorkspace::logicle_trans(w=0.5, 
                                                                           m=4.5, 
                                                                           t = 262144, 
                                                                           a = 0),
                                                     scales::identity_trans())
-        rval$trans_parameters[[new_par[i]]] <- switch(rval$parameters$display[idx_new[i]],
+        
+        trans_parameters[[new_par[i]]] <- switch(rval_mod$parameters$display[idx_new[i]],
                                                       "LOG" = list(w=0.5, 
                                                                    m=4.5, 
                                                                    t = 262144, 
                                                                    a = 0),
                                                       list())
       }
-      
     }
+    
+    rval$trans_parameters <- trans_parameters
+    rval$gating_set@transformation <- transformation
+    #print(class(rval$gating_set))
+    #rval$update_gs <- rval$update_gs + 1
     
   })
   
   
   observeEvent(input$apply_transformation, {
+
+    transformation <- rval$gating_set@transformation
+    trans_parameters <- rval$trans_parameters
     
     if(length(input$parameters_table_rows_selected)>0){
       
-      var_name <- rval$parameters$name[input$parameters_table_rows_selected]
+      var_name <- rval_mod$parameters$name[input$parameters_table_rows_selected]
       
       trans_params <- switch(input$trans,
                              "identity" = list(),
@@ -266,51 +258,58 @@ Transform <- function(input, output, session, rval) {
       
       
       for(i in 1:length(var_name)){
-        rval$transformation[[var_name[i]]] <- trans
-        rval$trans_parameters[[var_name[i]]] <- trans_params
+        transformation[[var_name[i]]] <- trans
+        trans_parameters[[var_name[i]]] <- trans_params
       }
       
     }
     
+    rval$trans_parameters <- trans_parameters
+    rval$gating_set@transformation <- transformation
+    #rval$update_gs <- rval$update_gs + 1
+    
   })
   
   observe({
+    validate(need(class(rval$gating_set) == "GatingSet", "No GatingSet available"))
+    transformation <- rval$gating_set@transformation
+    trans_parameters <- rval$trans_parameters
+    # validate(
+    #   need(rval$transformation, "No transformation defined")
+    # )
+    # 
+    # validate(
+    #   need(rval$parameters, "No parameters")
+    # )
     
-    validate(
-      need(rval$transformation, "No transformation defined")
-    )
-    
-    validate(
-      need(rval$parameters, "No parameters")
-    )
-    
-    trans_name <- sapply(rval$transformation, function(x){x$name})
-    trans_param <- sapply(rval$trans_parameters, function(x){
+    trans_name <- sapply(transformation, function(x){x$name})
+    trans_param <- sapply(trans_parameters, function(x){
       paste( paste(names(x), as.character(x), sep = ": "), collapse="; ")})
     
-    idx_match <- match(rval$parameters$name, names(rval$transformation))
+    idx_match <- match(rval_mod$parameters$name, names(transformation))
+    rval_mod$parameters$transform <- trans_name[idx_match]
     
-    rval$parameters$transform <- trans_name[idx_match]
-    rval$parameters[["transform parameters"]] <- trans_param[idx_match]
+    idx_match_trans <- match(rval_mod$parameters$name, names(trans_parameters))
+    rval_mod$parameters[["transform parameters"]] <- trans_param[idx_match_trans]
     
     
   })
   
   output$parameters_table <- DT::renderDT({
     validate(
-      need(rval$parameters, "No data imported")
+      need(rval_mod$parameters, "No parameters defined")
     )
-    df <- rval$parameters
+    df <- rval_mod$parameters
     df$minRange <- format(df$minRange, digits = 2)
     df$maxRange <- format(df$maxRange, digits = 2)
-    df[["channel_name"]] <- df$name_long
+    
     DT::datatable(
-      df[, c("name", "desc", "channel_name", "transform", "transform parameters", "minRange", "maxRange",  "range", "display" )],
+      df[, c("name", "desc", "transform", "transform parameters", "minRange", "maxRange",  "range", "display" )],
       rownames = FALSE)
   })
   
   #Edit data table
-  output$parameters <- renderDT({validate(need(rval$parameters, "No metadata")); rval$parameters},
+  output$parameters <- renderDT({validate(need(rval_mod$parameters, "No metadata")); rval_mod$parameters},
                            rownames = FALSE,
                            selection = 'none',
                            editable = 'cell',
@@ -322,8 +321,8 @@ Transform <- function(input, output, session, rval) {
     info = input$parameters_cell_edit
     info$col <- info$col + 1
     if(info$col == 2){
-      rval$parameters <<- editData(rval$parameters, info)
-      replaceData(proxy, rval$parameters, resetPaging = FALSE)
+      rval_mod$parameters <<- editData(rval_mod$parameters, info)
+      replaceData(proxy, rval_mod$parameters, resetPaging = FALSE)
     }
   })
   
@@ -331,3 +330,38 @@ Transform <- function(input, output, session, rval) {
   
   
 }
+
+##################################################################################
+# Tests
+##################################################################################
+#
+# library(shiny)
+# library(shinydashboard)
+# 
+# if (interactive()){
+# 
+#   ui <- dashboardPage(
+#     dashboardHeader(title = "plotting"),
+#     sidebar = dashboardSidebar(disable = TRUE),
+#     body = dashboardBody(
+#       TransformUI("module")
+#     )
+#   )
+# 
+#   server <- function(input, output, session) {
+# 
+#     rval <- reactiveValues()
+#     plot_params <- reactiveValues()
+# 
+#     observe({
+#       utils::data("GvHD", package = "flowCore")
+#       rval$gating_set <- GatingSet(GvHD)
+#     })
+# 
+#     res <- callModule(Transform, "module", rval = rval)
+# 
+#   }
+# 
+#   shinyApp(ui, server)
+# 
+# }

@@ -1606,9 +1606,12 @@ format_plot <- function(p,
   color_var <- as.character(p$plot_env$color_var)
   
   facet_yvar <- NULL
-  if(p$plot_env$plot_type == "bar"){
-    facet_yvar <- "variable"
+  if(!is.null(p$plot_env$plot_type)){
+    if(p$plot_env$plot_type == "bar"){
+      facet_yvar <- "variable"
+    }
   }
+  
   
   ############################################################################33
   #default parameters
@@ -1654,9 +1657,15 @@ format_plot <- function(p,
       labx <- ifelse(xvar %in% names(options$axis_labels), options$axis_labels[[xvar]], xvar)
       
       if(xvar %in% names(transformation)){
-        p <- p + scale_x_continuous(name = labx, trans = transformation[[xvar]], limits = xlim) 
-      }else if(is.numeric(p$data[[xvar]])){
+        if(is.double(p$data[[xvar]])){
+          p <- p + scale_x_continuous(name = labx, trans = transformation[[xvar]], limits = xlim) 
+        }else{
+          p <- p + scale_x_discrete(name = labx, limits = xlim) 
+        }
+      }else if(is.double(p$data[[xvar]])){
         p <- p + scale_x_continuous(name = labx, trans = default_trans, limits = xlim)
+      }else{
+        p <- p + scale_x_discrete(name = labx, limits = xlim) 
       }
     }
   }
@@ -1667,26 +1676,33 @@ format_plot <- function(p,
       laby <- ifelse(yvar %in% names(options$axis_labels), options$axis_labels[[yvar]], yvar)
       
       if(yvar %in% names(transformation)){
-        p <- p + scale_y_continuous(name = laby, trans = transformation[[yvar]], limits = ylim) 
-      }else if(is.numeric(p$data[[yvar]])){
+        if(is.double(p$data[[yvar]])){
+          p <- p + scale_y_continuous(name = laby, trans = transformation[[yvar]], limits = ylim) 
+        }else{
+          p <- p + scale_y_discrete(name = laby, limits = ylim) 
+        }
+      }else if(is.double(p$data[[yvar]])){
         p <- p + scale_y_continuous(name = laby, trans = default_trans, limits = ylim)
+      }else{
+        p <- p + scale_y_discrete(name = laby, limits = ylim)
       }
     }
   }
   
-  
-  if(p$plot_env$plot_type == "dots"){
-    
-    if(!is.null(color_var)){
-      if(length(color_var) == 1){
-        
-        label_color <- ifelse(color_var %in% names(options$axis_labels), options$axis_labels[[color_var]], color_var)
-        
-        if( as.character(color_var) %in% setdiff(names(transformation), "cluster")){
+  if(!is.null(p$plot_env$plot_type)){
+    if(p$plot_env$plot_type == "dots"){
+      
+      if(!is.null(color_var)){
+        if(length(color_var) == 1){
           
-          p <- p + viridis::scale_colour_viridis(trans = transformation[[color_var]],
-                                        name = label_color,
-                                        option = option)
+          label_color <- ifelse(color_var %in% names(options$axis_labels), options$axis_labels[[color_var]], color_var)
+          
+          if( as.character(color_var) %in% setdiff(names(transformation), "cluster")){
+            
+            p <- p + viridis::scale_colour_viridis(trans = transformation[[color_var]],
+                                          name = label_color,
+                                          option = option)
+          }
         }
       }
     }
