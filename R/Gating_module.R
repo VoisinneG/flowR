@@ -308,14 +308,7 @@ Gating <- function(input, output, session, rval) {
         
         poly_gate <- flowCore::polygonGate(.gate = polygon, filterId=input$gate_name)
         rval$gate <- poly_gate
-        
-        # if(res$params$subset != "root"){
-        #   gate_name <- paste(res$params$subset, "/", input$gate_name, sep = "")
-        # }else{
-        #   gate_name <- paste("/", input$gate_name, sep = "")
-        # }
           
-
         flowWorkspace::gs_pop_add(rval$gating_set, poly_gate, parent = res$params$subset)
         flowWorkspace::recompute(rval$gating_set)
         rval$update_gs <- rval$update_gs + 1
@@ -323,6 +316,11 @@ Gating <- function(input, output, session, rval) {
         gate$x <- NULL
         gate$y <- NULL
 
+        if(res$params$subset != "root"){
+          gate_name <- paste(res$params$subset, "/", input$gate_name, sep = "")
+        }else{
+          gate_name <- paste("/", input$gate_name, sep = "")
+        }
         plot_params$subset <- gate_name
       }
     }
@@ -341,7 +339,8 @@ Gating <- function(input, output, session, rval) {
       rval$update_gs <- rval$update_gs + 1
 
       plot_params$subset <- "root"
-      
+      print("OK delete")
+      print(gs_get_pop_paths(rval$gating_set))
     }
     
   })
@@ -406,6 +405,7 @@ Gating <- function(input, output, session, rval) {
     rval$update_gs
     validate(need(class(rval$gating_set)=="GatingSet", "No GatingSet available"))
     gates <- get_gates_from_gs(rval$gating_set)
+    print(gates)
     validate(need(names(gates), "Empty GatingSet"))
     
     if(!input$show_all_subsets){
@@ -424,6 +424,7 @@ Gating <- function(input, output, session, rval) {
   })
   
   output$tree <- renderPlot({
+    rval$update_gs
     gates <- gate_list()
 
     gR = methods::new("graphNEL", nodes = union("root", names(gates)), edgemode = "directed")

@@ -108,6 +108,15 @@ plotGatingHierarchy <- function(input, output, session,
     validate(need(length(plot_var)>0, "No variables in GatingSet"))
     
     desc <- parameters(rval$gating_set@data[[1]])$desc
+    
+    minRange <- parameters(rval$gating_set@data[[1]])@data$minRange
+    maxRange <- parameters(rval$gating_set@data[[1]])@data$maxRange
+    
+    axis_limits <- lapply(1:length(plot_var), function(x){
+      return(as.numeric(c(minRange[x], maxRange[x])))})
+    
+    names(axis_limits) <- plot_var
+    
     labels <- sapply(1:length(plot_var), function(x){
       if(is.na(desc[x])){
         plot_var[x]
@@ -122,6 +131,7 @@ plotGatingHierarchy <- function(input, output, session,
       list(sample = pData(rval$gating_set)$name,
            plot_var = plot_var,
            labels = labels,
+           axis_limits = axis_limits,
            transformation = rval$gating_set@transformation,
            compensation = rval$gating_set@compensation,
            gates = get_gates_from_gs(rval$gating_set)
@@ -135,7 +145,14 @@ plotGatingHierarchy <- function(input, output, session,
     validate(need(setdiff(gs_get_pop_paths(rval$gating_set), "root"), "No gates to display"))
     
     axis_labels <- choices()$labels
-
+    
+    axis_limits <- list()
+    if(!is.null(rval_plot$auto_focus)){
+      if(!rval_plot$auto_focus){
+        axis_limits <- choices()$axis_limits
+      }
+    }
+    
     transformation <- choices()$transformation
     if(!is.null(rval$apply_trans)){
       if(!rval$apply_trans){
@@ -160,6 +177,7 @@ plotGatingHierarchy <- function(input, output, session,
     options <- reactiveValuesToList(rval_plot)
     options$transformation <- transformation
     options$axis_labels <- axis_labels
+    options$axis_limits <- axis_limits
     
     p <- plot_gh( gs = rval$gating_set,
                   df = NULL,

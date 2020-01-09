@@ -1474,28 +1474,81 @@ add_polygon_layer <- function(p,
   
   if(p$plot_env$plot_type != "histogram" & setequal(names(polygon), c("x", "y"))){
     if(!is.null(polygon$x)){
-      
-      polygon <- data.frame(x = polygon$x, y = polygon$y)
-      polygon <- rbind(polygon, polygon[1,])
-      
-      p <- p +
-        geom_path(data = polygon, mapping = aes(x=x, y=y), color = "red") +
-        geom_polygon(data=polygon, mapping = aes(x=x, y=y),
-                     fill="red",
-                     alpha=0.05)
-      if(!is.null(label)){
-        df_label <- data.frame(x=mean(polygon$x), y= mean(polygon$y))
-        p <- p +  geom_label_repel(data = df_label, force = 4,
-                                   mapping = aes(x=x, y=y), 
-                                   label = label, 
-                                   fill = grDevices::rgb(1,1,1,0.85), 
-                                   color = "red", 
-                                   nudge_y = 0, 
-                                   nudge_x =0, 
-                                   point.padding = 0)
-        #hjust = "middle", vjust = "center")
+      if(length(polygon$x)>1){
+        polygon <- data.frame(x = polygon$x, y = polygon$y)
+        polygon <- rbind(polygon, polygon[1,])
+        
+        ########################################################################
+        # Adjust plot limits
+        layer_info <- layer_scales(p)
+        
+        update_range_x <- FALSE
+        
+        if(!is.null(layer_info$x$limits) & 
+           class(layer_info$x$range) == "RangeContinuous"){
+          
+          xrange <- layer_info$x$trans$inverse(layer_info$x$limits)
+          if(!is.null(xrange)){
+            if(max(polygon$x) > max(xrange)){
+              update_range_x <- TRUE
+              xrange[2] <- max(polygon$x)
+            }
+            if(min(polygon$x) < min(xrange)){
+              update_range_x <- TRUE
+              xrange[1] <- min(polygon$x)
+            }
+          }
+        }
+        
+        if(update_range_x){
+          p <- p + scale_x_continuous(name = layer_info$x$name, 
+                                      trans = layer_info$x$trans, 
+                                      limits = xrange)
+        }
+        
+        update_range_y <- FALSE
+        
+        if(!is.null(layer_info$x$limits) & 
+           class(layer_info$x$range) == "RangeContinuous"){
+          
+          yrange <- layer_info$y$trans$inverse(layer_info$y$limits)
+          if(!is.null(yrange)){
+            if(max(polygon$y) > max(yrange)){
+              update_range_y <- TRUE
+              yrange[2] <- max(polygon$y)
+            }
+            if(min(polygon$y) < min(yrange)){
+              update_range_y <- TRUE
+              yrange[1] <- min(polygon$y)
+            }
+          }
+        }
+        if(update_range_y){
+          p <- p + scale_y_continuous(name = layer_info$y$name, 
+                                      trans = layer_info$y$trans, 
+                                      limits = yrange)
+        }
+        ########################################################################3
+        
+        p <- p +
+          geom_path(data = polygon, mapping = aes(x=x, y=y), color = "red") +
+          geom_polygon(data=polygon, mapping = aes(x=x, y=y),
+                       fill="red",
+                       alpha=0.05)
+        if(!is.null(label)){
+          df_label <- data.frame(x=mean(polygon$x), y= mean(polygon$y))
+          p <- p +  geom_label_repel(data = df_label, force = 4,
+                                     mapping = aes(x=x, y=y), 
+                                     label = label, 
+                                     fill = grDevices::rgb(1,1,1,0.85), 
+                                     color = "red", 
+                                     nudge_y = 0, 
+                                     nudge_x =0, 
+                                     point.padding = 0)
+        }
       }
       
+
     }
     
   }
@@ -1601,6 +1654,10 @@ format_plot <- function(p,
   xlim <- NULL
   ylim <- NULL
   
+  transformation <- list()
+  axis_labels <- list()
+  axis_limits <- list()
+  
   color_var <- as.character(p$plot_env$color_var)
   
   facet_yvar <- NULL
@@ -1615,7 +1672,7 @@ format_plot <- function(p,
   #default parameters
   
   var_options <- c("xlim", "ylim", "transformation", "default_trans", 
-                   "axis_labels", "color_var_name", "facet_var", "facet_yvar",
+                   "axis_labels", "axis_limits", "color_var_name", "facet_var", "facet_yvar",
                    "scales", "option", "theme", "legend.position")
   
   for(var in intersect(names(options), var_options)){
@@ -1642,29 +1699,19 @@ format_plot <- function(p,
   ############################################################################33
   #transformations
   
-  transformation <- list()
-  
-  for(var in names(options$transformation)){
-    transformation[[var]] <- options$transformation[[var]]
-  }
-  
-  
   if(!is.null(xvar)){
     if(length(xvar) == 1){
       
-      labx <- ifelse(xvar %in% names(options$axis_labels), options$axis_labels[[xvar]], xvar)
+      labx <- ifelse(xvar %in% names(axis_labels), axis_labels[[xvar]], xvar)
+      trans_x <- ifelse(xvar %in% names(transformation), transformation[[xvar]], default_trans)
+      xlim <- axis_limits[[xvar]]
       
-      if(xvar %in% names(transformation)){
-        if(is.double(p$data[[xvar]])){
-          p <- p + scale_x_continuous(name = labx, trans = transformation[[xvar]], limits = xlim) 
-        }else{
-          p <- p + scale_x_discrete(name = labx, limits = xlim) 
-        }
-      }else if(is.double(p$data[[xvar]])){
-        p <- p + scale_x_continuous(name = labx, trans = default_trans, limits = xlim)
+      if(is.double(p$data[[xvar]])){
+        p <- p + scale_x_continuous(name = labx, trans = trans_x, limits = xlim) 
       }else{
-        p <- p + scale_x_discrete(name = labx, limits = xlim) 
+        p <- p + scale_x_discrete(name = labx) 
       }
+     
     }
   }
   
@@ -1672,18 +1719,15 @@ format_plot <- function(p,
     if(length(yvar) == 1){
       
       laby <- ifelse(yvar %in% names(options$axis_labels), options$axis_labels[[yvar]], yvar)
-      
-      if(yvar %in% names(transformation)){
-        if(is.double(p$data[[yvar]])){
-          p <- p + scale_y_continuous(name = laby, trans = transformation[[yvar]], limits = ylim) 
-        }else{
-          p <- p + scale_y_discrete(name = laby, limits = ylim) 
-        }
-      }else if(is.double(p$data[[yvar]])){
-        p <- p + scale_y_continuous(name = laby, trans = default_trans, limits = ylim)
+      trans_y <- ifelse(yvar %in% names(transformation), transformation[[yvar]], default_trans)
+      ylim <- axis_limits[[yvar]]
+
+      if(is.double(p$data[[yvar]])){
+        p <- p + scale_y_continuous(name = laby, trans = trans_y, limits = ylim) 
       }else{
-        p <- p + scale_y_discrete(name = laby, limits = ylim)
+        p <- p + scale_y_discrete(name = laby) 
       }
+        
     }
   }
   
@@ -1751,7 +1795,7 @@ format_plot <- function(p,
   }
   
   p <- p + theme(plot.title = element_text(face = "bold"))
-  
+
   return(p)
   
 }
@@ -1800,15 +1844,14 @@ plot_gs <- function(gs,
   
   if(is.null(sample)) sample <-  flowWorkspace::pData(gs)$name[1]
   if(is.null(subset)) subset <- flowWorkspace::gs_get_pop_paths(gs)[1]
-  
+
   df <- get_plot_data(df = df,
                       gs = gs, 
                       sample = sample,
                       subset = subset,
                       spill = spill, 
                       metadata = metadata)
-  
-  
+
   p <- call_plot_function(df = df,
                           plot_type = plot_type,
                           plot_args = plot_args)
