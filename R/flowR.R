@@ -1485,7 +1485,7 @@ add_polygon_layer <- function(p,
         update_range_x <- FALSE
         
         if(!is.null(layer_info$x$limits) & 
-           class(layer_info$x$range) == "RangeContinuous"){
+           "RangeContinuous" %in% class(layer_info$x$range) ){
           
           xrange <- layer_info$x$trans$inverse(layer_info$x$limits)
           if(!is.null(xrange)){
@@ -1504,12 +1504,13 @@ add_polygon_layer <- function(p,
           p <- p + scale_x_continuous(name = layer_info$x$name, 
                                       trans = layer_info$x$trans, 
                                       limits = xrange)
+          
         }
         
         update_range_y <- FALSE
         
         if(!is.null(layer_info$x$limits) & 
-           class(layer_info$x$range) == "RangeContinuous"){
+           "RangeContinuous" %in% class(layer_info$x$range) ){
           
           yrange <- layer_info$y$trans$inverse(layer_info$y$limits)
           if(!is.null(yrange)){
@@ -1528,11 +1529,15 @@ add_polygon_layer <- function(p,
                                       trans = layer_info$y$trans, 
                                       limits = yrange)
         }
+        
         ########################################################################3
         
+        
+        
         p <- p +
-          geom_path(data = polygon, mapping = aes(x=x, y=y), color = "red") +
-          geom_polygon(data=polygon, mapping = aes(x=x, y=y),
+          geom_path(data = polygon, mapping = aes(x=x, y=y), color = "red", inherit.aes = FALSE) +
+          geom_polygon(data=polygon, mapping = aes(x=x, y=y), 
+                       inherit.aes = FALSE,
                        fill="red",
                        alpha=0.05)
         if(!is.null(label)){
@@ -1552,7 +1557,6 @@ add_polygon_layer <- function(p,
     }
     
   }
-  
   return(p)
   
 }
@@ -1569,6 +1573,7 @@ add_gate <- function(p, gate){
   
   xvar <- NULL
   yvar <- NULL
+  color_var <- NULL
   
   if("x" %in% names(p$mapping)){
     if("quosure" %in% class(p$mapping$x)){
@@ -1582,6 +1587,11 @@ add_gate <- function(p, gate){
     }
   }
   
+  if("colour" %in% names(p$mapping)){
+    if("quosure" %in% class(p$mapping$colour)){
+      color_var <- as.character(rlang::quo_get_expr(p$mapping$colour))
+    }
+  }
   
   if(setequal(c(xvar, yvar), names(polygon))){ 
     
@@ -1749,6 +1759,8 @@ format_plot <- function(p,
       }
     }
   }
+  
+
   ############################################################################33
   #facet
   if(!is.null(options$facet_var) | !is.null(facet_yvar)){
@@ -1851,7 +1863,7 @@ plot_gs <- function(gs,
                       subset = subset,
                       spill = spill, 
                       metadata = metadata)
-
+  
   p <- call_plot_function(df = df,
                           plot_type = plot_type,
                           plot_args = plot_args)
@@ -1864,7 +1876,6 @@ plot_gs <- function(gs,
       p <- add_gate(p, g)
     }
   }
-  
   return(p)
 }
 
@@ -2059,7 +2070,7 @@ plot_gh <- function( gs,
 
         plot_args$xvar <- par_nodes[[1]][1]
         plot_args$yvar <- par_nodes[[1]][2]
-
+        
         plist[[count]] <- plot_gs(df = df, 
                                    gs=gs, 
                                    sample=sample, 
