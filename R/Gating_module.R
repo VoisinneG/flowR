@@ -128,6 +128,11 @@ Gating <- function(input, output, session, rval) {
   display_params <- reactiveValues()
   rval_mod <- reactiveValues()
   
+  observe({
+    rval$update_gs <- 0
+    plot_params$plot_type = "dots"
+    plot_params$color_var = "SSC-A"})
+  
   #reset reacivevalues object when GatingSet has been updated
   observeEvent(rval$update_gs, {
     plot_params <- reactiveValues()
@@ -163,18 +168,35 @@ Gating <- function(input, output, session, rval) {
   
   #Passing plot parameters to the gating hierarchy plot
   observe({
-    for(var in setdiff(names(res$params), c("xvar",
-                                            "yvar",
-                                            "group_var",
-                                            "facet_var",
-                                            "norm", 
-                                            "smooth", 
-                                            "ridges", 
-                                            "yridges_var",
-                                            "show_label")) ){
+    # for(var in setdiff(names(res$params), c("xvar",
+    #                                         "yvar",
+    #                                         "subset",
+    #                                         "group_var",
+    #                                         "facet_var",
+    #                                         "norm", 
+    #                                         "smooth", 
+    #                                         "ridges", 
+    #                                         "yridges_var",
+    #                                         "show_label")) ){
+      for(var in intersect(names(res$params), c("sample",
+                                              "plot_type",
+                                              "auto_focus",
+                                              "legend.position",
+                                              "theme",
+                                              "bins",
+                                              "size", 
+                                              "alpha", 
+                                              "option",
+                                              "color_var",
+                                              "show_outliers")) ){
       plot_params_gh[[var]] <- res$params[[var]]
+      #print(reactiveValuesToList(plot_params_gh))
     }
-    display_params$top <- paste(res$params$sample, collapse = " + ")
+    #display_params$top <- paste(res$params$sample, collapse = " + ")
+  })
+  
+  observe({
+    print(reactiveValuesToList(plot_params_gh))
   })
   
   observe({
@@ -339,8 +361,7 @@ Gating <- function(input, output, session, rval) {
       rval$update_gs <- rval$update_gs + 1
 
       plot_params$subset <- "root"
-      print("OK delete")
-      print(gs_get_pop_paths(rval$gating_set))
+      
     }
     
   })
@@ -405,7 +426,6 @@ Gating <- function(input, output, session, rval) {
     rval$update_gs
     validate(need(class(rval$gating_set)=="GatingSet", "No GatingSet available"))
     gates <- get_gates_from_gs(rval$gating_set)
-    print(gates)
     validate(need(names(gates), "Empty GatingSet"))
     
     if(!input$show_all_subsets){
@@ -424,7 +444,6 @@ Gating <- function(input, output, session, rval) {
   })
   
   output$tree <- renderPlot({
-    rval$update_gs
     gates <- gate_list()
 
     gR = methods::new("graphNEL", nodes = union("root", names(gates)), edgemode = "directed")
@@ -561,51 +580,50 @@ Gating <- function(input, output, session, rval) {
 # Tests
 ##################################################################################
 # 
-# library(shiny)
-# library(shinydashboard)
-# library(flowWorkspace)
-# library(flowCore)
-# library(viridis)
-# library(scales)
-# library(ggplot2)
-# library(ggrepel)
-# library(plotly)
-# library(ggridges)
-# 
-# if (interactive()){
-# 
-#   ui <- dashboardPage(
-#     dashboardHeader(title = "Gating"),
-#     sidebar = dashboardSidebar(disable = TRUE),
-#     body = dashboardBody(
-#       GatingUI("module")
-#     )
-#   )
-# 
-#   server <- function(input, output, session) {
-# 
-#     rval <- reactiveValues()
-#     plot_params <- reactiveValues()
-# 
-#     observe({
-#       load("../flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
-#       fs <- build_flowset_from_df(df = res$cluster$data, origin = res$cluster$flow_set)
-#       gs <- GatingSet(fs)
-#       gs@transformation <-  res$cluster$transformation
-#       add_gates_flowCore(gs, res$cluster$gates)
-#       rval$gating_set <- gs
-#       plot_params$sample <- pData(gs)$name[1]
-#       #utils::data("GvHD", package = "flowCore")
-#       #rval$gating_set <- GatingSet(GvHD)
-#       #gs <- load_gs("./inst/ext/gs")
-#       #rval$gating_set <- gs
-#     })
-# 
-#     res <- callModule(Gating, "module", rval = rval)
-# 
-#   }
-# 
-#   shinyApp(ui, server)
-# 
-# }
+library(shiny)
+library(shinydashboard)
+library(flowWorkspace)
+library(flowCore)
+library(viridis)
+library(scales)
+library(ggplot2)
+library(ggrepel)
+library(plotly)
+library(ggridges)
+
+if (interactive()){
+
+  ui <- dashboardPage(
+    dashboardHeader(title = "Gating"),
+    sidebar = dashboardSidebar(disable = TRUE),
+    body = dashboardBody(
+      GatingUI("module")
+    )
+  )
+
+  server <- function(input, output, session) {
+
+    rval <- reactiveValues()
+
+    observe({
+      load("../flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
+      fs <- build_flowset_from_df(df = res$cluster$data, origin = res$cluster$flow_set)
+      gs <- GatingSet(fs)
+      gs@transformation <-  res$cluster$transformation
+      add_gates_flowCore(gs, res$cluster$gates)
+      rval$gating_set <- gs
+      #plot_params$sample <- pData(gs)$name[1]
+      #utils::data("GvHD", package = "flowCore")
+      #rval$gating_set <- GatingSet(GvHD)
+      #gs <- load_gs("./inst/ext/gs")
+      #rval$gating_set <- gs
+    })
+
+    res <- callModule(Gating, "module", rval = rval)
+
+  }
+
+  shinyApp(ui, server)
+
+}
 

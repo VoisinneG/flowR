@@ -57,7 +57,7 @@ plotGatingSetInput <- function(id) {
   
   tagList(
     uiOutput(ns("ui_update")),
-    box(collapsible = TRUE, collapsed = FALSE, width = NULL, height = NULL,
+    box(collapsible = TRUE, collapsed = TRUE, width = NULL, height = NULL,
         title = "Sample/Subset",
         selectionInput(ns("selection_module"))
     ),
@@ -147,7 +147,12 @@ plotGatingSet <- function(input, output, session,
                              count_raw = 0, count_format = 0, count_gate = 0)
   
   # rval_plot stores default values
-  rval_plot <- reactiveValues(show_gates = FALSE,
+  rval_plot <- reactiveValues(plot_type = "hexagonal",
+                              use_all_cells = FALSE,
+                              auto_focus = FALSE,
+                              legend.position = "right",
+                              theme = "gray",
+                              show_gates = FALSE,
                               norm = TRUE,
                               smooth = FALSE,
                               ridges = FALSE,
@@ -214,21 +219,24 @@ plotGatingSet <- function(input, output, session,
     }
   })
   
-  observe({
-    
-    if("plot_type" %in% names(plot_params)){
-      updateCheckboxInput(session, "plot_type", value = plot_params[["plot_type"]])
-    }
-    
-    if("use_all_cells" %in% names(plot_params)){
-      updateCheckboxInput(session, "use_all_cells", value = plot_params[["use_all_cells"]])
-    }
-    
-    if("auto_focus" %in% names(plot_params)){
-      updateCheckboxInput(session, "auto_focus", value = plot_params[["auto_focus"]])
-    }
-    
-  })
+  # observeEvent(plot_params[["plot_type"]], {
+  #   if("plot_type" %in% names(plot_params)){
+  #     updateCheckboxInput(session, "plot_type", value = plot_params[["plot_type"]])
+  #     rval_plot[["plot_type"]] <- plot_params[["plot_type"]]
+  #   }
+  # })
+  # observeEvent(plot_params[["use_all_cells"]], {
+  #   if("use_all_cells" %in% names(plot_params)){
+  #     updateCheckboxInput(session, "use_all_cells", value = plot_params[["use_all_cells"]])
+  #     rval_plot[["use_all_cells"]] <- plot_params[["use_all_cells"]]
+  #   }
+  # })
+  # observeEvent(plot_params[["auto_focus"]], {
+  #   if("auto_focus" %in% names(plot_params)){
+  #     updateCheckboxInput(session, "auto_focus", value = plot_params[["auto_focus"]])
+  #     rval_plot[["auto_focus"]] <- plot_params[["auto_focus"]]
+  #   }
+  # })
   
   ######################################################################################
   # Sample and subset selection module
@@ -310,6 +318,24 @@ plotGatingSet <- function(input, output, session,
     ns <- session$ns
     x <- list()
     
+    x[["plot_type"]] <- selectInput(ns("plot_type"), label = "plot type",
+                choices = c("hexagonal", "histogram", "dots", "contour"),
+                selected = rval_plot[["plot_type"]])
+    
+    x[["use_all_cells"]] <- checkboxInput(ns("use_all_cells"), "Use all cells", rval_plot[["use_all_cells"]])
+    
+    x[["auto_focus"]] <- checkboxInput(ns("auto_focus"), "Auto-focus", rval_plot[["auto_focus"]])
+    
+    x[["legend.position"]] <- selectInput(ns("legend.position"), label = "legend position",
+                choices = c("none", "right", "top", "left", "bottom"),
+                selected = rval_plot[["legend.position"]])
+    
+    x[["theme"]] <- selectInput(ns("theme"), 
+                label = "plot theme", 
+                choices = c("gray", "light", "minimal", "classic", 
+                            "bw", "dark", "void"), 
+                selected = rval_plot[["theme"]])
+    
     x[["show_gates"]] <- checkboxInput(ns("show_gates"), "show defining gates", 
                                        value = rval_plot[["show_gates"]])
     
@@ -362,6 +388,7 @@ plotGatingSet <- function(input, output, session,
     }else if (input$plot_type == 'contour'){
       vars <- c("show_gates", "show_outliers",  "bins", "alpha", "size")
     }
+    vars <- c("plot_type", "use_all_cells", "auto_focus", "legend.position", "theme", vars)
     
     tagList(rval_mod$plot_options[vars])
     
@@ -405,21 +432,22 @@ plotGatingSet <- function(input, output, session,
     #                             "dots" = c("none", "subset", choices()$meta_var, 
     #                                        choices()$plot_var),
     #                             c("none", "subset", choices()$meta_var))
-    x <- list()
     
-    x[["xvar"]] <- selectizeInput(ns("xvar"),
+    #x <- list()
+    
+    rval_mod$plot_variables[["xvar"]] <- selectizeInput(ns("xvar"),
                    multiple = !simple_plot,
                    label = "x variable", 
                    choices = choices()$plot_var,
                    selected = rval_plot[["xvar"]])
     
-    x[["yvar"]] <- selectizeInput(ns("yvar"),
+    rval_mod$plot_variables[["yvar"]] <- selectizeInput(ns("yvar"),
                    multiple = !simple_plot,
                    label = "y variable",
                    choices = choices()$plot_var,
                    selected = rval_plot[["yvar"]])
     
-    x[["group_var"]] <- selectizeInput(ns("group_var"), 
+    rval_mod$plot_variables[["group_var"]] <- selectizeInput(ns("group_var"), 
                                        multiple = !simple_plot,
                                        label = "group variable",
                                        choices = c("none", "subset", choices()$meta_var),
@@ -431,7 +459,7 @@ plotGatingSet <- function(input, output, session,
     #                                    choices = color_var_choices,
     #                                    selected = rval_input[["color_var"]])
     
-    x[["facet_var"]] <- selectizeInput(ns("facet_var"),
+    rval_mod$plot_variables[["facet_var"]] <- selectizeInput(ns("facet_var"),
                                        multiple =TRUE,
                                        label = "facet variables",
                                        choices = c("subset", 
@@ -442,13 +470,13 @@ plotGatingSet <- function(input, output, session,
     
     split_choices <- c("xvar", "yvar", "color_var")
     names(split_choices) <- c("x variable", "y variable", "color variable")
-    x[["split_var"]] <- selectInput(ns("split_var"),
+    rval_mod$plot_variables[["split_var"]] <- selectInput(ns("split_var"),
                                          label = "select variable used to split plots",
                                          choices = split_choices,
                                          selected = rval_plot[["split_var"]]
     )
 
-    rval_mod$plot_variables <- x
+    #rval_mod$plot_variables <- x
     
   })
   
@@ -768,7 +796,7 @@ plotGatingSet <- function(input, output, session,
   # Add gates corresponding to plot coordinates
   draw_gates <- eventReactive(rval_mod$count_format, {
     
-    print("gate")
+    #print("gate")
     
     gate <- NULL
 
@@ -785,7 +813,7 @@ plotGatingSet <- function(input, output, session,
     }
     
     plist <- rval_mod$plot_list
-    print(gate)
+    #print(gate)
     
     plist <- lapply( plist,
                      function(p){

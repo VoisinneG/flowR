@@ -167,7 +167,7 @@ simpleDisplay <- function(input, output, session,
                                            top = rval_plot$top),
                        silent = TRUE)
               
-              if(class(g)=="try-error"){
+              if("try-error" %in% class(g)){
                 showModal(modalDialog(
                   title = "Error",
                   print(g),

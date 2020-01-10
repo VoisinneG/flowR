@@ -179,6 +179,7 @@ plotGatingHierarchy <- function(input, output, session,
     options$axis_labels <- axis_labels
     options$axis_limits <- axis_limits
     
+
     p <- plot_gh( gs = rval$gating_set,
                   df = NULL,
                   sample = rval_plot$sample,
