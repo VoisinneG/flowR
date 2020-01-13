@@ -1,8 +1,6 @@
 #' @title exampleModuleUI and exampleModule
 #' @description  A example shiny module to import a csv file
-#' 
 #' @param id shiny id
-#' @export
 #' @examples
 #' \dontrun{
 #' library(shiny)

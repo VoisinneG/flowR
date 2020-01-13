@@ -28,3 +28,41 @@ Edit, visualize and show statistics from a gating hierarchy
 
 Gating module server function
 }
+\examples{
+\dontrun{
+library(shiny)
+library(shinydashboard)
+library(flowWorkspace)
+library(flowCore)
+library(viridis)
+library(scales)
+library(ggplot2)
+library(ggrepel)
+library(plotly)
+library(ggridges)
+
+if (interactive()){
+
+  ui <- dashboardPage(
+    dashboardHeader(title = "Gating"),
+    sidebar = dashboardSidebar(disable = TRUE),
+    body = dashboardBody(
+      GatingUI("module")
+    )
+  )
+
+  server <- function(input, output, session) {
+
+    rval <- reactiveValues()
+    observe({
+      utils::data("GvHD", package = "flowCore")
+      rval$gating_set <- GatingSet(GvHD)
+    })
+    res <- callModule(Gating, "module", rval = rval)
+  }
+
+  shinyApp(ui, server)
+
+}
+}
+}

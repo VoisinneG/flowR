@@ -148,7 +148,7 @@ flowR_server <- function(session, input, output, modules = NULL) {
   
  
   ##################################################################################################
-  # Updating related GatingSets (in the same tree)
+  # Updating GatingSets
   ##################################################################################################
   
   # Update transformation

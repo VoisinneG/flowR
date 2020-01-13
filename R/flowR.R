@@ -942,7 +942,9 @@ plot_histogram <- function(args = list()){
   }
   
   if(!is.null(color_var)){
-    color_var <- as.name(color_var)
+    if(color_var %in% names(df)){
+      color_var <- as.name(color_var)
+    }
   }
   
   if(!is.null(group_var)){
@@ -952,11 +954,15 @@ plot_histogram <- function(args = list()){
   }
   
   if(!is.null(group_var)){
-    group_var <- as.name(group_var)
+    if(group_var %in% names(df)){
+      group_var <- as.name(group_var)
+    }
   }
   
   if(!is.null(yridges_var)){
-    yridges_var <- as.name(yridges_var)
+    if(yridges_var %in% names(df)){
+      yridges_var <- as.name(yridges_var)
+    }
   }
 
   if(smooth){
@@ -983,9 +989,10 @@ plot_histogram <- function(args = list()){
                                                  group = group_var,
                                                  y = stat_var), 
                             alpha = alpha,  
-                            bins = bins, 
-                            position = "identity", 
-                            boundary = 0) 
+                            bins = bins,
+                            position = "identity",
+                            boundary = 0
+                            ) 
   }
   
   return(p)
@@ -1027,26 +1034,33 @@ plot_dots <-function(args = list()){
     if(color_var == "none"){
       color_var <- NULL
     }else{
-      id.vars <- color_var
+      if(color_var %in% names(df)){
+        id.vars <- color_var
+      }
     }
   }
   
   if(!is.null(color_var)){
-    color_var <- as.name(color_var)
+    if(color_var %in% names(df)){
+      color_var <- as.name(color_var)
+    }
   }
   
   if(!is.null(group_var)){
     if(group_var == "none"){
       group_var <- NULL
     }else{
-      id.vars <- group_var
+      if(group_var %in% names(df)){
+        id.vars <- group_var
+      }
     }
   }
   
   if(!is.null(group_var)){
-    group_var <- as.name(group_var)
+    if(group_var %in% names(df)){
+      group_var <- as.name(group_var)
+    }
   }
-  
   p <- ggplot(df,
               aes_string(x = as.name( xvar ), 
                          y = as.name( yvar ),
@@ -1054,7 +1068,6 @@ plot_dots <-function(args = list()){
                          group = group_var)) + 
     geom_point(alpha = alpha, 
                size = size)
-   
   if(show_label){
     df_stat <- compute_stats(df = df,
                              stat_function = "median",
@@ -1068,7 +1081,6 @@ plot_dots <-function(args = list()){
                              data = df_stat,
                              fill = "white")
   }
-  
   return(p)
   
 }
@@ -1112,7 +1124,9 @@ plot_contour <-function(args = list()){
   }
   
   if(!is.null(color_var)){
-    color_var <- as.name(color_var)
+    if(color_var %in% names(df)){
+      color_var <- as.name(color_var)
+    }
   }
   
   if(!is.null(group_var)){
@@ -1122,7 +1136,9 @@ plot_contour <-function(args = list()){
   }
   
   if(!is.null(group_var)){
-    group_var <- as.name(group_var)
+    if(color_var %in% names(df)){
+      group_var <- as.name(group_var)
+    }
   }
   
   
@@ -1305,11 +1321,15 @@ plot_bar <-function(args = list()){
   }
   
   if(!is.null(group_var)){
-    group_var <- as.name(group_var)
+    if(group_var %in% names(df)){
+      group_var <- as.name(group_var)
+    }
   }
   
   if(!is.null(color_var)){
-    color_var <- as.name(color_var)
+    if(color_var %in% names(df)){
+      color_var <- as.name(color_var)
+    }
   }
   
   df_melt <- df_melt[df_melt$variable %in% stat_var, ]
@@ -1369,7 +1389,9 @@ plot_tile <-function(args = list()){
   }
   
   if(!is.null(group_var)){
-    group_var <- as.name(group_var)
+    if(group_var %in% names(df)){
+      group_var <- as.name(group_var)
+    }
   }
 
   
@@ -1444,10 +1466,14 @@ plot_pca <-function(args = list()){
   df_pca <- cbind(df_pca, annotation[match(row.names(annotation), row.names(df_pca)), ])
   
   if(!is.null(color_var)){
-    color_var <- as.name(color_var)
+    if(color_var %in% names(df_pca)){
+      color_var <- as.name(color_var)
+    }
   }
   if(!is.null(label_var)){
-    label_var <- as.name(label_var)
+    if(label_var %in% names(df_pca)){
+      label_var <- as.name(label_var)
+    }
   }
   
   p <- ggplot(df_pca, aes_string(x=as.name(PCx), 
@@ -1542,7 +1568,7 @@ add_polygon_layer <- function(p,
                        alpha=0.05)
         if(!is.null(label)){
           df_label <- data.frame(x=mean(polygon$x), y= mean(polygon$y))
-          p <- p +  geom_label_repel(data = df_label, force = 4,
+          p <- p +  geom_label_repel(data = df_label, force = 4, inherit.aes = FALSE,
                                      mapping = aes(x=x, y=y), 
                                      label = label, 
                                      fill = grDevices::rgb(1,1,1,0.85), 
@@ -1678,10 +1704,10 @@ format_plot <- function(p,
   }
   
   
-  ############################################################################33
+  ############################################################################
   #default parameters
   
-  var_options <- c("xlim", "ylim", "transformation", "default_trans", 
+  var_options <- c("xlim", "ylim", "transformation", "default_trans",
                    "axis_labels", "axis_limits", "color_var_name", "facet_var", "facet_yvar",
                    "scales", "option", "theme", "legend.position")
   
@@ -1746,14 +1772,15 @@ format_plot <- function(p,
       
       if(!is.null(color_var)){
         if(length(color_var) == 1){
-          
+
           label_color <- ifelse(color_var %in% names(options$axis_labels), options$axis_labels[[color_var]], color_var)
+          trans_col <- ifelse(color_var %in% names(transformation), transformation[[color_var]], default_trans)
+          is_cont <- ifelse(color_var %in% names(p$data), is.double(p$data[[color_var]]), FALSE)
           
-          if( as.character(color_var) %in% setdiff(names(transformation), "cluster")){
-            
-            p <- p + viridis::scale_colour_viridis(trans = transformation[[color_var]],
-                                          name = label_color,
-                                          option = option)
+          if(is_cont){
+            p <- p + viridis::scale_colour_viridis(trans = trans_col,
+                                                   name = label_color,
+                                                   option = option)
           }
         }
       }

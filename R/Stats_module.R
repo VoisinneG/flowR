@@ -3,7 +3,6 @@
 #' @importFrom shinydashboard box tabBox
 #' @import shiny
 #' @importFrom  DT DTOutput
-#' @export
 StatsUI <- function(id) {
   
   ns <- NS(id)
@@ -45,7 +44,6 @@ StatsUI <- function(id) {
 #' @import shiny
 #' @importFrom DT renderDT datatable
 #' @importFrom utils write.table
-#' @export
 #' @rdname StatsUI
 Stats <- function(input, output, session, rval) {
 

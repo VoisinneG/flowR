@@ -22,6 +22,7 @@
 #' @param plot_params A reactiveValues object with plot parameters
 #' @return A list of plots
 #' @import shiny
+#' @export
 #' @examples 
 #' \dontrun{
 #' library(shiny)

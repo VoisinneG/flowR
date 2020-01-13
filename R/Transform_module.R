@@ -4,6 +4,34 @@
 #' @import shiny
 #' @importFrom DT DTOutput
 #' @export
+#' @examples 
+#' \dontrun{
+#' library(shiny)
+#' library(shinydashboard)
+#' 
+#' if (interactive()){
+#'   
+#'   ui <- dashboardPage(
+#'     dashboardHeader(title = "Transform"),
+#'     sidebar = dashboardSidebar(disable = TRUE),
+#'     body = dashboardBody(
+#'       TransformUI("module")
+#'     )
+#'   )
+#'   
+#'   server <- function(input, output, session) {
+#'     rval <- reactiveValues()
+#'     observe({
+#'       utils::data("GvHD", package = "flowCore")
+#'       rval$gating_set <- GatingSet(GvHD)
+#'     })
+#'     res <- callModule(Transform, "module", rval = rval)
+#'   }
+#'   
+#'   shinyApp(ui, server)
+#'   
+#' }
+#' }
 TransformUI <- function(id) {
   
   ns <- NS(id)
@@ -96,9 +124,11 @@ Transform <- function(input, output, session, rval) {
     tagList(x)
   })
   
-
   observe({
-      
+    rval$update_gs <- 0
+  })
+  
+  observe({
       plot_params$plot_type <- "histogram"
       plot_params$color_var <- NULL
       plot_params$use_all_cells <- FALSE
@@ -108,9 +138,9 @@ Transform <- function(input, output, session, rval) {
 
     if(length(input$parameters_table_rows_selected)>0){
       
-      #reset plot parameters (only non null parameters will be updated)
-      for(var in names(reactiveValuesToList(plot_params))){
-        plot_params[[var]] <- NULL
+      #update plot_params
+      for(var in names(plot_params)){
+        plot_params[[var]] <- res$params[[var]]
       }
       
       plot_params$xvar <- rval_mod$parameters$name[input$parameters_table_rows_selected[1]]
@@ -124,8 +154,8 @@ Transform <- function(input, output, session, rval) {
   
   
   
-  res <- callModule(plotGatingSet, "plot_module", rval, plot_params, simple_plot = TRUE)
-  callModule(simpleDisplay, "simple_display_module", res$plot)
+  res <- callModule(plotGatingSet, "plot_module", rval = rval, plot_params = plot_params, simple_plot = TRUE)
+  callModule(simpleDisplay, "simple_display_module", plot_list = res$plot)
 
   
   ##########################################################################################################
@@ -199,7 +229,6 @@ Transform <- function(input, output, session, rval) {
     rval$gating_set@transformation <- transformation
     #print(class(rval$gating_set))
     #rval$update_gs <- rval$update_gs + 1
-    
   })
   
   
@@ -330,7 +359,7 @@ Transform <- function(input, output, session, rval) {
 # if (interactive()){
 # 
 #   ui <- dashboardPage(
-#     dashboardHeader(title = "plotting"),
+#     dashboardHeader(title = "Transform"),
 #     sidebar = dashboardSidebar(disable = TRUE),
 #     body = dashboardBody(
 #       TransformUI("module")
@@ -338,17 +367,12 @@ Transform <- function(input, output, session, rval) {
 #   )
 # 
 #   server <- function(input, output, session) {
-# 
 #     rval <- reactiveValues()
-#     plot_params <- reactiveValues()
-# 
 #     observe({
 #       utils::data("GvHD", package = "flowCore")
 #       rval$gating_set <- GatingSet(GvHD)
 #     })
-# 
 #     res <- callModule(Transform, "module", rval = rval)
-# 
 #   }
 # 
 #   shinyApp(ui, server)

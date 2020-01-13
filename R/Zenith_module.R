@@ -6,7 +6,6 @@ utils::globalVariables(c("A", "B", "C", "Z", "sdA", "sdB", "sdC", "sdZ"))
 #' @importFrom shinydashboard box tabBox
 #' @importFrom DT DTOutput
 #' @importFrom plotly plotlyOutput
-#' @export
 ZenithUI <- function(id) {
 
   ns <- NS(id)
@@ -108,7 +107,6 @@ ZenithUI <- function(id) {
 #' @importFrom stats sd
 #' @importFrom DT datatable renderDT
 #' @import ggplot2
-#' @export
 #' @rdname ZenithUI
 Zenith <- function(input, output, session, rval) {
   

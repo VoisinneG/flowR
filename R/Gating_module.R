@@ -4,6 +4,43 @@
 #' @importFrom shinydashboard box tabBox
 #' @importFrom DT DTOutput
 #' @export
+#' @examples
+#' \dontrun{
+#' library(shiny)
+#' library(shinydashboard)
+#' library(flowWorkspace)
+#' library(flowCore)
+#' library(viridis)
+#' library(scales)
+#' library(ggplot2)
+#' library(ggrepel)
+#' library(plotly)
+#' library(ggridges)
+#' 
+#' if (interactive()){
+#' 
+#'   ui <- dashboardPage(
+#'     dashboardHeader(title = "Gating"),
+#'     sidebar = dashboardSidebar(disable = TRUE),
+#'     body = dashboardBody(
+#'       GatingUI("module")
+#'     )
+#'   )
+#' 
+#'   server <- function(input, output, session) {
+#' 
+#'     rval <- reactiveValues()
+#'     observe({
+#'       utils::data("GvHD", package = "flowCore")
+#'       rval$gating_set <- GatingSet(GvHD)
+#'     })
+#'     res <- callModule(Gating, "module", rval = rval)
+#'   }
+#' 
+#'   shinyApp(ui, server)
+#' 
+#' }
+#' }
 GatingUI <- function(id) {
   
   ns <- NS(id)
@@ -130,22 +167,11 @@ Gating <- function(input, output, session, rval) {
   
   observe({
     rval$update_gs <- 0
-    plot_params$plot_type = "dots"
-    plot_params$color_var = "SSC-A"})
-  
-  #reset reacivevalues object when GatingSet has been updated
-  observeEvent(rval$update_gs, {
-    plot_params <- reactiveValues()
-    gate <- reactiveValues(x = NULL, y = NULL)
-    plot_params_gh <- reactiveValues()
-    display_params <- reactiveValues()
-    rval_mod <- reactiveValues()
   })
-
   
   # Call modules
   res <- callModule(plotGatingSet, "plot_module", 
-                    rval=rval, 
+                    rval=rval,
                     plot_params=plot_params,
                     simple_plot = TRUE, 
                     show_gates = TRUE,
@@ -192,11 +218,7 @@ Gating <- function(input, output, session, rval) {
       plot_params_gh[[var]] <- res$params[[var]]
       #print(reactiveValuesToList(plot_params_gh))
     }
-    #display_params$top <- paste(res$params$sample, collapse = " + ")
-  })
-  
-  observe({
-    print(reactiveValuesToList(plot_params_gh))
+    display_params$top <- paste(res$params$sample, collapse = " + ")
   })
   
   observe({
@@ -209,6 +231,10 @@ Gating <- function(input, output, session, rval) {
   })
   
   observeEvent(input$gate_selection, {
+    #update plot_params
+    for(var in names(plot_params)){
+      plot_params[[var]] <- res$params[[var]]
+    }
     plot_params$subset <- input$gate_selection
   })
   
@@ -343,6 +369,10 @@ Gating <- function(input, output, session, rval) {
         }else{
           gate_name <- paste("/", input$gate_name, sep = "")
         }
+        #update plot_params
+        for(var in names(plot_params)){
+          plot_params[[var]] <- res$params[[var]]
+        }
         plot_params$subset <- gate_name
       }
     }
@@ -359,7 +389,10 @@ Gating <- function(input, output, session, rval) {
       flowWorkspace::gs_pop_remove(gs = rval$gating_set, node = target_gate)
       flowWorkspace::recompute(rval$gating_set)
       rval$update_gs <- rval$update_gs + 1
-
+      #update plot_params
+      for(var in names(plot_params)){
+        plot_params[[var]] <- res$params[[var]]
+      }
       plot_params$subset <- "root"
       
     }
@@ -390,6 +423,10 @@ Gating <- function(input, output, session, rval) {
       gates <- get_gates_from_gs(gs = rval$gating_set)
       rval$gate <- gates[[res$params$subset]]$gate
       
+      #update plot_params
+      for(var in names(plot_params)){
+        plot_params[[var]] <- res$params[[var]]
+      }
       plot_params$subset <- gates[[res$params$subset]]$parent
       
       gate_params <- names(rval$gate@parameters)
@@ -580,50 +617,50 @@ Gating <- function(input, output, session, rval) {
 # Tests
 ##################################################################################
 # 
-library(shiny)
-library(shinydashboard)
-library(flowWorkspace)
-library(flowCore)
-library(viridis)
-library(scales)
-library(ggplot2)
-library(ggrepel)
-library(plotly)
-library(ggridges)
-
-if (interactive()){
-
-  ui <- dashboardPage(
-    dashboardHeader(title = "Gating"),
-    sidebar = dashboardSidebar(disable = TRUE),
-    body = dashboardBody(
-      GatingUI("module")
-    )
-  )
-
-  server <- function(input, output, session) {
-
-    rval <- reactiveValues()
-
-    observe({
-      load("../flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
-      fs <- build_flowset_from_df(df = res$cluster$data, origin = res$cluster$flow_set)
-      gs <- GatingSet(fs)
-      gs@transformation <-  res$cluster$transformation
-      add_gates_flowCore(gs, res$cluster$gates)
-      rval$gating_set <- gs
-      #plot_params$sample <- pData(gs)$name[1]
-      #utils::data("GvHD", package = "flowCore")
-      #rval$gating_set <- GatingSet(GvHD)
-      #gs <- load_gs("./inst/ext/gs")
-      #rval$gating_set <- gs
-    })
-
-    res <- callModule(Gating, "module", rval = rval)
-
-  }
-
-  shinyApp(ui, server)
-
-}
+# library(shiny)
+# library(shinydashboard)
+# library(flowWorkspace)
+# library(flowCore)
+# library(viridis)
+# library(scales)
+# library(ggplot2)
+# library(ggrepel)
+# library(plotly)
+# library(ggridges)
+# 
+# if (interactive()){
+# 
+#   ui <- dashboardPage(
+#     dashboardHeader(title = "Gating"),
+#     sidebar = dashboardSidebar(disable = TRUE),
+#     body = dashboardBody(
+#       GatingUI("module")
+#     )
+#   )
+# 
+#   server <- function(input, output, session) {
+# 
+#     rval <- reactiveValues()
+# 
+#     observe({
+#       #load("../flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
+#       #fs <- build_flowset_from_df(df = res$cluster$data, origin = res$cluster$flow_set)
+#       #gs <- GatingSet(fs)
+#       #gs@transformation <-  res$cluster$transformation
+#       #add_gates_flowCore(gs, res$cluster$gates)
+#       #rval$gating_set <- gs
+#       #plot_params$sample <- pData(gs)$name[1]
+#       utils::data("GvHD", package = "flowCore")
+#       rval$gating_set <- GatingSet(GvHD)
+#       #gs <- load_gs("./inst/ext/gs")
+#       #rval$gating_set <- gs
+#     })
+# 
+#     res <- callModule(Gating, "module", rval = rval)
+# 
+#   }
+# 
+#   shinyApp(ui, server)
+# 
+# }
 

@@ -3,7 +3,6 @@
 #' @import shiny
 #' @importFrom shinydashboard tabBox
 #' @importFrom DT DTOutput DTOutput
-#' @export
 MetadataUI <- function(id) {
   
   ns <- NS(id)
@@ -71,7 +70,6 @@ MetadataUI <- function(id) {
 #' @importFrom readxl read_excel
 #' @importFrom utils read.csv write.table
 #' @importFrom DT renderDT dataTableProxy editData replaceData
-#' @export
 #' @rdname MetadataUI
 Metadata <- function(input, output, session, rval) {
   
