@@ -3,7 +3,6 @@
 #' @import shiny
 #' @importFrom shinydashboard tabBox valueBoxOutput
 #' @importFrom DT DTOutput
-#' @export
 Dim_reductionUI <- function(id) {
   # Create a namespace function using the provided id
   ns <- NS(id)
@@ -60,7 +59,6 @@ Dim_reductionUI <- function(id) {
 #' @importFrom shinydashboard renderValueBox
 #' @importFrom DT renderDT datatable
 #' @importFrom scales identity_trans log10_trans
-#' @export
 #' @rdname Dim_reductionUI
 Dim_reduction <- function(input, output, session, rval) {
   

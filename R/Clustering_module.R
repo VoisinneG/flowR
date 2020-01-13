@@ -3,7 +3,6 @@
 #' @importFrom shinydashboard tabBox
 #' @import shiny
 #' @importFrom DT DTOutput
-#' @export
 ClusteringUI <- function(id) {
   
   ns <- NS(id)
@@ -60,7 +59,6 @@ ClusteringUI <- function(id) {
 #' @importFrom FlowSOM UpdateNodeSize PlotPies PlotStars PlotMarker
 #' @importFrom scales identity_trans log10_trans
 #' @importFrom graphics plot.new
-#' @export
 #' @rdname ClusteringUI
 Clustering <- function(input, output, session, rval) {
   

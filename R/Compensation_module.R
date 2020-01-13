@@ -4,7 +4,6 @@
 #' @importFrom shinydashboard box tabBox
 #' @importFrom plotly plotlyOutput
 #' @importFrom DT DTOutput
-#' @export
 CompensationUI <- function(id) {
   # Create a namespace function using the provided id
   ns <- NS(id)
@@ -91,7 +90,6 @@ CompensationUI <- function(id) {
 #' @importFrom DT renderDT
 #' @importFrom utils read.table
 #' @importFrom  stats median
-#' @export
 #' @rdname CompensationUI
 Compensation <- function(input, output, session, rval) {
 

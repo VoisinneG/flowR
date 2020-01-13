@@ -22,6 +22,7 @@
 #' @param plot_params A reactiveValues object with plot parameters
 #' @return A list of plots
 #' @import shiny
+#' @export
 #' @examples 
 #' \dontrun{
 #' library(shiny)
@@ -100,6 +101,7 @@ plotGatingHierarchy <- function(input, output, session,
   ######################################################################################
   # get parameters from GatingSet
   choices <- reactive({
+    
     validate(need(class(rval$gating_set) == "GatingSet", "Input is not a GatingSet"))
     
     plot_var <- parameters(rval$gating_set@data[[1]])$name
@@ -107,6 +109,15 @@ plotGatingHierarchy <- function(input, output, session,
     validate(need(length(plot_var)>0, "No variables in GatingSet"))
     
     desc <- parameters(rval$gating_set@data[[1]])$desc
+    
+    minRange <- parameters(rval$gating_set@data[[1]])@data$minRange
+    maxRange <- parameters(rval$gating_set@data[[1]])@data$maxRange
+    
+    axis_limits <- lapply(1:length(plot_var), function(x){
+      return(as.numeric(c(minRange[x], maxRange[x])))})
+    
+    names(axis_limits) <- plot_var
+    
     labels <- sapply(1:length(plot_var), function(x){
       if(is.na(desc[x])){
         plot_var[x]
@@ -121,6 +132,7 @@ plotGatingHierarchy <- function(input, output, session,
       list(sample = pData(rval$gating_set)$name,
            plot_var = plot_var,
            labels = labels,
+           axis_limits = axis_limits,
            transformation = rval$gating_set@transformation,
            compensation = rval$gating_set@compensation,
            gates = get_gates_from_gs(rval$gating_set)
@@ -129,12 +141,19 @@ plotGatingHierarchy <- function(input, output, session,
   })
   
   plot_all_gates <- reactive({
-    
+    rval$update_gs
     validate(need(class(rval$gating_set) == "GatingSet", "Input is not a GatingSet"))
     validate(need(setdiff(gs_get_pop_paths(rval$gating_set), "root"), "No gates to display"))
     
     axis_labels <- choices()$labels
-
+    
+    axis_limits <- list()
+    if(!is.null(rval_plot$auto_focus)){
+      if(!rval_plot$auto_focus){
+        axis_limits <- choices()$axis_limits
+      }
+    }
+    
     transformation <- choices()$transformation
     if(!is.null(rval$apply_trans)){
       if(!rval$apply_trans){
@@ -159,7 +178,9 @@ plotGatingHierarchy <- function(input, output, session,
     options <- reactiveValuesToList(rval_plot)
     options$transformation <- transformation
     options$axis_labels <- axis_labels
+    options$axis_limits <- axis_limits
     
+
     p <- plot_gh( gs = rval$gating_set,
                   df = NULL,
                   sample = rval_plot$sample,
@@ -169,7 +190,8 @@ plotGatingHierarchy <- function(input, output, session,
                   plot_type = rval_plot$plot_type,
                   plot_args = reactiveValuesToList(rval_plot),
                   options = options)
-    
+    #print(reactiveValuesToList(rval_plot))
+    #print(options)
     p
     
   })
@@ -196,7 +218,7 @@ plotGatingHierarchy <- function(input, output, session,
 # if (interactive()){
 # 
 #   ui <- dashboardPage(
-#     dashboardHeader(title = "plotGatingHierarchy2"),
+#     dashboardHeader(title = "plotGatingHierarchy"),
 #     sidebar = dashboardSidebar(disable = TRUE),
 #     body = dashboardBody(
 #       fluidRow(
@@ -212,14 +234,22 @@ plotGatingHierarchy <- function(input, output, session,
 #     display_params <- reactiveValues()
 # 
 #     observe({
-#       gs <- load_gs("./inst/ext/gs")
+#       #gs <- load_gs("./inst/ext/gs")
+#       load("../flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
+#       fs <- build_flowset_from_df(df = res$cluster$data)
+#       gs <- GatingSet(fs)
+#       add_gates_flowCore(gs, res$cluster$gates)
 #       rval$gating_set <- gs
 #       plot_params$sample <- pData(gs)$name
-#       plot_params$plot_type <- "hexagonal"
+#       print(gs_get_pop_paths(rval$gating_set))
+#       plot_params$sample <- "Z_037.fcs"
+#       plot_params$use_all_cells <- FALSE
+#       #plot_params$plot_type <- "hexagonal"
+#       plot_params$selected_subsets <- c("/HLA-DR_myeloid", "/HLA-DR_myeloid/Single_Cells", "/cluster1")
 #       display_params$top <- paste(plot_params$sample, collapse = " + ")
 #     })
 # 
-#     plot_all_gates <- callModule(plotGatingHierarchy2, "module",
+#     plot_all_gates <- callModule(plotGatingHierarchy, "module",
 #                       rval = rval,
 #                       plot_params = plot_params)
 # 

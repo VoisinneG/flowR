@@ -21,7 +21,7 @@ Modules(input, output, session, rval)
 \item{rval}{reactivevalues object with the following elements :
 \describe{
   \item{gating_set}{: a GatingSet object}
-  \item{menu_elements}{: Named list. Names should correspond to the names of available modules.}
+  \item{modules}{: Names of pre-selected modules}
 }}
 }
 \value{
@@ -53,7 +53,7 @@ if (interactive()){
   )
   
   server <- function(input, output, session) {
-    rval <- reactiveValues(menu_elements = list("Modules" = NULL))
+    rval <- reactiveValues(modules = c("Import"))
     rval <- callModule(Modules, "module", rval = rval)
   }
   

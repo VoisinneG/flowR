@@ -282,10 +282,16 @@ Import <- function(input, output, session, rval) {
           gs@transformation <- res[[name]]$transformation
           rval$trans_parameters <- res[[name]]$trans_parameters
           parent <- NULL
-          if(res[[name]]$parent  %in% names(res)){
-            parent <- res[[name]]$parent
+          if(!is.null(res[[name]]$parent)){
+            if(res[[name]]$parent  %in% names(res)){
+              parent <- res[[name]]$parent
+            }
           }
-          rval$gating_set_list[[name]] <- list(gating_set = gs, parent = parent)
+          
+          
+          rval$gating_set_list[[name]] <- list(gating_set = gs, 
+                                               parent = parent, 
+                                               trans_parameters = res[[name]]$trans_parameters)
         }
         
         rval$gating_set_selected <- names(res)[1]
