@@ -1662,7 +1662,7 @@ add_gate <- function(p, gate){
 #' legend.position : legend position
 #' @import ggplot2
 #' @import viridis
-#' @import flowWorkspace
+#' @importFrom flowWorkspace logicle_trans
 #' @importFrom stats as.formula
 #' @importFrom rlang quo_get_expr
 #' @importFrom scales identity_trans
