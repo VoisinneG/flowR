@@ -17,6 +17,7 @@ flowR_server <- function(session, input, output, modules = NULL) {
                          #observe environments (for instance after updating a GatingSet with gs_pop_add() )
                          gating_set = NULL,
                          gating_set_list = list(),
+                         gating_set_selected = NULL,
                          tab_elements = list(),
                          menu_elements = list(),
                          modules = NULL

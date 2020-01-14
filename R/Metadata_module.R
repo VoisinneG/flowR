@@ -1,8 +1,38 @@
 #' Import, export and edit metadata associated with a GatingSet
 #' @param id shiny id
-#' @import shiny
 #' @importFrom shinydashboard tabBox
-#' @importFrom DT DTOutput DTOutput
+#' @import shiny
+#' @importFrom DT DTOutput
+#' @export
+#' @examples 
+#' \dontrun{
+#' # library(shiny)
+#' library(shinydashboard)
+#' library(flowWorkspace)
+#' 
+#' if (interactive()){
+#' 
+#'   ui <- dashboardPage(
+#'     dashboardHeader(title = "Metadata"),
+#'     sidebar = dashboardSidebar(disable = TRUE),
+#'     body = dashboardBody(
+#'       MetadataUI("module")
+#'     )
+#'   )
+#' 
+#'   server <- function(input, output, session) {
+#'     rval <- reactiveValues()
+#'     observe({
+#'       utils::data("GvHD", package = "flowCore")
+#'       rval$gating_set <- GatingSet(GvHD)
+#'     })
+#'     res <- callModule(Metadata, "module", rval = rval)
+#'   }
+#' 
+#'   shinyApp(ui, server)
+#' 
+#' }
+#' }
 MetadataUI <- function(id) {
   
   ns <- NS(id)
@@ -26,7 +56,7 @@ MetadataUI <- function(id) {
                   tabPanel(title = "Filter",
                            "Filter samples based on metadata",
                            uiOutput(ns("filter_meta")),
-                           textInput(ns("fs_name"), "Flow-set name", "filter")
+                           textInput(ns("gs_name"), "GatingSet name", "filter")
                   )
            )
     ),
@@ -35,7 +65,7 @@ MetadataUI <- function(id) {
                   width = NULL, height = NULL,
                   tabPanel(title = "Keywords",
                            selectizeInput(ns("keyword"), "select keywords", 
-                                          choices = NULL, 
+                                          choices = NULL,
                                           selected = NULL,
                                           multiple = TRUE),
                            actionButton(ns("append_keywords"), label = "Add keywords"),
@@ -58,51 +88,52 @@ MetadataUI <- function(id) {
 }
 
 
-#' metadata module server function
+#' Metadata module server function
 #' @param input shiny input
 #' @param output shiny output
 #' @param session shiny session
 #' @param rval A reactive values object
 #' @return The updated reactiveValues object \code{rval}
 #' @import shiny
-#' @importFrom flowWorkspace pData gs_get_pop_paths
+#' @importFrom flowWorkspace pData
 #' @importFrom tools file_ext
 #' @importFrom readxl read_excel
 #' @importFrom utils read.csv write.table
 #' @importFrom DT renderDT dataTableProxy editData replaceData
+#' @export
 #' @rdname MetadataUI
 Metadata <- function(input, output, session, rval) {
   
   rval_mod <- reactiveValues()
 
-  
-  observeEvent(input$apply, {
-    validate(need(rval$flow_set, "No flow set available"))
-    pData(rval$flow_set) <- rval$pdata
-    pData(rval$flow_set_list[[rval$flow_set_selected]]$flow_set) <- rval$pdata
-    rval$flow_set_list[[rval$flow_set_selected]]$metadata <- rval$pdata
+  observe({
+    if(is.null(rval$update_gs)){
+      rval$update_gs <- 0
+    }
   })
   
-  observe({
-    
-    validate(
-      need(rval$flow_set, "No flow set available")
-    )
-    
-    if(is.null(rval$pdata)){
-      rval$pdata <- as.data.frame(pData(rval$flow_set))
-    }else if(!setequal(pData(rval$flow_set)$name, rval$pdata$name)){
-      rval$pdata <- as.data.frame(pData(rval$flow_set))
+  observeEvent(input$apply, {
+    validate(need(class(rval$gating_set)=="GatingSet", "No GatingSet available"))
+    flowWorkspace::pData(rval$gating_set) <- rval_mod$pdata
+    if(!is.null(rval$gating_set_selected)){
+      if(rval$gating_set_selected %in% names(rval$gating_set_list)){
+        flowWorkspace::pData(rval$gating_set_list[[rval$gating_set_selected]]$gating_set) <- rval_mod$pdata
+      }
     }
-    
+    rval$update_gs <- rval$update_gs + 1
+  })
+  
+  observeEvent(rval$update_gs, {
+    validate(need(class(rval$gating_set)=="GatingSet", "No GatingSet available"))
+    rval_mod$pdata <- as.data.frame(flowWorkspace::pData(rval$gating_set))
   })
   
   #Update available keywords
   observe({
+    rval$update_gs
+    validate(need(class(rval$gating_set)=="GatingSet", "No GatingSet available"))
     
-    validate(need(rval$flow_set, "No flow set available"))
-    
-    ff <- rval$flow_set[[1]]
+    ff <- rval$gating_set@data[[1]]
     
     rval_mod$keywords <- names( ff@description )
     
@@ -138,14 +169,14 @@ Metadata <- function(input, output, session, rval) {
     validate(need(rval_mod$df_meta_imported, "no metadata imported"))
     
     df_meta <- as.data.frame(rval_mod$df_meta_imported)
-    idx_match <- match(rval$pdata$name, df_meta[,1])
+    idx_match <- match(rval_mod$pdata$name, df_meta[,1])
     
     idx_match <- idx_match[!is.na(idx_match)]
     if(length(idx_match)>0){
       df_meta_mapped <- df_meta[idx_match, ]
-      idx_new <- ! names(df_meta_mapped) %in% names(rval$pdata) 
+      idx_new <- ! names(df_meta_mapped) %in% names(rval_mod$pdata) 
       if(sum(idx_new)>0){
-        rval$pdata <- cbind(rval$pdata, df_meta_mapped[idx_new])
+        rval_mod$pdata <- cbind(rval_mod$pdata, df_meta_mapped[idx_new])
       }
     }
     
@@ -154,33 +185,33 @@ Metadata <- function(input, output, session, rval) {
   
   observeEvent(input$append_keywords, {
     
-    validate(need(rval$flow_set, "no flow-set available"))
+    validate(need(class(rval$gating_set)=="GatingSet", "No GatingSet available"))
     
     df <- NULL
     keys <- input$keyword
-    
     if(length(keys)>0){
       for(key in keys){
-        df <- cbind(df, fsApply(rval$flow_set, function(x){description(x)[[key]]}))
+        df <- cbind(df, fsApply(rval$gating_set@data, function(x){description(x)[[key]]}))
       }
       keys <- gsub(pattern = " ", replacement = "_", keys, fixed = TRUE)
       keys <- gsub(pattern = "$", replacement = "", keys, fixed = TRUE)
       df <- data.frame(df)
       colnames(df) <- keys
-      df$name <- pData(rval$flow_set)$name
+      df$name <- flowWorkspace::pData(rval$gating_set)$name
       
     }
     
-    idx_match <- match(rval$pdata$name, df$name)
+    idx_match <- match(rval_mod$pdata$name, df$name)
     idx_match <- idx_match[!is.na(idx_match)]
+    
     if(length(idx_match)>0){
       df_keywords <- df[idx_match, ]
-      idx_new <- ! names(df_keywords) %in% names(rval$pdata)
+      idx_new <- ! names(df_keywords) %in% names(rval_mod$pdata)
+      
       if(sum(idx_new)>0){
-        rval$pdata <- cbind(rval$pdata, df_keywords[idx_new])
+        rval_mod$pdata <- cbind(rval_mod$pdata, df_keywords[idx_new])
       }
     }
-  
   })
 
   
@@ -189,44 +220,49 @@ Metadata <- function(input, output, session, rval) {
     
     ns <- session$ns
     
-    validate(
-      need(rval$pdata, "No metadata")
-    )
+    validate(need(rval_mod$pdata, "No metadata"))
     
     df <- list()
-    for(meta_var in names(rval$pdata)){
-      df[[meta_var]] <- rval$pdata[[meta_var]] %in% input[[meta_var]]
+    for(meta_var in names(rval_mod$pdata)){
+      df[[meta_var]] <- rval_mod$pdata[[meta_var]] %in% input[[meta_var]]
     }
     
     df1 <- do.call(cbind, df)
     is_selected <- apply(X = df1, MARGIN = 1, FUN = function(x){sum(x) == length(x)})
-    samples <- rval$pdata$name[is_selected]
+    samples <- rval_mod$pdata$name[is_selected]
     
     if(length(samples)>0){
       
-      idx_match <- match(samples, pData(rval$flow_set)$name)
-      flow_set_filter <- rval$flow_set[idx_match]
-      pdata <- rval$pdata
-      if(length(colnames(pdata))>1){
-        pData(flow_set_filter) <- pdata[idx_match, ]
-      }else{
-        pData(flow_set_filter)$name <- pdata[idx_match, ]
+      if( input$gs_name %in% names(rval$gating_set_list) | nchar(input$gs_name)==0 ){
+        showModal(modalDialog(
+          title = "Invalid GatingSet name",
+          paste("Name is empty or already exists. Please choose another name", sep=""),
+          easyClose = TRUE,
+          footer = NULL
+        ))
       }
       
-      fs <- flow_set_filter
-
-      rval$flow_set_list[[input$fs_name]] <- list(flow_set = fs, 
-                                                  metadata = pData(fs),
-                                                  parameters = lapply(1:length(fs), function(x){parameters(fs[[x]])}),
-                                                  desc = lapply(1:length(fs), function(x){description(fs[[x]])}),
-                                                  name = input$fs_name, 
-                                                  parent = rval$flow_set_selected,
-                                                  gates = rval$gates_flowCore[setdiff(gs_get_pop_paths(rval$gating_set), "root")],
-                                                  spill = rval$df_spill,
-                                                  transformation = rval$transformation,
-                                                  trans_parameters = rval$trans_parameters)
+      validate(need(! input$gs_name %in% names(rval$gating_set_list), "Name already exists" ))
       
-      rval$flow_set_selected <- input$fs_name
+      idx_match <- match(samples, flowWorkspace::pData(rval$gating_set)$name)
+      gs_filter <- GatingSet(rval$gating_set@data[idx_match])
+      gates <- get_gates_from_gs(gs = rval$gating_set)
+      add_gates_flowCore(gs = gs_filter, gates = gates)
+      gs_filter@compensation <- rval$gating_set@compensation
+      gs_filter@transformation <- rval$gating_set@transformation
+      flowWorkspace::pData(gs_filter) <- rval_mod$pdata[idx_match, ]
+      
+      if(!is.null(rval$gating_set_selected)){
+        if(rval$gating_set_selected %in% names(rval$gating_set_list)){
+          flowWorkspace::pData(rval$gating_set_list[[rval$gating_set_selected]]$gating_set) <- rval_mod$pdata
+        }
+      }
+      
+      rval$gating_set_list[[input$gs_name]] <- list(gating_set = gs_filter,
+                                                    parent = rval$gating_set_selected)
+      rval$gating_set_selected <- input$gs_name
+      rval$gating_set <- gs_filter
+      rval$update_gs <- rval$update_gs + 1
 
     }
     
@@ -236,14 +272,12 @@ Metadata <- function(input, output, session, rval) {
     
     ns <- session$ns
     
-    validate(
-      need(rval$pdata, "No meta data")
-    )
+    validate(need(rval_mod$pdata, "No meta data"))
     
     x <- list()
     
-    for(meta_var in names(rval$pdata)){
-      uvar <- unique(rval$pdata[[meta_var]])
+    for(meta_var in names(rval_mod$pdata)){
+      uvar <- unique(rval_mod$pdata[[meta_var]])
       
       x[[meta_var]] <- selectizeInput(ns(meta_var), meta_var, 
                                       choices = uvar, 
@@ -276,7 +310,7 @@ Metadata <- function(input, output, session, rval) {
   
   observeEvent(input$ok, {
     if(nchar(input$col_name)>0){
-      rval$pdata[[input$col_name]] <- rep("", length(rval$pdata$name))
+      rval_mod$pdata[[input$col_name]] <- rep("", length(rval_mod$pdata$name))
       removeModal()
     }
   })
@@ -284,7 +318,10 @@ Metadata <- function(input, output, session, rval) {
   observeEvent(input$delete_column, {
     ns <- session$ns
     showModal(modalDialog(title = "Delete column",
-                          selectInput(ns("col_name_del"), "Choose a column name", choices = names(rval$pdata), selected = NULL),
+                          selectInput(ns("col_name_del"), 
+                                      "Choose a column name", 
+                                      choices = names(rval_mod$pdata), 
+                                      selected = NULL),
                           footer = tagList(
                             modalButton("Cancel"),
                             actionButton(ns("ok_delete"), "OK")
@@ -296,13 +333,13 @@ Metadata <- function(input, output, session, rval) {
   
   observeEvent(input$ok_delete, {
     if(nchar(input$col_name_del)>0){
-      rval$pdata <- rval$pdata[-which(names(rval$pdata) == input$col_name_del)]
+      rval_mod$pdata <- rval_mod$pdata[-which(names(rval_mod$pdata) == input$col_name_del)]
       removeModal()
     }
   })
   
   # edit metadata information
-  output$pData <- DT::renderDT({validate(need(rval$pdata, "No metadata")); rval$pdata},
+  output$pData <- DT::renderDT({validate(need(rval_mod$pdata, "No metadata")); rval_mod$pdata},
                             rownames = FALSE,
                             selection = 'none',
                             editable = 'cell',
@@ -313,25 +350,54 @@ Metadata <- function(input, output, session, rval) {
   observeEvent(input$pData_cell_edit, {
     info = input$pData_cell_edit
     info$col <- info$col + 1
-    rval$pdata <<- DT::editData(rval$pdata, info)
-    DT::replaceData(proxy, rval$pdata, resetPaging = FALSE)  
+    rval_mod$pdata <<- DT::editData(rval_mod$pdata, info)
+    DT::replaceData(proxy, rval_mod$pdata, resetPaging = FALSE)  
   })
   
 
   output$meta <- DT::renderDT({
-    validate(
-      need(rval_mod$df_meta_imported, "No meta data imported")
-    )
+    validate(need(rval_mod$df_meta_imported, "No meta data imported"))
     as.data.frame(rval_mod$df_meta_imported)
   })
   
   output$download_meta <- downloadHandler(
     filename = "metadata.txt",
     content = function(file) {
-      utils::write.table(rval$pdata, file = file, row.names = FALSE, quote = FALSE, sep = "\t")
+      utils::write.table(rval_mod$pdata, file = file, row.names = FALSE, quote = FALSE, sep = "\t")
     }
   )
   
   return(rval)
   
 }
+
+##################################################################################
+# Tests
+##################################################################################
+#
+# library(shiny)
+# library(shinydashboard)
+# library(flowWorkspace)
+# 
+# if (interactive()){
+# 
+#   ui <- dashboardPage(
+#     dashboardHeader(title = "Metadata"),
+#     sidebar = dashboardSidebar(disable = TRUE),
+#     body = dashboardBody(
+#       MetadataUI("module")
+#     )
+#   )
+# 
+#   server <- function(input, output, session) {
+#     rval <- reactiveValues()
+#     observe({
+#       utils::data("GvHD", package = "flowCore")
+#       rval$gating_set <- GatingSet(GvHD)
+#     })
+#     res <- callModule(Metadata, "module", rval = rval)
+#   }
+# 
+#   shinyApp(ui, server)
+# 
+# }

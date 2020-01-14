@@ -26,5 +26,35 @@ The updated reactiveValues object \code{rval}
 \description{
 Import, export and edit metadata associated with a GatingSet
 
-metadata module server function
+Metadata module server function
+}
+\examples{
+\dontrun{
+# library(shiny)
+library(shinydashboard)
+library(flowWorkspace)
+
+if (interactive()){
+
+  ui <- dashboardPage(
+    dashboardHeader(title = "Metadata"),
+    sidebar = dashboardSidebar(disable = TRUE),
+    body = dashboardBody(
+      MetadataUI("module")
+    )
+  )
+
+  server <- function(input, output, session) {
+    rval <- reactiveValues()
+    observe({
+      utils::data("GvHD", package = "flowCore")
+      rval$gating_set <- GatingSet(GvHD)
+    })
+    res <- callModule(Metadata, "module", rval = rval)
+  }
+
+  shinyApp(ui, server)
+
+}
+}
 }
