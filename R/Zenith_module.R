@@ -40,7 +40,7 @@ ZenithUI <- function(id) {
                ),
                box(collapsible = TRUE, collapsed = TRUE, width = NULL, height = NULL,
                    title = "Subset",
-                   selectizeInput(ns("gate"),
+                   selectizeInput(ns("subset"),
                                   label = "subset",
                                   choices = "root",
                                   selected = "root",
@@ -63,9 +63,9 @@ ZenithUI <- function(id) {
                )
                
            ),
-           box(width = NULL, height = NULL, title = "Create Flow-set",
-               textInput(ns("fs_name"), "Flow-set name", "zenith"),
-               actionButton(ns("create"), "Create Flow-set")
+           box(width = NULL, height = NULL, title = "Create GatingSet",
+               textInput(ns("gs_name"), "GatingSet name", "zenith"),
+               actionButton(ns("create"), "Create GatingSet")
           )
     ),
     column(width = 8,
@@ -107,31 +107,51 @@ ZenithUI <- function(id) {
 #' @importFrom magrittr %>%
 #' @importFrom stats sd
 #' @importFrom DT datatable renderDT
+#' @importFrom plotly renderPlotly
 #' @import ggplot2
 #' @export
 #' @rdname ZenithUI
 Zenith <- function(input, output, session, rval) {
   
-  observe({
-    validate(need(rval$plot_var, "No variables available"))
-    updateSelectInput(session, "yvar", choices = rval$plot_var, selected = rval$plot_var[1]) 
+  ######################################################################################
+  # get parameters from GatingSet
+  choices <- reactive({
+    validate(need(class(rval$gating_set) == "GatingSet", "input is not a GatingSet"))
+    
+    plot_var <- parameters(rval$gating_set@data[[1]])$name
+    
+    validate(need(length(plot_var)>0, "No variables in GatingSet"))
+
+    return( 
+      list(sample = pData(rval$gating_set)$name,
+           subset = gs_get_pop_paths(rval$gating_set),
+           plot_var = plot_var,
+           metadata = pData(rval$gating_set),
+           parameters = parameters(rval$gating_set@data[[1]]),
+           meta_var = names(pData(rval$gating_set)),
+           transformation = rval$gating_set@transformation,
+           compensation = rval$gating_set@compensation,
+           gates = get_gates_from_gs(rval$gating_set)
+      )
+    )
   })
   
   observe({
-    validate(need(rval$gates_flowCore, "no gating set"))
-    updateSelectInput(session, "gate", choices = union("root", names(rval$gates_flowCore)), selected = "root")
+    updateSelectInput(session, "yvar", choices = choices()$plot_var, selected = choices()$plot_var[1]) 
+  })
+  
+  observe({
+    updateSelectInput(session, "subset", choices = choices()$subset, selected = "root")
   })
     
   observe({
-    validate(need(rval$pdata, "no metadata available"))
-    updateSelectInput(session, "A_sample", choices = rval$pdata$name, selected = rval$pdata$name[1])
-    updateSelectInput(session, "B_sample", choices = rval$pdata$name, selected = rval$pdata$name[1])
-    updateSelectInput(session, "C_sample", choices = rval$pdata$name, selected = rval$pdata$name[1])
-    updateSelectInput(session, "Z_sample", choices = rval$pdata$name, selected = rval$pdata$name[1])
+    updateSelectInput(session, "A_sample", choices = choices()$sample, selected = choices()$sample[1])
+    updateSelectInput(session, "B_sample", choices = choices()$sample, selected = choices()$sample[1])
+    updateSelectInput(session, "C_sample", choices = choices()$sample, selected = choices()$sample[1])
+    updateSelectInput(session, "Z_sample", choices = choices()$sample, selected = choices()$sample[1])
   }) 
   
   raw_data <- reactive({
-    validate(need(rval$gating_set, "Empty gating set"))
     validate(need(input$A_sample, "Please select samples"))
     validate(need(input$B_sample, "Please select samples"))
     validate(need(input$C_sample, "Please select samples"))
@@ -142,12 +162,13 @@ Zenith <- function(input, output, session, rval) {
     validate(need(sum(samples_table>1)==0, 
                   "Please select different samples for A, B, C and Z conditions"))
       
-    validate(need(input$gate, "Please select subsets"))
+    validate(need(input$subset, "Please select subsets"))
     
     df <- get_data_gs(gs = rval$gating_set,
                       sample = unique(c(input$A_sample, input$B_sample, input$C_sample, input$Z_sample)),
-                      subset = input$gate,
-                      spill = rval$spill)
+                      subset = input$subset,
+                      spill = choices()$compensation, 
+                      return_comp_data = TRUE)
     df
     
  })
@@ -157,15 +178,12 @@ Zenith <- function(input, output, session, rval) {
     validate(need(input$yvar, "Please select a readout variable"))
    
     df <- raw_data()
+    yvar <- input$yvar
     
-    idx_y <- match(input$yvar, rval$parameters$name_long)
-    yvar <- rval$parameters$name[idx_y]
-    
+    y_trans <- identity_trans()
     if(input$y_trans == "default"){
-      if(rval$apply_trans){
-        y_trans <- rval$transformation[[yvar]]
-      }else{
-        y_trans <- identity_trans()
+      if(!is.null(rval$apply_trans)){
+        y_trans <- choices()$transformation[[yvar]]
       }
     }else{
       y_trans <- switch(input$y_trans,
@@ -174,7 +192,6 @@ Zenith <- function(input, output, session, rval) {
                         "identity" = identity_trans(),
                         NULL)
     }
-    
     
     df[[yvar]] <- y_trans$transform(df[[yvar]])
 
@@ -217,17 +234,23 @@ Zenith <- function(input, output, session, rval) {
   
   plot_gluc_dep <- reactive({
     df <- metabo_data()
+    
     df[["ymin"]] <-  df[["mean_score_gluc_dep"]] -  df[["sd_score_gluc_dep"]]
     df[["ymax"]] <-  df[["mean_score_gluc_dep"]] +  df[["sd_score_gluc_dep"]]
-    df[["subset"]] <- factor(df[["subset"]], levels = input$gate)
-    p <- ggplot(df, aes_string(x="subset", y="mean_score_gluc_dep", color = "subset", fill = "subset")) +
+    df[["subset"]] <- factor(df[["subset"]], levels = input$subset)
+    
+    p <- ggplot(df, aes_string(x="subset", 
+                               y="mean_score_gluc_dep", 
+                               color = "subset", 
+                               fill = "subset")) +
+      ylab("%") +
+      ggtitle("Dependency on Glycolysis") + 
       geom_col(alpha = 0.5)
     
     if(input$show_error_bar){
       p <- p + geom_errorbar(mapping = aes_string(ymin = "ymin", ymax = "ymax"), width = 0.25)
     }
-    
-    
+
     if(input$set_y_lim){
       p <- p + coord_cartesian(ylim = c(input$ymin, input$ymax))
     }
@@ -238,9 +261,14 @@ Zenith <- function(input, output, session, rval) {
     df <- metabo_data()
     df[["ymin"]] <-  df[["mean_score_mito_dep"]] -  df[["sd_score_mito_dep"]]
     df[["ymax"]] <-  df[["mean_score_mito_dep"]] +  df[["sd_score_mito_dep"]]
-    df[["subset"]] <- factor(df[["subset"]], levels = input$gate)
+    df[["subset"]] <- factor(df[["subset"]], levels = input$subset)
     
-    p <- ggplot(df, aes_string(x="subset", y="mean_score_mito_dep", color = "subset", fill = "subset")) + 
+    p <- ggplot(df, aes_string(x="subset", 
+                               y="mean_score_mito_dep", 
+                               color = "subset", 
+                               fill = "subset")) + 
+      ggtitle("Dependency on Ox-Phos") + 
+      ylab("%") + 
       geom_col(alpha = 0.5)
     
     if(input$show_error_bar){
@@ -254,11 +282,11 @@ Zenith <- function(input, output, session, rval) {
     p
   })
   
-  output$plot1 <- renderPlotly({
+  output$plot1 <- plotly::renderPlotly({
     plot_gluc_dep()
   })
-  
-  output$plot2 <- renderPlotly({
+
+  output$plot2 <- plotly::renderPlotly({
     plot_mito_dep()
   })
   
@@ -270,7 +298,7 @@ Zenith <- function(input, output, session, rval) {
 
   observeEvent(input$create, {
 
-    if( input$fs_name %in% names(rval$flow_set_list) ){
+    if( input$gs_name %in% names(rval$gating_set_list) ){
       showModal(modalDialog(
         title = "Name already exists",
         paste("Please choose another name", sep=""),
@@ -279,7 +307,7 @@ Zenith <- function(input, output, session, rval) {
       ))
     }
     
-    validate(need(! input$fs_name %in% names(rval$flow_set_list), "Name already exists" ))
+    validate(need(! input$gs_name %in% names(rval$gating_set_list), "Name already exists" ))
     
     df <- raw_data()
     df_metabo <- metabo_data()
@@ -288,19 +316,17 @@ Zenith <- function(input, output, session, rval) {
     df[["mean_score_mito_dep"]] <- df_metabo[["mean_score_mito_dep"]][match(df$subset, df_metabo$subset)]
     
     fs <- build_flowset_from_df(df, 
-                                origin = rval$flow_set_list[[rval$flow_set_selected]]$flow_set)
+                                origin = rval$gating_set@data)
     
-    rval$flow_set_list[[input$fs_name]] <- list(flow_set = fs, 
-                                                par = lapply(1:length(fs), function(x){parameters(fs[[x]])}),
-                                                desc = lapply(1:length(fs), function(x){description(fs[[x]])}),
-                                                name = input$fs_name, 
-                                                parent = rval$flow_set_selected,
-                                                gates = rval$gates_flowCore[setdiff(gs_get_pop_paths(rval$gating_set), "root")],
-                                                spill = rval$df_spill,
-                                                transformation = rval$transformation,
-                                                trans_parameters = rval$trans_parameters)
+    gs <- GatingSet(fs)
+    add_gates_flowCore(gs = gs, gates = choices()$gates)
+    gs@compensation <- choices()$compensation
+    gs@transformation <- choices()$transformation
     
-    rval$flow_set_selected <- input$fs_name
+    rval$gating_set_list[[input$gs_name]] <- list(gating_set = gs,
+                                                  parent = rval$gating_set_selected)
+    
+    rval$gating_set_selected <- input$gs_name
     
   })
   
@@ -314,3 +340,47 @@ Zenith <- function(input, output, session, rval) {
   return( rval )
   
 }
+
+
+##################################################################################
+# Tests
+##################################################################################
+# 
+# library(shiny)
+# library(shinydashboard)
+# library(flowWorkspace)
+# library(flowCore)
+# library(ggplot2)
+# library(plotly)
+# if (interactive()){
+# 
+#   ui <- dashboardPage(
+#     dashboardHeader(title = "Zenith"),
+#     sidebar = dashboardSidebar(disable = TRUE),
+#     body = dashboardBody(
+#       fluidRow(
+#         column(12, box(width = NULL, ZenithUI("module")))
+#       )
+#     )
+#   )
+# 
+#   server <- function(input, output, session) {
+# 
+#     rval <- reactiveValues()
+# 
+#     observe({
+#       load("../flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
+#       gs <- GatingSet(res$cluster$flow_set)
+#       add_gates_flowCore(gs, res$cluster$gates)
+#       rval$gating_set <- gs
+#       #utils::data("GvHD", package = "flowCore")
+#       #rval$gating_set <- GatingSet(GvHD)
+#     })
+# 
+#     rval <- callModule(Zenith, "module", rval = rval)
+# 
+#   }
+# 
+#   shinyApp(ui, server)
+# 
+# }

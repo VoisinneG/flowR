@@ -31,7 +31,7 @@ nodesStat <- function(input, output, session, rval) {
   `%then%` <- shiny:::`%OR%`
   
   output$nodes_stat <- renderText({
-    validate(class(rval$gating_set) == "GatingSet", "no GatingSet")
+    validate(need(class(rval$gating_set) == "GatingSet", "no GatingSet"))
     print( gs_get_pop_paths(rval$gating_set) )
   })
   
