@@ -483,7 +483,7 @@ transform_gates <- function(gates,
 #' @param spill spillover matrix. If NULL, uncompensated data is used for gating
 #' @param filter a filter object applied before computing statistics. Ignored if NULL.
 #' @importFrom flowCore Subset
-#' @importFrom flowWorkspace GatingSet gs_pop_get_count_fast
+#' @importFrom flowWorkspace pData GatingSet gs_pop_get_count_fast
 getPopStatsPlus <- function(gs, spill = NULL, filter = NULL){
   
   fs <- gs@data
@@ -501,8 +501,8 @@ getPopStatsPlus <- function(gs, spill = NULL, filter = NULL){
   df <- flowWorkspace::gs_pop_get_count_fast(gs_comp)
   
   df$name <- sapply(df$name, function(x){strsplit(x, split = "_[0-9]+$")[[1]][1]})
-  df_root <- data.frame(name = pData(fs)$name)
-  df_root$name <- pData(fs)$name
+  df_root <- data.frame(name = flowWorkspace::pData(fs)$name)
+  #df_root$name <- flowWorkspace::pData(fs)$name
   df_root$Population <- "root"
   df_root$Count <- sapply(1:length(fs), function(x){dim(fs[[x]]@exprs)[1]})
   df_root$Parent <- NA
