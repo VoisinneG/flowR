@@ -62,17 +62,18 @@ get_gates_from_ws <- function(ws_path, group = NULL){
   sample_info <- lapply(SampleNodes , parseSampleNodes)
   sample_info <- data.frame( do.call(rbind, sample_info ) )
   #print(sample_info)
-  
+
   if(is.null(group)){
-    group_selected <- group_info$name[1]
+    group_selected <- unlist(group_info$name)[1]
   }else{
     group_selected <- group
   }
+
   
   # get Gates for first sample in group
-  sampleID <- group_info$sampleID[[which(group_info$name == group_selected)]][1]
+  sampleID <- group_info$sampleID[[which(unlist(group_info$name) == group_selected)]][1]
   if(length(sampleID) > 0){
-    SampleNode <- SampleNodes[ which( sample_info$sampleID == sampleID) ]
+    SampleNode <- SampleNodes[ which(unlist(sample_info$sampleID) == sampleID) ]
   }else{
     stop("Could not find sample in group")
   }
@@ -405,19 +406,16 @@ transform_gates <- function(gates,
           colnames(polygon) <- gsub(pattern = pattern, replacement = replacement, colnames(polygon))
         }
         
-        
-        if(!is.null(transformation)){
-          for(j in 1:length(colnames(polygon))){
+        for(j in 1:length(colnames(polygon))){
+          if(colnames(polygon)[j] %in% names(transformation)){
             polygon[,j] <- transformation[[colnames(polygon)[j]]]$transform(polygon[,j])
-            if(colnames(polygon)[j] == "Time"){
-              if(!is.null(time_step)){
-                polygon[,j] <- polygon[,j]/time_step
-              }
-              
+          }
+          if(colnames(polygon)[j] == "Time"){
+            if(!is.null(time_step)){
+              polygon[,j] <- polygon[,j]/time_step
             }
           }
         }
-        
         
         trans_gate <- flowCore::polygonGate(.gate = polygon, filterId=g$gate@filterId)
       }
@@ -944,7 +942,9 @@ plot_histogram <- function(args = list()){
   }
   
   if(!is.null(color_var)){
-    color_var <- as.name(color_var)
+    if(color_var %in% names(df)){
+      color_var <- as.name(color_var)
+    }
   }
   
   if(!is.null(group_var)){
@@ -954,11 +954,15 @@ plot_histogram <- function(args = list()){
   }
   
   if(!is.null(group_var)){
-    group_var <- as.name(group_var)
+    if(group_var %in% names(df)){
+      group_var <- as.name(group_var)
+    }
   }
   
   if(!is.null(yridges_var)){
-    yridges_var <- as.name(yridges_var)
+    if(yridges_var %in% names(df)){
+      yridges_var <- as.name(yridges_var)
+    }
   }
 
   if(smooth){
@@ -985,9 +989,10 @@ plot_histogram <- function(args = list()){
                                                  group = group_var,
                                                  y = stat_var), 
                             alpha = alpha,  
-                            bins = bins, 
-                            position = "identity", 
-                            boundary = 0) 
+                            bins = bins,
+                            position = "identity",
+                            boundary = 0
+                            ) 
   }
   
   return(p)
@@ -1029,26 +1034,33 @@ plot_dots <-function(args = list()){
     if(color_var == "none"){
       color_var <- NULL
     }else{
-      id.vars <- color_var
+      if(color_var %in% names(df)){
+        id.vars <- color_var
+      }
     }
   }
   
   if(!is.null(color_var)){
-    color_var <- as.name(color_var)
+    if(color_var %in% names(df)){
+      color_var <- as.name(color_var)
+    }
   }
   
   if(!is.null(group_var)){
     if(group_var == "none"){
       group_var <- NULL
     }else{
-      id.vars <- group_var
+      if(group_var %in% names(df)){
+        id.vars <- group_var
+      }
     }
   }
   
   if(!is.null(group_var)){
-    group_var <- as.name(group_var)
+    if(group_var %in% names(df)){
+      group_var <- as.name(group_var)
+    }
   }
-  
   p <- ggplot(df,
               aes_string(x = as.name( xvar ), 
                          y = as.name( yvar ),
@@ -1056,7 +1068,6 @@ plot_dots <-function(args = list()){
                          group = group_var)) + 
     geom_point(alpha = alpha, 
                size = size)
-   
   if(show_label){
     df_stat <- compute_stats(df = df,
                              stat_function = "median",
@@ -1070,7 +1081,6 @@ plot_dots <-function(args = list()){
                              data = df_stat,
                              fill = "white")
   }
-  
   return(p)
   
 }
@@ -1114,7 +1124,9 @@ plot_contour <-function(args = list()){
   }
   
   if(!is.null(color_var)){
-    color_var <- as.name(color_var)
+    if(color_var %in% names(df)){
+      color_var <- as.name(color_var)
+    }
   }
   
   if(!is.null(group_var)){
@@ -1124,7 +1136,9 @@ plot_contour <-function(args = list()){
   }
   
   if(!is.null(group_var)){
-    group_var <- as.name(group_var)
+    if(color_var %in% names(df)){
+      group_var <- as.name(group_var)
+    }
   }
   
   
@@ -1307,11 +1321,15 @@ plot_bar <-function(args = list()){
   }
   
   if(!is.null(group_var)){
-    group_var <- as.name(group_var)
+    if(group_var %in% names(df)){
+      group_var <- as.name(group_var)
+    }
   }
   
   if(!is.null(color_var)){
-    color_var <- as.name(color_var)
+    if(color_var %in% names(df)){
+      color_var <- as.name(color_var)
+    }
   }
   
   df_melt <- df_melt[df_melt$variable %in% stat_var, ]
@@ -1371,7 +1389,9 @@ plot_tile <-function(args = list()){
   }
   
   if(!is.null(group_var)){
-    group_var <- as.name(group_var)
+    if(group_var %in% names(df)){
+      group_var <- as.name(group_var)
+    }
   }
 
   
@@ -1446,10 +1466,14 @@ plot_pca <-function(args = list()){
   df_pca <- cbind(df_pca, annotation[match(row.names(annotation), row.names(df_pca)), ])
   
   if(!is.null(color_var)){
-    color_var <- as.name(color_var)
+    if(color_var %in% names(df_pca)){
+      color_var <- as.name(color_var)
+    }
   }
   if(!is.null(label_var)){
-    label_var <- as.name(label_var)
+    if(label_var %in% names(df_pca)){
+      label_var <- as.name(label_var)
+    }
   }
   
   p <- ggplot(df_pca, aes_string(x=as.name(PCx), 
@@ -1476,32 +1500,89 @@ add_polygon_layer <- function(p,
   
   if(p$plot_env$plot_type != "histogram" & setequal(names(polygon), c("x", "y"))){
     if(!is.null(polygon$x)){
-      
-      polygon <- data.frame(x = polygon$x, y = polygon$y)
-      polygon <- rbind(polygon, polygon[1,])
-      
-      p <- p +
-        geom_path(data = polygon, mapping = aes(x=x, y=y), color = "red") +
-        geom_polygon(data=polygon, mapping = aes(x=x, y=y),
-                     fill="red",
-                     alpha=0.05)
-      if(!is.null(label)){
-        df_label <- data.frame(x=mean(polygon$x), y= mean(polygon$y))
-        p <- p +  geom_label_repel(data = df_label, force = 4,
-                                   mapping = aes(x=x, y=y), 
-                                   label = label, 
-                                   fill = grDevices::rgb(1,1,1,0.85), 
-                                   color = "red", 
-                                   nudge_y = 0, 
-                                   nudge_x =0, 
-                                   point.padding = 0)
-        #hjust = "middle", vjust = "center")
+      if(length(polygon$x)>1){
+        polygon <- data.frame(x = polygon$x, y = polygon$y)
+        polygon <- rbind(polygon, polygon[1,])
+        
+        ########################################################################
+        # Adjust plot limits
+        layer_info <- layer_scales(p)
+        
+        update_range_x <- FALSE
+        
+        if(!is.null(layer_info$x$limits) & 
+           "RangeContinuous" %in% class(layer_info$x$range) ){
+          
+          xrange <- layer_info$x$trans$inverse(layer_info$x$limits)
+          if(!is.null(xrange)){
+            if(max(polygon$x) > max(xrange)){
+              update_range_x <- TRUE
+              xrange[2] <- max(polygon$x)
+            }
+            if(min(polygon$x) < min(xrange)){
+              update_range_x <- TRUE
+              xrange[1] <- min(polygon$x)
+            }
+          }
+        }
+        
+        if(update_range_x){
+          p <- p + scale_x_continuous(name = layer_info$x$name, 
+                                      trans = layer_info$x$trans, 
+                                      limits = xrange)
+          
+        }
+        
+        update_range_y <- FALSE
+        
+        if(!is.null(layer_info$x$limits) & 
+           "RangeContinuous" %in% class(layer_info$x$range) ){
+          
+          yrange <- layer_info$y$trans$inverse(layer_info$y$limits)
+          if(!is.null(yrange)){
+            if(max(polygon$y) > max(yrange)){
+              update_range_y <- TRUE
+              yrange[2] <- max(polygon$y)
+            }
+            if(min(polygon$y) < min(yrange)){
+              update_range_y <- TRUE
+              yrange[1] <- min(polygon$y)
+            }
+          }
+        }
+        if(update_range_y){
+          p <- p + scale_y_continuous(name = layer_info$y$name, 
+                                      trans = layer_info$y$trans, 
+                                      limits = yrange)
+        }
+        
+        ########################################################################3
+        
+        
+        
+        p <- p +
+          geom_path(data = polygon, mapping = aes(x=x, y=y), color = "red", inherit.aes = FALSE) +
+          geom_polygon(data=polygon, mapping = aes(x=x, y=y), 
+                       inherit.aes = FALSE,
+                       fill="red",
+                       alpha=0.05)
+        if(!is.null(label)){
+          df_label <- data.frame(x=mean(polygon$x), y= mean(polygon$y))
+          p <- p +  geom_label_repel(data = df_label, force = 4, inherit.aes = FALSE,
+                                     mapping = aes(x=x, y=y), 
+                                     label = label, 
+                                     fill = grDevices::rgb(1,1,1,0.85), 
+                                     color = "red", 
+                                     nudge_y = 0, 
+                                     nudge_x =0, 
+                                     point.padding = 0)
+        }
       }
       
+
     }
     
   }
-  
   return(p)
   
 }
@@ -1518,6 +1599,7 @@ add_gate <- function(p, gate){
   
   xvar <- NULL
   yvar <- NULL
+  color_var <- NULL
   
   if("x" %in% names(p$mapping)){
     if("quosure" %in% class(p$mapping$x)){
@@ -1531,6 +1613,11 @@ add_gate <- function(p, gate){
     }
   }
   
+  if("colour" %in% names(p$mapping)){
+    if("quosure" %in% class(p$mapping$colour)){
+      color_var <- as.character(rlang::quo_get_expr(p$mapping$colour))
+    }
+  }
   
   if(setequal(c(xvar, yvar), names(polygon))){ 
     
@@ -1603,18 +1690,25 @@ format_plot <- function(p,
   xlim <- NULL
   ylim <- NULL
   
+  transformation <- list()
+  axis_labels <- list()
+  axis_limits <- list()
+  
   color_var <- as.character(p$plot_env$color_var)
   
   facet_yvar <- NULL
-  if(p$plot_env$plot_type == "bar"){
-    facet_yvar <- "variable"
+  if(!is.null(p$plot_env$plot_type)){
+    if(p$plot_env$plot_type == "bar"){
+      facet_yvar <- "variable"
+    }
   }
   
-  ############################################################################33
+  
+  ############################################################################
   #default parameters
   
-  var_options <- c("xlim", "ylim", "transformation", "default_trans", 
-                   "axis_labels", "color_var_name", "facet_var", "facet_yvar",
+  var_options <- c("xlim", "ylim", "transformation", "default_trans",
+                   "axis_labels", "axis_limits", "color_var_name", "facet_var", "facet_yvar",
                    "scales", "option", "theme", "legend.position")
   
   for(var in intersect(names(options), var_options)){
@@ -1641,23 +1735,19 @@ format_plot <- function(p,
   ############################################################################33
   #transformations
   
-  transformation <- list()
-  
-  for(var in names(options$transformation)){
-    transformation[[var]] <- options$transformation[[var]]
-  }
-  
-  
   if(!is.null(xvar)){
     if(length(xvar) == 1){
       
-      labx <- ifelse(xvar %in% names(options$axis_labels), options$axis_labels[[xvar]], xvar)
+      labx <- ifelse(xvar %in% names(axis_labels), axis_labels[[xvar]], xvar)
+      trans_x <- ifelse(xvar %in% names(transformation), transformation[[xvar]], default_trans)
+      xlim <- axis_limits[[xvar]]
       
-      if(xvar %in% names(transformation)){
-        p <- p + scale_x_continuous(name = labx, trans = transformation[[xvar]], limits = xlim) 
-      }else if(is.numeric(p$data[[xvar]])){
-        p <- p + scale_x_continuous(name = labx, trans = default_trans, limits = xlim)
+      if(is.double(p$data[[xvar]])){
+        p <- p + scale_x_continuous(name = labx, trans = trans_x, limits = xlim) 
+      }else{
+        p <- p + scale_x_discrete(name = labx) 
       }
+     
     }
   }
   
@@ -1665,32 +1755,39 @@ format_plot <- function(p,
     if(length(yvar) == 1){
       
       laby <- ifelse(yvar %in% names(options$axis_labels), options$axis_labels[[yvar]], yvar)
-      
-      if(yvar %in% names(transformation)){
-        p <- p + scale_y_continuous(name = laby, trans = transformation[[yvar]], limits = ylim) 
-      }else if(is.numeric(p$data[[yvar]])){
-        p <- p + scale_y_continuous(name = laby, trans = default_trans, limits = ylim)
+      trans_y <- ifelse(yvar %in% names(transformation), transformation[[yvar]], default_trans)
+      ylim <- axis_limits[[yvar]]
+
+      if(is.double(p$data[[yvar]])){
+        p <- p + scale_y_continuous(name = laby, trans = trans_y, limits = ylim) 
+      }else{
+        p <- p + scale_y_discrete(name = laby) 
       }
+        
     }
   }
   
-  
-  if(p$plot_env$plot_type == "dots"){
-    
-    if(!is.null(color_var)){
-      if(length(color_var) == 1){
-        
-        label_color <- ifelse(color_var %in% names(options$axis_labels), options$axis_labels[[color_var]], color_var)
-        
-        if( as.character(color_var) %in% setdiff(names(transformation), "cluster")){
+  if(!is.null(p$plot_env$plot_type)){
+    if(p$plot_env$plot_type == "dots"){
+      
+      if(!is.null(color_var)){
+        if(length(color_var) == 1){
+
+          label_color <- ifelse(color_var %in% names(options$axis_labels), options$axis_labels[[color_var]], color_var)
+          trans_col <- ifelse(color_var %in% names(transformation), transformation[[color_var]], default_trans)
+          is_cont <- ifelse(color_var %in% names(p$data), is.double(p$data[[color_var]]), FALSE)
           
-          p <- p + viridis::scale_colour_viridis(trans = transformation[[color_var]],
-                                        name = label_color,
-                                        option = option)
+          if(is_cont){
+            p <- p + viridis::scale_colour_viridis(trans = trans_col,
+                                                   name = label_color,
+                                                   option = option)
+          }
         }
       }
     }
   }
+  
+
   ############################################################################33
   #facet
   if(!is.null(options$facet_var) | !is.null(facet_yvar)){
@@ -1737,7 +1834,7 @@ format_plot <- function(p,
   }
   
   p <- p + theme(plot.title = element_text(face = "bold"))
-  
+
   return(p)
   
 }
@@ -1786,14 +1883,13 @@ plot_gs <- function(gs,
   
   if(is.null(sample)) sample <-  flowWorkspace::pData(gs)$name[1]
   if(is.null(subset)) subset <- flowWorkspace::gs_get_pop_paths(gs)[1]
-  
+
   df <- get_plot_data(df = df,
                       gs = gs, 
                       sample = sample,
                       subset = subset,
                       spill = spill, 
                       metadata = metadata)
-  
   
   p <- call_plot_function(df = df,
                           plot_type = plot_type,
@@ -1807,7 +1903,6 @@ plot_gs <- function(gs,
       p <- add_gate(p, g)
     }
   }
-  
   return(p)
 }
 
@@ -2002,7 +2097,7 @@ plot_gh <- function( gs,
 
         plot_args$xvar <- par_nodes[[1]][1]
         plot_args$yvar <- par_nodes[[1]][2]
-
+        
         plist[[count]] <- plot_gs(df = df, 
                                    gs=gs, 
                                    sample=sample, 

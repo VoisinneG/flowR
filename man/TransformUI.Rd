@@ -28,3 +28,32 @@ Edit flow parameter transformation and description
 
 Transform module server function
 }
+\examples{
+\dontrun{
+library(shiny)
+library(shinydashboard)
+
+if (interactive()){
+  
+  ui <- dashboardPage(
+    dashboardHeader(title = "Transform"),
+    sidebar = dashboardSidebar(disable = TRUE),
+    body = dashboardBody(
+      TransformUI("module")
+    )
+  )
+  
+  server <- function(input, output, session) {
+    rval <- reactiveValues()
+    observe({
+      utils::data("GvHD", package = "flowCore")
+      rval$gating_set <- GatingSet(GvHD)
+    })
+    res <- callModule(Transform, "module", rval = rval)
+  }
+  
+  shinyApp(ui, server)
+  
+}
+}
+}

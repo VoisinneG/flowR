@@ -5,6 +5,5 @@ devtools::document('.') # genere NAMESPACE et man
 devtools::load_all('.') # charge le package
 #options(app.prod = FALSE) # TRUE = production mode, FALSE = development mode
 #run_flowR("zenith") # lance l'application
-#run_flowR(modules = c("Import"))
 #runApp("./")
 run_flowR()

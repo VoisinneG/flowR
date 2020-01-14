@@ -109,8 +109,8 @@ if (interactive()){
     plot_params <- reactiveValues()
     
     observe({
-      gs <- load_gs("./inst/ext/gs")
-      rval$gating_set <- gs
+      utils::data("GvHD", package = "flowCore")
+      rval$gating_set <- GatingSet(GvHD)
       plot_params$plot_type <- "histogram"
     })
     
