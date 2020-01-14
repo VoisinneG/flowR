@@ -111,9 +111,16 @@ ZenithUI <- function(id) {
 #' @rdname ZenithUI
 Zenith <- function(input, output, session, rval) {
   
+  observe({
+    if(is.null(rval$update_gs)){
+      rval$update_gs <- 0
+    }
+  })
+  
   ######################################################################################
   # get parameters from GatingSet
   choices <- reactive({
+    rval$update_gs
     validate(need(class(rval$gating_set) == "GatingSet", "input is not a GatingSet"))
     
     plot_var <- parameters(rval$gating_set@data[[1]])$name
@@ -321,10 +328,17 @@ Zenith <- function(input, output, session, rval) {
     gs@compensation <- choices()$compensation
     gs@transformation <- choices()$transformation
     
-    rval$gating_set_list[[input$gs_name]] <- list(gating_set = gs,
-                                                  parent = rval$gating_set_selected)
+    if(!is.null(rval$gating_set_selected)){
+      if(rval$gating_set_selected %in% names(rval$gating_set_list)){
+        rval$gating_set_list[[input$gs_name]] <- list(gating_set = gs,
+                                                      parent = rval$gating_set_selected)
+        
+        rval$gating_set_selected <- input$gs_name
+        rval$update_gs <- rval$update_gs + 1
+      }
+    }
     
-    rval$gating_set_selected <- input$gs_name
+    rval$update_gs <- rval$update_gs + 1
     
   })
   

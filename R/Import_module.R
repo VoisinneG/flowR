@@ -318,7 +318,7 @@ Import <- function(input, output, session, rval) {
                                           emptyValue=FALSE, 
                                           truncate_max_range = TRUE )
         
-        pData(fs)$name <- rval_mod$df_files$name[input$files_table_rows_selected]
+        flowWorkspace::pData(fs)$name <- rval_mod$df_files$name[input$files_table_rows_selected]
         gs <- GatingSet(fs)
         rval$gating_set_list[[input$gs_name]] <- list(gating_set = gs,
                                                     parent = NULL)
