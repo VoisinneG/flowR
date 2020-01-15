@@ -2,7 +2,8 @@
 % Please edit documentation in R/flowR.R
 \name{ellipse_path}
 \alias{ellipse_path}
-\title{Return coordinates of points along an ellipse defined by its covariance matrix and its center}
+\title{Return coordinates of points along an ellipse defined by its 
+covariance matrix and its center}
 \usage{
 ellipse_path(cov, mean, n = 100)
 }
@@ -17,5 +18,6 @@ ellipse_path(cov, mean, n = 100)
 a data.frame with point cordinates
 }
 \description{
-Return coordinates of points along an ellipse defined by its covariance matrix and its center
+Return coordinates of points along an ellipse defined by its 
+covariance matrix and its center
 }

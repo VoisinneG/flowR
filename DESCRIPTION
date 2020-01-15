@@ -22,7 +22,7 @@ Imports:
   ggsignif,
   xml2,
   gridExtra,
-  CytoML,
+  CytoML (>= 1.12),
   Rgraphviz,
   graph,
   igraph,

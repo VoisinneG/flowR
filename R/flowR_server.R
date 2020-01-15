@@ -13,8 +13,11 @@
 #' @export
 flowR_server <- function(session, input, output, modules = NULL) {
   
+  ### Definition of the main reactivevalues object #############################################
+  
   rval <- reactiveValues(update_gs = 0, # useful to force execution of 
-                         #observe environments (for instance after updating a GatingSet with gs_pop_add() )
+                         #observe environments (for instance after updating 
+                         #a GatingSet with gs_pop_add() )
                          gating_set = NULL,
                          gating_set_list = list(),
                          gating_set_selected = NULL,
@@ -23,8 +26,7 @@ flowR_server <- function(session, input, output, modules = NULL) {
                          modules = NULL
                          )
   
-  ##########################################################################################################
-  # Build ui based on selected modules
+  ### Build UI based on selected modules #######################################################
   
   observe({
     default_modules <- c("Import", "Transform", "Gating", "Plotting", "Subsample")
@@ -68,7 +70,9 @@ flowR_server <- function(session, input, output, modules = NULL) {
                            icon = icon("check-circle"),
                            checkboxInput("apply_comp", "apply compensation", TRUE),
                            checkboxInput("apply_trans", "apply transformation", TRUE),
-                           selectInput("gating_set", "Select GatingSet", choices = NULL, selected = NULL),
+                           selectInput("gating_set", "Select GatingSet", 
+                                       choices = NULL, 
+                                       selected = NULL),
                            br()
                   )
       )
@@ -106,10 +110,7 @@ flowR_server <- function(session, input, output, modules = NULL) {
     
   })
   
- 
-  ##########################################################################################################
-  # General controls
-  
+  ### General controls #########################################################################
   observeEvent(input$apply_trans, {
     rval$apply_trans <- input$apply_trans
     
@@ -119,8 +120,7 @@ flowR_server <- function(session, input, output, modules = NULL) {
     rval$apply_comp <- input$apply_comp
   })
   
-  ##########################################################################################################
-  # observe and reactive functions
+  ### Update selected GatingSet ################################################################
   
   observeEvent( c(names(rval$gating_set_list), rval$gating_set_selected), {
     updateSelectInput(session, "gating_set", 
@@ -147,20 +147,17 @@ flowR_server <- function(session, input, output, modules = NULL) {
   
   })
   
- 
-  ##################################################################################################
-  # Updating GatingSets
-  ##################################################################################################
-  
-  # Update transformation
+  ### Update GatingSet transformation ##########################################################
   observeEvent(rval$gating_set, {
     validate(need(class(rval$gating_set) == "GatingSet", "No GatingSet available"))
     validate(need(rval$gating_set_list, "No list of GatingSets available"))
     validate(need(rval$gating_set_selected, "No GatingSet selected"))
     
     items_to_update <- union(rval$gating_set_selected,
-                             union(get_all_descendants(rval$gating_set_list, rval$gating_set_selected),
-                                   get_all_ancestors(rval$gating_set_list, rval$gating_set_selected)))
+                             union(get_all_descendants(rval$gating_set_list, 
+                                                       rval$gating_set_selected),
+                                   get_all_ancestors(rval$gating_set_list, 
+                                                     rval$gating_set_selected)))
     items_to_update <- intersect(items_to_update, names(rval$gating_set_list))
     print("update GatingSet list")
     print(items_to_update)
@@ -170,50 +167,7 @@ flowR_server <- function(session, input, output, modules = NULL) {
     }
   })
   
-  # observeEvent(rval$update_gs , {
-  # 
-  #   validate(need(rval$gating_set_list, "No flow-sets available"))
-  #   validate(need(rval$gating_set_selected, "No flow-set selected"))
-  # 
-  #   # print("flow-sets")
-  #   # print(rval$flow_set_selected)
-  #   # print(get_all_descendants(rval$flow_set_list, rval$flow_set_selected))
-  #   # print(get_all_ancestors(rval$flow_set_list, rval$flow_set_selected))
-  # 
-  #   items_to_update <- union(rval$gating_set_selected,
-  #                            union(get_all_descendants(rval$gating_set_list, rval$gating_set_selected),
-  #                                  get_all_ancestors(rval$gating_set_list, rval$gating_set_selected)))
-  #   items_to_update <- intersect(items_to_update, names(rval$gating_set_list))
-  # 
-  #   print("updating")
-  #   print(items_to_update)
-  # 
-  #   for(i in 1:length(items_to_update)){
-  #     if(!is.null(rval$gates_flowCore)){
-  #       if(length(rval$gates_flowCore)>0){
-  #         rval$gating_set_list[[items_to_update[i]]]$gates <- rval$gates_flowCore
-  #       }
-  #     }
-  #     
-  #     if(!is.null(rval$gating_set@compensation)){
-  #       rval$gating_set_list[[items_to_update[i]]]@transformation <- rval$gating_set@compensation
-  #     }
-  #     if(!is.null(rval$gating_set@transformation)){
-  #       rval$gating_set_list[[items_to_update[i]]]@transformation <- rval$gating_set@transformation
-  #     }
-  #     if(!is.null(rval$trans_parameters)){
-  #       rval$gating_set_list[[items_to_update[i]]]$trans_parameters <- rval$trans_parameters
-  #     }
-  #     if(!is.null(rval$pdata)){
-  #       rval$gating_set_list[[items_to_update[i]]]$metadata <- rval$pdata
-  #     }
-  # 
-  #   }
-  # 
-  # })
-  
-  ##########################################################################################################
-  # Output value boxes
+  ### Main Value boxes #########################################################################
   
   output$progressBox <- renderValueBox({
     Nsamples <- 0

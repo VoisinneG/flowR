@@ -110,6 +110,8 @@ GatingSets <- function(input, output, session, rval) {
     rval$gating_set_list <- rval$gating_set_list[-idx]
   })
   
+  ### Plot Hierarchy ###############################################################################
+  
   output$gating_set_tree <- renderPlot({
     
     validate(need(length(rval$gating_set_list)>0, "no hierarchy"))
@@ -139,6 +141,8 @@ GatingSets <- function(input, output, session, rval) {
                 )
     
   })
+  
+  ### Save GatingSet(s) ############################################################################
   
   output$save_gating_set <- downloadHandler(
     
@@ -215,9 +219,8 @@ GatingSets <- function(input, output, session, rval) {
   
 }
 
-##################################################################################
-# Tests
-##################################################################################
+
+### Tests #########################################################################################
 # 
 # library(shiny)
 # library(shinydashboard)

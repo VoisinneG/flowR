@@ -7,8 +7,9 @@
 get_all_ancestors(named_list, names)
 }
 \arguments{
-\item{named_list}{a list representing a tree. It must be named according to tree node names and 
-each of its element must have a field 'parent' containing the name of its parent node.}
+\item{named_list}{a list representing a tree. It must be named 
+according to tree node names and each of its element must have a field 'parent' 
+containing the name of its parent node.}
 
 \item{names}{Names of the nodes for which all ancestors must be returned}
 }

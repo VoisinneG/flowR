@@ -33,7 +33,8 @@ List names should correspond to variable names.}
 
 \item{k}{integer; number of nearest neighbours (passed to \code{Rphenograph()})}
 
-\item{k_meta}{Maximum number of clusters to try out (passed to \code{FlowSOM::MetaClustering()})}
+\item{k_meta}{Maximum number of clusters to try out 
+(passed to \code{FlowSOM::MetaClustering()})}
 
 \item{scale}{logical; Scale values before building SOM (for method 'FlowSOM' only)}
 
