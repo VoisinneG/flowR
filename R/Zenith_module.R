@@ -85,7 +85,8 @@ ZenithUI <- function(id) {
                            br(),
                            br(),
                            div(style = 'overflow-x: scroll', DT::DTOutput(ns("data"))),
-                           br()
+                           br(),
+                           downloadButton(ns("download_data"), label = "Download")
                   )
            )
     )
@@ -119,8 +120,7 @@ Zenith <- function(input, output, session, rval) {
     }
   })
   
-  ######################################################################################
-  # get parameters from GatingSet
+  ### get parameters from GatingSet ################################################################
   choices <- reactive({
     rval$update_gs
     validate(need(class(rval$gating_set) == "GatingSet", "input is not a GatingSet"))
@@ -129,26 +129,40 @@ Zenith <- function(input, output, session, rval) {
     
     validate(need(length(plot_var)>0, "No variables in GatingSet"))
 
+    desc <- parameters(rval$gating_set@data[[1]])$desc
+    
+    labels <- sapply(1:length(plot_var), function(x){
+      if(is.na(desc[x])){
+        plot_var[x]
+      }else{
+        paste(plot_var[x], "(", desc[x], ")")
+      }
+    })
+    names(plot_var) <- labels
+    names(labels) <- plot_var 
+    
     return( 
       list(sample = pData(rval$gating_set)$name,
            subset = gs_get_pop_paths(rval$gating_set),
            plot_var = plot_var,
-           metadata = pData(rval$gating_set),
-           parameters = parameters(rval$gating_set@data[[1]]),
-           meta_var = names(pData(rval$gating_set)),
            transformation = rval$gating_set@transformation,
-           compensation = rval$gating_set@compensation,
-           gates = get_gates_from_gs(rval$gating_set)
+           compensation = rval$gating_set@compensation
       )
     )
   })
   
+  ### Update UI ####################################################################################
+  
   observe({
-    updateSelectInput(session, "yvar", choices = choices()$plot_var, selected = choices()$plot_var[1]) 
+    updateSelectInput(session, "yvar", 
+                      choices = choices()$plot_var, 
+                      selected = choices()$plot_var[1]) 
   })
   
   observe({
-    updateSelectInput(session, "subset", choices = choices()$subset, selected = "root")
+    updateSelectInput(session, "subset", 
+                      choices = choices()$subset, 
+                      selected = "root")
   })
     
   observe({
@@ -158,7 +172,9 @@ Zenith <- function(input, output, session, rval) {
     updateSelectInput(session, "Z_sample", choices = choices()$sample, selected = choices()$sample[1])
   }) 
   
+  ### Get raw data  #################################################################################
   raw_data <- reactive({
+    validate(need(class(rval$gating_set) == "GatingSet", "input is not a GatingSet"))
     validate(need(input$A_sample, "Please select samples"))
     validate(need(input$B_sample, "Please select samples"))
     validate(need(input$C_sample, "Please select samples"))
@@ -172,13 +188,18 @@ Zenith <- function(input, output, session, rval) {
     validate(need(input$subset, "Please select subsets"))
     
     df <- get_data_gs(gs = rval$gating_set,
-                      sample = unique(c(input$A_sample, input$B_sample, input$C_sample, input$Z_sample)),
+                      sample = unique(c(input$A_sample, 
+                                        input$B_sample, 
+                                        input$C_sample, 
+                                        input$Z_sample)),
                       subset = input$subset,
                       spill = choices()$compensation, 
                       return_comp_data = TRUE)
     df
     
  })
+
+ ### Transform puromycin reporter intensity  ######################################################
   
  reporter_data <- reactive({  
    
@@ -213,6 +234,8 @@ Zenith <- function(input, output, session, rval) {
     
   })
   
+  ### Compute dependency on glycolysis and ox-phos #################################################
+  
   metabo_data <- reactive({
     df <- reporter_data()
     df_melt <- reshape2::melt(df, id.vars = c("name", "subset"), measure.vars = "value")
@@ -233,11 +256,17 @@ Zenith <- function(input, output, session, rval) {
     
     df_mean <- df_mean %>% dplyr::mutate(mean_score_gluc_dep = 100*(A-B)/(A-Z), 
                                   mean_score_mito_dep = 100*(A-C)/(A-Z),
-                                  sd_score_gluc_dep = 100*(abs(sdA*(Z-B)/(A-Z)^2) + abs(sdB/(Z-A)) + abs(sdZ*(A-B)/(A-Z)^2)),
-                                  sd_score_mito_dep = 100*(abs(sdA*(Z-C)/(A-Z)^2) + abs(sdC/(Z-A)) + abs(sdZ*(A-C)/(A-Z)^2)))
+                                  sd_score_gluc_dep = 100*(abs(sdA*(Z-B)/(A-Z)^2) + 
+                                                             abs(sdB/(Z-A)) + 
+                                                             abs(sdZ*(A-B)/(A-Z)^2)),
+                                  sd_score_mito_dep = 100*(abs(sdA*(Z-C)/(A-Z)^2) + 
+                                                             abs(sdC/(Z-A)) + 
+                                                             abs(sdZ*(A-C)/(A-Z)^2)))
 
     df_mean
   })
+  
+  ### Plot results ##################################################################################
   
   plot_gluc_dep <- reactive({
     df <- metabo_data()
@@ -297,12 +326,24 @@ Zenith <- function(input, output, session, rval) {
     plot_mito_dep()
   })
   
+  #### Display/Download data ####
+  
   output$data <- DT::renderDT({
     df <- metabo_data()
     #df[["value"]] <- sprintf("%.2f", df[["value"]])
     DT::datatable(df, rownames = FALSE)
   })
+  
+  output$download_data <- downloadHandler(
+    filename = "zenith_results.txt",
+    content = function(file) {
+      utils::write.table(metabo_data(), file = file, row.names = FALSE, quote = FALSE, sep = "\t")
+    }
+  )
 
+  
+  ### Create GatingSet #############################################################################
+  
   observeEvent(input$create, {
 
     if( input$gs_name %in% names(rval$gating_set_list) ){
@@ -318,15 +359,16 @@ Zenith <- function(input, output, session, rval) {
     
     df <- raw_data()
     df_metabo <- metabo_data()
-    
-    df[["mean_score_gluc_dep"]] <- df_metabo[["mean_score_gluc_dep"]][match(df$subset, df_metabo$subset)]
-    df[["mean_score_mito_dep"]] <- df_metabo[["mean_score_mito_dep"]][match(df$subset, df_metabo$subset)]
+    idx_match <- match(df$subset, df_metabo$subset)
+    df[["mean_score_gluc_dep"]] <- df_metabo[["mean_score_gluc_dep"]][idx_match]
+    df[["mean_score_mito_dep"]] <- df_metabo[["mean_score_mito_dep"]][idx_match]
     
     fs <- build_flowset_from_df(df, 
                                 origin = rval$gating_set@data)
     
     gs <- GatingSet(fs)
-    add_gates_flowCore(gs = gs, gates = choices()$gates)
+    gates <- get_gates_from_gs(rval$gating_set)
+    add_gates_flowCore(gs = gs, gates = gates)
     gs@compensation <- choices()$compensation
     gs@transformation <- choices()$transformation
     
@@ -340,16 +382,7 @@ Zenith <- function(input, output, session, rval) {
       }
     }
     
-    rval$update_gs <- rval$update_gs + 1
-    
   })
-  
-  # output$download_data <- downloadHandler(
-  #   filename = "pop_stats.txt",
-  #   content = function(file) {
-  #     write.table(pop_stats(), file = file, row.names = FALSE, quote = FALSE, sep = "\t")
-  #   }
-  # )
   
   return( rval )
   
