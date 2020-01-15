@@ -130,6 +130,7 @@ simpleDisplay <- function(input, output, session,
     
   })
     
+  ### Layout plots ##########################################################################
   
   plot_display <- reactive({
     
@@ -218,6 +219,8 @@ simpleDisplay <- function(input, output, session,
     plot_display()
   })
   
+  ### Build UI for plot options #############################################################
+  
   output$ui_options <- renderUI({
     ns <- session$ns
     
@@ -235,6 +238,8 @@ simpleDisplay <- function(input, output, session,
       )
     }
   })
+  
+  ### Display plot ##########################################################################
   
   output$ui_plot <- renderUI({
     
@@ -260,6 +265,7 @@ simpleDisplay <- function(input, output, session,
 
   })
 
+  ### Save plot ############################################################################
   
   output$download_plot <- downloadHandler(
     filename = "plot.pdf",
@@ -278,9 +284,8 @@ simpleDisplay <- function(input, output, session,
 }
 
 
-##################################################################################
-# Tests
-##################################################################################
+
+### Tests ###################################################################################
 # library(shiny)
 # library(shinydashboard)
 # library(gridExtra)

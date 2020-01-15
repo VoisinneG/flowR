@@ -63,7 +63,8 @@ patternSelectionInput <- function(id) {
 #' @param input shiny input
 #' @param output shiny output
 #' @param session shiny session
-#' @param choices reactivevalues object containing vectors of possible choices for each selection variable 
+#' @param choices reactivevalues object containing vectors of 
+#' possible choices for each selection variable 
 #' @return a reactivevalues object with:
 #' \describe{
 #'   \item{values}{: selected values}
@@ -79,18 +80,20 @@ patternSelection <- function(input, output, session, choices = reactiveValues())
   output$options <- renderUI({
     ns <- session$ns
     if(input$var_name == 'subset'){
-      tagList(checkboxInput(ns("use_whole_path"), "Search in entire subset path", FALSE))
+      tagList(
+        checkboxInput(ns("use_whole_path"), "Search in entire subset path", FALSE)
+        )
     }
   })
   
   observe({
     if(length(names(choices))>0){
-      updateSelectInput(session, "var_name", choices = names(choices), selected = names(choices)[1])
+      updateSelectInput(session, "var_name", 
+                        choices = names(choices), selected = names(choices)[1])
     }
   })
   
-  ######################################################################################
-  # Select values of variable using a pattern
+  ### Select values of variable using a pattern ###########################################
   
   observeEvent(input$select_values, {
     selected_values <- NULL
@@ -102,8 +105,10 @@ patternSelection <- function(input, output, session, choices = reactiveValues())
       }
     }
     
-    
-    idx_selected <- try(grep(input$pattern, values, fixed = !input$use_reg_expr), silent = TRUE)
+    idx_selected <- try(grep(input$pattern, 
+                             values, 
+                             fixed = !input$use_reg_expr
+                             ), silent = TRUE)
     
     if(class(idx_selected) == "try-error"){
       showModal(modalDialog(
@@ -120,9 +125,6 @@ patternSelection <- function(input, output, session, choices = reactiveValues())
       rval_mod$variable <- input$var_name
     }
     
-    
-    
-    
 
   })
   
@@ -131,9 +133,8 @@ patternSelection <- function(input, output, session, choices = reactiveValues())
 }
 
 
-##################################################################################
-# Tests
-##################################################################################
+
+### Tests #################################################################################
 # 
 # library(shiny)
 # library(shinydashboard)

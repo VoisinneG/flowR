@@ -2218,7 +2218,7 @@ dim_reduction <- function(df,
                           yvar,
                           Ncells = NULL,
                           transformation = NULL,
-                          y_trans = log10_trans(),
+                          y_trans = identity_trans(),
                           perplexity = 50,
                           dims = 2,
                           method = "tSNE",
@@ -2233,7 +2233,7 @@ dim_reduction <- function(df,
     }
   }
   
-  if(!is.null(y_trans)){
+  if(!is.null(y_trans) & is.null(transformation)){
     transformation <- lapply(yvar, function(x){y_trans})
     names(transformation) <- yvar
   }

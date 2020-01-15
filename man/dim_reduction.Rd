@@ -9,7 +9,7 @@ dim_reduction(
   yvar,
   Ncells = NULL,
   transformation = NULL,
-  y_trans = log10_trans(),
+  y_trans = identity_trans(),
   perplexity = 50,
   dims = 2,
   method = "tSNE",

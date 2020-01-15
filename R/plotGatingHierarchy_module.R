@@ -75,8 +75,7 @@ plotGatingHierarchy <- function(input, output, session,
   
   rval_plot <- reactiveValues()
   
-  ######################################################################################
-  # Set plot parameters
+  ### Set plot parameters ########################################################################
   
   observe({
     rval_plot$sample <- choices()$sample[1]
@@ -98,8 +97,7 @@ plotGatingHierarchy <- function(input, output, session,
     
   })
                               
-  ######################################################################################
-  # get parameters from GatingSet
+  ### get parameters from GatingSet #############################################################
   choices <- reactive({
     
     validate(need(class(rval$gating_set) == "GatingSet", "Input is not a GatingSet"))
@@ -139,6 +137,8 @@ plotGatingHierarchy <- function(input, output, session,
       )
     )
   })
+  
+  ### Plot gates #####################################################################################
   
   plot_all_gates <- reactive({
     rval$update_gs
@@ -190,8 +190,7 @@ plotGatingHierarchy <- function(input, output, session,
                   plot_type = rval_plot$plot_type,
                   plot_args = reactiveValuesToList(rval_plot),
                   options = options)
-    #print(reactiveValuesToList(rval_plot))
-    #print(options)
+
     p
     
   })
@@ -200,9 +199,8 @@ plotGatingHierarchy <- function(input, output, session,
   
 }
 
-##################################################################################
-# Tests
-##################################################################################
+
+### Tests ###########################################################################################
 # 
 # library(shiny)
 # library(shinydashboard)

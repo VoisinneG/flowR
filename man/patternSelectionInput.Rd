@@ -18,7 +18,8 @@ patternSelection(input, output, session, choices = reactiveValues())
 
 \item{session}{shiny session}
 
-\item{choices}{reactivevalues object containing vectors of possible choices for each selection variable}
+\item{choices}{reactivevalues object containing vectors of 
+possible choices for each selection variable}
 }
 \value{
 a reactivevalues object with:

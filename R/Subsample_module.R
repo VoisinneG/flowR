@@ -42,30 +42,28 @@ SubsampleUI <- function(id) {
   
   ns <- NS(id)
   
-  fluidRow(
-    column(width = 6,
-           tabBox(title = "",
-                  width = NULL, height = NULL,
-                  tabPanel("Sample/Subset",
+  tagList(
+    tabBox(title = "",
+           width = NULL, height = NULL,
+           tabPanel("Sample/Subset",
                     selectionInput(ns("selection_module"))
-                  ),
-                  tabPanel("Compute",
-                           numericInput(ns("ncells_per_sample"), "Number of cells / subset / sample", 1000),
-                           textInput(ns("gs_name"), "GatingSet name", "sub-sample"),
-                           actionButton(ns("compute_data"), "sample"),
-                           br(),
-                           br(),
-                           "Summary",
-                           br(),
-                           verbatimTextOutput(ns("summary_sub_sample"))
-                  )
-                  
            ),
-           fluidRow(
-             valueBoxOutput(ns("progressBox"), width = 6),
-             valueBoxOutput(ns("progressBox2"), width = 6)
+           tabPanel("Compute",
+                    numericInput(ns("ncells_per_sample"), 
+                                 "Number of cells / subset / sample", 1000),
+                    textInput(ns("gs_name"), "GatingSet name", "sub-sample"),
+                    actionButton(ns("compute_data"), "sample"),
+                    br(),
+                    br(),
+                    "Summary",
+                    br(),
+                    verbatimTextOutput(ns("summary_sub_sample"))
            )
-        
+           
+    ),
+    fluidRow(
+      valueBoxOutput(ns("progressBox"), width = 6),
+      valueBoxOutput(ns("progressBox2"), width = 6)
     )
   )
   
@@ -95,10 +93,11 @@ Subsample <- function(input, output, session, rval) {
   
   selected <- callModule(selection, "selection_module", rval)
   
-  rval_mod <- reactiveValues( gs_subsample = NULL, df_sample = NULL)
+  rval_mod <- reactiveValues( gs = NULL, df_sample = NULL)
   
-  ### Get parameters from GatingSet ###################################################################
+  ### Get parameters from GatingSet ########################################################
   choices <- reactive({
+    rval$update_gs
     validate(need(class(rval$gating_set) == "GatingSet", "input is not a GatingSet"))
 
     return( 
@@ -109,7 +108,7 @@ Subsample <- function(input, output, session, rval) {
     )
   })
 
-  ### Observe functions for sub-sampling ##############################################################
+  ### Observe functions for sub-sampling ###################################################
   
   observeEvent(input$compute_data, {
 
@@ -143,7 +142,8 @@ Subsample <- function(input, output, session, rval) {
       ))
     }
     
-    validate(need(! input$gs_name %in% names(rval$gating_set_list), "Name already exists" ))
+    validate(need(! input$gs_name %in% names(rval$gating_set_list), 
+                  "Name already exists" ))
 
     
     if( length(selected$subset) == 0 ){
@@ -156,8 +156,6 @@ Subsample <- function(input, output, session, rval) {
     }
     
     validate(need(selected$subset, "No subset selected"))
-    
-    #sample = rval$pdata$name[input$sub_sample_table_rows_selected]
     
     spill <- choices()$compensation
     if(!is.null(rval$apply_comp)){
@@ -189,22 +187,24 @@ Subsample <- function(input, output, session, rval) {
     fs <- build_flowset_from_df(df_sample, 
                                 origin = rval$gating_set@data)
     
-    rval_mod$gs_subsample <- GatingSet(fs)
-    add_gates_flowCore(gs = rval_mod$gs_subsample, gates = choices()$gates)
-    rval_mod$gs_subsample@compensation <- choices()$compensation
-    rval_mod$gs_subsample@transformation <- choices()$transformation
+    rval_mod$gs <- GatingSet(fs)
+    add_gates_flowCore(gs = rval_mod$gs, gates = choices()$gates)
+    rval_mod$gs@compensation <- choices()$compensation
+    rval_mod$gs@transformation <- choices()$transformation
     
 
-    rval$gating_set_list[[input$gs_name]] <- list(gating_set = rval_mod$gs_subsample,
+    rval$gating_set_list[[input$gs_name]] <- list(gating_set = rval_mod$gs,
                                                   parent = rval$gating_set_selected)
     rval$gating_set_selected <- input$gs_name
     
   })
   
+  ### Value boxes ##########################################################################
+  
   output$progressBox <- renderValueBox({
     Nsamples <- 0
-    if(!is.null(rval_mod$gs_subsample)){
-      Nsamples <- length(pData(rval_mod$gs_subsample)$name)
+    if(!is.null(rval_mod$gs)){
+      Nsamples <- length(pData(rval_mod$gs)$name)
     }
     
     valueBox(
@@ -215,8 +215,8 @@ Subsample <- function(input, output, session, rval) {
   
   output$progressBox2 <- renderValueBox({
     ncells <- 0
-    if(!is.null(rval_mod$gs_subsample)){
-      fs <- rval_mod$gs_subsample@data
+    if(!is.null(rval_mod$gs)){
+      fs <- rval_mod$gs@data
       ncells <- sum( sapply(1:length(fs), function(x){dim(fs[[x]]@exprs)[1]}) )
     }
     
@@ -225,6 +225,8 @@ Subsample <- function(input, output, session, rval) {
       color = "green"
     )
   })
+  
+  ### Summary ##############################################################################
   
   output$summary_sub_sample <- renderPrint({
     if(!is.null(rval_mod$df_sample)){
@@ -238,7 +240,7 @@ Subsample <- function(input, output, session, rval) {
   
 }
 
-### Tests #########################################################################################
+### Tests #################################################################################
 # 
 # library(shiny)
 # library(shinydashboard)
@@ -252,7 +254,7 @@ Subsample <- function(input, output, session, rval) {
 #     sidebar = dashboardSidebar(disable = TRUE),
 #     body = dashboardBody(
 #       fluidRow(
-#         column(12, box(width = NULL, SubsampleUI("module")))
+#         column(6, box(width = NULL, SubsampleUI("module")))
 #       )
 #     )
 #   )

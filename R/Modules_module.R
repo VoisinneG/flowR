@@ -84,12 +84,17 @@ ModulesUI <- function(id) {
 #' @export
 Modules <- function(input, output, session, rval) {
 
-  rval_mod <- reactiveValues(modules = NULL, df_module_info = NULL, packages = NULL, choices = NULL)
+  rval_mod <- reactiveValues(modules = NULL, 
+                             df_module_info = NULL, 
+                             packages = NULL, 
+                             choices = NULL)
   
   
   observe({
     rval_mod$packages <- c(names(sessionInfo()$otherPkgs), ".GlobalEnv")
-    updateSelectizeInput(session, "packages", choices = rval_mod$packages, selected = c("flowR", ".GlobalEnv"))
+    updateSelectizeInput(session, "packages", 
+                         choices = rval_mod$packages, 
+                         selected = c("flowR", ".GlobalEnv"))
   })
   
   observe({
@@ -222,9 +227,8 @@ format_info <- function(info){
   return(s)
 }
 
-##################################################################################
-# Tests
-##################################################################################
+
+### Tests #########################################################################################
 # 
 # library(shiny)
 # library(shinydashboard)
