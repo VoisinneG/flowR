@@ -112,6 +112,7 @@ Metadata <- function(input, output, session, rval) {
     }
   })
   
+  #### Update metadata ####
   observeEvent(input$apply, {
     validate(need(class(rval$gating_set)=="GatingSet", "No GatingSet available"))
     flowWorkspace::pData(rval$gating_set) <- rval_mod$pdata
@@ -123,12 +124,13 @@ Metadata <- function(input, output, session, rval) {
     rval$update_gs <- rval$update_gs + 1
   })
   
+  #### Get metadata from GatingSet ####
   observeEvent(rval$update_gs, {
     validate(need(class(rval$gating_set)=="GatingSet", "No GatingSet available"))
     rval_mod$pdata <- as.data.frame(flowWorkspace::pData(rval$gating_set))
   })
   
-  #Update available keywords
+  #### Update available keywords ####
   observe({
     rval$update_gs
     validate(need(class(rval$gating_set)=="GatingSet", "No GatingSet available"))
@@ -142,12 +144,10 @@ Metadata <- function(input, output, session, rval) {
                       selected = NULL)  
   })
   
-  
+  #### Import metadata from file ####
   observe({
     
-    validate(
-      need(length(input$file_meta)>0, "Please select a file to load")
-    )
+    validate(need(length(input$file_meta)>0, "Please select a file to load"))
     
     sep <- switch(input$sep_meta,
                   "comma" = ",",
@@ -160,8 +160,6 @@ Metadata <- function(input, output, session, rval) {
     }else if(tools::file_ext(input$file_meta$datapath) %in% c("xls", "xlsx")){
       rval_mod$df_meta_imported <- readxl::read_excel(input$file_meta$datapath)
     }
-    
-    
   })
   
   observeEvent(input$append_meta, {
@@ -179,7 +177,6 @@ Metadata <- function(input, output, session, rval) {
         rval_mod$pdata <- cbind(rval_mod$pdata, df_meta_mapped[idx_new])
       }
     }
-    
   })
   
   
@@ -214,8 +211,7 @@ Metadata <- function(input, output, session, rval) {
     }
   })
 
-  
-  
+  #### Filter a GatingSet based on metadata ####
   observeEvent(input$apply_filter_meta, {
     
     ns <- session$ns
@@ -268,6 +264,7 @@ Metadata <- function(input, output, session, rval) {
     
   })
   
+  #### Build UI for filtering ####
   output$filter_meta <- renderUI({
     
     ns <- session$ns
@@ -294,7 +291,7 @@ Metadata <- function(input, output, session, rval) {
     
   })
   
-  
+  #### add/delete metadata column ####
   observeEvent(input$add_column, {
     ns <- session$ns
     showModal(modalDialog(title = "Add column",
@@ -338,7 +335,7 @@ Metadata <- function(input, output, session, rval) {
     }
   })
   
-  # edit metadata information
+  #### edit metadata information ####
   output$pData <- DT::renderDT({validate(need(rval_mod$pdata, "No metadata")); rval_mod$pdata},
                             rownames = FALSE,
                             selection = 'none',
@@ -354,7 +351,8 @@ Metadata <- function(input, output, session, rval) {
     DT::replaceData(proxy, rval_mod$pdata, resetPaging = FALSE)  
   })
   
-
+  #### Display/Download metadata ####
+  
   output$meta <- DT::renderDT({
     validate(need(rval_mod$df_meta_imported, "No meta data imported"))
     as.data.frame(rval_mod$df_meta_imported)
@@ -371,9 +369,8 @@ Metadata <- function(input, output, session, rval) {
   
 }
 
-##################################################################################
-# Tests
-##################################################################################
+
+#### Tests ####
 #
 # library(shiny)
 # library(shinydashboard)
