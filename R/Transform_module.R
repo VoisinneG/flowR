@@ -104,6 +104,8 @@ Transform <- function(input, output, session, rval) {
   rval_mod <- reactiveValues(parameters = NULL)
   plot_params <- reactiveValues()
   
+  ### build UI for transform parameters ####################################################
+  
   output$trans_param_ui <- renderUI({
     ns <- session$ns
     x <- list()
@@ -133,6 +135,8 @@ Transform <- function(input, output, session, rval) {
     rval$update_gs <- 0
   })
   
+  ### Set plot parameters ###################################################################
+  
   observe({
       plot_params$plot_type <- "histogram"
       plot_params$color_var <- NULL
@@ -157,7 +161,7 @@ Transform <- function(input, output, session, rval) {
     }
   })
   
-  
+  ### Call modules ##########################################################################
   
   res <- callModule(plotGatingSet, "plot_module", 
                     rval = rval, plot_params = plot_params, simple_plot = TRUE)

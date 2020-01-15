@@ -42,31 +42,32 @@ SubsampleUI <- function(id) {
   
   ns <- NS(id)
   
-  tagList(
-    tabBox(title = "",
-           width = NULL, height = NULL,
-           tabPanel("Sample/Subset",
-                    selectionInput(ns("selection_module"))
-           ),
-           tabPanel("Compute",
-                    numericInput(ns("ncells_per_sample"), 
-                                 "Number of cells / subset / sample", 1000),
-                    textInput(ns("gs_name"), "GatingSet name", "sub-sample"),
-                    actionButton(ns("compute_data"), "sample"),
-                    br(),
-                    br(),
-                    "Summary",
-                    br(),
-                    verbatimTextOutput(ns("summary_sub_sample"))
-           )
-           
-    ),
-    fluidRow(
-      valueBoxOutput(ns("progressBox"), width = 6),
-      valueBoxOutput(ns("progressBox2"), width = 6)
+  fluidRow(
+    column(width = 6,
+      tabBox(title = "",
+             width = NULL, height = NULL,
+             tabPanel("Sample/Subset",
+                      selectionInput(ns("selection_module"))
+             ),
+             tabPanel("Compute",
+                      numericInput(ns("ncells_per_sample"), 
+                                   "Number of cells / subset / sample", 1000),
+                      textInput(ns("gs_name"), "GatingSet name", "sub-sample"),
+                      actionButton(ns("compute_data"), "sample"),
+                      br(),
+                      br(),
+                      "Summary",
+                      br(),
+                      verbatimTextOutput(ns("summary_sub_sample"))
+             )
+             
+      ),
+      fluidRow(
+        valueBoxOutput(ns("progressBox"), width = 6),
+        valueBoxOutput(ns("progressBox2"), width = 6)
+      )
     )
   )
-  
 }
 
 

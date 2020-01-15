@@ -357,7 +357,6 @@ plotGatingSet <- function(input, output, session,
                  choices()$plot_var), {
     
     validate(need(rval_input$plot_type, "No plot type selected"))   
-    validate(need(rval_plot[["color_var"]], "No color variable defined"))             
                    
     for(var in names(rval_input)){
       rval_plot[[var]] <- rval_input[[var]]
@@ -368,6 +367,9 @@ plotGatingSet <- function(input, output, session,
                                 "dots" = c("none", "subset", choices()$meta_var, 
                                            choices()$plot_var),
                                 c("none", "subset", choices()$meta_var))
+    if(is.null(rval_plot[["color_var"]])){
+      rval_plot[["color_var"]] <- color_var_choices[1]
+    }
     
     if(! rval_plot[["color_var"]] %in% color_var_choices ){
       rval_plot[["color_var"]] <- color_var_choices[1]
@@ -456,7 +458,7 @@ plotGatingSet <- function(input, output, session,
   
   observe({
     
-    validate(need(rval_input$plot_type, "Not plot type selected"))
+    validate(need(rval_input$plot_type, "No plot type selected"))
     
     choices_color_var <- switch(rval_input$plot_type,
                                 "dots" = c("none", "subset", choices()$meta_var, 
@@ -519,7 +521,7 @@ plotGatingSet <- function(input, output, session,
   ### Control update of plot data ##################################################################
   
   params_update_data <- reactive({
-    #print("update_data")
+    
     if(!auto_update){
       input$update_plot
     }else{
@@ -542,6 +544,7 @@ plotGatingSet <- function(input, output, session,
   
   params_update_plot_raw <- reactive({
     #print("update_raw")
+    
     if(!auto_update){
       input$update_plot
     }else{
@@ -653,6 +656,7 @@ plotGatingSet <- function(input, output, session,
     
     df <- data_plot_focus()
     rval_mod$plot_list <- list()
+    rval_mod$count_raw <- rval_mod$count_raw + 1
     
     validate(need(rval_input$xvar %in% choices()$plot_var, "Please select x variable"))
     validate(need(rval_input$plot_type, "Please select plot type"))
@@ -680,7 +684,7 @@ plotGatingSet <- function(input, output, session,
     
     }
     
-    rval_mod$count_raw <- rval_mod$count_raw + 1
+    
   })
   
   ### Format plot ##################################################################################

@@ -2484,7 +2484,7 @@ build_flowset_from_df <- function(df,
       pdata <- data.frame(flowWorkspace::pData(origin))
       idx_match <- match(samples, pdata$name)
       if(length(colnames(pdata))>1){
-        pData(fs_new) <- pdata[idx_match, ]
+        flowWorkspace::pData(fs_new) <- pdata[idx_match, ]
       }else{
         flowWorkspace::pData(fs_new)$name <- pdata[idx_match, ]
       }
