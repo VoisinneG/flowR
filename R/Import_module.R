@@ -111,41 +111,6 @@ Import <- function(input, output, session, rval) {
     rval_mod$df_files <- df
   })
   
-  
-  #### Select group within a workspace #####
-  
-  # observe({
-  #   validate(
-  #     need(length(input$files_table_rows_selected)>0, "Please select a file to load")
-  #   )
-  #   if(file_ext(rval_mod$df_files$datapath[input$files_table_rows_selected[1]]) %in% c("xml", "wsp") ){
-  #     ws <- try( CytoML::open_flowjo_xml(rval_mod$df_files$datapath[input$files_table_rows_selected[1]]),
-  #                silent = TRUE)
-  #     if(class(ws) != "try-error"){
-  #       groups <- unique(CytoML::fj_ws_get_sample_groups(ws)$groupName)
-  #     }
-  #     else{
-  #       ws <- try( CytoML::open_diva_xml(rval_mod$df_files$datapath[input$files_table_rows_selected[1]]),
-  #                  silent = TRUE)
-  #       if(class(ws) != "try-error"){
-  #         groups <- unique(CytoML::diva_get_sample_groups(ws)$specimen)
-  #       }
-  #     }
-  #     
-  #     if(class(ws) == "try-error"){
-  #       showModal(modalDialog(
-  #         title = "Error parsing xml workspace",
-  #         print(ws),
-  #         easyClose = TRUE,
-  #         footer = NULL
-  #       ))
-  #     }
-  #     
-  #     updateSelectInput(session, "groups", choices = groups, selected = groups[1])
-  #   }
-  #   
-  # })
-  
   #### Create GatingSet ####
   
   observeEvent(input$load, {
@@ -169,106 +134,7 @@ Import <- function(input, output, session, rval) {
     on.exit(progress$close())
     progress$set(message = "Loading data", value = 0.5)
     
-    
-    
-      
-      # if(tools::file_ext(rval_mod$df_files$datapath[input$files_table_rows_selected[1]]) %in% c("xml", "wsp")){
-      #   ws <- try( open_flowjo_xml(rval_mod$df_files$datapath[input$files_table_rows_selected[1]]),
-      #              silent = TRUE)
-      #   if(class(ws) == "try-error"){
-      #     ws <- try( open_diva_xml(rval_mod$df_files$datapath[input$files_table_rows_selected[1]]),
-      #                silent = TRUE)
-      #   }
-      #   
-      #   if(class(ws) == "try-error"){
-      #     showModal(modalDialog(
-      #       title = "Error parsing xml workspace",
-      #       print(ws),
-      #       easyClose = TRUE,
-      #       footer = NULL
-      #     ))
-      #   }
-      # 
-      #   gs <- try(CytoML::flowjo_to_gatingset(ws,
-      #                            name = input$groups,
-      #                            execute = TRUE,
-      #                            isNcdf = TRUE,
-      #                            sampNloc = "sampleNode",
-      #                            path = dirname(rval_mod$df_files$datapath[1])),
-      #             silent = TRUE)
-      #   
-      #   if(class(gs) == "try-error"){
-      #     showModal(modalDialog(
-      #       title = "Error parsing xml workspace",
-      #       print(gs),
-      #       easyClose = TRUE,
-      #       footer = NULL
-      #     ))
-      #   }
-      #   
-      #   validate(
-      #     need(class(gs) == "GatingSet", "No gating set imported")
-      #   )
-      #   
-      #   fs <- gs@data
-      #   
-      #
-      #   #get gates and transfrom gates
-      #   
-      #   gates <- get_gates_from_gs(gs)
-      #   if(tools::file_ext(rval_mod$df_files$datapath[input$files_table_rows_selected[1]]) %in% c("wsp")){
-      #     gates <- get_gates_from_ws(ws_path = rval_mod$df_files$datapath[input$files_table_rows_selected[1]], 
-      #                                group = input$groups)
-      #   }
-      #   
-      #   ff <- fs[[1]]
-      #   
-      #   # time_step is needed to transform gates containing the parameter "Time"
-      #   time_step <- as.numeric(description(ff)[["$TIMESTEP"]])
-      #   
-      #   params <- parameters(ff)$name
-      #   
-      #   pattern <- NULL
-      #   if( length( grep("[\\<|\\>]", params) ) >0 ){
-      #     pattern <- "[\\<|\\>]"
-      #   }else if(length( grep("Comp-", params) ) >0){
-      #     pattern <- "Comp-"
-      #   }
-      #   replacement <- ""
-      #   if(!is.null(pattern)){
-      #     params <- gsub(pattern = pattern, replacement = replacement, params)
-      #   }
-      #   
-      #   myTrans <- lapply(params, function(x){scales::identity_trans()})
-      #   names(myTrans) <- params
-      #   
-      #   gates <- transform_gates(gates = gates,
-      #                                          pattern = pattern,
-      #                                          replacement = replacement,
-      #                                          transformation = myTrans, 
-      #                                          time_step = time_step)
-      #   
-      #   
-      #
-      #   #match fcs file names and import non-compensated, non-transformed data
-      #   
-      #   names_imported <- flowCore::fsApply(fs, function(x){description(x)[["FILENAME"]]})
-      #   names_imported <- basename(names_imported)
-      #   idx_match <- match(names_imported, rval_mod$df_files$name)
-      #   
-      #   fs <- ncdfFlow::read.ncdfFlowSet(rval_mod$df_files$datapath[idx_match], 
-      #                                    truncate_max_range = TRUE )
-      #   
-      #   flowWorkspace::pData(fs)$name <- rval_mod$df_files$name[idx_match]
-      #   
-      #   gs <- GatingSet(fs)
-      #   add_gates_flowCore(gs, gates)
-      #   rval$gating_set_list[[input$gs_name]] <- list(gating_set = gs,
-      #                                                 parent = NULL)
-      #   rval$gating_set_selected <- input$gs_name
-      #   
-      # }else 
-    
+    #### Build GatingSet ####
     
     if(file_ext(rval_mod$df_files$datapath[input$files_table_rows_selected[1]]) == "rda"){
         
