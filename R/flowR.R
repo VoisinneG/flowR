@@ -1,8 +1,7 @@
 utils::globalVariables(c("df", "xvar", "yvar", "x", "y"))
 
-####################################################################################################
-# Parse workspace and gates from xml files (.wsp flowJO workspace files)
-####################################################################################################
+
+###### Parse workspace and gates from xml files (.wsp flowJO workspace files) ###################
 
 #' Return the name and ID of a SampleNode section
 #' @param x a xml document
@@ -29,7 +28,8 @@ find_all_parent_gates <- function(x){
   all_parents <- NULL
   y <- x
   while(xml_name( xml_parent(xml_parent(xml_parent(y))) ) == "Population"){
-    all_parents <- c(xml_text(xml_find_all( xml_parent(xml_parent(xml_parent(y))), ".//@name")[1]), all_parents)
+    all_parents <- c(xml_text(xml_find_all( xml_parent(xml_parent(xml_parent(y))), ".//@name")[1]), 
+                     all_parents)
     y <- xml_parent(xml_parent(xml_parent(y)))
     idx_gate <- which( xml_name( xml_children(y) ) == "Gate")
     if(length(idx_gate)>0){
@@ -155,7 +155,9 @@ parseGate <- function(x){
     res <- c(res, list("boundaries" = m))
   }
   if(type == "PolygonGate" ){
-    vertexes <- xml_double(xml_find_all(xml_find_all(x, ".//gating:vertex"), ".//@data-type:value"))
+    vertexes <- xml_double(
+      xml_find_all(
+        xml_find_all(x, ".//gating:vertex"), ".//@data-type:value"))
     polygon <- matrix(vertexes, nrow = 2)
     polygon <- t(polygon)
     colnames(polygon) <- res[["dim"]]
@@ -165,9 +167,8 @@ parseGate <- function(x){
 }
 
 
-####################################################################################################
-# Transformations
-####################################################################################################
+###### Transformations #########################################################################
+
 
 #' @importFrom flowWorkspace flowJoTrans flow_trans
 flowJo_biexp_inverse_trans <- function (..., n = 6, equal.space = FALSE){
@@ -200,12 +201,13 @@ asinh_trans <- function (..., n = 6, equal.space = FALSE){
              n = n, equal.space = equal.space)
 }
 
-####################################################################################################
-# Gating
-####################################################################################################
+
+### Gating #####################################################################################
+
 
 #' Return coordinates of flowCore gate.
-#' @param gate a flowCore gate either from class "polygonGate", "rectangleGate" or "ellipsoidGate"
+#' @param gate a flowCore gate either from class "polygonGate", "rectangleGate" or 
+#' "ellipsoidGate"
 get_gate_coordinates <- function(gate){
   
   polygon <- NULL
@@ -233,7 +235,8 @@ get_gate_coordinates <- function(gate){
   
 }
 
-#' Return coordinates of points along an ellipse defined by its covariance matrix and its center
+#' Return coordinates of points along an ellipse defined by its 
+#' covariance matrix and its center
 #' @param cov covariance matrix
 #' @param mean coordinates of the center of the ellipse
 #' @param n number of points to return along the ellipse
@@ -263,8 +266,9 @@ ellipse_path <- function(cov, mean, n = 100){
 }
 
 #' Return all descendants from a set of nodes in a tree
-#' @param named_list a list representing a tree. It must be named according to tree node names and 
-#' each of its element must have a field 'parent' containing the name of its parent node.
+#' @param named_list a list representing a tree. It must be named 
+#' according to tree node names and each of its element must have a field 'parent' 
+#' containing the name of its parent node.
 #' @param names Names of the nodes for which all descendants must be returned
 get_all_descendants <- function(named_list, names){
   
@@ -280,8 +284,9 @@ get_all_descendants <- function(named_list, names){
 }
 
 #' Return all ancestors from a set of nodes in a tree
-#' @param named_list a list representing a tree. It must be named according to tree node names and 
-#' each of its element must have a field 'parent' containing the name of its parent node.
+#' @param named_list a list representing a tree. It must be named 
+#' according to tree node names and each of its element must have a field 'parent' 
+#' containing the name of its parent node.
 #' @param names Names of the nodes for which all ancestors must be returned
 get_all_ancestors <- function(named_list, names){
   
@@ -377,10 +382,13 @@ add_gates_flowCore <- function(gs, gates){
 #' Transform gates coordinates and modify names of parameters.
 #' @param gates a named list representing the gating hierarchy.
 #' @param transformation A list of trans objects. 
-#' Each element must be named after a parameter and contain the transfomation to apply for this parameter.
+#' Each element must be named after a parameter and contain the transfomation 
+#' to apply for this parameter.
 #' @param pattern pattern to be replaced in the names of gate coordinates
-#' @param replacement Character string that is to replace 'pattern' in in the names of gate coordinates
-#' @param time_step value of the time step used to transform gates with the 'Time' parameter. Ignored if NULL.
+#' @param replacement Character string that is to replace 'pattern' in in the 
+#' names of gate coordinates
+#' @param time_step value of the time step used to transform gates with 
+#' the 'Time' parameter. Ignored if NULL.
 #' @importFrom flowCore polygonGate rectangleGate
 transform_gates <- function(gates,
                             transformation = NULL, 
@@ -403,7 +411,9 @@ transform_gates <- function(gates,
         
         polygon <- g$gate@boundaries
         if(!is.null(pattern)){
-          colnames(polygon) <- gsub(pattern = pattern, replacement = replacement, colnames(polygon))
+          colnames(polygon) <- gsub(pattern = pattern, 
+                                    replacement = replacement, 
+                                    colnames(polygon))
         }
         
         for(j in 1:length(colnames(polygon))){
@@ -424,7 +434,9 @@ transform_gates <- function(gates,
         
         polygon <- rbind(g$gate@min, g$gate@max)
         if(!is.null(pattern)){
-          colnames(polygon) <- gsub(pattern = pattern, replacement = replacement, colnames(polygon))
+          colnames(polygon) <- gsub(pattern = pattern, 
+                                    replacement = replacement, 
+                                    colnames(polygon))
         }
 
         
@@ -448,7 +460,9 @@ transform_gates <- function(gates,
         polygon <- as.matrix(ellipse_path(cov = cov, mean = mean))
         
         if(!is.null(pattern)){
-          colnames(polygon) <- gsub(pattern = pattern, replacement = replacement, colnames(polygon))
+          colnames(polygon) <- gsub(pattern = pattern, 
+                                    replacement = replacement, 
+                                    colnames(polygon))
         }
 
         
@@ -474,9 +488,8 @@ transform_gates <- function(gates,
 }
 
 
-####################################################################################################
-# Getting data
-####################################################################################################
+### Getting data ###############################################################################
+
 
 #' Return statistics for all subsets ans samples in a GatingSet
 #' @param gs a GatingSet
@@ -719,7 +732,11 @@ compute_stats <- function(df = NULL,
       
       stat.fun <- function(...){do.call(stat_function, args = list(...))}
       df_cast <- reshape2::dcast(df_melt, 
-                                 formula = stats::as.formula(paste(paste(id.vars, collapse = " + "), " ~ variable", sep ="")), 
+                                 formula = stats::as.formula(
+                                   paste(
+                                     paste(id.vars, collapse = " + "), 
+                                     " ~ variable", 
+                                     sep ="")), 
                                  fun.aggregate =  stat.fun, 
                                  na.rm = TRUE)
       
@@ -823,9 +840,8 @@ get_plot_data <- function(gs,
   
 }
 
-####################################################################################################
-# Plotting
-####################################################################################################
+
+### Plotting ##################################################################################
 
 #' Generates a plot from data
 #' @param df data.frame with plot data (as returned by \code{get_plot_data})
@@ -848,9 +864,7 @@ call_plot_function <- function(df,
 }
 
 
-
-####################################################################################################
-# Generate plot for data with single cell resolution (plotGatingSetInput_module)
+### Plots for data with single cell resolution (plotGatingSetInput_module)
 
 #' Generates a hexagonal heatmap of 2d bin counts (see ggplot2::geom_hex)
 #' @param args list of arguments. 
@@ -1197,9 +1211,8 @@ plot_contour <-function(args = list()){
   return(p)
 }
 
-####################################################################################################
-# Generate plot for aggregated data (plotStatInput_module)
-####################################################################################################
+
+### Plot for aggregated data (plotStatInput_module)
 
 #' Generates a heatmap
 #' @param args list of arguments. 
@@ -1487,9 +1500,8 @@ plot_pca <-function(args = list()){
 }
 
 
-####################################################################################################
-# Add plot layers
-####################################################################################################
+
+### Add plot layers
 
 #' @import ggplot2
 #' @importFrom grDevices rgb
@@ -1504,8 +1516,8 @@ add_polygon_layer <- function(p,
         polygon <- data.frame(x = polygon$x, y = polygon$y)
         polygon <- rbind(polygon, polygon[1,])
         
-        ########################################################################
-        # Adjust plot limits
+
+        # adjust plot limits
         layer_info <- layer_scales(p)
         
         update_range_x <- FALSE
@@ -1556,10 +1568,8 @@ add_polygon_layer <- function(p,
                                       limits = yrange)
         }
         
-        ########################################################################3
-        
-        
-        
+        # add polygon layer
+
         p <- p +
           geom_path(data = polygon, mapping = aes(x=x, y=y), color = "red", inherit.aes = FALSE) +
           geom_polygon(data=polygon, mapping = aes(x=x, y=y), 
@@ -1640,9 +1650,8 @@ add_gate <- function(p, gate){
   
 }
 
-####################################################################################################
-# Format plot (legend, scale, labels ...)
-####################################################################################################
+
+### Format plot (legend, scale, labels ...) #####################################################
 
 #' Format a ggplot object
 #' @param p a ggplot object
@@ -1704,8 +1713,7 @@ format_plot <- function(p,
   }
   
   
-  ############################################################################
-  #default parameters
+  #### default parameters ###
   
   var_options <- c("xlim", "ylim", "transformation", "default_trans",
                    "axis_labels", "axis_limits", "color_var_name", "facet_var", "facet_yvar",
@@ -1730,10 +1738,7 @@ format_plot <- function(p,
     default_trans <- scales::identity_trans()
   }
   
-  
-  
-  ############################################################################33
-  #transformations
+  ### transformations ###
   
   if(!is.null(xvar)){
     if(length(xvar) == 1){
@@ -1786,10 +1791,8 @@ format_plot <- function(p,
       }
     }
   }
-  
 
-  ############################################################################33
-  #facet
+  ### facet ###
   if(!is.null(options$facet_var) | !is.null(facet_yvar)){
     
     left_formula <- paste(facet_yvar, collapse = " + ")
@@ -1809,8 +1812,7 @@ format_plot <- function(p,
                         scales = scales)
   }
   
-  ############################################################################
-  #theme
+  ### theme ###
   if(length(unique(p$data$subset))==1){
     p <- p + ggtitle(unique(p$data$subset))
   }
@@ -1839,9 +1841,8 @@ format_plot <- function(p,
   
 }
 
-####################################################################################################
-# Main plot functions
-####################################################################################################
+### Main plot functions #######################################################################
+
 
 #' Plot a GatingSet
 #' @param df a data.frame with plot data resulting from a call of \code{get_plot_data}. 
@@ -2193,9 +2194,7 @@ scale_values <- function(df, id.vars = NULL){
 }
 
 
-####################################################################################################
-# Dimensionality Reduction 
-####################################################################################################
+### Dimensionality Reduction ###################################################################
 
 #' Perform dimensionality reduction
 #' @description  Perform dimensionality reduction
@@ -2293,9 +2292,7 @@ dim_reduction <- function(df,
   
 }
 
-####################################################################################################
-# Clustering
-####################################################################################################
+### Clustering ##################################################################################
 
 #' Identify clusters
 #' @description  Identify clusters
@@ -2308,7 +2305,8 @@ dim_reduction <- function(df,
 #' @param alpha ClusterX alpha parameter
 #' @param method Name of the method used. Either "FlowSOM", "ClusterX", "Rphenograph".
 #' @param k integer; number of nearest neighbours (passed to \code{Rphenograph()})
-#' @param k_meta Maximum number of clusters to try out (passed to \code{FlowSOM::MetaClustering()})
+#' @param k_meta Maximum number of clusters to try out 
+#' (passed to \code{FlowSOM::MetaClustering()})
 #' @param scale logical; Scale values before building SOM (for method 'FlowSOM' only)
 #' @return a data.frame with the additionnal column "cluster"
 #' @importFrom FlowSOM BuildSOM BuildMST MetaClustering
@@ -2397,9 +2395,8 @@ get_cluster <- function(df,
 }
 
 
-####################################################################################################
-# Build FlowSet
-####################################################################################################
+
+### Build FlowSet ###############################################################################
 
 #' Build a flowSet from a data.frame
 #' @description Build a flowSet from a data.frame

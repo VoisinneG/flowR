@@ -7,7 +7,8 @@
 get_gate_coordinates(gate)
 }
 \arguments{
-\item{gate}{a flowCore gate either from class "polygonGate", "rectangleGate" or "ellipsoidGate"}
+\item{gate}{a flowCore gate either from class "polygonGate", "rectangleGate" or 
+"ellipsoidGate"}
 }
 \description{
 Return coordinates of flowCore gate.

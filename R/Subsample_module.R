@@ -97,8 +97,7 @@ Subsample <- function(input, output, session, rval) {
   
   rval_mod <- reactiveValues( gs_subsample = NULL, df_sample = NULL)
   
-  ######################################################################################
-  # get parameters from GatingSet
+  ### Get parameters from GatingSet ###################################################################
   choices <- reactive({
     validate(need(class(rval$gating_set) == "GatingSet", "input is not a GatingSet"))
 
@@ -109,8 +108,8 @@ Subsample <- function(input, output, session, rval) {
       )
     )
   })
-  ##########################################################################################################
-  # Observe functions for sub-sampling
+
+  ### Observe functions for sub-sampling ##############################################################
   
   observeEvent(input$compute_data, {
 
@@ -239,9 +238,7 @@ Subsample <- function(input, output, session, rval) {
   
 }
 
-##################################################################################
-# Tests
-##################################################################################
+### Tests #########################################################################################
 # 
 # library(shiny)
 # library(shinydashboard)

@@ -50,11 +50,16 @@ TransformUI <- function(id) {
                   ),
                   tabPanel(title = "Transform",
                            selectInput(ns("trans"), "transformation", 
-                                       choices = c("identity", "logicle", "asinh", "flowJo_asinh", "log"), 
+                                       choices = c("identity", 
+                                                   "logicle", 
+                                                   "asinh", 
+                                                   "flowJo_asinh", 
+                                                   "log"), 
                                        selected = "identity"),
                            uiOutput(ns("trans_param_ui")),
                            br(),
-                           actionButton(ns("apply_transformation"), label = "apply to selected chanels"),
+                           actionButton(ns("apply_transformation"), 
+                                        label = "apply to selected chanels"),
                            br()
                   ),
                   tabPanel(title = "Edit",
@@ -154,14 +159,13 @@ Transform <- function(input, output, session, rval) {
   
   
   
-  res <- callModule(plotGatingSet, "plot_module", rval = rval, plot_params = plot_params, simple_plot = TRUE)
+  res <- callModule(plotGatingSet, "plot_module", 
+                    rval = rval, plot_params = plot_params, simple_plot = TRUE)
   callModule(simpleDisplay, "simple_display_module", plot_list = res$plot)
 
+
+  ### Get parameters from GatingSet ##################################################################
   
-  ##########################################################################################################
-  # Observe functions for data transformation
-  
-  #get parameters information from flow set
   observe({
     rval$update_gs
     validate(need(class(rval$gating_set) == "GatingSet", "No GatingSet available"))
@@ -196,7 +200,8 @@ Transform <- function(input, output, session, rval) {
   })
 
   
-  # Initialization of transformation for new parameters
+  ### Update transformation ################################################################
+  
   observe({
     
     validate(need(class(rval$gating_set) == "GatingSet", "No GatingSet available"))
@@ -231,6 +236,7 @@ Transform <- function(input, output, session, rval) {
     #rval$update_gs <- rval$update_gs + 1
   })
   
+  ### Apply transformation ################################################################
   
   observeEvent(input$apply_transformation, {
 
@@ -316,16 +322,19 @@ Transform <- function(input, output, session, rval) {
     df$maxRange <- format(df$maxRange, digits = 2)
     
     DT::datatable(
-      df[, c("name", "desc", "transform", "transform parameters", "minRange", "maxRange",  "range", "display" )],
+      df[, c("name", "desc", "transform", "transform parameters", 
+             "minRange", "maxRange",  "range", "display" )],
       rownames = FALSE)
   })
   
-  #Edit data table
-  output$parameters <- renderDT({validate(need(rval_mod$parameters, "No metadata")); rval_mod$parameters},
-                           rownames = FALSE,
-                           selection = 'none',
-                           editable = 'cell',
-                           server = TRUE)
+  ### Edit parameter description ######################################################################
+  output$parameters <- renderDT(
+    {validate(need(rval_mod$parameters, "No metadata")); rval_mod$parameters},
+    rownames = FALSE,
+    selection = 'none',
+    editable = 'cell',
+    server = TRUE)
+                           
   
   proxy = dataTableProxy('parameters')
   
@@ -349,10 +358,7 @@ Transform <- function(input, output, session, rval) {
   
 }
 
-##################################################################################
-# Tests
-##################################################################################
-#
+### Tests ##############################################################################################
 # library(shiny)
 # library(shinydashboard)
 # 

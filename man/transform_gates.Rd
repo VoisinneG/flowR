@@ -16,13 +16,16 @@ transform_gates(
 \item{gates}{a named list representing the gating hierarchy.}
 
 \item{transformation}{A list of trans objects. 
-Each element must be named after a parameter and contain the transfomation to apply for this parameter.}
+Each element must be named after a parameter and contain the transfomation 
+to apply for this parameter.}
 
 \item{pattern}{pattern to be replaced in the names of gate coordinates}
 
-\item{replacement}{Character string that is to replace 'pattern' in in the names of gate coordinates}
+\item{replacement}{Character string that is to replace 'pattern' in in the 
+names of gate coordinates}
 
-\item{time_step}{value of the time step used to transform gates with the 'Time' parameter. Ignored if NULL.}
+\item{time_step}{value of the time step used to transform gates with 
+the 'Time' parameter. Ignored if NULL.}
 }
 \description{
 Transform gates coordinates and modify names of parameters.
