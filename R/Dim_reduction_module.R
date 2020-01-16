@@ -4,6 +4,45 @@
 #' @importFrom shinydashboard tabBox valueBoxOutput
 #' @importFrom DT DTOutput
 #' @export
+#' @examples 
+#' \dontrun{
+#' library(shiny)
+#' library(shinydashboard)
+#' library(flowWorkspace)
+#' library(flowCore)
+#' 
+#' if (interactive()){
+#' 
+#'   ui <- dashboardPage(
+#'     dashboardHeader(title = "Dim_reduction"),
+#'     sidebar = dashboardSidebar(disable = TRUE),
+#'     body = dashboardBody(
+#'       Dim_reductionUI("module")
+#'     )
+#'   )
+#' 
+#'   server <- function(input, output, session) {
+#' 
+#'     rval <- reactiveValues()
+#' 
+#'     observe({
+#'       utils::data("GvHD", package = "flowCore")
+#'       gs <- GatingSet(GvHD)
+#'       transformation <- lapply(colnames(GvHD), function(x){logicle_trans()} )
+#'       names(transformation) <- colnames(GvHD)
+#'       print(transformation)
+#'       gs@transformation <- transformation
+#'       rval$gating_set <- gs
+#'     })
+#' 
+#'     rval <- callModule(Dim_reduction, "module", rval = rval)
+#' 
+#'   }
+#' 
+#'   shinyApp(ui, server)
+#' 
+#' }
+#' }
 Dim_reductionUI <- function(id) {
   
   # Create a namespace function using the provided id
@@ -82,11 +121,21 @@ Dim_reductionUI <- function(id) {
 #' @rdname Dim_reductionUI
 Dim_reduction <- function(input, output, session, rval) {
   
-  selected <- callModule(selection, "selection_module", rval)
   plot_params <- reactiveValues()
   rval_mod <- reactiveValues( gs = NULL )
   
-  #observe({ rval$update_gs <- 0 })
+  observe({ 
+    if(! "update_gs" %in% names(rval)){
+      rval$update_gs <- 0
+    }
+  })
+  
+  ### Call modules #########################################################################
+  
+  selected <- callModule(selection, "selection_module", rval)
+  res <- callModule(plotGatingSet, "plot_module", 
+                    rval = rval, plot_params = plot_params, simple_plot = FALSE)
+  callModule(simpleDisplay, "simple_display_module", plot_list = res$plot)
   
   ### Build UI with options ##############################################################
   
@@ -124,13 +173,8 @@ Dim_reduction <- function(input, output, session, rval) {
     } 
   })
   
-  ### Call modules #########################################################################
-  
-  res <- callModule(plotGatingSet, "plot_module", 
-                    rval = rval, plot_params = plot_params, simple_plot = FALSE)
-  callModule(simpleDisplay, "simple_display_module", plot_list = res$plot)
-  
   ### Get parameters from GatingSet ########################################################
+  
   choices <- reactive({
     rval$update_gs
     validate(need(class(rval$gating_set) == "GatingSet", "No GatingSet available"))
@@ -399,7 +443,6 @@ Dim_reduction <- function(input, output, session, rval) {
 #     rval <- reactiveValues()
 # 
 #     observe({
-#       print("setup")
 #       utils::data("GvHD", package = "flowCore")
 #       gs <- GatingSet(GvHD)
 #       transformation <- lapply(colnames(GvHD), function(x){logicle_trans()} )

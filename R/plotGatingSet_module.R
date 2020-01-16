@@ -203,18 +203,18 @@ plotGatingSet <- function(input, output, session,
     rval$update_gs
     validate(need(class(rval$gating_set) == "GatingSet", "input is not a GatingSet"))
     
-    plot_var <- parameters(rval$gating_set@data[[1]])$name
+    ff <- rval$gating_set@data[[1]]
+    params <- parameters(ff)
+    plot_var <- params@data$name
     
     validate(need(length(plot_var)>0, "No variables in GatingSet"))
     
-    desc <- parameters(rval$gating_set@data[[1]])$desc
-    minRange <- parameters(rval$gating_set@data[[1]])@data$minRange
-    maxRange <- parameters(rval$gating_set@data[[1]])@data$maxRange
+    desc <- params@data$desc
+    minRange <- params@data$minRange
+    maxRange <- params@data$maxRange
     
     axis_limits <- lapply(1:length(plot_var), function(x){
       return(as.numeric(c(minRange[x], maxRange[x])))})
-    
-    names(axis_limits) <- plot_var
       
     labels <- sapply(1:length(plot_var), function(x){
       if(is.na(desc[x])){
@@ -223,25 +223,39 @@ plotGatingSet <- function(input, output, session,
         paste(plot_var[x], "(", desc[x], ")")
       }
     })
+    
+    varType <- unlist(sapply(rownames(params@data), FUN = function(x){
+      kw <- paste(x, "TYPEOF", sep = "")
+      print(kw)
+      varType <- ff@description[[kw]]
+      if(is.null(varType)){
+        varType <- "double"
+      }
+      return(varType)
+    }))
+    
+    names(varType) <- plot_var
+    names(axis_limits) <- plot_var
     names(plot_var) <- labels
     names(labels) <- plot_var 
     
-    extra_facet_var <- plot_var[plot_var %in% c("cluster", "bin")]
-    
-    if(length(extra_facet_var) == 0){
-      extra_facet_var <- NULL
-    }
+    # extra_facet_var <- plot_var[plot_var %in% c("cluster", "bin")]
+    # 
+    # if(length(extra_facet_var) == 0){
+    #   extra_facet_var <- NULL
+    # }
     
     return( 
       list(sample = pData(rval$gating_set)$name,
            subset = gs_get_pop_paths(rval$gating_set),
            plot_var = plot_var,
+           varType = varType,
            labels = labels,
            axis_limits = axis_limits,
            metadata = pData(rval$gating_set),
            parameters = parameters(rval$gating_set@data[[1]]),
            meta_var = names(pData(rval$gating_set)),
-           extra_facet_var = extra_facet_var,
+           # extra_facet_var = extra_facet_var,
            transformation = rval$gating_set@transformation,
            compensation = rval$gating_set@compensation,
            gates = get_gates_from_gs(rval$gating_set)
@@ -363,10 +377,14 @@ plotGatingSet <- function(input, output, session,
     }
     
     ns <- session$ns
+    
     color_var_choices <- switch(rval_input$plot_type,
                                 "dots" = c("none", "subset", choices()$meta_var, 
                                            choices()$plot_var),
-                                c("none", "subset", choices()$meta_var))
+                                c("none", "subset", 
+                                  choices()$meta_var, 
+                                  choices()$plot_var[choices()$varType != "double"]))
+    
     if(is.null(rval_plot[["color_var"]])){
       rval_plot[["color_var"]] <- color_var_choices[1]
     }
@@ -400,7 +418,9 @@ plotGatingSet <- function(input, output, session,
     rval_mod$plot_variables[["group_var"]] <- selectizeInput(ns("group_var"), 
                                        multiple = !simple_plot,
                                        label = "group variable",
-                                       choices = c("none", "subset", choices()$meta_var),
+                                       choices = c("none", "subset", 
+                                                   choices()$meta_var,
+                                                   choices()$plot_var[choices()$varType != "double"]),
                                        selected = rval_plot[["group_var"]])
     
     rval_mod$plot_variables[["facet_var"]] <- selectizeInput(ns("facet_var"),
@@ -408,7 +428,7 @@ plotGatingSet <- function(input, output, session,
                                        label = "facet variables",
                                        choices = c("subset", 
                                                    choices()$meta_var, 
-                                                   choices()$extra_facet_var),
+                                                   choices()$plot_var[choices()$varType != "double"]),
                                        selected = rval_plot[["facet_var"]]
     )
     
@@ -642,7 +662,8 @@ plotGatingSet <- function(input, output, session,
                       subset = rval_input$subset,
                       spill = spill,
                       metadata = choices()$metadata,
-                      Ncells = Ncells)
+                      Ncells = Ncells,
+                      varType = choices()$varType)
     
     return(df)
     

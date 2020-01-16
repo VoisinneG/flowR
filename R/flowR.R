@@ -537,18 +537,21 @@ getPopStatsPlus <- function(gs, spill = NULL, filter = NULL){
 #' @param return_comp_data logical. Should compensated data be returned ?
 #' @param updateProgress function used in shiny to update a progress bar
 #' @return a data.frame
-#' @importFrom flowWorkspace colnames GatingSet gh_pop_get_indices pData
+#' @importFrom flowWorkspace pData gs_get_pop_paths colnames GatingSet gh_pop_get_indices pData
 #' @importFrom flowCore compensate
 get_data_gs <- function(gs,
-                        sample,
-                        subset,
+                        sample = NULL,
+                        subset = NULL,
                         Ncells = NULL,
                         spill = NULL,
                         return_comp_data = TRUE,
                         updateProgress = NULL
 ){
   
-  idx <- match(sample, pData(gs)$name)
+  if(is.null(sample)){ sample <- flowWorkspace::pData(gs)$name}
+  if(is.null(subset)){subset <- flowWorkspace::gs_get_pop_paths(gs)}
+  
+  idx <- match(sample, flowWorkspace::pData(gs)$name)
   idx <- idx[!is.na(idx)]
   
   if(length(idx) != length(sample)){
@@ -810,7 +813,8 @@ get_plot_data <- function(gs,
                           subset,
                           Ncells = NULL,
                           spill = NULL,
-                          metadata = NULL){
+                          metadata = NULL,
+                          varType = NULL){
   
   
   if(is.null(df)){
@@ -832,9 +836,17 @@ get_plot_data <- function(gs,
                                     metadata = metadata)
   }
   
-  if("cluster" %in% names(df)){
-    df[["cluster"]] <- as.factor(df[["cluster"]])  
+  if(!is.null(varType)){
+    for(var in names(varType)){
+      if(varType[[var]] %in% c("factor", "integer", "character")){
+        df[[var]] <- do.call(paste("as.", varType[[var]], sep = ""), args = list(df[[var]]) )
+      }
+    }
   }
+  
+  # if("cluster" %in% names(df)){
+  #   df[["cluster"]] <- as.factor(df[["cluster"]])  
+  # }
   
   return(df)
   
@@ -943,10 +955,16 @@ plot_histogram <- function(args = list()){
   p <- ggplot(df,
               aes_(x = as.name( xvar )))
   
+  if(typeof(df[[xvar]])!= "double"){
+    warning("Cannot plot histogram : x variable is not continuous.")
+    return(NULL)
+  }
+    
   if(norm_density){
-    stat_var <- "stat(ndensity)"
+      stat_var <- "stat(ndensity)"
   }else{
-    stat_var <- "stat(density)"
+      stat_var <- "stat(density)"
+    
   }
   
   if(!is.null(color_var)){
@@ -1748,7 +1766,12 @@ format_plot <- function(p,
       xlim <- axis_limits[[xvar]]
       
       if(is.double(p$data[[xvar]])){
-        p <- p + scale_x_continuous(name = labx, trans = trans_x, limits = xlim) 
+        p <- p + scale_x_continuous(name = labx, trans = trans_x, limits = xlim ) 
+      }else if(is.integer(p$data[[xvar]])){
+        limits <- NULL
+        if(!is.null(xlim)){limits <- seq(xlim[1], xlim[2])}
+        print(limits)
+        p <- p + scale_x_discrete(name = labx,  limits = limits) 
       }else{
         p <- p + scale_x_discrete(name = labx) 
       }
@@ -1765,6 +1788,10 @@ format_plot <- function(p,
 
       if(is.double(p$data[[yvar]])){
         p <- p + scale_y_continuous(name = laby, trans = trans_y, limits = ylim) 
+      }else if(is.integer(p$data[[yvar]])){
+        limits <- NULL
+        if(!is.null(ylim)){limits <- seq(ylim[1], ylim[2])}
+        p <- p + scale_y_discrete(name = laby,  limits = limits) 
       }else{
         p <- p + scale_y_discrete(name = laby) 
       }
@@ -2327,7 +2354,7 @@ get_cluster <- function(df,
          
   idx_cells_kept <- 1:dim(df)[1]
   
-  if(!is.null(y_trans)){
+  if(!is.null(y_trans) & is.null(transformation)){
     transformation <- lapply(yvar, function(x){y_trans})
     names(transformation) <- yvar
   }
@@ -2342,12 +2369,15 @@ get_cluster <- function(df,
     df_trans[[yvar[i]]] <- transformation[[yvar[i]]]$transform(df[[yvar[i]]])
   }
   
-  cell_has_non_finite <- apply(X = df_trans[, yvar], MARGIN = 1, FUN = function(x){sum(!is.finite(x) )>0})
+  cell_has_non_finite <- apply(X = df_trans[, yvar], 
+                               MARGIN = 1, 
+                               FUN = function(x){sum(!is.finite(x) )>0})
   cell_has_na <- rowSums(is.na(df_trans[, yvar])) > 0
   idx_filter <- which(cell_has_na | cell_has_non_finite)
   
   if(length(idx_filter)>0){
-    message(paste("Filter out ", length(idx_filter), " cells with NA or non-finite values", sep =""))
+    message(paste("Filter out ", length(idx_filter), 
+                  " cells with NA or non-finite values", sep =""))
     df_trans <- df_trans[-idx_filter, ]
     df_filter <- df_filter[-idx_filter, ]
     idx_cells_kept <- idx_cells_kept[-idx_filter]
@@ -2363,14 +2393,17 @@ get_cluster <- function(df,
                  scale = scale,
                  prettyColnames = colnames(data))
     
-    message(paste("Clustering ", dim(data)[1], " cells using 'FlowSOM' on ",  length(yvar), " parameters", sep = ""))
+    message(paste("Clustering ", dim(data)[1], " cells using 'FlowSOM' on ", 
+                  length(yvar), " parameters", sep = ""))
     
     fSOM <- BuildSOM(fSOM, colsToUse = which(colnames(data) %in% yvar))
     fSOM <- BuildMST(fSOM)
-    fSOM$metaClustering <- MetaClustering(fSOM$map$codes, "metaClustering_consensus", max=k_meta)
+    fSOM$metaClustering <- MetaClustering(fSOM$map$codes, 
+                                          "metaClustering_consensus", max=k_meta)
     
     metaClustering_perCell <- fSOM$metaClustering[fSOM$map$mapping[,1]]
-    df_filter$cluster <- metaClustering_perCell
+    df_filter$cluster_fsom <- as.integer(fSOM$map$mapping[,1])
+    df_filter$cluster <- as.integer(metaClustering_perCell)
     
     return(list(df = df_filter, keep = idx_cells_kept, fSOM = fSOM))
     
@@ -2378,16 +2411,18 @@ get_cluster <- function(df,
     # warning("Rphenograph is not supported")
     # df_filter$cluster <- 1 
     # return(list(df = df_filter, keep = idx_cells_kept))
-    message(paste("Clustering ", dim(df_trans)[1], " cells using 'Rphenograph' on ",  length(yvar), " parameters", sep = ""))
+    message(paste("Clustering ", dim(df_trans)[1], " cells using 'Rphenograph' on ",  
+                  length(yvar), " parameters", sep = ""))
     Rphenograph_out <- Rphenograph(df_trans[ , yvar], k = k)
-    df_filter$cluster <- igraph::membership(Rphenograph_out[[2]])
+    df_filter$cluster <- as.integer(igraph::membership(Rphenograph_out[[2]]))
   }else if(method == "ClusterX"){
     # warning("ClusterX is not supported")
     # df_filter$cluster <- 1 
     # return(list(df = df_filter, keep = idx_cells_kept))
-    message(paste("Clustering ", dim(df_trans)[1], " cells using 'CluserX' on ",  length(yvar), " parameters", sep = ""))
+    message(paste("Clustering ", dim(df_trans)[1], " cells using 'CluserX' on ",  
+                  length(yvar), " parameters", sep = ""))
     DC <- ClusterX(df_trans[ , yvar], dc = dc, alpha = alpha)
-    df_filter$cluster <- DC$cluster
+    df_filter$cluster <- as.integer(DC$cluster)
   }
  
   return(list(df = df_filter, keep = idx_cells_kept))
@@ -2453,14 +2488,30 @@ build_flowset_from_df <- function(df,
           new_par <- setdiff(chanel_col, par@data$name)
           npar <- length(par@data$name)
           
+          for(i in 1:length(par@data$name)){
+            param <- par@data$name[i]
+            desc[[paste("$P",i,"TYPEOF",sep="")]] <- typeof(df_sample[[param]])
+          }
+          
           for(param in new_par){
             npar <- npar +1
-            rg <- range(df_sample[[param]])
+            rg <- c(NA, NA)
+            
+            if(is.numeric(df_sample[[param]])){
+              rg <- range(df_sample[[param]])
+            }
             
             par@data <- rbind(par@data, c(param, NA, diff(rg), rg[1], rg[2]))
             rownames(par@data)[npar] <- paste("$P",npar, sep = "")
             desc[[paste("$P",npar,"DISPLAY",sep="")]] <- NA
+            desc[[paste("$P",npar,"TYPEOF",sep="")]] <- typeof(df_sample[[param]])
           }
+          
+          par@data$typeof <- sapply(par@data$name, function(x){typeof(df_sample[[x]])})
+          rn <- row.names(par@varMetadata)
+          par@varMetadata <- rbind(par@varMetadata, "type")
+          row.names(par@varMetadata)<- c(rn, "type")
+          
           
           desc[["$TOT"]] <- dim(df_sample)[1]
         }

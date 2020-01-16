@@ -178,8 +178,8 @@ Transform <- function(input, output, session, rval) {
     
     params <- flowCore::parameters(ff)
     
-    desc <- as.character(params$desc)
-    name <- as.character(params$name)
+    desc <- as.character(params@data$desc)
+    name <- as.character(params@data$name)
     
     display <- unlist(sapply(rownames(params@data), FUN = function(x){
       kw <- substr(x, start = 2, stop = nchar(x))
@@ -193,9 +193,21 @@ Transform <- function(input, output, session, rval) {
     
     names(display) <- params@data$name
     
+    varType <- unlist(sapply(rownames(params@data), FUN = function(x){
+      kw <- paste(x, "TYPEOF", sep = "")
+      varType <- ff@description[[kw]]
+      if(is.null(varType)){
+        varType <- "double"
+      }
+      return(varType)
+    }))
+
+    names(varType) <- params@data$name
+    
     rval_mod$parameters <- data.frame(name = name,
                                       desc = desc,
-                                      display = display[match(name, names(display))],
+                                      display = display,
+                                      typeof = varType,
                                       range = params@data$range,
                                       minRange = params@data$minRange,
                                       maxRange = params@data$maxRange,
@@ -317,18 +329,22 @@ Transform <- function(input, output, session, rval) {
     
   })
   
-  output$parameters_table <- DT::renderDT({
-    validate(
-      need(rval_mod$parameters, "No parameters defined")
-    )
+  params_table <- reactive({
+    
+    validate(need(rval_mod$parameters, "No parameters defined"))
+    
     df <- rval_mod$parameters
     df$minRange <- format(df$minRange, digits = 2)
     df$maxRange <- format(df$maxRange, digits = 2)
-    
-    DT::datatable(
-      df[, c("name", "desc", "transform", "transform parameters", 
-             "minRange", "maxRange",  "range", "display" )],
-      rownames = FALSE)
+
+    df
+    # df[, c("name", "desc", "transform", "transform parameters", 
+    #          "minRange", "maxRange",  "range", "display", "typeof" )]
+      
+  })
+  
+  output$parameters_table <- DT::renderDT({
+    DT::datatable(params_table(), rownames = FALSE)
   })
   
   ### Edit parameter description ######################################################################
@@ -345,13 +361,25 @@ Transform <- function(input, output, session, rval) {
   observeEvent(input$parameters_cell_edit, {
     info = input$parameters_cell_edit
     info$col <- info$col + 1
-    if(info$col == 2){
+    col_param <- names(params_table())[info$col]
+    if(col_param %in% c("desc", "typeof")){
+      
       rval_mod$parameters <<- editData(rval_mod$parameters, info)
       replaceData(proxy, rval_mod$parameters, resetPaging = FALSE)
       
-      for(i in 1:length(rval$gating_set)){
-        rval$gating_set@data[[i]]@parameters$desc <- rval_mod$parameters$desc
+      if(col_param == "desc"){
+        for(i in 1:length(rval$gating_set)){
+          rval$gating_set@data[[i]]@parameters[[col_param]] <- rval_mod$parameters[[col_param]]
+        }
       }
+      
+      if(col_param == "typeof"){
+        for(i in 1:length(rval$gating_set)){
+          desc_field <- paste("$P",info$row,"TYPEOF", sep="")
+          rval$gating_set@data[[i]]@description[[desc_field]] <- rval_mod$parameters[[col_param]][info$row]
+        }
+      }
+  
       rval$update_gs <- rval$update_gs + 1 
       
     }
