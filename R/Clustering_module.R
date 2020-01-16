@@ -3,6 +3,39 @@
 #' @importFrom shinydashboard tabBox
 #' @import shiny
 #' @importFrom DT DTOutput
+#' @export
+#' @examples 
+#' \dontrun{
+#' library(shiny)
+#' library(shinydashboard)
+#' library(flowWorkspace)
+#' library(flowCore)
+#' 
+#' if (interactive()){
+#' 
+#'   ui <- dashboardPage(
+#'     dashboardHeader(title = "Clustering"),
+#'     sidebar = dashboardSidebar(disable = TRUE),
+#'     body = dashboardBody(
+#'       ClusteringUI("module")
+#'     )
+#'   )
+#' 
+#'   server <- function(input, output, session) {
+#' 
+#'     rval <- reactiveValues()
+#'     observe({
+#'       utils::data("GvHD", package = "flowCore")
+#'       gs <- GatingSet(GvHD)
+#'       rval$gating_set <- gs
+#'     })
+#'     rval <- callModule(Clustering, "module", rval = rval)
+#'   }
+#' 
+#'   shinyApp(ui, server)
+#' 
+#' }
+#' }
 ClusteringUI <- function(id) {
   
   ns <- NS(id)
@@ -15,12 +48,18 @@ ClusteringUI <- function(id) {
                              selectionInput(ns("selection_module"))
                     ),
                     tabPanel("Variables",
-                             div(style = 'overflow-x: scroll', DT::DTOutput(ns("clustering_variables_table")))
+                              checkboxInput(ns("select_all"), "Select all", value = FALSE),
+                              br(),
+                              div(style = 'overflow-x: scroll', 
+                                  DT::DTOutput(ns("variables_table")))
                     ),
                     tabPanel("Options",
-                             selectInput(ns("y_trans_clustering"),
+                             selectInput(ns("y_trans"),
                                          label = "Transform variables:",
-                                         choices = c("log10", "asinh", "identity", "default"),
+                                         choices = c("log10", 
+                                                     "asinh", 
+                                                     "identity", 
+                                                     "default"),
                                          selected = "default"),
                              selectInput(ns("clustering_method"), 
                                          label = "method", 
@@ -29,18 +68,18 @@ ClusteringUI <- function(id) {
                              uiOutput(ns("method_ui"))
                     ),
                     tabPanel("Cluster",
-                             textInput(ns("fs_name"), "Flow-set name", "cluster"),
-                             actionButton(ns("start_clustering"), "Start"),
+                             textInput(ns("gs_name"), "GatingSet name", "cluster"),
+                             actionButton(ns("start"), "Start"),
                              br(),
                              br(),
                              "Summary",
                              br(),
-                             verbatimTextOutput(ns("summary_cluster"))
+                             verbatimTextOutput(ns("summary"))
                     )
              )
       ),
       column(width = 6,
-             uiOutput(ns("cluster_plot_ui"))
+             uiOutput(ns("fsom_plot_ui"))
              )
     )
 }
@@ -59,16 +98,34 @@ ClusteringUI <- function(id) {
 #' @importFrom FlowSOM UpdateNodeSize PlotPies PlotStars PlotMarker
 #' @importFrom scales identity_trans log10_trans
 #' @importFrom graphics plot.new
+#' @export
 #' @rdname ClusteringUI
 Clustering <- function(input, output, session, rval) {
   
   selected <- callModule(selection, "selection_module", rval)
+  rval_mod <- reactiveValues( gs = NULL, parameters = NULL, fSOM = NULL)
   
-  rval_mod <- reactiveValues( flow_set_cluster = NULL, parameters = NULL )
-  callModule(simpleDisplay, "simple_display_module", plot_fSOM)
+  observe({ 
+    if(! "update_gs" %in% names(rval)){
+      rval$update_gs <- 0
+    }
+  })
   
-  ##########################################################################################################
-  # Observe functions for t-SNE
+  observe({
+    # if(!is.null(rval$gating_set_selected)){
+    #   if("fSOM" %in% names(rval$gating_set_list[[rval$gating_set_selected]])){
+    #     rval_mod$fSOM <- rval$gating_set_list[[rval$gating_set_selected]]$fSOM
+    #   }
+    # }
+    rval_mod$fSOM <- rval$gating_set_list[[rval$gating_set_selected]]$fSOM
+  })
+  
+  ### Call modules #########################################################################
+  
+  selected <- callModule(selection, "selection_module", rval)
+  callModule(simpleDisplay, "simple_display_module", plot_list = plot_fSOM, size = 500)
+  
+  ### Build UI with options ##################################################################
   
   output$method_ui <- renderUI({
     ns <- session$ns
@@ -85,7 +142,11 @@ Clustering <- function(input, output, session, rval) {
     tagList(x)
   })
   
-  output$cluster_plot_ui <- renderUI({
+  ### Build UI with FlowSOM plot ##############################################################
+  
+  output$fsom_plot_ui <- renderUI({
+    
+    validate(need(rval_mod$fSOM, ""))
     
     ns <- session$ns
 
@@ -97,12 +158,17 @@ Clustering <- function(input, output, session, rval) {
                       #plotOutput(ns("plot_fSOM"))
              ),
              tabPanel("Options",
-                      selectInput(ns("fSOM_plot_type"), "Plot type", choices = c("stars", "pies", "marker"), selected = "pies"),
-                      selectInput(ns("cellTypes"), "Pie variable", choices = c("name", "subset"), selected = "subset"),
+                      selectInput(ns("fSOM_plot_type"), "Plot type",
+                                  choices = c("stars", "pies", "marker"),
+                                  selected = "pies"),
+                      selectInput(ns("cellTypes"), "Pie variable", 
+                                  choices = c("name", "subset"), 
+                                  selected = "subset"),
                       checkboxInput(ns("scale_node_size"), "Scale node size", TRUE),
                       checkboxInput(ns("show_background"), "Show background", TRUE),
                       selectInput(ns("color_var"), "Color variable", 
-                                  choices = rval_mod$parameters, 
+                                  choices = choices()$plot_var[
+                                    choices()$plot_var %in% colnames(rval_mod$fSOM$data)], 
                                   selected = NULL)
              )
       )
@@ -110,16 +176,41 @@ Clustering <- function(input, output, session, rval) {
 
   })
   
-  ##########################################################################################################
-  # Observe functions for Clustering
+  ### Get parameters from GatingSet ########################################################
   
-  observeEvent(input$start_clustering, {
+  choices <- reactive({
+    rval$update_gs
+    validate(need(class(rval$gating_set) == "GatingSet", "No GatingSet available"))
     
-    validate(
-      need(rval$flow_set, "Empty flow set")
+    plot_var <- parameters(rval$gating_set@data[[1]])$name
+    validate(need(length(plot_var)>0, "No variables in GatingSet"))
+    
+    desc <- parameters(rval$gating_set@data[[1]])$desc
+    labels <- sapply(1:length(plot_var), function(x){
+      if(is.na(desc[x])){
+        plot_var[x]
+      }else{
+        paste(plot_var[x], "(", desc[x], ")")
+      }
+    })
+    names(plot_var) <- labels
+    
+    return( 
+      list(compensation = rval$gating_set@compensation,
+           plot_var = plot_var,
+           transformation = rval$gating_set@transformation,
+           gates = get_gates_from_gs(rval$gating_set),
+           params = flowCore::parameters(rval$gating_set@data[[1]])
+      )
     )
+  })
+  
+  ### Perform Clustering ######################################################################
+  
+  observeEvent(input$start, {
+
     
-    if( length(selected$samples) ==0 ){
+    if( length(selected$sample) ==0 ){
       showModal(modalDialog(
         title = "No sample selected",
         paste("Please select samples before proceeding", sep=""),
@@ -128,12 +219,10 @@ Clustering <- function(input, output, session, rval) {
       ))
     }
     
-    validate(
-      need(length(selected$samples)>0, "No sample selected")
-    )
+    validate(need(length(selected$sample)>0, "No sample selected"))
     
     
-    if( nchar(selected$gate) == 0 ){
+    if( nchar(selected$subset) == 0 ){
       showModal(modalDialog(
         title = "No subset selected",
         paste("Please select a subset before proceeding", sep=""),
@@ -142,11 +231,9 @@ Clustering <- function(input, output, session, rval) {
       ))
     }
     
-    validate(
-      need(selected$gate, "No subset selected")
-    )
+    validate(need(selected$subset, "No subset selected"))
     
-    if( length(input$clustering_variables_table_rows_selected)==0){
+    if( length(input$variables_table_rows_selected)==0){
       showModal(modalDialog(
         title = "No variable selected",
         paste("Please select variables before proceeding", sep=""),
@@ -155,11 +242,9 @@ Clustering <- function(input, output, session, rval) {
       ))
     }
     
-    validate(
-      need(length(input$clustering_variables_table_rows_selected) >0, "No variables selected")
-    )
+    validate( need(length(input$variables_table_rows_selected) >0, "No variables selected"))
     
-    if( input$fs_name %in% names(rval$flow_set_list) ){
+    if( input$gs_name %in% names(rval$gating_set_list) ){
       showModal(modalDialog(
         title = "Name already exists",
         paste("Please choose another name", sep=""),
@@ -168,7 +253,7 @@ Clustering <- function(input, output, session, rval) {
       ))
     }
     
-    validate(need(! input$fs_name %in% names(rval$flow_set_list), "Name already exists" ))
+    validate(need(! input$gs_name %in% names(rval$gating_set_list), "Name already exists" ))
     
     # Create a Progress object
     progress <- shiny::Progress$new(min = 0, max = 100)
@@ -178,12 +263,24 @@ Clustering <- function(input, output, session, rval) {
       progress$set(value = value, detail = detail)
     }
     
-    transformation <- NULL
-    if(rval$apply_trans){
-      transformation <- rval$transformation
+    spill <- choices()$compensation
+    if(!is.null(rval$apply_comp)){
+      if(!rval$apply_comp){
+        spill <- NULL
+      }
     }
     
-    y_trans <- switch(input$y_trans_clustering,
+    transformation <- choices()$transformation
+    if(!is.null(rval$apply_trans)){
+      if(!rval$apply_trans){
+        transformation <- NULL
+      }
+    }
+    if(input$y_trans != "default"){
+      transformation <- NULL
+    }
+    
+    y_trans <- switch(input$y_trans,
                       "log10" = scales::log10_trans(),
                       "asinh" = asinh_trans(),
                       "identity" = scales::identity_trans(),
@@ -192,27 +289,28 @@ Clustering <- function(input, output, session, rval) {
     progress$set(message = "Clustering...", value = 0)
     
     df_raw <- get_data_gs(gs = rval$gating_set,
-                          sample = selected$samples,
-                          subset = selected$gate,
-                          spill = rval$spill,
+                          sample = selected$sample,
+                          subset = selected$subset,
+                          spill = spill,
                           return_comp_data = FALSE,
                           Ncells = NULL,
                           updateProgress = updateProgress)
     
-    rval_mod$df_cluster <- get_data_gs(gs = rval$gating_set,
-                                   sample = selected$samples,
-                                   subset = selected$gate,
-                                   spill = rval$spill,
+    df_cluster <- get_data_gs(gs = rval$gating_set,
+                                   sample = selected$sample,
+                                   subset = selected$subset,
+                                   spill = spill,
                                    return_comp_data = TRUE,
                                    Ncells = NULL,
                                    updateProgress = updateProgress)
     
     progress$set(message = "Clustering...", value = 50)
     
-    rval_mod$parameters <- rval$parameters$name_long[input$clustering_variables_table_rows_selected]
+    print("OK1")
+    print(transformation)
     
-    res <- try(get_cluster(df=rval_mod$df_cluster, 
-                       yvar = rval$parameters$name[input$clustering_variables_table_rows_selected],
+    res <- try(get_cluster(df=df_cluster, 
+                       yvar = parameters_table()$name[input$variables_table_rows_selected],
                        y_trans = y_trans,
                        transformation = transformation,
                        method = input$clustering_method,
@@ -235,52 +333,27 @@ Clustering <- function(input, output, session, rval) {
         rval_mod$fSOM <- res$fSOM
       }
       
-      rval_mod$df_cluster <- res$df
-      if("cluster" %in% names(rval_mod$df_cluster)){
-        df <- cbind(df_raw[res$keep, setdiff(names(df_raw), "cluster")], rval_mod$df_cluster[c("cluster")])
-      }else{
-        df <- df_raw[res$keep, ]
-      }
       
-      fs <- build_flowset_from_df(df = df, origin = rval$flow_set_list[[rval$flow_set_selected]]$flow_set)
-      rval_mod$flow_set_cluster <- fs
+      df <- cbind(df_raw[res$keep, setdiff(names(df_raw), names(res$df))], res$df)
       
-      # delete previous cluster gates
       
-      idx_cluster_gates <- grep("^/cluster[0-9]+", names(rval$gates_flowCore))
+      fs <- build_flowset_from_df(df = df, 
+                                  origin = rval$gating_set@data)
       
-      if(length(idx_cluster_gates)>0){
-        rval$gates_flowCore <- rval$gates_flowCore[-idx_cluster_gates]
-      }
+      rval_mod$gs <- GatingSet(fs)
+      gates <- get_gates_from_gs(rval$gating_set)
+      add_gates_flowCore(gs = rval_mod$gs, gates = gates)
+      rval_mod$gs@compensation <- choices()$compensation
+      rval_mod$gs@transformation <- choices()$transformation
       
-      # create one gate per cluster
+      rval$gating_set_list[[input$gs_name]] <- list(gating_set = rval_mod$gs,
+                                                    parent = rval$gating_set_selected,
+                                                    fSOM = res$fSOM)
+      rval$gating_set_selected <- input$gs_name
       
-      uclust <- unique(rval_mod$df_cluster$cluster)
-      uclust <- uclust[ order(as.numeric(uclust), decreasing = FALSE) ]
-      if(length(uclust) > 0){
-        for(i in 1:length(uclust)){
-          filterID <- paste("cluster", uclust[i], sep = "")
-          polygon <- matrix(c(as.numeric(uclust[i])-0.25, 
-                              as.numeric(uclust[i])+0.25, 
-                              range(rval_mod$df_cluster[[colnames(rval_mod$flow_set_cluster)[1]]])
-          ), 
-          ncol = 2)
-          row.names(polygon) <- c("min", "max")
-          colnames(polygon) <- c("cluster", colnames(rval_mod$flow_set_cluster)[1])
-          g <- flowCore::rectangleGate(.gate = polygon, filterId=filterID)
-          rval$gates_flowCore[[paste("/",filterID, sep="")]] <- list(gate = g, parent = "root")
-        }
-      }
+      rval$gating_set <- rval_mod$gs
+      rval$update_gs <- rval$update_gs + 1
       
-      rval$flow_set_list[[input$fs_name]] <- list(flow_set = fs, 
-                                                  name = input$fs_name, 
-                                                  parent = rval$flow_set_selected,
-                                                  gates = rval$gates_flowCore,
-                                                  spill = rval$df_spill,
-                                                  transformation = rval$transformation,
-                                                  trans_parameters = rval$trans_parameters)
-      
-      rval$flow_set_selected <- input$fs_name
     }
     
     
@@ -288,10 +361,12 @@ Clustering <- function(input, output, session, rval) {
     
   })
   
+  ### Build FlowSOM plot ####################################################################
   
   plot_fSOM <- reactive({
+    
     validate(need(input$clustering_method == "FlowSOM", "No plot to display"))
-    validate(need("fSOM" %in% names(rval_mod), "No plot to display"))
+    validate(need(rval_mod$fSOM, "No plot to display"))
     
     fSOM <- rval_mod$fSOM
     
@@ -304,48 +379,76 @@ Clustering <- function(input, output, session, rval) {
       backgroundValues <- as.factor(fSOM$metaClustering)
     }
     
-    
     graphics::plot.new()
     
     if(input$fSOM_plot_type == "pies"){
+      print("OK pies")
       FlowSOM::PlotPies(fSOM,
-                        cellTypes=rval_mod$df_cluster[[input$cellTypes]], 
+                        cellTypes=get_data_gs(gs = rval$gating_set, subset = "root")[[input$cellTypes]], 
                         backgroundValues = backgroundValues
       )
     }else if(input$fSOM_plot_type == "stars"){
+      print("OK stars")
       FlowSOM::PlotStars(fSOM, 
                          backgroundValues = backgroundValues)
     }else if(input$fSOM_plot_type == "marker"){
-      color_var <- rval$parameters$name[match(input$color_var, rval$parameters$name_long)]
-      print(color_var)
-      FlowSOM::PlotMarker(fSOM, marker =  color_var)
+      print("OK marker")
+      FlowSOM::PlotMarker(fSOM, marker = input$color_var)
     }
   })
   
-  output$plot_fSOM <- renderPlot({
+  # output$plot_fSOM <- renderPlot({
+  #   print("OK render")
+  #   plot_fSOM()
+  # })
+  
 
-    plot_fSOM()
+  ### Display available variables ##########################################################
+  
+  parameters_table <- reactive({
     
+    transformation <- choices()$transformation
+    trans_parameters <- rval$trans_parameters
+    
+    trans_name <- sapply(choices()$params$name, function(x){
+      ifelse(!is.null(transformation[[x]]$name), transformation[[x]]$name , NA)
+    })
+    
+    trans_param <- sapply(choices()$params$name, function(x){
+      params <- trans_parameters[[x]]
+      name <- paste( paste(names(params), as.character(params), sep = ": "), collapse="; ")
+      ifelse(!is.null(name), name, NA)
+    })
+    
+    df <- data.frame("name" = choices()$params$name, 
+                     "desc" = choices()$params$desc, 
+                     "transform" = unlist(trans_name), 
+                     "transform parameters" = unlist(trans_param), check.names = FALSE)
+    df
   })
   
   
-  output$clustering_variables_table <- DT::renderDT({
+  output$variables_table <- DT::renderDT({
     
-    validate(
-      need(rval$parameters, "No data imported")
-    )
+    df <- parameters_table()
     
-    df <- rval$parameters
-    df[["chanel_name"]] <- df$name_long
+    selected <- NULL
+    if(input$select_all){
+      selected <- 1:length(df$name)
+    }
     
     DT::datatable(
-      df[, c("chanel_name", "transform", "transform parameters")], 
-      rownames = FALSE)
+      df, 
+      rownames = FALSE, selection = list(target = 'row', selected = selected))
   })
   
-  output$summary_cluster <- renderPrint({
-    if(!is.null(rval_mod$df_cluster)){
-      print(paste("Number of unique clusters :", length(unique(rval_mod$df_cluster$cluster))))
+  ### Summary #############################################################################
+  
+  output$summary <- renderPrint({
+    if("cluster" %in% colnames(rval$gating_set)){
+      fs <- rval$gating_set@data
+      cluster <- lapply(1:length(fs), function(x){return(unique(fs[[x]]@exprs[ , "cluster"]))})
+      print(paste("Number of unique clusters :", length(unique(unlist(cluster)))))
     }else{
       "No clustering performed yet"
     }
@@ -354,3 +457,36 @@ Clustering <- function(input, output, session, rval) {
   return( rval )
   
 }
+
+
+### Tests #################################################################################
+# 
+# library(shiny)
+# library(shinydashboard)
+# library(flowWorkspace)
+# library(flowCore)
+# 
+# if (interactive()){
+# 
+#   ui <- dashboardPage(
+#     dashboardHeader(title = "Clustering"),
+#     sidebar = dashboardSidebar(disable = TRUE),
+#     body = dashboardBody(
+#       ClusteringUI("module")
+#     )
+#   )
+# 
+#   server <- function(input, output, session) {
+# 
+#     rval <- reactiveValues()
+#     observe({
+#       utils::data("GvHD", package = "flowCore")
+#       gs <- GatingSet(GvHD)
+#       rval$gating_set <- gs
+#     })
+#     rval <- callModule(Clustering, "module", rval = rval)
+#   }
+# 
+#   shinyApp(ui, server)
+# 
+# }
