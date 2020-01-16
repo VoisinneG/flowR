@@ -226,7 +226,6 @@ plotGatingSet <- function(input, output, session,
     
     varType <- unlist(sapply(rownames(params@data), FUN = function(x){
       kw <- paste(x, "TYPEOF", sep = "")
-      print(kw)
       varType <- ff@description[[kw]]
       if(is.null(varType)){
         varType <- "double"

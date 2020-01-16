@@ -1770,7 +1770,6 @@ format_plot <- function(p,
       }else if(is.integer(p$data[[xvar]])){
         limits <- NULL
         if(!is.null(xlim)){limits <- seq(xlim[1], xlim[2])}
-        print(limits)
         p <- p + scale_x_discrete(name = labx,  limits = limits) 
       }else{
         p <- p + scale_x_discrete(name = labx) 

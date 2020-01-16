@@ -42,13 +42,14 @@ TransformUI <- function(id) {
            tabBox(title = "Channels",
                   width = NULL, height = NULL,
                   tabPanel(title = "Table",
-                           "Select channels",
-                           br(),
-                           br(),
+                           selectInput(ns("sample"), "Sample", choices = NULL, selected = NULL),
+                           h4("Parameters"),
                            div(style = 'overflow-x: scroll', DT::DTOutput(ns("parameters_table")))
                            
                   ),
                   tabPanel(title = "Transform",
+                           selectizeInput(ns("selected_params"), "Select parameters", 
+                                          choices = NULL, selected = NULL, multiple = TRUE),
                            selectInput(ns("trans"), "transformation", 
                                        choices = c("identity", 
                                                    "logicle", 
@@ -57,9 +58,8 @@ TransformUI <- function(id) {
                                                    "log"), 
                                        selected = "identity"),
                            uiOutput(ns("trans_param_ui")),
-                           br(),
                            actionButton(ns("apply_transformation"), 
-                                        label = "apply to selected chanels"),
+                                        label = "apply to selected parameters"),
                            br()
                   ),
                   tabPanel(title = "Edit",
@@ -147,8 +147,11 @@ Transform <- function(input, output, session, rval) {
 
     if(length(input$parameters_table_rows_selected)>0){
       
+      updateSelectizeInput(session, "selected_params",
+                           selected = rval_mod$parameters$name[input$parameters_table_rows_selected])
+      
       #update plot_params
-      for(var in names(plot_params)){
+      for(var in names(res$params)){
         plot_params[[var]] <- res$params[[var]]
       }
       
@@ -161,6 +164,31 @@ Transform <- function(input, output, session, rval) {
     }
   })
   
+  observeEvent(input$sample, {
+    if(!is.null(input$sample)){
+      #update plot_params
+      for(var in names(res$params)){
+        plot_params[[var]] <- res$params[[var]]
+      }
+      plot_params$sample <- input$sample
+      print(reactiveValuesToList(plot_params))
+    }
+    
+  })
+  
+  observe({
+    updateSelectInput(session, "sample", 
+                      choices = choices()$sample, 
+                      selected = choices()$sample[1])
+  })
+  
+  observe({
+    updateSelectizeInput(session, "selected_params", 
+                      choices = choices()$plot_var, 
+                      selected = NULL)
+  })
+
+  
   ### Call modules ##########################################################################
   
   res <- callModule(plotGatingSet, "plot_module", 
@@ -169,12 +197,43 @@ Transform <- function(input, output, session, rval) {
 
 
   ### Get parameters from GatingSet ##################################################################
-  
-  observe({
+  choices <- reactive({
     rval$update_gs
     validate(need(class(rval$gating_set) == "GatingSet", "No GatingSet available"))
     
     ff <- rval$gating_set@data[[1]]
+    params <- parameters(ff)
+    plot_var <- params@data$name
+    
+    validate(need(length(plot_var)>0, "No variables in GatingSet"))
+    
+    desc <- params@data$desc
+
+    labels <- sapply(1:length(plot_var), function(x){
+      if(is.na(desc[x])){
+        plot_var[x]
+      }else{
+        paste(plot_var[x], "(", desc[x], ")")
+      }
+    })
+
+    names(plot_var) <- labels
+
+    list(sample = flowWorkspace::pData(rval$gating_set)$name,
+         plot_var = plot_var
+    )
+                     
+  })
+  
+  
+  
+ observe({
+    rval$update_gs
+    rval_mod$parameters <- NULL
+    validate(need(class(rval$gating_set) == "GatingSet", "No GatingSet available"))
+    validate(need(input$sample, "No sample selected"))
+    
+    ff <- rval$gating_set@data[[input$sample]]
     
     params <- flowCore::parameters(ff)
     
@@ -221,6 +280,7 @@ Transform <- function(input, output, session, rval) {
   observe({
     
     validate(need(class(rval$gating_set) == "GatingSet", "No GatingSet available"))
+    validate(need(rval_mod$parameters, "No parameters defined"))
     
     transformation <- rval$gating_set@transformation
     trans_parameters <- rval$trans_parameters
@@ -259,9 +319,9 @@ Transform <- function(input, output, session, rval) {
     transformation <- rval$gating_set@transformation
     trans_parameters <- rval$trans_parameters
     
-    if(length(input$parameters_table_rows_selected)>0){
+    if(length( input$selected_params )>0){
       
-      var_name <- rval_mod$parameters$name[input$parameters_table_rows_selected]
+      var_name <- input$selected_params
       
       trans_params <- switch(input$trans,
                              "identity" = list(),
@@ -306,6 +366,8 @@ Transform <- function(input, output, session, rval) {
   
   observe({
     validate(need(class(rval$gating_set) == "GatingSet", "No GatingSet available"))
+    validate(need(rval_mod$parameters, "No parameters defined"))
+    
     transformation <- rval$gating_set@transformation
     trans_parameters <- rval$trans_parameters
     # validate(
@@ -344,12 +406,18 @@ Transform <- function(input, output, session, rval) {
   })
   
   output$parameters_table <- DT::renderDT({
-    DT::datatable(params_table(), rownames = FALSE)
+    if(!is.null(input$selected_params)){
+      selected <- match(input$selected_params, params_table()$name)
+      print(selected)
+    }else{
+      selected <- NULL
+    }
+    DT::datatable(params_table(), rownames = FALSE, selection = list(mode = "multiple", selected = selected))
   })
   
-  ### Edit parameter description ######################################################################
+  ### Edit parameters table ######################################################################
   output$parameters <- renderDT(
-    {validate(need(rval_mod$parameters, "No metadata")); rval_mod$parameters},
+    {validate(need(rval_mod$parameters, "No parameters")); rval_mod$parameters},
     rownames = FALSE,
     selection = 'none',
     editable = 'cell',
