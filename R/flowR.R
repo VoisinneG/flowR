@@ -549,7 +549,7 @@ get_parameters_gs <- function(gs){
          params = params,
          meta_var = names(pdata),
          transformation = gs@transformation,
-         compensation = gs@compensation,
+         compensation = lapply(gs@compensation, as.matrix),
          gates = get_gates_from_gs(gs)
     )
   )
