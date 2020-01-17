@@ -12,7 +12,7 @@ get_plot_data(
   Ncells = NULL,
   spill = NULL,
   metadata = NULL,
-  varType = NULL
+  vartype = NULL
 )
 }
 \arguments{

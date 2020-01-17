@@ -181,28 +181,7 @@ Clustering <- function(input, output, session, rval) {
   choices <- reactive({
     rval$update_gs
     validate(need(class(rval$gating_set) == "GatingSet", "No GatingSet available"))
-    
-    plot_var <- parameters(rval$gating_set@data[[1]])$name
-    validate(need(length(plot_var)>0, "No variables in GatingSet"))
-    
-    desc <- parameters(rval$gating_set@data[[1]])$desc
-    labels <- sapply(1:length(plot_var), function(x){
-      if(is.na(desc[x])){
-        plot_var[x]
-      }else{
-        paste(plot_var[x], "(", desc[x], ")")
-      }
-    })
-    names(plot_var) <- labels
-    
-    return( 
-      list(compensation = rval$gating_set@compensation,
-           plot_var = plot_var,
-           transformation = rval$gating_set@transformation,
-           gates = get_gates_from_gs(rval$gating_set),
-           params = flowCore::parameters(rval$gating_set@data[[1]])
-      )
-    )
+    get_parameters_gs(rval$gating_set)
   })
   
   ### Perform Clustering ######################################################################

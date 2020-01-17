@@ -3,7 +3,7 @@
 \name{CompensationUI}
 \alias{CompensationUI}
 \alias{Compensation}
-\title{Edit compensation matrices associated with a GatingSet}
+\title{Visualize, import, export and edit compensation matrices associated with a GatingSet}
 \usage{
 CompensationUI(id)
 
@@ -24,7 +24,7 @@ Compensation(input, output, session, rval)
 The updated reactiveValues object \code{rval}
 }
 \description{
-Edit compensation matrices associated with a GatingSet
+Visualize, import, export and edit compensation matrices associated with a GatingSet
 
 Compensation server function
 }

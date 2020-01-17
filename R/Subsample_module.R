@@ -100,13 +100,7 @@ Subsample <- function(input, output, session, rval) {
   choices <- reactive({
     rval$update_gs
     validate(need(class(rval$gating_set) == "GatingSet", "input is not a GatingSet"))
-
-    return( 
-      list(compensation = rval$gating_set@compensation,
-           transformation = rval$gating_set@transformation,
-           gates = get_gates_from_gs(rval$gating_set)
-      )
-    )
+    get_parameters_gs(rval$gating_set)
   })
 
   ### Observe functions for sub-sampling ###################################################

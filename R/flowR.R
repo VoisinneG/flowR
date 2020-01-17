@@ -490,6 +490,70 @@ transform_gates <- function(gates,
 
 ### Getting data ###############################################################################
 
+#' Get parameters from a GatingSet
+#' @param gs a GatingSet
+#' @return a list
+#' @importFrom flowWorkspace pData gs_get_pop_paths
+#' @importFrom flowCore parameters
+#' @export
+get_parameters_gs <- function(gs){
+  
+  ff <- gs@data[[1]]
+  pdata <- flowWorkspace::pData(gs)
+  params <- flowCore::parameters(ff)@data
+  
+  params$display <- unlist(sapply(rownames(params), FUN = function(x){
+    kw <- substr(x, start = 2, stop = nchar(x))
+    kw <- paste(kw, "DISPLAY", sep = "")
+    disp <- ff@description[[kw]]
+    if(is.null(disp)){
+      disp <- "NA"
+    }
+    return(disp)
+  }))
+  
+  
+  params$vartype <- unlist(sapply(rownames(params), FUN = function(x){
+    kw <- paste(x, "VARTYPE", sep = "")
+    vartype <- ff@description[[kw]]
+    if(is.null(vartype)){
+      vartype <- "double"
+    }
+    return(vartype)
+  }))
+  
+  axis_limits <- lapply(1:length(params$name), function(x){
+    return(as.numeric(c(params$minRange[x], params$maxRange[x])))})
+  
+  labels <- sapply(1:length(params$name), function(x){
+    if(is.na(params$desc[x])){
+      params$name[x]
+    }else{
+      paste(params$name[x], "(", params$desc[x], ")")
+    }
+  })
+  
+  plot_var <- params$name
+  
+  names(plot_var) <- labels
+  names(labels) <- params$name
+  names(axis_limits) <- params$name
+  
+  return( 
+    list(sample = pdata$name,
+         subset = gs_get_pop_paths(gs),
+         plot_var = plot_var,
+         labels = labels,
+         axis_limits = axis_limits,
+         metadata = pdata,
+         params = params,
+         meta_var = names(pdata),
+         transformation = gs@transformation,
+         compensation = gs@compensation,
+         gates = get_gates_from_gs(gs)
+    )
+  )
+}  
 
 #' Return statistics for all subsets ans samples in a GatingSet
 #' @param gs a GatingSet
@@ -814,7 +878,7 @@ get_plot_data <- function(gs,
                           Ncells = NULL,
                           spill = NULL,
                           metadata = NULL,
-                          varType = NULL){
+                          vartype = NULL){
   
   
   if(is.null(df)){
@@ -836,10 +900,10 @@ get_plot_data <- function(gs,
                                     metadata = metadata)
   }
   
-  if(!is.null(varType)){
-    for(var in names(varType)){
-      if(varType[[var]] %in% c("factor", "integer", "character")){
-        df[[var]] <- do.call(paste("as.", varType[[var]], sep = ""), args = list(df[[var]]) )
+  if(!is.null(vartype)){
+    for(var in names(vartype)){
+      if(vartype[[var]] %in% c("factor", "integer", "character")){
+        df[[var]] <- do.call(paste("as.", vartype[[var]], sep = ""), args = list(df[[var]]) )
       }
     }
   }
@@ -2489,7 +2553,7 @@ build_flowset_from_df <- function(df,
           
           for(i in 1:length(par@data$name)){
             param <- par@data$name[i]
-            desc[[paste("$P",i,"TYPEOF",sep="")]] <- typeof(df_sample[[param]])
+            desc[[paste("$P",i,"VARTYPE",sep="")]] <- typeof(df_sample[[param]])
           }
           
           for(param in new_par){
@@ -2503,7 +2567,7 @@ build_flowset_from_df <- function(df,
             par@data <- rbind(par@data, c(param, NA, diff(rg), rg[1], rg[2]))
             rownames(par@data)[npar] <- paste("$P",npar, sep = "")
             desc[[paste("$P",npar,"DISPLAY",sep="")]] <- NA
-            desc[[paste("$P",npar,"TYPEOF",sep="")]] <- typeof(df_sample[[param]])
+            desc[[paste("$P",npar,"VARTYPE",sep="")]] <- typeof(df_sample[[param]])
           }
           
           par@data$typeof <- sapply(par@data$name, function(x){typeof(df_sample[[x]])})

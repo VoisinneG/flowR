@@ -104,6 +104,12 @@ Transform <- function(input, output, session, rval) {
   rval_mod <- reactiveValues(parameters = NULL)
   plot_params <- reactiveValues()
   
+  ### Call modules ##########################################################################
+  
+  res <- callModule(plotGatingSet, "plot_module", 
+                    rval = rval, plot_params = plot_params, simple_plot = TRUE)
+  callModule(simpleDisplay, "simple_display_module", plot_list = res$plot)
+  
   ### build UI for transform parameters ####################################################
   
   output$trans_param_ui <- renderUI({
@@ -167,7 +173,7 @@ Transform <- function(input, output, session, rval) {
   observeEvent(input$sample, {
     if(!is.null(input$sample)){
       #update plot_params
-      for(var in names(res$params)){
+      for(var in intersect(names(res$params), names(plot_params))){
         plot_params[[var]] <- res$params[[var]]
       }
       plot_params$sample <- input$sample
@@ -175,6 +181,19 @@ Transform <- function(input, output, session, rval) {
     }
     
   })
+
+  ### Get parameters from GatingSet ##################################################################
+  choices <- reactive({
+    rval$update_gs
+    validate(need(class(rval$gating_set) == "GatingSet", "No GatingSet available"))
+    get_parameters_gs(rval$gating_set)
+  })
+  
+  observe({
+    rval_mod$parameters <- choices()$params
+  })
+  
+  ### Update UI ################################################################################
   
   observe({
     updateSelectInput(session, "sample", 
@@ -184,105 +203,17 @@ Transform <- function(input, output, session, rval) {
   
   observe({
     updateSelectizeInput(session, "selected_params", 
-                      choices = choices()$plot_var, 
-                      selected = NULL)
+                         choices = choices()$plot_var, 
+                         selected = NULL)
   })
-
-  
-  ### Call modules ##########################################################################
-  
-  res <- callModule(plotGatingSet, "plot_module", 
-                    rval = rval, plot_params = plot_params, simple_plot = TRUE)
-  callModule(simpleDisplay, "simple_display_module", plot_list = res$plot)
-
-
-  ### Get parameters from GatingSet ##################################################################
-  choices <- reactive({
-    rval$update_gs
-    validate(need(class(rval$gating_set) == "GatingSet", "No GatingSet available"))
-    
-    ff <- rval$gating_set@data[[1]]
-    params <- parameters(ff)
-    plot_var <- params@data$name
-    
-    validate(need(length(plot_var)>0, "No variables in GatingSet"))
-    
-    desc <- params@data$desc
-
-    labels <- sapply(1:length(plot_var), function(x){
-      if(is.na(desc[x])){
-        plot_var[x]
-      }else{
-        paste(plot_var[x], "(", desc[x], ")")
-      }
-    })
-
-    names(plot_var) <- labels
-
-    list(sample = flowWorkspace::pData(rval$gating_set)$name,
-         plot_var = plot_var
-    )
-                     
-  })
-  
-  
-  
- observe({
-    rval$update_gs
-    rval_mod$parameters <- NULL
-    validate(need(class(rval$gating_set) == "GatingSet", "No GatingSet available"))
-    validate(need(input$sample, "No sample selected"))
-    
-    ff <- rval$gating_set@data[[input$sample]]
-    
-    params <- flowCore::parameters(ff)
-    
-    desc <- as.character(params@data$desc)
-    name <- as.character(params@data$name)
-    
-    display <- unlist(sapply(rownames(params@data), FUN = function(x){
-      kw <- substr(x, start = 2, stop = nchar(x))
-      kw <- paste(kw, "DISPLAY", sep = "")
-      disp <- ff@description[[kw]]
-      if(is.null(disp)){
-        disp <- "NA"
-      }
-      return(disp)
-    }))
-    
-    names(display) <- params@data$name
-    
-    varType <- unlist(sapply(rownames(params@data), FUN = function(x){
-      kw <- paste(x, "TYPEOF", sep = "")
-      varType <- ff@description[[kw]]
-      if(is.null(varType)){
-        varType <- "double"
-      }
-      return(varType)
-    }))
-
-    names(varType) <- params@data$name
-    
-    rval_mod$parameters <- data.frame(name = name,
-                                      desc = desc,
-                                      display = display,
-                                      typeof = varType,
-                                      range = params@data$range,
-                                      minRange = params@data$minRange,
-                                      maxRange = params@data$maxRange,
-                                      stringsAsFactors = FALSE)
-
-  })
-
   
   ### Update transformation ################################################################
   
   observe({
     
-    validate(need(class(rval$gating_set) == "GatingSet", "No GatingSet available"))
     validate(need(rval_mod$parameters, "No parameters defined"))
     
-    transformation <- rval$gating_set@transformation
+    transformation <- choices()$transformation
     trans_parameters <- rval$trans_parameters
     
     new_par <- setdiff(colnames(rval$gating_set), names(transformation))
@@ -304,19 +235,21 @@ Transform <- function(input, output, session, rval) {
                                                                    a = 0),
                                                       list())
       }
+      
+      rval$trans_parameters <- trans_parameters
+      rval$gating_set@transformation <- transformation
+      rval$update_gs <- rval$update_gs + 1
     }
     
-    rval$trans_parameters <- trans_parameters
-    rval$gating_set@transformation <- transformation
-    #print(class(rval$gating_set))
-    #rval$update_gs <- rval$update_gs + 1
+    
+    
   })
   
   ### Apply transformation ################################################################
   
   observeEvent(input$apply_transformation, {
 
-    transformation <- rval$gating_set@transformation
+    transformation <- choices()$transformation
     trans_parameters <- rval$trans_parameters
     
     if(length( input$selected_params )>0){
@@ -360,23 +293,18 @@ Transform <- function(input, output, session, rval) {
     
     rval$trans_parameters <- trans_parameters
     rval$gating_set@transformation <- transformation
-    #rval$update_gs <- rval$update_gs + 1
+    rval$update_gs <- rval$update_gs + 1
     
   })
   
+  ### add transform name and transfrom parameters to parameters table ##################################
+  
   observe({
-    validate(need(class(rval$gating_set) == "GatingSet", "No GatingSet available"))
+    
     validate(need(rval_mod$parameters, "No parameters defined"))
     
-    transformation <- rval$gating_set@transformation
+    transformation <- choices()$transformation
     trans_parameters <- rval$trans_parameters
-    # validate(
-    #   need(rval$transformation, "No transformation defined")
-    # )
-    # 
-    # validate(
-    #   need(rval$parameters, "No parameters")
-    # )
     
     trans_name <- sapply(transformation, function(x){x$name})
     trans_param <- sapply(trans_parameters, function(x){
@@ -400,8 +328,6 @@ Transform <- function(input, output, session, rval) {
     df$maxRange <- format(df$maxRange, digits = 2)
 
     df
-    # df[, c("name", "desc", "transform", "transform parameters", 
-    #          "minRange", "maxRange",  "range", "display", "typeof" )]
       
   })
   
@@ -430,7 +356,7 @@ Transform <- function(input, output, session, rval) {
     info = input$parameters_cell_edit
     info$col <- info$col + 1
     col_param <- names(params_table())[info$col]
-    if(col_param %in% c("desc", "typeof")){
+    if(col_param %in% c("desc", "vartype")){
       
       rval_mod$parameters <<- editData(rval_mod$parameters, info)
       replaceData(proxy, rval_mod$parameters, resetPaging = FALSE)
@@ -441,9 +367,9 @@ Transform <- function(input, output, session, rval) {
         }
       }
       
-      if(col_param == "typeof"){
+      if(col_param == "vartype"){
         for(i in 1:length(rval$gating_set)){
-          desc_field <- paste("$P",info$row,"TYPEOF", sep="")
+          desc_field <- paste("$P",info$row,"VARTYPE", sep="")
           rval$gating_set@data[[i]]@description[[desc_field]] <- rval_mod$parameters[[col_param]][info$row]
         }
       }

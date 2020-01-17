@@ -178,14 +178,7 @@ Dim_reduction <- function(input, output, session, rval) {
   choices <- reactive({
     rval$update_gs
     validate(need(class(rval$gating_set) == "GatingSet", "No GatingSet available"))
-
-    return( 
-      list(compensation = rval$gating_set@compensation,
-           transformation = rval$gating_set@transformation,
-           gates = get_gates_from_gs(rval$gating_set),
-           params = flowCore::parameters(rval$gating_set@data[[1]])
-      )
-    )
+    get_parameters_gs(rval$gating_set)
   })
   
   ### Compute Dim. Red. #################################################################
