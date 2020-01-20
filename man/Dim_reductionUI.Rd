@@ -28,3 +28,43 @@ Perform dimensionality reduction using t-SNE or UMAP
 
 Dim_reduction module  server function
 }
+\examples{
+\dontrun{
+library(shiny)
+library(shinydashboard)
+library(flowWorkspace)
+library(flowCore)
+
+if (interactive()){
+
+  ui <- dashboardPage(
+    dashboardHeader(title = "Dim_reduction"),
+    sidebar = dashboardSidebar(disable = TRUE),
+    body = dashboardBody(
+      Dim_reductionUI("module")
+    )
+  )
+
+  server <- function(input, output, session) {
+
+    rval <- reactiveValues()
+
+    observe({
+      utils::data("GvHD", package = "flowCore")
+      gs <- GatingSet(GvHD)
+      transformation <- lapply(colnames(GvHD), function(x){logicle_trans()} )
+      names(transformation) <- colnames(GvHD)
+      print(transformation)
+      gs@transformation <- transformation
+      rval$gating_set <- gs
+    })
+
+    rval <- callModule(Dim_reduction, "module", rval = rval)
+
+  }
+
+  shinyApp(ui, server)
+
+}
+}
+}

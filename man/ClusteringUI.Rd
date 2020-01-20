@@ -28,3 +28,36 @@ Automatic cluster identification
 
 Clustering module server function
 }
+\examples{
+\dontrun{
+library(shiny)
+library(shinydashboard)
+library(flowWorkspace)
+library(flowCore)
+
+if (interactive()){
+
+  ui <- dashboardPage(
+    dashboardHeader(title = "Clustering"),
+    sidebar = dashboardSidebar(disable = TRUE),
+    body = dashboardBody(
+      ClusteringUI("module")
+    )
+  )
+
+  server <- function(input, output, session) {
+
+    rval <- reactiveValues()
+    observe({
+      utils::data("GvHD", package = "flowCore")
+      gs <- GatingSet(GvHD)
+      rval$gating_set <- gs
+    })
+    rval <- callModule(Clustering, "module", rval = rval)
+  }
+
+  shinyApp(ui, server)
+
+}
+}
+}

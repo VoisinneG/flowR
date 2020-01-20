@@ -98,44 +98,11 @@ plotGatingHierarchy <- function(input, output, session,
   })
                               
   ### get parameters from GatingSet #############################################################
+  
   choices <- reactive({
-    
+    rval$update_gs
     validate(need(class(rval$gating_set) == "GatingSet", "Input is not a GatingSet"))
-    
-    plot_var <- parameters(rval$gating_set@data[[1]])$name
-    
-    validate(need(length(plot_var)>0, "No variables in GatingSet"))
-    
-    desc <- parameters(rval$gating_set@data[[1]])$desc
-    
-    minRange <- parameters(rval$gating_set@data[[1]])@data$minRange
-    maxRange <- parameters(rval$gating_set@data[[1]])@data$maxRange
-    
-    axis_limits <- lapply(1:length(plot_var), function(x){
-      return(as.numeric(c(minRange[x], maxRange[x])))})
-    
-    names(axis_limits) <- plot_var
-    
-    labels <- sapply(1:length(plot_var), function(x){
-      if(is.na(desc[x])){
-        plot_var[x]
-      }else{
-        paste(plot_var[x], "(", desc[x], ")")
-      }
-    })
-    names(plot_var) <- labels
-    names(labels) <- plot_var 
-
-    return( 
-      list(sample = pData(rval$gating_set)$name,
-           plot_var = plot_var,
-           labels = labels,
-           axis_limits = axis_limits,
-           transformation = rval$gating_set@transformation,
-           compensation = rval$gating_set@compensation,
-           gates = get_gates_from_gs(rval$gating_set)
-      )
-    )
+    get_parameters_gs(rval$gating_set)
   })
   
   ### Plot gates #####################################################################################

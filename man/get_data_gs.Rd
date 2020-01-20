@@ -6,8 +6,8 @@
 \usage{
 get_data_gs(
   gs,
-  sample,
-  subset,
+  sample = NULL,
+  subset = NULL,
   Ncells = NULL,
   spill = NULL,
   return_comp_data = TRUE,

@@ -11,7 +11,8 @@ get_plot_data(
   subset,
   Ncells = NULL,
   spill = NULL,
-  metadata = NULL
+  metadata = NULL,
+  vartype = NULL
 )
 }
 \arguments{
