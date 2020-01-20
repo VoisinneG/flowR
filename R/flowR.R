@@ -624,16 +624,17 @@ get_data_gs <- function(gs,
   
   gs_comp <- gs
   
+  
   if(!is.null(spill)){
-    #spill <- spill[row.names(spill) %in% flowWorkspace::colnames(gs), 
-    #               colnames(spill) %in% flowWorkspace::colnames(gs)]
-    gates <- get_gates_from_gs(gs)
-    fs <- gs@data[idx]
-    #spill_list <- lapply(1:length(idx), function(x){return(spill)})
-    #names(spill_list) <- flowCore::pData(fs)$name
-    fs <- flowCore::compensate(fs, spill[idx])
-    gs_comp <- flowWorkspace::GatingSet(fs)
-    gs_comp <- add_gates_flowCore(gs_comp, gates)
+    
+    if( setequal(names(spill),  flowWorkspace::pData(gs)$name) ){
+      gates <- get_gates_from_gs(gs)
+      fs <- gs@data[idx]
+      fs <- flowCore::compensate(fs, spill[idx])
+      gs_comp <- flowWorkspace::GatingSet(fs)
+      gs_comp <- add_gates_flowCore(gs_comp, gates)
+    }
+   
   }
   
   df <- list()

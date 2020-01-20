@@ -602,6 +602,8 @@ plotGatingSet <- function(input, output, session,
       }
     }
     
+    print(spill)
+    
     df <- get_plot_data(gs = rval$gating_set,
                       sample = rval_input$sample,
                       subset = rval_input$subset,

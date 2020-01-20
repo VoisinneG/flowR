@@ -2,6 +2,8 @@
 
 export(Clustering)
 export(ClusteringUI)
+export(Compensation)
+export(CompensationUI)
 export(Dim_reduction)
 export(Dim_reductionUI)
 export(Gating)

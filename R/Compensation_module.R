@@ -4,6 +4,36 @@
 #' @importFrom shinydashboard box tabBox
 #' @importFrom plotly plotlyOutput
 #' @importFrom DT DTOutput
+#' @export
+#' @examples 
+#' \dontrun{
+#' library(shiny)
+#' library(shinydashboard)
+#' 
+#' if (interactive()){
+#' 
+#'   ui <- dashboardPage(
+#'     dashboardHeader(title = "Compensation"),
+#'     sidebar = dashboardSidebar(disable = TRUE),
+#'     body = dashboardBody(
+#'       CompensationUI("module")
+#'     )
+#'   )
+#' 
+#'   server <- function(input, output, session) {
+#'     rval <- reactiveValues()
+#'     observe({
+#'       utils::data("GvHD", package = "flowCore")
+#'       rval$gating_set <- GatingSet(GvHD)
+#'     })
+#' 
+#'     res <- callModule(Compensation, "module", rval = rval)
+#'   }
+#' 
+#'   shinyApp(ui, server)
+#' 
+#' }
+#' }
 CompensationUI <- function(id) {
   # Create a namespace function using the provided id
   ns <- NS(id)
@@ -13,6 +43,19 @@ CompensationUI <- function(id) {
       column(width = 6,
              tabBox(title = "",
                     width = NULL, height = NULL,
+                    tabPanel(title = "Compensation",
+                             box(title = "Table", width = NULL, height = NULL, collapsible = TRUE, collapsed = TRUE,
+                                 br(),
+                                 div(style = 'overflow-x: scroll', DT::DTOutput(ns("spill_per_sample_table"))),
+                                 br() 
+                             ),
+                             box(title = "Edit", width = NULL, height = NULL, collapsible = TRUE, collapsed = TRUE,
+                                 selectizeInput(ns("selected_samples"), "Select samples", 
+                                                choices = NULL, selected = NULL, multiple = TRUE),
+                                 selectInput(ns("selected_matrix"), "Select matrix", choices = NULL, selected = NULL),
+                                 actionButton(ns("apply_matrix"), "Apply to selected samples")
+                             )
+                    ),
                     tabPanel(title = "Matrix",
                              selectInput(ns("comp_mat"), "Select matrix", 
                                          choices = NULL, selected = NULL),
@@ -44,68 +87,14 @@ CompensationUI <- function(id) {
                              ),
                              downloadButton(ns("download_spill")),
                     ),
-                    # tabPanel("Edit",
-                    #          selectInput(ns("xvar_comp"), label = "column (channel)", 
-                    #                      choices = NULL, selected = NULL),
-                    #          selectInput(ns("yvar_comp"), label = "row (fluorophore)", 
-                    #                      choices = NULL, selected = NULL),
-                    #          numericInput(ns("spill_value"), 
-                    #                       label = "spillover (%)", 
-                    #                       value = 0, 
-                    #                       min = 0, 
-                    #                       max = 100, 
-                    #                       step = 1),
-                    #          numericInput(ns("step_size"), label = "step size", value = 1),
-                    #          actionButton(ns("set_spill_value"), "set value")
-                    # ),
-                    # tabPanel(title = "Table",
-                    #          actionButton(ns("reset_comp"), "reset"),
-                    #          actionButton(ns("apply_comp"), "apply"),
-                    #          downloadButton(ns("download_spill")),
-                    #          br(),
-                    #          br(),
-                    #          div(style = 'overflow-x: scroll', DT::DTOutput(ns("spill_table"))),
-                    #          br()    
-                    # ),
-                    tabPanel(title = "Compensation",
-                             box(title = "Table", width = NULL, height = NULL, collapsible = TRUE, collapsed = TRUE,
-                                 br(),
-                                 div(style = 'overflow-x: scroll', DT::DTOutput(ns("spill_per_sample_table"))),
-                                 br() 
-                             ),
-                             box(title = "Edit", width = NULL, height = NULL, collapsible = TRUE, collapsed = TRUE,
-                                 selectizeInput(ns("selected_samples"), "Select samples", 
-                                                choices = NULL, selected = NULL, multiple = TRUE),
-                                 selectInput(ns("selected_matrix"), "Select matrix", choices = NULL, selected = NULL),
-                                 actionButton(ns("apply_matrix"), "Apply to selected samples")
-                             )
-                    )
-             ),
-             tabBox(title = "",
-                    width = NULL, height = NULL,   
-                    tabPanel("Import",
-                             width = NULL, height = NULL,
-                             actionButton(ns("import_from_gs"), "Import from GatingSet"),
-                             fileInput(inputId = ns("spill_file"), 
-                                       label = "Choose spillover matrix file", 
-                                       multiple = FALSE),
-                             selectInput(ns("sep_spill"), "column separator", 
-                                         choices = c("comma", "semi-column", "tab", "space"), 
-                                         selected = "tab"),
-                             div(style = 'overflow-x: scroll', DT::DTOutput(ns("spill_imported"))),
-                             br(),
-                             actionButton(ns("set_spillover_matrix"), "Set spillover matrix")
-                    ),
                     tabPanel("Compute",
                              width = NULL, height = NULL,
-                             uiOutput(ns("ui_compute_spill")),
-                             actionButton(ns("add_spill_param"), "Add parameter"),
-                             br(),
-                             br(),
-                             selectizeInput(ns("spill_params"), "Spillover parameters", 
-                                            choices = NULL, selected = NULL, multiple = TRUE),
-                             actionButton(ns("compute_spillover_matrix"), "Compute spillover matrix")
+                             ComputeSpillUI(ns("compute_spill_module"))
                     )
+                    # tabPanel("Import",
+                    #          width = NULL, height = NULL,
+                    #          ImportSpillUI(ns("import_spill_module"))
+                    # )
              )
     ),
     column(width = 6,
@@ -138,6 +127,7 @@ CompensationUI <- function(id) {
 #' @importFrom DT renderDT
 #' @importFrom utils read.table
 #' @importFrom  stats median
+#' @export
 #' @rdname CompensationUI
 Compensation <- function(input, output, session, rval) {
 
@@ -148,14 +138,15 @@ Compensation <- function(input, output, session, rval) {
   
   res <- callModule(plotGatingSet, "plot_module", rval, plot_params, simple_plot = FALSE)
   callModule(simpleDisplay, "simple_display_module", res$plot, nrow = 2, size = 200 )
-  
+  spill_computed <- callModule(ComputeSpill, "compute_spill_module", rval = rval)
+    
   ### Get parameters from GatingSet ##################################################################
   choices <- reactive({
     rval$update_gs
     validate(need(class(rval$gating_set) == "GatingSet", "No GatingSet available"))
     get_parameters_gs(rval$gating_set)
   })
-  
+
   ### Set plot parameters ###################################################################
 
   observe({
@@ -209,7 +200,7 @@ Compensation <- function(input, output, session, rval) {
   #   
   # })
   
-  ### Update GatingSet compensation ####################################################################
+  ### Set GatingSet compensation ####################################################################
   
   observe({
 
@@ -238,7 +229,7 @@ Compensation <- function(input, output, session, rval) {
     }
   })
 
-  ### Get list of compensation matrices from GatingSet ################################################
+  ### Match GatingSet compensation with loaded matrices ################################################
   
   observeEvent(choices()$compensation, {
     
@@ -318,153 +309,24 @@ Compensation <- function(input, output, session, rval) {
     }
   })
   
-  
-  
-  
-  
-  #     if(length(new_par)>0){
-  #   rval_mod$spill <- spill
-  #   
-  #   if(is.null(rval$df_spill)){
-  #     fs <- rval$gating_set
-  #     params <- flowCore::parameters(fs[[1]])
-  #     m <- diag( length(params$name) )
-  #     colnames(m) <- params$name
-  #     rval$df_spill <- as.data.frame(m)
-  #     row.names(rval$df_spill) <- colnames(rval$df_spill)
-  #     
-  #     #rval$df_spill <- NULL
-  #     
-  #     for(i in 1:length(fs)){
-  #       desc <- flowCore::description(fs[[i]])
-  #       if("SPILL" %in% names(desc)){
-  #         df <- as.data.frame(desc[["SPILL"]])
-  #         is_identity <- sum(apply(df, 
-  #                                  MARGIN = 1, 
-  #                                  FUN = function(x){
-  #                                    sum(x==0) == (length(x)-1)
-  #                                    })
-  #                            ) == dim(df)[1]
-  #         if(!is_identity){
-  #           rval$df_spill <- df
-  #           row.names(rval$df_spill) <- colnames(rval$df_spill)
-  #           break
-  #         }
-  #       }
-  #     }
-  #     
-  #     rval$df_spill_original <- rval$df_spill
-  #   }
-  #   
-  # })
-  
   ### Compute compensation matrix ##################################################################
 
-  # output$ui_compute_spill <- renderUI({
-  #   
-  #   ns <- session$ns
-  #   
-  #   validate(
-  #     need(rval$gating_set, "No flow set available")
-  #   )
-  #   
-  #   tagList(
-  #     selectInput(ns("fluo"), 
-  #                 "fluorophore",
-  #                 choices = rval$gating_set@colnames,
-  #                 selected = rval$gating_set@colnames[1]),
-  #     
-  #     selectInput(ns("sample_pos"),
-  #                 "sample pos",
-  #                 choices = pData(rval$gating_set)$name,
-  #                 selected = pData(rval$gating_set)$name[1]),
-  #     
-  #     selectInput(ns("gate_pos"),
-  #                 "gate pos",
-  #                 choices = names(rval$gates_flowCore),
-  #                 selected = "root"),
-  #     
-  #     selectInput(ns("sample_neg"), 
-  #                 "sample neg",
-  #                 choices = pData(rval$gating_set)$name,
-  #                 selected = pData(rval$gating_set)$name[1]),
-  #     
-  #     selectInput(ns("gate_neg"),
-  #                 "gate neg",
-  #                 choices = names(rval$gates_flowCore),
-  #                 selected = "root")
-  #   )
-  #   
-  # })
-  # 
-  # observeEvent(input$add_spill_param, {
-  #   
-  #   validate(
-  #     need(rval$gating_set, "No gating set available")
-  #   )
-  #   
-  #   
-  #   df_pos <- get_data_gs(gs = rval$gating_set,
-  #                         sample = input$sample_pos,
-  #                         subset = input$gate_pos,
-  #                         spill = NULL)
-  #   df_pos <- df_pos[names(df_pos) %in% rval$flow_set@colnames]
-  #   pos_values <- apply(df_pos, MARGIN = 2, FUN = stats::median,  na.rm = TRUE)
-  #   pos_values <- pos_values[rval$flow_set@colnames]
-  #   names(pos_values) <- rval$flow_set@colnames
-  #   rval$pos_values[[input$fluo]] <- pos_values
-  #   
-  #   print(rval$pos_values)
-  #   
-  #   df_neg <- get_data_gs(gs = rval$gating_set,
-  #                         sample = input$sample_neg,
-  #                         subset = input$gate_neg,
-  #                         spill = NULL)
-  #   
-  #   df_neg <- df_neg[names(df_neg) %in% rval$flow_set@colnames]
-  #   neg_values <- apply(df_neg, MARGIN = 2, FUN = stats::median, na.rm = TRUE)
-  #   neg_values <- neg_values[rval$flow_set@colnames]
-  #   names(neg_values) <- rval$flow_set@colnames
-  #   rval$neg_values[[input$fluo]] <- neg_values
-  #   
-  #   print(rval$pos_values)
-  #   
-  # })
-  # 
-  # observe({
-  #   updateSelectInput(session, "spill_params", 
-  #                     choices = names(rval$pos_values), 
-  #                     selected = names(rval$pos_values))
-  # })
-  # 
-  # observeEvent(input$compute_spillover_matrix, {
-  #   validate(
-  #     need(length(input$spill_params)>0, "Not enough parameters selected")
-  #   )
-  #   
-  #   df_pos_tot <- data.frame(do.call(rbind, rval$pos_values[input$spill_params]), 
-  #                            check.names = FALSE)
-  #   row.names(df_pos_tot) <- input$spill_params
-  #   df_pos_tot <- df_pos_tot[input$spill_params]
-  #   #print(df_pos_tot)
-  #   
-  #   df_neg_tot <- data.frame(do.call(rbind, rval$neg_values[input$spill_params]), 
-  #                            check.names = FALSE)
-  #   row.names(df_neg_tot) <- input$spill_params
-  #   df_neg_tot <- df_neg_tot[input$spill_params]
-  #   #print(df_neg_tot)
-  #   
-  #   df_spill <- df_pos_tot
-  #   for(i in 1:length(input$spill_params)){
-  #     neg <- rval$neg_values[[input$spill_params[i]]][[input$spill_params[i]]]
-  #     pos <- rval$pos_values[[input$spill_params[i]]][[input$spill_params[i]]]
-  #     df_spill[input$spill_params[i]] <- (df_pos_tot[input$spill_params[i]] - neg)/(pos - neg)
-  #   }
-  #   
-  #   #print(df_spill)
-  #   rval$df_spill <- df_spill
-  #   
-  # })
+  observeEvent(spill_computed(), {
+    
+    if(length(spill_computed())>0){
+      if(!names(spill_computed()) %in% names(rval_mod$spill_list)){
+        rval_mod$spill_list[[names(spill_computed())]] <- as.matrix(spill_computed()[[1]])
+      }else{
+        showModal(modalDialog(
+          title = "Matrix name already exists",
+          paste("Please choose another name", sep=""),
+          easyClose = TRUE,
+          footer = NULL
+        ))
+      }
+    }
+
+  })
   
 
   ### Import compensation matrix ###################################################################
@@ -607,6 +469,7 @@ Compensation <- function(input, output, session, rval) {
                    custom_hovertext = df,
                    margins = c(50, 50, 50, 0)
     )
+    
     p$x$source <- "select_heatmap"
     
     p
@@ -658,34 +521,34 @@ Compensation <- function(input, output, session, rval) {
   # library(shiny)
   # library(shinydashboard)
   # 
-  if (interactive()){
-
-    ui <- dashboardPage(
-      dashboardHeader(title = "Compensation"),
-      sidebar = dashboardSidebar(disable = TRUE),
-      body = dashboardBody(
-        CompensationUI("module")
-      )
-    )
-
-    server <- function(input, output, session) {
-      rval <- reactiveValues()
-      observe({
-        #utils::data("GvHD", package = "flowCore")
-        #rval$gating_set <- GatingSet(GvHD)
-        load("../flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
-        gs <- GatingSet(res$cluster$flow_set)
-        gs@transformation <- res$cluster$transformation
-        spill <- as.matrix(res$cluster$spill)
-        spill_list <- lapply(pData(gs)$name, function(x){return(spill)})
-        names(spill_list) <- pData(gs)$name
-        gs@compensation <- spill_list
-        rval$gating_set <- gs
-      })
-
-      res <- callModule(Compensation, "module", rval = rval)
-    }
-
-    shinyApp(ui, server)
-
-  }
+  # if (interactive()){
+  # 
+  #   ui <- dashboardPage(
+  #     dashboardHeader(title = "Compensation"),
+  #     sidebar = dashboardSidebar(disable = TRUE),
+  #     body = dashboardBody(
+  #       CompensationUI("module")
+  #     )
+  #   )
+  # 
+  #   server <- function(input, output, session) {
+  #     rval <- reactiveValues()
+  #     observe({
+  #       #utils::data("GvHD", package = "flowCore")
+  #       #rval$gating_set <- GatingSet(GvHD)
+  #       load("../flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
+  #       gs <- GatingSet(res$cluster$flow_set)
+  #       gs@transformation <- res$cluster$transformation
+  #       spill <- as.matrix(res$cluster$spill)
+  #       spill_list <- lapply(pData(gs)$name, function(x){return(spill)})
+  #       names(spill_list) <- pData(gs)$name
+  #       gs@compensation <- spill_list
+  #       rval$gating_set <- gs
+  #     })
+  # 
+  #     res <- callModule(Compensation, "module", rval = rval)
+  #   }
+  # 
+  #   shinyApp(ui, server)
+  # 
+  # }

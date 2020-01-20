@@ -28,3 +28,33 @@ Visualize, import, export and edit compensation matrices associated with a Gatin
 
 Compensation server function
 }
+\examples{
+\dontrun{
+library(shiny)
+library(shinydashboard)
+
+if (interactive()){
+
+  ui <- dashboardPage(
+    dashboardHeader(title = "Compensation"),
+    sidebar = dashboardSidebar(disable = TRUE),
+    body = dashboardBody(
+      CompensationUI("module")
+    )
+  )
+
+  server <- function(input, output, session) {
+    rval <- reactiveValues()
+    observe({
+      utils::data("GvHD", package = "flowCore")
+      rval$gating_set <- GatingSet(GvHD)
+    })
+
+    res <- callModule(Compensation, "module", rval = rval)
+  }
+
+  shinyApp(ui, server)
+
+}
+}
+}
