@@ -194,6 +194,7 @@ asinh_transform <- function(b=5, inverse = FALSE){
 #' @param n desired number of breaks (see \code{flow_trans()})
 #' @param equal.space whether breaks at equal-spaced intervals (see \code{flow_trans()})
 #' @importFrom flowWorkspace flow_trans
+#' @export
 asinh_trans <- function (..., n = 6, equal.space = FALSE){
   trans <- asinh_transform(...)
   inv <- asinh_transform(..., inverse = TRUE)
@@ -2315,6 +2316,8 @@ dim_reduction <- function(df,
                           method = "tSNE",
                           check_duplicates = FALSE){
   
+  yvar <- as.character(yvar)
+  
   idx_cells_kept <- 1:dim(df)[1]
   
   if(is.numeric(Ncells)){
@@ -2333,6 +2336,8 @@ dim_reduction <- function(df,
   
   df_trans <- df
   df_filter <- df
+  
+  print(trans_name)
   
   for(i in 1:length(yvar)){
     df_trans[[yvar[i]]] <- transformation[[yvar[i]]]$transform(df[[yvar[i]]])
@@ -2401,8 +2406,6 @@ dim_reduction <- function(df,
 #' @param scale logical; Scale values before building SOM (for method 'FlowSOM' only)
 #' @return a data.frame with the additionnal column "cluster"
 #' @importFrom FlowSOM BuildSOM BuildMST MetaClustering
-#' @importFrom Rphenograph Rphenograph
-#' @importFrom ClusterX ClusterX
 #' @importFrom igraph membership
 #' @importFrom scales identity_trans
 get_cluster <- function(df,
@@ -2415,7 +2418,9 @@ get_cluster <- function(df,
                         k_meta = 8,
                         scale = FALSE,
                         method = "FlowSOM"){
-         
+  
+  yvar <- as.character(yvar)
+  
   idx_cells_kept <- 1:dim(df)[1]
   
   if(!is.null(y_trans) & is.null(transformation)){
@@ -2428,7 +2433,7 @@ get_cluster <- function(df,
   df_trans <- df
   df_filter <- df
   
-  
+  print(trans_name)
   for(i in 1:length(yvar)){
     df_trans[[yvar[i]]] <- transformation[[yvar[i]]]$transform(df[[yvar[i]]])
   }
@@ -2470,27 +2475,9 @@ get_cluster <- function(df,
     df_filter$cluster <- as.integer(metaClustering_perCell)
     
     return(list(df = df_filter, keep = idx_cells_kept, fSOM = fSOM))
-    
-  }else if(method == "Rphenograph"){
-    # warning("Rphenograph is not supported")
-    # df_filter$cluster <- 1 
-    # return(list(df = df_filter, keep = idx_cells_kept))
-    message(paste("Clustering ", dim(df_trans)[1], " cells using 'Rphenograph' on ",  
-                  length(yvar), " parameters", sep = ""))
-    Rphenograph_out <- Rphenograph(df_trans[ , yvar], k = k)
-    df_filter$cluster <- as.integer(igraph::membership(Rphenograph_out[[2]]))
-  }else if(method == "ClusterX"){
-    # warning("ClusterX is not supported")
-    # df_filter$cluster <- 1 
-    # return(list(df = df_filter, keep = idx_cells_kept))
-    message(paste("Clustering ", dim(df_trans)[1], " cells using 'CluserX' on ",  
-                  length(yvar), " parameters", sep = ""))
-    DC <- ClusterX(df_trans[ , yvar], dc = dc, alpha = alpha)
-    df_filter$cluster <- as.integer(DC$cluster)
+  }else{
+    stop("Clustering method not supported")
   }
- 
-  return(list(df = df_filter, keep = idx_cells_kept))
-  
 }
 
 
@@ -2571,10 +2558,10 @@ build_flowset_from_df <- function(df,
             desc[[paste("$P",npar,"VARTYPE",sep="")]] <- typeof(df_sample[[param]])
           }
           
-          par@data$typeof <- sapply(par@data$name, function(x){typeof(df_sample[[x]])})
-          rn <- row.names(par@varMetadata)
-          par@varMetadata <- rbind(par@varMetadata, "type")
-          row.names(par@varMetadata)<- c(rn, "type")
+          # par@data$vartype <- sapply(par@data$name, function(x){typeof(df_sample[[x]])})
+          # rn <- row.names(par@varMetadata)
+          # par@varMetadata <- rbind(par@varMetadata, "vartype")
+          # row.names(par@varMetadata)<- c(rn, "vartype")
           
           
           desc[["$TOT"]] <- dim(df_sample)[1]

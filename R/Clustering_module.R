@@ -63,7 +63,7 @@ ClusteringUI <- function(id) {
                                          selected = "default"),
                              selectInput(ns("clustering_method"), 
                                          label = "method", 
-                                         choices = c("FlowSOM", "ClusterX", "Rphenograph"), 
+                                         choices = c("FlowSOM"), 
                                          selected = "FlowSOM"),
                              uiOutput(ns("method_ui"))
                     ),
@@ -130,15 +130,17 @@ Clustering <- function(input, output, session, rval) {
   output$method_ui <- renderUI({
     ns <- session$ns
     x <- list()
-    if(input$clustering_method == 'ClusterX'){
-      x[[1]] <- numericInput(ns("cluster_dc"), "dc", 5)
-      x[[2]] <- numericInput(ns("cluster_alpha"), "alpha", 0.0001)
-    }else if(input$clustering_method == 'Rphenograph'){
-      x[[1]] <- numericInput(ns("k_param"), "k", 100)
-    }else if(input$clustering_method == 'FlowSOM'){
-      x[[1]] <- numericInput(ns("k_meta"), "k", 7)
-      x[[2]] <- checkboxInput(ns("scale"), "scale", FALSE)
-    }
+    # if(input$clustering_method == 'ClusterX'){
+    #   x[[1]] <- numericInput(ns("cluster_dc"), "dc", 5)
+    #   x[[2]] <- numericInput(ns("cluster_alpha"), "alpha", 0.0001)
+    # }else if(input$clustering_method == 'Rphenograph'){
+    #   x[[1]] <- numericInput(ns("k_param"), "k", 100)
+    # }else if(input$clustering_method == 'FlowSOM'){
+    #   x[[1]] <- numericInput(ns("k_meta"), "k", 7)
+    #   x[[2]] <- checkboxInput(ns("scale"), "scale", FALSE)
+    # }
+    x[[1]] <- numericInput(ns("k_meta"), "k", 7)
+    x[[2]] <- checkboxInput(ns("scale"), "scale", FALSE)
     tagList(x)
   })
   
@@ -263,7 +265,7 @@ Clustering <- function(input, output, session, rval) {
                       "log10" = scales::log10_trans(),
                       "asinh" = asinh_trans(),
                       "identity" = scales::identity_trans(),
-                      NULL)
+                      scales::identity_trans())
     
     progress$set(message = "Clustering...", value = 0)
     

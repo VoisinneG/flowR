@@ -43,12 +43,7 @@ Imports:
   magrittr,
   methods,
   reshape2,
-  FlowSOM,
-  Rphenograph,
-  ClusterX
-Remotes: 
-  JinmiaoChenLab/ClusterX,
-  JinmiaoChenLab/Rphenograph
+  FlowSOM
 LazyData: TRUE
 License: file LICENSE
 RoxygenNote: 7.0.2

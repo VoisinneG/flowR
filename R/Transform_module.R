@@ -157,7 +157,7 @@ Transform <- function(input, output, session, rval) {
                            selected = rval_mod$parameters$name[input$parameters_table_rows_selected])
       
       #update plot_params
-      for(var in names(res$params)){
+      for(var in intersect(names(res$params), names(plot_params))){
         plot_params[[var]] <- res$params[[var]]
       }
       
@@ -177,7 +177,6 @@ Transform <- function(input, output, session, rval) {
         plot_params[[var]] <- res$params[[var]]
       }
       plot_params$sample <- input$sample
-      print(reactiveValuesToList(plot_params))
     }
     
   })
@@ -192,7 +191,10 @@ Transform <- function(input, output, session, rval) {
   observe({
     rval_mod$parameters <- choices()$params
   })
-  
+
+  observe({
+    print(rval_mod$parameters)
+  })
   ### Update UI ################################################################################
   
   observe({
@@ -219,6 +221,9 @@ Transform <- function(input, output, session, rval) {
     new_par <- setdiff(colnames(rval$gating_set), names(transformation))
     idx_new <- match(new_par, colnames(rval$gating_set))
     
+    print("new")
+    print(new_par)
+    
     if(length(new_par)>0){
       for(i in 1:length(new_par)){
         transformation[[new_par[i]]] <- switch(rval_mod$parameters$display[idx_new[i]],
@@ -238,7 +243,7 @@ Transform <- function(input, output, session, rval) {
       
       rval$trans_parameters <- trans_parameters
       rval$gating_set@transformation <- transformation
-      rval$update_gs <- rval$update_gs + 1
+      #rval$update_gs <- rval$update_gs + 1
     }
     
     
@@ -289,11 +294,13 @@ Transform <- function(input, output, session, rval) {
         trans_parameters[[var_name[i]]] <- trans_params
       }
       
+      rval$trans_parameters <- trans_parameters
+      rval$gating_set@transformation <- transformation
+      rval$update_gs <- rval$update_gs + 1
+      
     }
     
-    rval$trans_parameters <- trans_parameters
-    rval$gating_set@transformation <- transformation
-    rval$update_gs <- rval$update_gs + 1
+    
     
   })
   
@@ -332,13 +339,13 @@ Transform <- function(input, output, session, rval) {
   })
   
   output$parameters_table <- DT::renderDT({
-    if(!is.null(input$selected_params)){
-      selected <- match(input$selected_params, params_table()$name)
-      print(selected)
-    }else{
-      selected <- NULL
-    }
-    DT::datatable(params_table(), rownames = FALSE, selection = list(mode = "multiple", selected = selected))
+    # if(!is.null(input$selected_params)){
+    #   selected <- match(input$selected_params, params_table()$name)
+    #   print(selected)
+    # }else{
+    #   selected <- NULL
+    # }
+    DT::datatable(params_table(), rownames = FALSE, selection = list(mode = "multiple"))
   })
   
   ### Edit parameters table ######################################################################
