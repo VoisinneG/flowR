@@ -210,7 +210,7 @@ Import <- function(input, output, session, rval) {
   
   })
   
-  #### Disaply loaded files ####
+  #### Display loaded files ####
   
   output$files_table <- DT::renderDT({
     validate(need(rval_mod$df_files, "Please select a file to import"))

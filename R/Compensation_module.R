@@ -44,7 +44,7 @@ CompensationUI <- function(id) {
              tabBox(title = "",
                     width = NULL, height = NULL,
                     tabPanel(title = "Compensation",
-                             box(title = "Table", width = NULL, height = NULL, collapsible = TRUE, collapsed = TRUE,
+                             box(title = "Table", width = NULL, height = NULL, collapsible = TRUE, collapsed = FALSE,
                                  br(),
                                  div(style = 'overflow-x: scroll', DT::DTOutput(ns("spill_per_sample_table"))),
                                  br() 
@@ -59,7 +59,7 @@ CompensationUI <- function(id) {
                     tabPanel(title = "Matrix",
                              selectInput(ns("comp_mat"), "Select matrix", 
                                          choices = NULL, selected = NULL),
-                             box(title = "Heatmap", width = NULL, height = NULL, collapsible = TRUE, collapsed = TRUE,
+                             box(title = "Heatmap", width = NULL, height = NULL, collapsible = TRUE, collapsed = FALSE,
                                  plotly::plotlyOutput(ns("heatmap_spill"))
                                  ),
                              box(title = "Edit", width = NULL, height = NULL, collapsible = TRUE, collapsed = TRUE,
@@ -90,11 +90,11 @@ CompensationUI <- function(id) {
                     tabPanel("Compute",
                              width = NULL, height = NULL,
                              ComputeSpillUI(ns("compute_spill_module"))
+                    ),
+                    tabPanel("Import",
+                             width = NULL, height = NULL,
+                             ImportSpillUI(ns("import_spill_module"))
                     )
-                    # tabPanel("Import",
-                    #          width = NULL, height = NULL,
-                    #          ImportSpillUI(ns("import_spill_module"))
-                    # )
              )
     ),
     column(width = 6,
@@ -139,6 +139,7 @@ Compensation <- function(input, output, session, rval) {
   res <- callModule(plotGatingSet, "plot_module", rval, plot_params, simple_plot = FALSE)
   callModule(simpleDisplay, "simple_display_module", res$plot, nrow = 2, size = 200 )
   spill_computed <- callModule(ComputeSpill, "compute_spill_module", rval = rval)
+  spill_imported <- callModule(ImportSpill, "import_spill_module", rval = rval)
     
   ### Get parameters from GatingSet ##################################################################
   choices <- reactive({
@@ -183,7 +184,7 @@ Compensation <- function(input, output, session, rval) {
   })
   
   observe({
-    updateSelectInput(session, "xvar_comp", 
+    updateSelectInput(session, "xvar_comp",
                       choices = choices()$plot_var, selected = choices()$plot_var[1])
     updateSelectInput(session, "yvar_comp", 
                       choices = choices()$plot_var, selected = choices()$plot_var[2])
@@ -225,6 +226,10 @@ Compensation <- function(input, output, session, rval) {
       }
       print("update_gs")
       rval$gating_set@compensation <- compensation
+      # update rval$gating_set_list
+      if("gating_set_selected" %in% names(rval)){
+        rval$gating_set_list[[rval$gating_set_selected]]$gating_set@compensation <- compensation
+      }
       rval$update_gs <- rval$update_gs + 1
     }
   })
@@ -254,7 +259,6 @@ Compensation <- function(input, output, session, rval) {
     }
     
     rval_mod$spill_per_sample <- unlist(rval_mod$spill_per_sample)
-    print(rval_mod$comp_mat_name)
     
   })
   
@@ -291,11 +295,39 @@ Compensation <- function(input, output, session, rval) {
   })
   
   observeEvent(input$apply_matrix, {
-    #rval_mod$spill_per_sample[input$selected_samples] <- selected_matrix
+    #rval_mod$spill_per_sample[input$selected_samples] <- input$selected_matrix
     compensation <- rval$gating_set@compensation
-    compensation[input$selected_samples] <- rval_mod$spill_list[[selected_matrix]]
-    rval$gating_set@compensation <- compensation
-    rval$update_gs <- rval$update_gs + 1
+    df <- rval_mod$spill_list[[input$selected_matrix]]
+
+    idx_match_row <- row.names(df)[row.names(df) %in% choices()$params$name]
+    idx_match_col <- colnames(df)[colnames(df) %in% choices()$params$name]
+    
+    df <- df[idx_match_row, idx_match_col]
+    print(df)
+    
+    if(dim(df)[1]!=dim(df)[2]){
+      showModal(modalDialog(
+        title = "Error",
+        paste("Incorrect matrix dimensions", sep=""),
+        easyClose = TRUE,
+        footer = NULL
+      ))
+    }else{
+      
+      for(sample in input$selected_samples){
+        compensation[[sample]] <- df
+      }
+      
+      rval$gating_set@compensation <- compensation
+      # update rval$gating_set_list
+      if("gating_set_selected" %in% names(rval)){
+        rval$gating_set_list[[rval$gating_set_selected]]$gating_set@compensation <- compensation
+      }
+      
+      rval$update_gs <- rval$update_gs + 1
+    }
+    
+    
   })
   
   observeEvent(input$comp_mat, {
@@ -328,65 +360,24 @@ Compensation <- function(input, output, session, rval) {
 
   })
   
-
-  ### Import compensation matrix ###################################################################
+  ### Import compensation matrix ##################################################################
   
-  # observe({
-  #   validate(
-  #     need(input$spill_file$datapath, "Please select a file to import")
-  #   )
-  #   
-  #   sep <- switch(input$sep_spill,
-  #                 "comma" = ",",
-  #                 "semi-column" = ";",
-  #                 "tab" = "\t",
-  #                 "space" = " ")
-  #   
-  #   rval$df_spill_imported <- utils::read.table(file = input$spill_file$datapath, 
-  #                                        sep = sep,
-  #                                        fill = TRUE,
-  #                                        quote = "\"",
-  #                                        header = TRUE,
-  #                                        check.names = FALSE)
-  #   
-  # })
-  # 
-  # output$spill_imported <- DT::renderDT({
-  #   validate(
-  #     need(rval$df_spill_imported, "No spillover data imported")
-  #   )
-  #   as.data.frame(rval$df_spill_imported)
-  # })
-  # 
-  # observeEvent(input$set_spillover_matrix,{
-  #   df <- as.data.frame(rval$df_spill_imported)
-  #   row.names(df) <- colnames(df)
-  #   df <- df[row.names(df) %in% colnames(rval$flow_set), colnames(df) %in% colnames(rval$flow_set)]
-  #   rval$df_spill <- df
-  #   
-  # })
-  # 
-  # 
-  # observe({
-  #   
-  #   validate(
-  #     need(length(input$file_comp)>0, "Please select a file to load")
-  #   )
-  #   
-  #   sep <- switch(input$sep_comp,
-  #                 "comma" = ",",
-  #                 "semi-column" = ";",
-  #                 "tab" = "\t")
-  #   
-  #   rval$df_comp <- read.csv(input$file_comp$datapath, sep = sep, header = TRUE, quote = "\"", fill = TRUE)
-  #   names(rval$df_comp)[1] <- "name"
-  # })
-  # 
-  # observeEvent(input$import_comp, {
-  #   idx_match_row <- match(rval$pdata$name, rval$df_comp[,1])
-  #   idx_match_col <- match(rval$pdata$name, names(rval$df_comp))
-  #   rval$df_spill <- rval$df_comp[idx_match_row, idx_match_col]
-  # })
+  observeEvent(spill_imported(), {
+    
+    if(length(spill_imported())>0){
+      if(!names(spill_imported()) %in% names(rval_mod$spill_list)){
+        rval_mod$spill_list[[names(spill_imported())]] <- as.matrix(spill_imported()[[1]])
+      }else{
+        showModal(modalDialog(
+          title = "Matrix name already exists",
+          paste("Please choose another name", sep=""),
+          easyClose = TRUE,
+          footer = NULL
+        ))
+      }
+    }
+    
+  })
   
   ### Edit spill parameter ###########################################################################
   
@@ -411,6 +402,10 @@ Compensation <- function(input, output, session, rval) {
         compensation[[sample]] <- rval_mod$spill
       }
       rval$gating_set@compensation <- compensation
+      # update rval$gating_set_list
+      if("gating_set_selected" %in% names(rval)){
+        rval$gating_set_list[[rval$gating_set_selected]]$gating_set@compensation <- compensation
+      }
       rval$update_gs <- rval$update_gs + 1
       print("update")
     }

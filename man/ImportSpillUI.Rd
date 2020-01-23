@@ -28,3 +28,35 @@ Import spillover matrix
 
 ImportSpill server function
 }
+\examples{
+\dontrun{
+library(shiny)
+library(shinydashboard)
+
+if (interactive()){
+ 
+  ui <- dashboardPage(
+    dashboardHeader(title = "ImportSpill"),
+    sidebar = dashboardSidebar(disable = TRUE),
+    body = dashboardBody(
+      box(title="Import", width = NULL, height = NULL,
+          ImportSpillUI("module")
+          )
+    )
+  )
+
+  server <- function(input, output, session) {
+    rval <- reactiveValues()
+    observe({
+      utils::data("GvHD", package = "flowCore")
+      rval$gating_set <- GatingSet(GvHD)
+    })
+
+    res <- callModule(ImportSpill, "module", rval = rval)
+  }
+
+  shinyApp(ui, server)
+
+}
+}
+}

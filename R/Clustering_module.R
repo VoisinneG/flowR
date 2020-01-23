@@ -117,7 +117,10 @@ Clustering <- function(input, output, session, rval) {
     #     rval_mod$fSOM <- rval$gating_set_list[[rval$gating_set_selected]]$fSOM
     #   }
     # }
-    rval_mod$fSOM <- rval$gating_set_list[[rval$gating_set_selected]]$fSOM
+    if(!is.null(rval$gating_set_selected)){
+      rval_mod$fSOM <- rval$gating_set_list[[rval$gating_set_selected]]$fSOM
+    }
+    
   })
   
   ### Call modules #########################################################################

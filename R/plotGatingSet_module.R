@@ -487,6 +487,7 @@ plotGatingSet <- function(input, output, session,
   
   params_update_data <- reactive({
     
+    print("update data")
     if(!auto_update){
       input$update_plot
     }else{
@@ -508,6 +509,7 @@ plotGatingSet <- function(input, output, session,
   ### Control update of raw plot ###################################################################
   
   params_update_plot_raw <- reactive({
+    
     #print("update_raw")
     
     if(!auto_update){
@@ -601,8 +603,6 @@ plotGatingSet <- function(input, output, session,
         spill <- NULL
       }
     }
-    
-    print(spill)
     
     df <- get_plot_data(gs = rval$gating_set,
                       sample = rval_input$sample,

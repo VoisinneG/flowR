@@ -189,12 +189,14 @@ Transform <- function(input, output, session, rval) {
   })
   
   observe({
+    print("initialize trans")
     rval_mod$parameters <- choices()$params
   })
 
   observe({
     print(rval_mod$parameters)
   })
+  
   ### Update UI ################################################################################
   
   observe({
@@ -213,19 +215,20 @@ Transform <- function(input, output, session, rval) {
   
   observe({
     
-    validate(need(rval_mod$parameters, "No parameters defined"))
+    validate(need(rval_mod$parameters$name, "No parameters defined"))
     
     transformation <- choices()$transformation
     trans_parameters <- rval$trans_parameters
     
-    new_par <- setdiff(colnames(rval$gating_set), names(transformation))
-    idx_new <- match(new_par, colnames(rval$gating_set))
+    new_par <- setdiff(rval_mod$parameters$name, names(transformation))
+    idx_new <- match(new_par, rval_mod$parameters$name)
     
-    print("new")
-    print(new_par)
     
     if(length(new_par)>0){
+      print("init new parameter")
+      print(new_par)
       for(i in 1:length(new_par)){
+        
         transformation[[new_par[i]]] <- switch(rval_mod$parameters$display[idx_new[i]],
                                                     "LOG" = flowWorkspace::logicle_trans(w=0.5, 
                                                                           m=4.5, 
@@ -243,7 +246,14 @@ Transform <- function(input, output, session, rval) {
       
       rval$trans_parameters <- trans_parameters
       rval$gating_set@transformation <- transformation
-      #rval$update_gs <- rval$update_gs + 1
+      
+      # update rval$gating_set_list
+      if("gating_set_selected" %in% names(rval)){
+        rval$gating_set_list[[rval$gating_set_selected]]$gating_set@transformation <- transformation
+        rval$gating_set_list[[rval$gating_set_selected]]$trans_parameters <- trans_parameters
+      }
+      
+      rval$update_gs <- rval$update_gs + 1
     }
     
     
@@ -288,7 +298,7 @@ Transform <- function(input, output, session, rval) {
                                                 a = input$a_logicle))
       
       
-      
+      print("update transformation")
       for(i in 1:length(var_name)){
         transformation[[var_name[i]]] <- trans
         trans_parameters[[var_name[i]]] <- trans_params
@@ -296,6 +306,13 @@ Transform <- function(input, output, session, rval) {
       
       rval$trans_parameters <- trans_parameters
       rval$gating_set@transformation <- transformation
+      
+      # update rval$gating_set_list
+      if("gating_set_selected" %in% names(rval)){
+        rval$gating_set_list[[rval$gating_set_selected]]$gating_set@transformation <- transformation
+        rval$gating_set_list[[rval$gating_set_selected]]$trans_parameters <- trans_parameters
+      }
+      
       rval$update_gs <- rval$update_gs + 1
       
     }
@@ -312,6 +329,8 @@ Transform <- function(input, output, session, rval) {
     
     transformation <- choices()$transformation
     trans_parameters <- rval$trans_parameters
+    
+    print(names(trans_parameters))
     
     trans_name <- sapply(transformation, function(x){x$name})
     trans_param <- sapply(trans_parameters, function(x){

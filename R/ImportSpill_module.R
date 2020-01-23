@@ -2,29 +2,53 @@
 #' @param id shiny id
 #' @import shiny
 #' @importFrom shinydashboard box tabBox
+#' @examples 
+#' \dontrun{
+#' library(shiny)
+#' library(shinydashboard)
+#' 
+#' if (interactive()){
+#'  
+#'   ui <- dashboardPage(
+#'     dashboardHeader(title = "ImportSpill"),
+#'     sidebar = dashboardSidebar(disable = TRUE),
+#'     body = dashboardBody(
+#'       box(title="Import", width = NULL, height = NULL,
+#'           ImportSpillUI("module")
+#'           )
+#'     )
+#'   )
+#' 
+#'   server <- function(input, output, session) {
+#'     rval <- reactiveValues()
+#'     observe({
+#'       utils::data("GvHD", package = "flowCore")
+#'       rval$gating_set <- GatingSet(GvHD)
+#'     })
+#' 
+#'     res <- callModule(ImportSpill, "module", rval = rval)
+#'   }
+#' 
+#'   shinyApp(ui, server)
+#' 
+#' }
+#' }
 ImportSpillUI <- function(id) {
   # Create a namespace function using the provided id
   ns <- NS(id)
   
   tagList(
-    fileInput(inputId = ns("spill_file"), 
-              label = "Choose file", 
+    fileInput(inputId = ns("file"),
+              label = "Choose file",
               multiple = FALSE),
     uiOutput(ns("ui_import_spill")),
-    
     box(title = "Preview",
-        width = NULL, collapsible = TRUE,
-        tabBox(
-          tabPanel(title = "Table",
-                   div(style = 'overflow-x: scroll', DT::DTOutput(ns("spill_imported")))
-                   ),
-          tabPanel(title  = "Heatmap",
-                   plotlyOutput(ns("heatmap_spill"))
-                   )
-        )
+        width = NULL, collapsible = TRUE, collapsed = FALSE,
+        div(style = 'overflow-x: scroll', DT::DTOutput(ns("spill_imported"))),
+        br()
     ),
     textInput(ns("spill_name"), "Matrix name", "CompMat"),
-    actionButton(ns("inport_matrix"), "import matrix"),
+    actionButton(ns("import_matrix"), "import matrix"),
     br(),
     br()
   )
@@ -38,8 +62,6 @@ ImportSpillUI <- function(id) {
 #' @param rval A reactive values object
 #' @return The Importd matrix
 #' @import shiny
-#' @importFrom heatmaply heatmaply
-#' @importFrom plotly renderPlotly event_data
 #' @importFrom DT renderDT
 #' @importFrom utils read.table
 #' @importFrom  stats median
@@ -56,25 +78,29 @@ ImportSpill <- function(input, output, session, rval) {
   })
   
   ### Import compensation matrix ##################################################################
-
-  output$ui_compute_spill <- renderUI({
+  
+  output$ui_import_spill <- renderUI({
+    
     
     ns <- session$ns
     
-    if(tools::file_ext(input$file$datapath) %in% c("csv", "txt")){
-      tagList(
-        selectInput(ns("sep_spill"), "column separator", 
-                  choices = c("comma", "semi-column", "tab", "space"), 
-                  selected = "tab")
-      )
+    if(!is.null(input$file$datapath)){
+      if(tools::file_ext(input$file$datapath) %in% c("csv", "txt")){
+        tagList(
+          selectInput(ns("sep_spill"), "column separator", 
+                    choices = c("comma", "semi-column", "tab", "space"), 
+                    selected = "tab")
+        )
+      }
+    }else{
+      NULL
     }
     
   })
 
   observe({
-    validate(
-      need(input$spill_file$datapath, "Please select a file to import")
-    )
+    validate(need(input$file$datapath, "Please select a file to import"))
+    validate(need(input$sep_spill, "Please select a file to import"))
 
     sep <- switch(input$sep_spill,
                   "comma" = ",",
@@ -82,82 +108,43 @@ ImportSpill <- function(input, output, session, rval) {
                   "tab" = "\t",
                   "space" = " ")
 
-    rval$df_spill_imported <- utils::read.table(file = input$spill_file$datapath,
+    df <- utils::read.table(file = input$file$datapath,
                                          sep = sep,
                                          fill = TRUE,
                                          quote = "\"",
                                          header = TRUE,
                                          check.names = FALSE)
+    
+    rval_mod$spill <- as.matrix(df)
 
   })
 
   output$spill_imported <- DT::renderDT({
-    validate(
-      need(rval$df_spill_imported, "No spillover data imported")
-    )
-    as.data.frame(rval$df_spill_imported)
+    validate(need(rval_mod$spill, "No spillover data imported"))
+    DT::datatable(rval_mod$spill, rownames = FALSE)
   })
 
-  observeEvent(input$set_spillover_matrix,{
-    df <- as.data.frame(rval$df_spill_imported)
-    row.names(df) <- colnames(df)
-    df <- df[row.names(df) %in% colnames(rval$flow_set), colnames(df) %in% colnames(rval$flow_set)]
-    rval$df_spill <- df
+  observeEvent(input$import_matrix, {
+    
+    rval_mod$spill_list <- list()
+    df <- rval_mod$spill
+    if(dim(df)[1] == dim(df)[2]){
+      row.names(df) <- colnames(df)
+      rval_mod$spill_list[[input$spill_name]] <- df
+    }else{
+      showModal(modalDialog(
+        title = "Error",
+        paste("Incorrect matrix dimensions", sep=""),
+        easyClose = TRUE,
+        footer = NULL
+      ))
+    }
 
-  })
-
-
-  observe({
-
-    validate(
-      need(length(input$file_comp)>0, "Please select a file to load")
-    )
-
-    sep <- switch(input$sep_comp,
-                  "comma" = ",",
-                  "semi-column" = ";",
-                  "tab" = "\t")
-
-    rval$df_comp <- read.csv(input$file_comp$datapath, sep = sep, header = TRUE, quote = "\"", fill = TRUE)
-    names(rval$df_comp)[1] <- "name"
-  })
-
-  observeEvent(input$import_comp, {
-    idx_match_row <- match(rval$pdata$name, rval$df_comp[,1])
-    idx_match_col <- match(rval$pdata$name, names(rval$df_comp))
-    rval$df_spill <- rval$df_comp[idx_match_row, idx_match_col]
+    
   })
   
   spill_matrix <- reactive({
-    rval_mod$spill
-  })
-  
-  output$heatmap_spill <- plotly::renderPlotly({
-    
-    validate(need(length(spill_matrix())>0, "No matrix computed"))
-    df <- as.data.frame(100*spill_matrix()[[1]])
-    df[df == 0] <- NA
-    df_log <- log10(df)
-    
-    p <- heatmaply::heatmaply(df_log,
-                              colors= viridis,
-                              plot_method="plotly",
-                              Rowv = NULL,
-                              Colv = NULL,
-                              column_text_angle = 90,
-                              xlab = "detection channel",
-                              ylab = "emitting fluorophore",
-                              fontsize_row = 10,
-                              fontsize_col = 10,
-                              cellnote_size = 6,
-                              hide_colorbar = TRUE,
-                              main = "spillover (%)",
-                              custom_hovertext = df,
-                              margins = c(50, 50, 50, 0)
-    )
-    
-    p
-    
+    rval_mod$spill_list
   })
   
   return(spill_matrix)
@@ -167,31 +154,27 @@ ImportSpill <- function(input, output, session, rval) {
 ### Tests ##############################################################################################
 # library(shiny)
 # library(shinydashboard)
-# library(plotly)
-# if (interactive()){
 # 
+# if (interactive()){
+#  
 #   ui <- dashboardPage(
-#     dashboardHeader(title = "ComputeSpill"),
+#     dashboardHeader(title = "ImportSpill"),
 #     sidebar = dashboardSidebar(disable = TRUE),
 #     body = dashboardBody(
-#       box(title="Compute", width = NULL, height = NULL,
-#           ComputeSpillUI("module")
+#       box(title="Import", width = NULL, height = NULL,
+#           ImportSpillUI("module")
 #           )
-# 
 #     )
 #   )
 # 
 #   server <- function(input, output, session) {
 #     rval <- reactiveValues()
 #     observe({
-#       #utils::data("GvHD", package = "flowCore")
-#       #rval$gating_set <- GatingSet(GvHD)
-#       load("../flowR_utils/demo-data/OC17BMGV/comp.rda")
-#       gs <- GatingSet(res$comp$flow_set)
-#       rval$gating_set <- gs
+#       utils::data("GvHD", package = "flowCore")
+#       rval$gating_set <- GatingSet(GvHD)
 #     })
 # 
-#     res <- callModule(ComputeSpill, "module", rval = rval)
+#     res <- callModule(ImportSpill, "module", rval = rval)
 #   }
 # 
 #   shinyApp(ui, server)

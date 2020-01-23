@@ -194,7 +194,6 @@ asinh_transform <- function(b=5, inverse = FALSE){
 #' @param n desired number of breaks (see \code{flow_trans()})
 #' @param equal.space whether breaks at equal-spaced intervals (see \code{flow_trans()})
 #' @importFrom flowWorkspace flow_trans
-#' @export
 asinh_trans <- function (..., n = 6, equal.space = FALSE){
   trans <- asinh_transform(...)
   inv <- asinh_transform(..., inverse = TRUE)

@@ -18,7 +18,7 @@ ComputeSpillUI <- function(id) {
     br(),
     br(),
     box(title = "Heatmap",
-        width = NULL, collapsible = TRUE,
+        width = NULL, collapsible = TRUE, collapsed = TRUE,
         plotlyOutput(ns("heatmap_spill"))
         )
   )
@@ -150,7 +150,7 @@ ComputeSpill <- function(input, output, session, rval) {
       
     }
     
-    print(df_spill)
+    #print(df_spill)
     rval_mod$spill[[input$spill_name]] <- df_spill
 
   })
