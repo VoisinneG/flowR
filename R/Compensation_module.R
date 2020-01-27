@@ -183,6 +183,11 @@ Compensation <- function(input, output, session, rval) {
     plot_params$yvar <- input$yvar_comp
   })
   
+  observeEvent(c(input$xvar_comp, input$yvar_comp, input$show_all_channels), {
+    
+    
+  })
+  
   observe({
     updateSelectInput(session, "xvar_comp",
                       choices = choices()$plot_var, selected = choices()$plot_var[1])
@@ -279,6 +284,19 @@ Compensation <- function(input, output, session, rval) {
   observeEvent(input$spill_per_sample_table_rows_selected, {
     samples <- names(rval_mod$spill_per_sample)[input$spill_per_sample_table_rows_selected]
     updateSelectInput(session, "selected_samples", selected = samples)
+    
+    if(length(input$spill_per_sample_table_rows_selected)>0){
+      CompMat <- rval_mod$spill_per_sample[input$spill_per_sample_table_rows_selected[1]]
+      updateSelectInput(session, "comp_mat", selected = CompMat)
+    }
+    
+    #update plot_params
+    for(var in intersect(names(res$params), names(plot_params))){
+      plot_params[[var]] <- res$params[[var]]
+    }
+    plot_params$sample <- samples
+    plot_params$facet_var <- "name"
+    
   })
     
     
@@ -304,8 +322,8 @@ Compensation <- function(input, output, session, rval) {
     
     df <- df[idx_match_row, idx_match_col]
     print(df)
-    
-    if(dim(df)[1]!=dim(df)[2]){
+    print(dim(df))
+    if(dim(df)[1]!=dim(df)[2] || dim(df)[1]==0 || dim(df)[2]==0){
       showModal(modalDialog(
         title = "Error",
         paste("Incorrect matrix dimensions", sep=""),
