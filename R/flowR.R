@@ -960,6 +960,7 @@ plot_hexagonal <- function(args = list()){
   option <- "viridis"
   
   if(length(unlist(args[c("xvar", "yvar")])) != 2 ){
+    warning("Incorrect dimensions")
     return(NULL)
   }
   
@@ -1010,6 +1011,7 @@ plot_histogram <- function(args = list()){
   alpha <- 0.1
   
   if(is.null(args["xvar"])){
+    warning("Incorrect dimensions")
     return(NULL)
   }
   
@@ -1120,6 +1122,7 @@ plot_dots <-function(args = list()){
   size <- 0.1
   
   if(length(unlist(args[c("xvar", "yvar")])) != 2 ){
+    warning("Incorrect dimensions")
     return(NULL)
   }
   
@@ -1207,6 +1210,7 @@ plot_contour <-function(args = list()){
   show_outliers <- FALSE
   
   if(length(unlist(args[c("xvar", "yvar")])) != 2 ){
+    warning("Incorrect dimensions")
     return(NULL)
   }
   

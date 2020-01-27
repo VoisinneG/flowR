@@ -481,8 +481,6 @@ plotGatingSet <- function(input, output, session,
   })
 
   
-  ### Update plot ##################################################################################
-
   ### Control update of plot data ##################################################################
   
   params_update_data <- reactive({
@@ -640,6 +638,12 @@ plotGatingSet <- function(input, output, session,
     split_variable  <- "xvar"
     if("split_var" %in% names(rval_input)){
       split_variable <- rval_input$split_var
+    }
+    
+    mono_var <- setdiff(c("xvar", "yvar", "color_var"), split_variable)
+    
+    for(var in mono_var){
+      plot_args[[var]] <- rval_input[[var]][1]
     }
     
     for(var in rval_input[[split_variable]]){

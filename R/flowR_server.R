@@ -29,7 +29,7 @@ flowR_server <- function(session, input, output, modules = NULL) {
   ### Build UI based on selected modules #######################################################
   
   observe({
-    default_modules <- c("Import", "Transform", "Compensation", "Gating", "Subsample", 
+    default_modules <- c("Import", "Metadata", "Transform", "Compensation", "Gating", "Subsample", 
                          "Clustering", "Dim_reduction", "Plotting", "GatingSets")
     if(is.null(modules)){
       rval$modules <- default_modules
