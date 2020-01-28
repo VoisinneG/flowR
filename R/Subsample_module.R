@@ -128,7 +128,7 @@ Subsample <- function(input, output, session, rval) {
     validate(need(length(selected$sample)>0, "No sample selected"))
     
    
-    if( input$gs_name %in% names(rval$gating_set_list) | nchar(input$gs_name)==0 ){
+      if( input$gs_name %in% names(rval$gating_set_list) | nchar(input$gs_name)==0 ){
       showModal(modalDialog(
         title = "Invalid GatingSet name",
         paste("Name is empty or already exists. Please choose another name", sep=""),

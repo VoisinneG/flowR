@@ -870,6 +870,8 @@ compute_stats <- function(df = NULL,
 #' @param Ncells number of cells to sample from the GatingSet
 #' @param spill spillover matrix. If NULL, uncompensated data is returned and used for gating.
 #' @param metadata a data.frame containing metadata associated to samples.
+#' @param vartype named character vector specifying variable type conversion.
+#' (either "factor", "integer" or "character")
 #' Must have a column \code{name} used for mapping.
 #' @return a data.frame
 get_plot_data <- function(gs,
@@ -904,6 +906,8 @@ get_plot_data <- function(gs,
   if(!is.null(vartype)){
     for(var in names(vartype)){
       if(vartype[[var]] %in% c("factor", "integer", "character")){
+        print("convert")
+        print(vartype[var])
         df[[var]] <- do.call(paste("as.", vartype[[var]], sep = ""), args = list(df[[var]]) )
       }
     }

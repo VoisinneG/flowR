@@ -395,7 +395,7 @@ Transform <- function(input, output, session, rval) {
       
       if(col_param == "vartype"){
         for(i in 1:length(rval$gating_set)){
-          desc_field <- paste("$P",info$row,"VARTYPE", sep="")
+          desc_field <- paste("$P", info$row, "VARTYPE", sep="")
           rval$gating_set@data[[i]]@description[[desc_field]] <- rval_mod$parameters[[col_param]][info$row]
         }
       }

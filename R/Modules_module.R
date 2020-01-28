@@ -119,8 +119,19 @@ Modules <- function(input, output, session, rval) {
           mod_ui_name <- pack_objs[grep("UI$", pack_objs)]
           if(length(mod_ui_name)>0){
             mod_name <- unlist(strsplit(mod_ui_name, split = "UI"))
+            
             mod_is_valid <- sapply(1:length(mod_name), function(x){
-              !is.na(match( mod_name[x], pack_objs ))})
+              server_exists <- !is.na(match( mod_name[x], pack_objs))
+              if(server_exists){
+                check_server_args <- all( c("input", "output",  "session", "rval") %in% 
+                                            names(formals(mod_name[x])))
+                check_ui_args <- "id" %in% names(formals(mod_ui_name[x]))
+                return(check_server_args & check_ui_args)
+              }else{
+                return(FALSE)
+              }
+            })
+            
             if(sum(mod_is_valid)>0){
               mod_name <- mod_name[mod_is_valid]
               df_info_list[[pack]] <- data.frame(package = rep(pack, length(mod_name)), 
@@ -141,7 +152,16 @@ Modules <- function(input, output, session, rval) {
           mod_name <- unlist(strsplit(mod_ui_name, split = "UI"))
           
           mod_is_valid <- sapply(1:length(mod_name), function(x){
-            !is.na(match( mod_name[x], pack_objs ))})
+            server_exists <- !is.na(match( mod_name[x], pack_objs))
+            if(server_exists){
+              check_server_args <- all( c("input", "output",  "session", "rval") %in% 
+                                         names(formals(mod_name[x])))
+              check_ui_args <- "id" %in% names(formals(mod_ui_name[x]))
+              return(check_server_args & check_ui_args)
+            }else{
+              return(FALSE)
+            }
+          })
           
           if(sum(mod_is_valid)>0){
             
