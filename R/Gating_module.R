@@ -102,7 +102,7 @@ GatingUI <- function(id) {
                            simpleDisplayUI(ns("simple_display_module"))
                   )
            ),
-           tabBox(title = "Gating hierarchy",
+           tabBox(title = "Hierarchy",
                   width = NULL, height = NULL,
                   tabPanel("Tree",
                            checkboxInput(ns("show_all_subsets"), 
@@ -120,18 +120,26 @@ GatingUI <- function(id) {
                            div(style = 'overflow-x: scroll', DT::DTOutput(ns("pop_stats"))),
                            br() 
                   ),
-                  tabPanel(title = "Import/Export",
+                  tabPanel(title = "Export",
                            br(),
                            downloadButton(ns("export_gh"), label = "Export Gating Hierarchy"),
                            br(),
-                           br(),
+                           br()
+                  ),
+                  tabPanel(title = "Import", 
                            fileInput(inputId = ns("import_gh"),
                                      label = "Import Gating Hierarchy",
-                                     multiple = FALSE),
-                           textInput(ns("pattern"), label = "Pattern", value  = "[\\<|\\>]"),
-                           textInput(ns("replacement"), label = "Replacement", value  = ""),
-                           numericInput(ns("time_step"), label = "Time step", value = 1),
-                           verbatimTextOutput(ns("import_gh_summary")),
+                                     multiple = FALSE
+                           ),
+                           box(title = "Transform gates", width = NULL, collapsible = TRUE, collapsed = TRUE,
+                               textInput(ns("pattern"), label = "Pattern", value  = "Comp-"),
+                               textInput(ns("replacement"), label = "Replacement", value  = ""),
+                               numericInput(ns("time_step"), label = "Time step", value = 1),
+                               actionButton(ns("transform_gates"), label = "Apply transformation")
+                           ),
+                           box(title = "Preview", width = NULL, collapsible = TRUE, collapsed = TRUE,
+                               verbatimTextOutput(ns("import_gh_summary"))
+                           ),
                            actionButton(ns("apply_gh"), label = "Apply Gating Hierarchy")
                   )
                   
@@ -532,6 +540,8 @@ Gating <- function(input, output, session, rval) {
     file_path <- input$import_gh$datapath
     if(file_ext(file_path) %in% c("wsp") ){
       rval_mod$gating_hierarchy <- get_gates_from_ws(ws_path = file_path)
+    }else if(file_ext(file_path) %in% c("xml") ){
+      rval_mod$gating_hierarchy <- get_gates_from_ws_diva(ws_path = file_path)
     }else if(file_ext(file_path) %in% c("rda", "Rda") ){
       res_name <- load(file_path)
       res <- get(res_name)
@@ -557,6 +567,7 @@ Gating <- function(input, output, session, rval) {
   
   
   observeEvent(input$apply_gh, {
+    validate(need(class(rval$gating_set)=="GatingSet", "No GatingSet available"))
     validate(need(length(rval_mod$gating_hierarchy)>0, "No gating hierarchy to apply"))
     
     old_gates <- gs_pop_get_children(obj = rval$gating_set[[1]], y = "root")
@@ -594,39 +605,39 @@ Gating <- function(input, output, session, rval) {
 # library(plotly)
 # library(ggridges)
 # 
-# if (interactive()){
-# 
-#   ui <- dashboardPage(
-#     dashboardHeader(title = "Gating"),
-#     sidebar = dashboardSidebar(disable = TRUE),
-#     body = dashboardBody(
-#       GatingUI("module")
-#     )
-#   )
-# 
-#   server <- function(input, output, session) {
-# 
-#     rval <- reactiveValues()
-# 
-#     observe({
-#       #load("../flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
-#       #fs <- build_flowset_from_df(df = res$cluster$data, origin = res$cluster$flow_set)
-#       #gs <- GatingSet(fs)
-#       #gs@transformation <-  res$cluster$transformation
-#       #add_gates_flowCore(gs, res$cluster$gates)
-#       #rval$gating_set <- gs
-#       #plot_params$sample <- pData(gs)$name[1]
-#       utils::data("GvHD", package = "flowCore")
-#       rval$gating_set <- GatingSet(GvHD)
-#       #gs <- load_gs("./inst/ext/gs")
-#       #rval$gating_set <- gs
-#     })
-# 
-#     res <- callModule(Gating, "module", rval = rval)
-# 
-#   }
-# 
-#   shinyApp(ui, server)
-# 
-# }
+if (interactive()){
+
+  ui <- dashboardPage(
+    dashboardHeader(title = "Gating"),
+    sidebar = dashboardSidebar(disable = TRUE),
+    body = dashboardBody(
+      GatingUI("module")
+    )
+  )
+
+  server <- function(input, output, session) {
+
+    rval <- reactiveValues()
+
+    observe({
+      #load("../flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
+      #fs <- build_flowset_from_df(df = res$cluster$data, origin = res$cluster$flow_set)
+      #gs <- GatingSet(fs)
+      #gs@transformation <-  res$cluster$transformation
+      #add_gates_flowCore(gs, res$cluster$gates)
+      #rval$gating_set <- gs
+      #plot_params$sample <- pData(gs)$name[1]
+      utils::data("GvHD", package = "flowCore")
+      rval$gating_set <- GatingSet(GvHD)
+      #gs <- load_gs("./inst/ext/gs")
+      #rval$gating_set <- gs
+    })
+
+    res <- callModule(Gating, "module", rval = rval)
+
+  }
+
+  shinyApp(ui, server)
+
+}
 

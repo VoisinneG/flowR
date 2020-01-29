@@ -1,29 +1,45 @@
 utils::globalVariables(c("df", "xvar", "yvar", "x", "y"))
 
-###### Parse workspace and gates from Diva xml files (.xml Diva workspace files) ###################
+###### Parse Diva workspace (.xml Diva workspace files) ######################################################
 
-parseTemplatesNodes <- function(x){
+#' Return the name of 'template' xml_node
+#' from a Diva xml workspace
+#' @param templateNode a 'template' xml_node from a Diva xml workspace
+#' @import xml2
+parseTemplatesNodesDiva <- function(templateNode){
+  x <- templateNode
   attrs <- as.list(xml_attrs(x))
   if("name" %in% names(attrs)){
     return(attrs$name)
   }else{return(NA)}
 }
 
+#' Return the names of all 'templates'
+#' from a Diva xml workspace
+#' @param ws_path path to the workspace
+#' @import xml2
 get_templates_from_ws_diva <- function(ws_path){
-  xt <- read_xml(ws_path)
-  templates <-  xml_find_all(xt, ".//worksheet_template")
-  template_names <- unlist(lapply(templates, parseTemplatesNodes))
+  ws <- read_xml(ws_path)
+  templates <-  xml_find_all(ws, ".//worksheet_template")
+  template_names <- unlist(lapply(templates, parseTemplatesNodesDiva))
   return(template_names[!is.na(template_names)])
 }
 
+#' Extract all gates from a Diva xml workspace
+#' @param ws_path path to the workspace
+#' @param template Names of the template to consider
+#' @import xml2
+#' @importFrom flowCore rectangleGate polygonGate
 get_gates_from_ws_diva <- function(ws_path, template = NULL){
   xt <- read_xml(ws_path)
   templates <-  xml_find_all(xt, ".//worksheet_template")
-  template_names <- unlist(lapply(templates, parseTemplatesNodes))
-  if(!is.null(template) & template %in% template_names){
-    idx_template <- which(template_names == template)
-  }else{
-    idx_template <- 1
+  template_names <- unlist(lapply(templates, parseTemplatesNodesDiva))
+  
+  idx_template <- 1
+  if(!is.null(template)){
+    if(template %in% template_names){
+      idx_template <- which(template_names == template)
+    }
   }
   
   gatesNode <- xml_find_first(templates[[idx_template]], ".//gates")
@@ -61,6 +77,10 @@ get_gates_from_ws_diva <- function(ws_path, template = NULL){
   return(gates)
 }
 
+#' Return relevant info from a 'gate' xml_node
+#' from a Diva xml workspace
+#' @param gateNode a 'gate' xml_node from a Diva xml workspace
+#' @import xml2
 parseGateDiva <- function(gateNode){
   
   res <- list()
@@ -79,7 +99,11 @@ parseGateDiva <- function(gateNode){
   parent <- xml_text(xml_find_all(gate, ".//parent"))
   
   parent <- gsub(fixed = FALSE, pattern = "\\\\", replacement = "/", x= parent)
-  parent <- gsub("All Events", "", parent)
+  if(parent == "All Events"){
+    parent <- "root"
+  }else{
+    parent <- gsub("All Events", "", parent)
+  }
   parent_long <- parent
   parent <- basename(parent)
   
@@ -127,10 +151,81 @@ parseGateDiva <- function(gateNode){
   
 }
 
-###### Parse workspace and gates from FlowJO workspace (.wsp flowJO workspace files) ################
+#' Extract spillover matrices from a Diva xml workspace
+#' @param ws_path path to the workspace
+#' @import xml2
+get_spillover_matrices_from_ws_diva <- function(ws_path){
+  ws <- read_xml(ws_path)
+  settingsNodes <-  xml_find_all(ws, ".//instrument_settings")
+  spill_list <- lapply(settingsNodes[1], parseSpilloverMatrixDiva)
+  spill_names <- unlist(lapply(settingsNodes[1], function(x){as.list(xml_attrs(x))$name}))
+  names(spill_list) <- spill_names
+  return(spill_list)
+}
 
-#' Return the name and ID of a SampleNode section
-#' @param x a xml document
+#' Return the spillover matrix associated with a 'instrument_settings' xml_node
+#' from a Diva xml workspace
+#' @param settingsNode a 'instrument_settings' xml_node from a Diva xml workspace
+#' @import xml2
+#' @importFrom reshape2 acast
+parseSpilloverMatrixDiva <- function(settingsNode){
+  x <- settingsNode
+  parameterNodes <- xml_find_all(x, ".//parameter")
+  spill_parameters <- unlist(lapply(parameterNodes, function(x){
+    name <- as.list(xml_attrs(x))$name
+    can_be_comp <- xml_text(xml_find_first(x, ".//can_be_compensated"))
+    is_comp <- FALSE
+    if(!is.na(can_be_comp)){
+      if(can_be_comp == "true"){
+        is_comp <- TRUE
+      }
+    }
+    if(is_comp){
+      return(name)
+    }else{
+      return(NULL)
+    }
+  }))
+  df_spillover_list <- lapply(parameterNodes, function(x){
+    name <- as.list(xml_attrs(x))$name
+    if(name %in% spill_parameters){
+      df <- parseCompensationDiva(x)
+      df$parameter <- spill_parameters
+      return(df)
+    }else{
+      return(NULL)
+    }
+  })
+  df_spillover <- do.call(rbind, df_spillover_list)
+  compMat <- reshape2::acast(df_spillover, parameter ~ input)
+  return(compMat)
+}
+
+#' Return the spillover coefficients associated with a 'parameter' xml_node
+#' from a Diva xml workspace
+#' @param parameterNode a 'parameter' xml_node from a Diva xml workspace
+#' @import xml2
+parseCompensationDiva <- function(parameterNode){
+  x <- parameterNode
+  name <- as.list(xml_attrs(x))$name
+  is_comp <- xml_text(xml_find_first(x, ".//can_be_compensated"))
+  compensationNode <- xml_find_first(x, ".//compensation")
+  coeffNodes <- xml_find_all(compensationNode, ".//compensation_coefficient")
+  coeffs <- unlist(lapply(coeffNodes, function(x){xml_double(x)}))
+  if(!is.null(coeffs)){
+    df <- data.frame(value = coeffs)
+    df$input <- name
+    return(df)
+  }else{
+    return(NULL)
+  }
+}
+
+###### Parse FlowJO workspace (.wsp flowJO workspace files) ##################################################
+
+#' Return the name and ID of a SampleNode xml_node 
+#' from a FlowJO wsp
+#' @param x a xml_document object 
 #' @import xml2
 parseSampleNodes <- function(x){
   name <- xml_text(xml_find_all(x, ".//@name"))[1]
@@ -138,8 +233,9 @@ parseSampleNodes <- function(x){
   return(list("name" = name, "sampleID" = sampleID))
 }
 
-#' Return the name and IDs of samples in a  GroupNode section
-#' @param x a xml document
+#' Return the name and IDs of samples in a  GroupNode xml_node
+#' from a flowJO wsp
+#' @param x a xml_document object
 #' @import xml2
 parseGroupNodes <- function(x){
   name <- xml_text(xml_find_all(x, ".//@name"))[1]
@@ -147,8 +243,9 @@ parseGroupNodes <- function(x){
   return(list("name" = name, "sampleID" = sampleID))
 }
 
-#' find all parent gates of a given Gate section, recursively
-#' @param x a xml document
+#' find, in a recursive manner, all parent gates of a given Gate xml_node
+#' from a FlowJO wsp
+#' @param x a Gate xml_node from a FlowJO wsp
 #' @import xml2
 find_all_parent_gates <- function(x){
   all_parents <- NULL
@@ -168,7 +265,7 @@ find_all_parent_gates <- function(x){
   return(all_parents)
 }
 
-#' Extract all gates from a flowJO workspace
+#' Extract all gates from a FlowJO workspace
 #' @param ws_path path to the workspace
 #' @param group Names of the sample groups to be considered
 #' @import xml2
@@ -239,8 +336,8 @@ get_gates_from_ws <- function(ws_path, group = NULL){
   
 }
 
-#' Return relevant info from a Gate section
-#' @param x a xml document
+#' Return relevant info from a Gate xml_node
+#' @param x a Gate xml_node from a FlowJO wsp
 #' @import xml2
 parseGate <- function(x){
   res <- list()
@@ -292,7 +389,46 @@ parseGate <- function(x){
   return(res)
 }
 
+#' Extract spillover matrices from a FlowJO workspace
+#' @param ws_path path to the workspace
+#' @import xml2
+get_spillover_matrices_from_ws <- function(ws_path){
+  ws <- read_xml(ws_path)
+  spilloverMatrixNodes <- xml_children(xml_find_first(ws, ".//Matrices"))
+  spill_list <- lapply(spilloverMatrixNodes, parseSpilloverMatrix)
+  spill_names <- unlist(lapply(spilloverMatrixNodes, function(x){as.list(xml_attrs(x))$name}))
+  names(spill_list) <- spill_names
+  return(spill_list)
+}
 
+#' Return the spillover matrix associated with a spilloverMatrix xml_node
+#' from a flowJO wsp
+#' @param x a spilloverMatrix xml_node from a FlowJO wsp
+#' @import xml2
+#' @importFrom reshape2 acast
+parseSpilloverMatrix <- function(x){
+  params_list <- xml_find_all(xml_find_first(x, ".//data-type:parameters"), ".//data-type:parameter")
+  parameters <- unlist(lapply(params_list, function(x){as.list(xml_attrs(x))$name}))
+  spilloverNodes <- xml_find_all(x, ".//transforms:spillover")
+  df_spillover_list <- lapply(spilloverNodes, parseSpillover)
+  df_spillover <- do.call(rbind, df_spillover_list)
+  compMat <- reshape2::acast(df_spillover, parameter ~ input)
+  return(compMat)
+}
+
+#' Return the spillover coefficients associated with a spillover xml_node
+#' from a flowJO wsp
+#' @param x a spillover xml_node from a FlowJO wsp
+#' @import xml2
+parseSpillover <- function(x){
+  parameter <- as.list(xml_attrs(x))$parameter
+  coeffNodes <- xml_find_all(x, ".//transforms:coefficient")
+  coeffs <- lapply(coeffNodes, function(x){xml_attrs(x)})
+  df <- as.data.frame(do.call(rbind, coeffs), stringsAsFactors = FALSE)
+  df$input <- parameter
+  df$value <- as.numeric(df$value)
+  return(df)
+}
 ###### Transformations #########################################################################
 
 
