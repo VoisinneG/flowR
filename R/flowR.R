@@ -124,8 +124,6 @@ parseGateDiva <- function(gateNode){
   points <- xml_find_first(region, ".//points")
   vertexes <- xml_find_all(points, ".//point")
   
-  print(res$diva_type)
-  
   m <- do.call(rbind, lapply(vertexes, function(v){
     x <- as.numeric(xml_attr(v, "x"))
     y <- as.numeric(xml_attr(v, "y"))
@@ -134,8 +132,6 @@ parseGateDiva <- function(gateNode){
   }))
   m <- as.matrix(m)
   colnames(m) <- c(xparm, yparm)
-  
-  print(m)
   
   if(type == "INTERVAL_REGION"){
     res <- c(res, list("type" = "RectangleGate",
@@ -171,6 +167,7 @@ get_spillover_matrices_from_ws_diva <- function(ws_path){
 parseSpilloverMatrixDiva <- function(settingsNode){
   x <- settingsNode
   parameterNodes <- xml_find_all(x, ".//parameter")
+  
   spill_parameters <- unlist(lapply(parameterNodes, function(x){
     name <- as.list(xml_attrs(x))$name
     can_be_comp <- xml_text(xml_find_first(x, ".//can_be_compensated"))
@@ -186,6 +183,7 @@ parseSpilloverMatrixDiva <- function(settingsNode){
       return(NULL)
     }
   }))
+  
   df_spillover_list <- lapply(parameterNodes, function(x){
     name <- as.list(xml_attrs(x))$name
     if(name %in% spill_parameters){
@@ -196,6 +194,7 @@ parseSpilloverMatrixDiva <- function(settingsNode){
       return(NULL)
     }
   })
+  
   df_spillover <- do.call(rbind, df_spillover_list)
   compMat <- reshape2::acast(df_spillover, parameter ~ input)
   return(compMat)
@@ -208,7 +207,6 @@ parseSpilloverMatrixDiva <- function(settingsNode){
 parseCompensationDiva <- function(parameterNode){
   x <- parameterNode
   name <- as.list(xml_attrs(x))$name
-  is_comp <- xml_text(xml_find_first(x, ".//can_be_compensated"))
   compensationNode <- xml_find_first(x, ".//compensation")
   coeffNodes <- xml_find_all(compensationNode, ".//compensation_coefficient")
   coeffs <- unlist(lapply(coeffNodes, function(x){xml_double(x)}))
@@ -263,6 +261,19 @@ find_all_parent_gates <- function(x){
     
   }
   return(all_parents)
+}
+
+#' Return the names of all 'groups'
+#' from a FlowJO workspace
+#' @param ws_path path to the workspace
+#' @import xml2
+get_groups_from_ws <- function(ws_path){
+  ws <- read_xml(ws_path)
+  GroupNodes <- xml_find_all(ws, "//GroupNode")
+  group_names <- unlist(lapply(GroupNodes, function(x){
+    parseGroupNodes(x)$name
+    }))
+  return(group_names)
 }
 
 #' Extract all gates from a FlowJO workspace

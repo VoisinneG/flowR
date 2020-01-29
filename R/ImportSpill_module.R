@@ -42,12 +42,7 @@ ImportSpillUI <- function(id) {
               label = "Choose file",
               multiple = FALSE),
     uiOutput(ns("ui_import_spill")),
-    box(title = "Preview",
-        width = NULL, collapsible = TRUE, collapsed = FALSE,
-        div(style = 'overflow-x: scroll', DT::DTOutput(ns("spill_imported"))),
-        br()
-    ),
-    textInput(ns("spill_name"), "Matrix name", "CompMat"),
+    uiOutput(ns("ui_preview_spill")),
     actionButton(ns("import_matrix"), "import matrix"),
     br(),
     br()
@@ -79,49 +74,105 @@ ImportSpill <- function(input, output, session, rval) {
   
   ### Import compensation matrix ##################################################################
   
+  observeEvent(c(input$file, input$sep_spill, input$spill_name), {
+    
+    rval_mod$imported_matrix_list <- list()
+    
+    if(tools::file_ext(input$file$datapath) %in% c("csv", "txt")){
+      if(!is.null(input$sep_spill) & !is.null(input$spill_name)){
+        sep <- switch(input$sep_spill,
+                      "comma" = ",",
+                      "semi-column" = ";",
+                      "tab" = "\t",
+                      "space" = " ")
+        
+        df <- utils::read.table(file = input$file$datapath,
+                                sep = sep,
+                                fill = TRUE,
+                                quote = "\"",
+                                header = TRUE,
+                                check.names = FALSE)
+        
+        rval_mod$imported_matrix_list[[input$spill_name]] <- as.matrix(df)
+      }
+    }else if(tools::file_ext(input$file$datapath) %in% c("wsp")){
+      rval_mod$imported_matrix_list <- get_spillover_matrices_from_ws(input$file$datapath)
+    }else if(tools::file_ext(input$file$datapath) %in% c("xml")){
+      rval_mod$imported_matrix_list <- get_spillover_matrices_from_ws_diva(input$file$datapath)
+    }
+  })
+  
+  
+  # observeEvent(input$file, {
+  #   
+  # })
+  
+  # observe({
+  #   ns <- session$ns
+  #   rval_mod$import_items[["preview"]] <- box(title = "Preview",
+  #                         width = NULL, collapsible = TRUE, collapsed = FALSE,
+  #                         selectInput(ns("select_spill_matrix_imported"), "Select matrix", 
+  #                                     choices = names(rval_mod$imported_matrix_list), 
+  #                                     selected = names(rval_mod$imported_matrix_list)[1]),
+  #                         div(style = 'overflow-x: scroll', DT::DTOutput(ns("spill_imported"))),
+  #                         br()
+  #   )
+  # })
+    
   output$ui_import_spill <- renderUI({
-    
-    
     ns <- session$ns
-    
+    x <- list()
     if(!is.null(input$file$datapath)){
       if(tools::file_ext(input$file$datapath) %in% c("csv", "txt")){
-        tagList(
-          selectInput(ns("sep_spill"), "column separator", 
-                    choices = c("comma", "semi-column", "tab", "space"), 
-                    selected = "tab")
-        )
+        
+        x[["sep_spill"]] <- selectInput(ns("sep_spill"), "column separator", 
+                                        choices = c("comma", "semi-column", "tab", "space"), 
+                                        selected = "tab")
+        
+        x[["spill_name"]] <- textInput(ns("spill_name"), "Matrix name", "CompMat")
+        
       }
-    }else{
-      NULL
     }
-    
+    tagList(x)
   })
 
-  observe({
-    validate(need(input$file$datapath, "Please select a file to import"))
-    validate(need(input$sep_spill, "Please select a file to import"))
-
-    sep <- switch(input$sep_spill,
-                  "comma" = ",",
-                  "semi-column" = ";",
-                  "tab" = "\t",
-                  "space" = " ")
-
-    df <- utils::read.table(file = input$file$datapath,
-                                         sep = sep,
-                                         fill = TRUE,
-                                         quote = "\"",
-                                         header = TRUE,
-                                         check.names = FALSE)
-    
-    rval_mod$spill <- as.matrix(df)
-
+  output$ui_preview_spill <- renderUI({
+    ns <- session$ns
+    tagList(box(title = "Preview",
+        width = NULL, collapsible = TRUE, collapsed = FALSE,
+        selectInput(ns("select_spill_matrix_imported"), "Select matrix", 
+                    choices = names(rval_mod$imported_matrix_list), 
+                    selected = names(rval_mod$imported_matrix_list)[1]),
+        div(style = 'overflow-x: scroll', DT::DTOutput(ns("spill_imported"))),
+        br()
+    ))
   })
+  # observe({
+  #   validate(need(input$file$datapath, "Please select a file to import"))
+  #   validate(need(input$sep_spill, "Please select a file to import"))
+  # 
+  #   sep <- switch(input$sep_spill,
+  #                 "comma" = ",",
+  #                 "semi-column" = ";",
+  #                 "tab" = "\t",
+  #                 "space" = " ")
+  # 
+  #   df <- utils::read.table(file = input$file$datapath,
+  #                                        sep = sep,
+  #                                        fill = TRUE,
+  #                                        quote = "\"",
+  #                                        header = TRUE,
+  #                                        check.names = FALSE)
+  #   
+  #   rval_mod$spill <- as.matrix(df)
+  # 
+  # })
 
   output$spill_imported <- DT::renderDT({
-    validate(need(rval_mod$spill, "No spillover data imported"))
-    DT::datatable(rval_mod$spill, rownames = FALSE)
+    validate(need(rval_mod$imported_matrix_list, "No spillover data imported"))
+    validate(need(input$select_spill_matrix_imported, "No selection"))
+    DT::datatable(rval_mod$imported_matrix_list[[input$select_spill_matrix_imported]], 
+                  rownames = FALSE)
   })
 
   observeEvent(input$import_matrix, {
@@ -155,28 +206,28 @@ ImportSpill <- function(input, output, session, rval) {
 # library(shiny)
 # library(shinydashboard)
 # 
-# if (interactive()){
-#  
-#   ui <- dashboardPage(
-#     dashboardHeader(title = "ImportSpill"),
-#     sidebar = dashboardSidebar(disable = TRUE),
-#     body = dashboardBody(
-#       box(title="Import", width = NULL, height = NULL,
-#           ImportSpillUI("module")
-#           )
-#     )
-#   )
-# 
-#   server <- function(input, output, session) {
-#     rval <- reactiveValues()
-#     observe({
-#       utils::data("GvHD", package = "flowCore")
-#       rval$gating_set <- GatingSet(GvHD)
-#     })
-# 
-#     res <- callModule(ImportSpill, "module", rval = rval)
-#   }
-# 
-#   shinyApp(ui, server)
-# 
-# }
+if (interactive()){
+
+  ui <- dashboardPage(
+    dashboardHeader(title = "ImportSpill"),
+    sidebar = dashboardSidebar(disable = TRUE),
+    body = dashboardBody(
+      box(title="Import", width = NULL, height = NULL,
+          ImportSpillUI("module")
+          )
+    )
+  )
+
+  server <- function(input, output, session) {
+    rval <- reactiveValues()
+    observe({
+      utils::data("GvHD", package = "flowCore")
+      rval$gating_set <- GatingSet(GvHD)
+    })
+
+    res <- callModule(ImportSpill, "module", rval = rval)
+  }
+
+  shinyApp(ui, server)
+
+}

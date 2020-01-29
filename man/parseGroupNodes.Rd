@@ -2,13 +2,15 @@
 % Please edit documentation in R/flowR.R
 \name{parseGroupNodes}
 \alias{parseGroupNodes}
-\title{Return the name and IDs of samples in a  GroupNode section}
+\title{Return the name and IDs of samples in a  GroupNode xml_node
+from a flowJO wsp}
 \usage{
 parseGroupNodes(x)
 }
 \arguments{
-\item{x}{a xml document}
+\item{x}{a xml_document object}
 }
 \description{
-Return the name and IDs of samples in a  GroupNode section
+Return the name and IDs of samples in a  GroupNode xml_node
+from a flowJO wsp
 }

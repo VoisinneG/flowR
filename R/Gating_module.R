@@ -131,7 +131,8 @@ GatingUI <- function(id) {
                                      label = "Import Gating Hierarchy",
                                      multiple = FALSE
                            ),
-                           box(title = "Transform gates", width = NULL, collapsible = TRUE, collapsed = TRUE,
+                           uiOutput(ns("import_options")),
+                           box(title = "Transform", width = NULL, collapsible = TRUE, collapsed = TRUE,
                                textInput(ns("pattern"), label = "Pattern", value  = "Comp-"),
                                textInput(ns("replacement"), label = "Replacement", value  = ""),
                                numericInput(ns("time_step"), label = "Time step", value = 1),
@@ -525,6 +526,22 @@ Gating <- function(input, output, session, rval) {
 
   ### Import/Export Gating Hierarchy ##############################################################
   
+  output$import_options <- renderUI({
+    ns <- session$ns
+    x <- list()
+    file_path <- input$import_gh$datapath
+    if(!is.null(file_path)){
+      if(file_ext(file_path) %in% c("xml")){
+        choices <- get_templates_from_ws_diva(file_path)
+        x[[1]] <- selectInput(ns("template"), "Template", choices = choices, selected = choices[1])
+      }else if(file_ext(file_path) %in% c("wsp")){
+        choices <- get_groups_from_ws(file_path)
+        x[[1]] <- selectInput(ns("group"), "Group", choices = choices, selected = choices[1])
+      }
+    }
+    tagList(x)
+  })
+  
   output$export_gh <- downloadHandler(
     filename = "gates.rda",
     content = function(file) {
@@ -533,15 +550,19 @@ Gating <- function(input, output, session, rval) {
     }
   )
   
-  observeEvent(input$import_gh, {
+  observeEvent(c(input$import_gh, input$template, input$group), {
     validate(
       need(input$import_gh$datapath, "Please select a file")
     )
     file_path <- input$import_gh$datapath
     if(file_ext(file_path) %in% c("wsp") ){
-      rval_mod$gating_hierarchy <- get_gates_from_ws(ws_path = file_path)
+      rval_mod$gating_hierarchy <- get_gates_from_ws(
+        ws_path = file_path,
+        group = input$group)
     }else if(file_ext(file_path) %in% c("xml") ){
-      rval_mod$gating_hierarchy <- get_gates_from_ws_diva(ws_path = file_path)
+      rval_mod$gating_hierarchy <- get_gates_from_ws_diva(
+        ws_path = file_path,
+        template = input$template)
     }else if(file_ext(file_path) %in% c("rda", "Rda") ){
       res_name <- load(file_path)
       res <- get(res_name)
@@ -554,7 +575,7 @@ Gating <- function(input, output, session, rval) {
   })
   
   output$import_gh_summary <- renderPrint({
-    print(paste(length(rval_mod$gating_hierarchy), "gates imported"))
+    print(paste("Number of gates imported :",length(rval_mod$gating_hierarchy)))
     print(rval_mod$gating_hierarchy)
   })
   
@@ -565,6 +586,15 @@ Gating <- function(input, output, session, rval) {
     updateNumericInput(session, "time_step", value = time_step)
   })
   
+  observeEvent(input$transform_gates, {
+    validate(need(length(rval_mod$gating_hierarchy)>0, "No gating hierarchy to apply"))
+    new_gates <- transform_gates(gates = rval_mod$gating_hierarchy, 
+                                 transformation = NULL,
+                                 pattern = input$pattern, 
+                                 replacement = input$replacement,
+                                 time_step = input$time_step)
+    rval_mod$gating_hierarchy <- new_gates
+  })
   
   observeEvent(input$apply_gh, {
     validate(need(class(rval$gating_set)=="GatingSet", "No GatingSet available"))
@@ -575,12 +605,6 @@ Gating <- function(input, output, session, rval) {
         flowWorkspace::gs_pop_remove(gs = rval$gating_set, node = gate)
     }
     new_gates <- rval_mod$gating_hierarchy
-    new_gates <- transform_gates(gates = new_gates, 
-                                 transformation = NULL,
-                                 pattern = input$pattern, 
-                                 replacement = input$replacement,
-                                 time_step = input$time_step)
-    
     add_gates_flowCore(gs = rval$gating_set, gates = new_gates)
     rval$update_gs <- rval$update_gs + 1
 
@@ -605,39 +629,41 @@ Gating <- function(input, output, session, rval) {
 # library(plotly)
 # library(ggridges)
 # 
-if (interactive()){
-
-  ui <- dashboardPage(
-    dashboardHeader(title = "Gating"),
-    sidebar = dashboardSidebar(disable = TRUE),
-    body = dashboardBody(
-      GatingUI("module")
-    )
-  )
-
-  server <- function(input, output, session) {
-
-    rval <- reactiveValues()
-
-    observe({
-      #load("../flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
-      #fs <- build_flowset_from_df(df = res$cluster$data, origin = res$cluster$flow_set)
-      #gs <- GatingSet(fs)
-      #gs@transformation <-  res$cluster$transformation
-      #add_gates_flowCore(gs, res$cluster$gates)
-      #rval$gating_set <- gs
-      #plot_params$sample <- pData(gs)$name[1]
-      utils::data("GvHD", package = "flowCore")
-      rval$gating_set <- GatingSet(GvHD)
-      #gs <- load_gs("./inst/ext/gs")
-      #rval$gating_set <- gs
-    })
-
-    res <- callModule(Gating, "module", rval = rval)
-
-  }
-
-  shinyApp(ui, server)
-
-}
+# if (interactive()){
+# 
+#   ui <- dashboardPage(
+#     dashboardHeader(title = "Gating"),
+#     sidebar = dashboardSidebar(disable = TRUE),
+#     body = dashboardBody(
+#       GatingUI("module")
+#     )
+#   )
+# 
+#   server <- function(input, output, session) {
+# 
+#     rval <- reactiveValues()
+# 
+#     observe({
+#       fs <- read.ncdfFlowSet(files = "../flowR_utils/demo-data/JL04BMVLG-Valentin/Tumor_T_001_012.fcs")
+#       rval$gating_set <- GatingSet(fs)
+#       #load("../flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
+#       #fs <- build_flowset_from_df(df = res$cluster$data, origin = res$cluster$flow_set)
+#       #gs <- GatingSet(fs)
+#       #gs@transformation <-  res$cluster$transformation
+#       #add_gates_flowCore(gs, res$cluster$gates)
+#       #rval$gating_set <- gs
+#       #plot_params$sample <- pData(gs)$name[1]
+#       #utils::data("GvHD", package = "flowCore")
+#       #rval$gating_set <- GatingSet(GvHD)
+#       #gs <- load_gs("./inst/ext/gs")
+#       #rval$gating_set <- gs
+#     })
+# 
+#     res <- callModule(Gating, "module", rval = rval)
+# 
+#   }
+# 
+#   shinyApp(ui, server)
+# 
+# }
 
