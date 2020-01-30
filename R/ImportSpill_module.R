@@ -41,9 +41,9 @@ ImportSpillUI <- function(id) {
     fileInput(inputId = ns("file"),
               label = "Choose file",
               multiple = FALSE),
-    uiOutput(ns("ui_import_spill")),
-    uiOutput(ns("ui_preview_spill")),
-    actionButton(ns("import_matrix"), "import matrix"),
+    uiOutput(ns("ui_import_options")),
+    uiOutput(ns("ui_preview")),
+    actionButton(ns("import"), "Import"),
     br(),
     br()
   )
@@ -60,6 +60,7 @@ ImportSpillUI <- function(id) {
 #' @importFrom DT renderDT
 #' @importFrom utils read.table
 #' @importFrom  stats median
+#' @importFrom RcolorBrewer brewer.pal
 #' @rdname ImportSpillUI
 ImportSpill <- function(input, output, session, rval) {
 
@@ -99,27 +100,26 @@ ImportSpill <- function(input, output, session, rval) {
       rval_mod$imported_matrix_list <- get_spillover_matrices_from_ws(input$file$datapath)
     }else if(tools::file_ext(input$file$datapath) %in% c("xml")){
       rval_mod$imported_matrix_list <- get_spillover_matrices_from_ws_diva(input$file$datapath)
+    }else if(tools::file_ext(input$file$datapath) %in% c("fcs", "FCS")){
+      fs <- read.ncdfFlowSet(files = input$file$datapath[1])
+      desc <- flowCore::description(fs[[1]])
+      if("SPILL" %in% names(desc)){
+        comp_mat <- desc[["SPILL"]]
+        row.names(comp_mat) <- colnames(comp_mat)
+        rval_mod$imported_matrix_list[[input$file$name[1]]] <- as.matrix(comp_mat)
+      }else{
+        showModal(modalDialog(
+          title = "Error",
+          paste("No 'SPILL' item in .fcs file ", sep=""),
+          easyClose = TRUE,
+          footer = NULL
+        ))
+      }
     }
   })
   
   
-  # observeEvent(input$file, {
-  #   
-  # })
-  
-  # observe({
-  #   ns <- session$ns
-  #   rval_mod$import_items[["preview"]] <- box(title = "Preview",
-  #                         width = NULL, collapsible = TRUE, collapsed = FALSE,
-  #                         selectInput(ns("select_spill_matrix_imported"), "Select matrix", 
-  #                                     choices = names(rval_mod$imported_matrix_list), 
-  #                                     selected = names(rval_mod$imported_matrix_list)[1]),
-  #                         div(style = 'overflow-x: scroll', DT::DTOutput(ns("spill_imported"))),
-  #                         br()
-  #   )
-  # })
-    
-  output$ui_import_spill <- renderUI({
+  output$ui_import_options <- renderUI({
     ns <- session$ns
     x <- list()
     if(!is.null(input$file$datapath)){
@@ -136,7 +136,7 @@ ImportSpill <- function(input, output, session, rval) {
     tagList(x)
   })
 
-  output$ui_preview_spill <- renderUI({
+  output$ui_preview <- renderUI({
     ns <- session$ns
     tagList(box(title = "Preview",
         width = NULL, collapsible = TRUE, collapsed = FALSE,
@@ -171,63 +171,68 @@ ImportSpill <- function(input, output, session, rval) {
   output$spill_imported <- DT::renderDT({
     validate(need(rval_mod$imported_matrix_list, "No spillover data imported"))
     validate(need(input$select_spill_matrix_imported, "No selection"))
-    DT::datatable(rval_mod$imported_matrix_list[[input$select_spill_matrix_imported]], 
-                  rownames = FALSE)
+
+    df <- rval_mod$imported_matrix_list[[input$select_spill_matrix_imported]]
+    df <- format_style_comp_matrix(df, editable = 'none')
+    
+    return(df)
   })
 
-  observeEvent(input$import_matrix, {
+  observeEvent(input$import, {
     
     rval_mod$spill_list <- list()
-    df <- rval_mod$spill
-    if(dim(df)[1] == dim(df)[2]){
-      row.names(df) <- colnames(df)
-      rval_mod$spill_list[[input$spill_name]] <- df
-    }else{
+    df <- rval_mod$imported_matrix_list[[input$select_spill_matrix_imported]]
+    check_spill_dim <- dim(df)[1] == dim(df)[2]
+    
+    if(!check_spill_dim){
+      name <- input$select_spill_matrix_imported
       showModal(modalDialog(
         title = "Error",
-        paste("Incorrect matrix dimensions", sep=""),
+        paste("Incorrect dimensions for matrix ", name, sep=""),
         easyClose = TRUE,
         footer = NULL
       ))
+    }else{
+      rval_mod$spill_list[[input$select_spill_matrix_imported]] <- df
     }
-
     
   })
   
-  spill_matrix <- reactive({
+  spill_matrix_list <- reactive({
     rval_mod$spill_list
   })
   
-  return(spill_matrix)
+  return(spill_matrix_list)
   
 }
+
 
 ### Tests ##############################################################################################
 # library(shiny)
 # library(shinydashboard)
 # 
-if (interactive()){
-
-  ui <- dashboardPage(
-    dashboardHeader(title = "ImportSpill"),
-    sidebar = dashboardSidebar(disable = TRUE),
-    body = dashboardBody(
-      box(title="Import", width = NULL, height = NULL,
-          ImportSpillUI("module")
-          )
-    )
-  )
-
-  server <- function(input, output, session) {
-    rval <- reactiveValues()
-    observe({
-      utils::data("GvHD", package = "flowCore")
-      rval$gating_set <- GatingSet(GvHD)
-    })
-
-    res <- callModule(ImportSpill, "module", rval = rval)
-  }
-
-  shinyApp(ui, server)
-
-}
+# if (interactive()){
+# 
+#   ui <- dashboardPage(
+#     dashboardHeader(title = "ImportSpill"),
+#     sidebar = dashboardSidebar(disable = TRUE),
+#     body = dashboardBody(
+#       box(title="Import", width = NULL, height = NULL,
+#           ImportSpillUI("module")
+#           )
+#     )
+#   )
+# 
+#   server <- function(input, output, session) {
+#     rval <- reactiveValues()
+#     observe({
+#       utils::data("GvHD", package = "flowCore")
+#       rval$gating_set <- GatingSet(GvHD)
+#     })
+# 
+#     res <- callModule(ImportSpill, "module", rval = rval)
+#   }
+# 
+#   shinyApp(ui, server)
+# 
+# }

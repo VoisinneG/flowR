@@ -1235,7 +1235,7 @@ plot_hexagonal <- function(args = list()){
   bins <- 100
   use_log10_count <- TRUE
   option <- "viridis"
-  
+  print("plot hex")
   if(length(unlist(args[c("xvar", "yvar")])) != 2 ){
     warning("Incorrect dimensions")
     return(NULL)
@@ -2565,7 +2565,107 @@ scale_values <- function(df, id.vars = NULL){
   df_scale
 }
 
+### compensation ##################################################################################
 
+matrix_equal <- function(x, y){
+  is.matrix(x) && is.matrix(y) && dim(x) == dim(y) && all(x == y)
+}
+#' @importFrom htmlwidgets JS
+#' @importFrom DT datatable formatRound formatStyle styleInterval
+#' @importFrom RColorBrewer brewer.pal
+format_style_comp_matrix <- function(df, editable = 'none', rownames = TRUE){
+  
+  df <- as.matrix(df)
+  do_formatting <- is.numeric(df[1])
+  
+  if(do_formatting){
+    
+    headerCallback <- c(
+      "function(thead, data, start, end, display){",
+      "  var $ths = $(thead).find('th');",
+      "  $ths.css({'vertical-align': 'bottom', 'white-space': 'nowrap'});",
+      "  var betterCells = [];",
+      "  $ths.each(function(){",
+      "    var cell = $(this);",
+      "    var newDiv = $('<div>', {height: 'auto', width: cell.height()});",
+      "    var newInnerDiv = $('<div>', {text: cell.text()});",
+      "    newDiv.css({margin: 'auto'});",
+      "    newInnerDiv.css({",
+      "      transform: 'rotate(180deg)',",
+      "      'writing-mode': 'tb-rl',",
+      "      'white-space': 'nowrap'",
+      "    });",
+      "    newDiv.append(newInnerDiv);",
+      "    betterCells.push(newDiv);",
+      "  });",
+      "  $ths.each(function(i){",
+      "    $(this).html(betterCells[i]);",
+      "  });",
+      "}"
+    )
+    
+    colors <- c(RColorBrewer::brewer.pal(n = 9, name = "Blues")[10-(1:9)], 
+                RColorBrewer::brewer.pal(n = 9, name = "Reds")[1:9])
+    colnames(df) <- unlist(lapply(strsplit(colnames(df), split="-"), function(x){
+      paste(unlist(x[2:(length(x)-1)]), collapse = "-")}))
+    row.names(df) <- unlist(lapply(strsplit(row.names(df), split="-"), function(x){
+      paste(unlist(x[2:(length(x)-1)]), collapse = "-")}))
+    df <- DT::datatable(df*100,
+                        rownames = rownames, 
+                        selection = list(mode = 'single', target = 'cell'), 
+                        editable  = editable, 
+                        options = list(
+                          initComplete = JS(
+                            "function(settings, json) {",
+                            "$(this.api().table().container()).css({'font-size': '12px'});",
+                            "}"),
+                          headerCallback = JS(headerCallback),
+                          autoWidth = FALSE,
+                          scrollX=TRUE
+                          #columnDefs = list(list(width = '10px', targets = "_all"))
+                        )) %>%
+      DT::formatRound(columns = colnames(df), digits = 2, ) %>%
+      #DT::formatStyle(columns = colnames(df), fontSize = '50%') %>%
+      DT::formatStyle(
+        columns = colnames(df),
+        backgroundColor = styleInterval(cuts = seq(-125, 125, 250/(length(colors)-2)), values = colors),
+      )
+    
+  }else{
+    df <- DT::datatable(df, rownames = rownames)
+  }
+  return(df)
+}
+
+
+plot_comp_as_heatmap <- function(df, name = ""){
+  
+  maxval <- 100*max(c(1.25, max(abs(df))))
+  limits <- c(-maxval, maxval)
+  df <- as.data.frame(100*df)
+  df <- signif(df, digits = 2)
+  df[df == 0] <- NA
+
+  colors <- c(RColorBrewer::brewer.pal(n = 9, name = "Blues")[10-(1:9)], 
+              RColorBrewer::brewer.pal(n = 9, name = "Reds")[1:9])
+  
+  p <- heatmaply::heatmaply(df,
+                            colors = colors,
+                            plot_method="plotly",
+                            limits = limits,
+                            Rowv = NULL,
+                            Colv = NULL,
+                            column_text_angle = 90,
+                            xlab = "detection channel",
+                            ylab = "emitting fluorophore",
+                            fontsize_row = 10,
+                            fontsize_col = 10,
+                            cellnote_size = 6,
+                            hide_colorbar = FALSE,
+                            main = paste(name, "spillover (%)"),
+                            margins = c(50, 50, 50, 0)
+  )
+}
 ### Dimensionality Reduction ###################################################################
 
 #' Perform dimensionality reduction
@@ -2580,7 +2680,8 @@ scale_values <- function(df, id.vars = NULL){
 #' @param perplexity t-SNE perplexity parameter (passed to \code{Rtsne:Rstne()})
 #' @param dims Number of dimensions (passed to \code{Rtsne:Rstne()})
 #' @param method Name of the method used. Either "tSNE" or "umap"
-#' @param check_duplicates logical. Checks whether duplicates are present (passed to \code{Rtsne:Rstne()})
+#' @param check_duplicates logical. Checks whether duplicates are 
+#' present (passed to \code{Rtsne:Rstne()})
 #' @return a data.frame with additionnal columns : 
 #' "tSNE1" and "tSNE2" for method 'tSNE', "UMAP1" and "UMAP2" for method 'umap'
 #' @importFrom Rtsne Rtsne

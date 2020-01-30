@@ -508,7 +508,7 @@ plotGatingSet <- function(input, output, session,
   
   params_update_plot_raw <- reactive({
     
-    #print("update_raw")
+    print("update_raw")
     
     if(!auto_update){
       input$update_plot
@@ -541,7 +541,7 @@ plotGatingSet <- function(input, output, session,
   ### Control update of formatted plot #############################################################
   
   params_update_plot_format <- reactive({
-    #print("update_format")
+    print("update_format")
     
     if(!auto_update){
       input$update_plot
@@ -576,7 +576,7 @@ plotGatingSet <- function(input, output, session,
   
   data_plot_focus <- eventReactive(params_update_data(), {
     
-    #print("data")
+    print("data")
     
     validate(need(rval$gating_set, "Empty GatingSet"))
     validate(need(rval_input$sample, "Please select samples"))
@@ -618,7 +618,7 @@ plotGatingSet <- function(input, output, session,
   
   observeEvent(c(params_update_plot_raw(),  data_plot_focus()), {
     
-    #print("raw")
+    print("raw")
     
     df <- data_plot_focus()
     rval_mod$plot_list <- list()
@@ -663,7 +663,7 @@ plotGatingSet <- function(input, output, session,
   
   observeEvent(params_update_plot_format(),  {
     
-    #print("format")
+    print("format")
     
     axis_labels <- choices()$labels
     
@@ -697,7 +697,7 @@ plotGatingSet <- function(input, output, session,
   
   draw_gates <- eventReactive(rval_mod$count_format, {
     
-    #print("gate")
+    print("gate")
     
     gate <- NULL
 

@@ -40,9 +40,8 @@ CompensationUI <- function(id) {
   
     fluidRow(
       
-      column(width = 6,
-             tabBox(title = "",
-                    width = NULL, height = NULL,
+      column(width = 4,
+             tabBox(title = "", width = NULL, height = NULL,
                     tabPanel(title = "Compensation",
                              box(title = "Table", width = NULL, height = NULL, collapsible = TRUE, collapsed = FALSE,
                                  br(),
@@ -57,47 +56,50 @@ CompensationUI <- function(id) {
                              )
                     ),
                     tabPanel(title = "Matrix",
-                             selectInput(ns("comp_mat"), "Select matrix", 
-                                         choices = NULL, selected = NULL),
-                             box(title = "Heatmap", width = NULL, height = NULL, collapsible = TRUE, collapsed = FALSE,
-                                 plotly::plotlyOutput(ns("heatmap_spill"))
-                                 ),
-                             box(title = "Edit", width = NULL, height = NULL, collapsible = TRUE, collapsed = TRUE,
-                                 selectInput(ns("xvar_comp"), label = "column (channel)", 
-                                             choices = NULL, selected = NULL),
-                                 selectInput(ns("yvar_comp"), label = "row (fluorophore)", 
-                                             choices = NULL, selected = NULL),
-                                 numericInput(ns("spill_value"), 
-                                              label = "spillover (%)", 
-                                              value = 0, 
-                                              min = 0, 
-                                              max = 100, 
-                                              step = 1),
-                                 numericInput(ns("step_size"), label = "step size", value = 1),
-                                 actionButton(ns("set_spill_value"), "set value")
-                                 ),
-                             box(title = "Table", width = NULL, height = NULL, collapsible = TRUE, collapsed = TRUE,
-                                 br(),
-                                 div(style = 'overflow-x: scroll', DT::DTOutput(ns("spill_table"))),
-                                 br() 
-                                 ),
-                             box(title = "Duplicate", width = NULL, height = NULL, collapsible = TRUE, collapsed = TRUE,
-                                 textInput(ns("new_name"), "CompMat name", value = "new name"),
-                                 actionButton(ns("duplicate"), "duplicate")
-                             ),
-                             downloadButton(ns("download_spill")),
-                    ),
-                    tabPanel("Compute",
-                             width = NULL, height = NULL,
-                             ComputeSpillUI(ns("compute_spill_module"))
-                    ),
-                    tabPanel("Import",
-                             width = NULL, height = NULL,
-                             ImportSpillUI(ns("import_spill_module"))
+                        selectInput(ns("comp_mat"), "Select matrix",
+                                    choices = NULL, selected = NULL),
+                        box(title = "Edit", width = NULL, height = NULL, collapsible = TRUE, collapsed = TRUE,
+                            selectInput(ns("xvar_comp"), label = "column (channel)", 
+                                        choices = NULL, selected = NULL),
+                            selectInput(ns("yvar_comp"), label = "row (fluorophore)", 
+                                        choices = NULL, selected = NULL),
+                            numericInput(ns("spill_value"), 
+                                         label = "spillover (%)", 
+                                         value = 0, 
+                                         min = 0, 
+                                         max = 100, 
+                                         step = 1),
+                            numericInput(ns("step_size"), label = "step size", value = 1),
+                            actionButton(ns("set_spill_value"), "set value")
+                        ),
+                        box(title = "Table", width = NULL, height = NULL, collapsible = TRUE, collapsed = TRUE,
+                            DT::DTOutput(ns("spill_table"))
+                        ),
+                        box(title = "Duplicate", width = NULL, height = NULL, collapsible = TRUE, collapsed = TRUE,
+                            textInput(ns("new_name"), "CompMat name", value = "new name"),
+                            actionButton(ns("duplicate"), "duplicate")
+                        ),
+                        downloadButton(ns("download_spill"))
                     )
+             ),
+             box(title = "Import/Compute", width = NULL, height = NULL, collapsible = TRUE, collapsed = FALSE,
+                 tabBox(title = "", width = NULL,
+                        tabPanel("Import",
+                                 width = NULL, height = NULL,
+                                 ImportSpillUI(ns("import_spill_module"))
+                        ),
+                        tabPanel("Compute",
+                                 width = NULL, height = NULL,
+                                 ComputeSpillUI(ns("compute_spill_module"))
+                        )
+                 )
              )
     ),
-    column(width = 6,
+    column(width = 8,
+           box(title = "Spillover Matrix", width = NULL, collapsible = TRUE, collapsed = FALSE,
+               #div(style = 'overflow-x: scroll', DT::DTOutput(ns("spill_table")))
+               plotly::plotlyOutput(ns("heatmap_spill"))
+           ),
            tabBox(title = "",
                   width = NULL, height = NULL,
                   tabPanel(title = "Plot",
@@ -175,12 +177,15 @@ Compensation <- function(input, output, session, rval) {
       plot_params[[var]] <- res$params[[var]]
     }
     
-    if(input$show_all_channels){
-      plot_params$xvar <- setdiff(choices()$plot_var, input$yvar_comp)
-    }else{
-      plot_params$xvar <- input$xvar_comp
+    if(input$comp_mat %in% rval_mod$spill_per_sample[res$params$sample]){
+      if(input$show_all_channels){
+        plot_params$xvar <- setdiff(choices()$plot_var, input$yvar_comp)
+      }else{
+        plot_params$xvar <- input$xvar_comp
+      }
+      plot_params$yvar <- input$yvar_comp
     }
-    plot_params$yvar <- input$yvar_comp
+    
   })
   
   observeEvent(c(input$xvar_comp, input$yvar_comp, input$show_all_channels), {
@@ -190,9 +195,9 @@ Compensation <- function(input, output, session, rval) {
   
   observe({
     updateSelectInput(session, "xvar_comp",
-                      choices = choices()$plot_var, selected = choices()$plot_var[1])
+                      choices = colnames(rval_mod$spill), selected = colnames(rval_mod$spill)[1])
     updateSelectInput(session, "yvar_comp", 
-                      choices = choices()$plot_var, selected = choices()$plot_var[2])
+                      choices = colnames(rval_mod$spill), selected = colnames(rval_mod$spill)[2])
   })
   
   ### Set GatingSet compensation #####################################################################
@@ -425,7 +430,6 @@ Compensation <- function(input, output, session, rval) {
         rval$gating_set_list[[rval$gating_set_selected]]$gating_set@compensation <- compensation
       }
       rval$update_gs <- rval$update_gs + 1
-      print("update")
     }
     
   })
@@ -444,11 +448,27 @@ Compensation <- function(input, output, session, rval) {
   ### Render compensation matrix #####################################################################
   
   output$spill_table <- DT::renderDT({
-    
     validate(need(rval_mod$spill, "No spillover matrix"))
+    df <- format_style_comp_matrix(rval_mod$spill, editable = 'none')
+    return(df)
+  })
+  
+  ### React to DT selection events #########################################################################
+  
+  observeEvent(input$spill_table_cells_selected, {
+    df <- rval_mod$spill
+    idx <- input$spill_table_cells_selected
+    print(dim(idx))
+    print(rval_mod$spill_per_sample[res$params$sample])
     
-    df <- as.data.frame(100*rval_mod$spill)
-    signif(df, digits = 2)
+    if(dim(idx)[1]>0 & dim(idx)[2]==2){
+      
+        updateSelectInput(session, "xvar_comp",
+                          selected = colnames(df)[idx[,2]])
+        updateSelectInput(session, "yvar_comp",
+                          selected = row.names(df)[idx[,1]])
+      
+    }
   })
   
   ### Render compensation matrix as an interactive heatmap ############################################
@@ -456,37 +476,9 @@ Compensation <- function(input, output, session, rval) {
   output$heatmap_spill <- plotly::renderPlotly({
     
     validate(need(rval_mod$spill, "No spillover matrix"))
-    
-    df <- as.data.frame(100*rval_mod$spill)
-    df[df == 0] <- NA
-    df_log <- log10(df)
-    
-    #print(df)
-    
-    p <- heatmaply::heatmaply(df_log,
-                   #colors = c(rgb(1,1,1), rgb(1,0,0)),
-                   colors= viridis,
-                   plot_method="plotly",
-                   #scale_fill_gradient_fun = scale_fill_viridis(trans = scales::log10_trans(), 
-                   #name = "spillover"),
-                   Rowv = NULL,
-                   Colv = NULL,
-                   column_text_angle = 90,
-                   xlab = "detection channel",
-                   ylab = "emitting fluorophore",
-                   fontsize_row = 10,
-                   fontsize_col = 10,
-                   cellnote_size = 6,
-                   hide_colorbar = TRUE,
-                   main = "spillover (%)",
-                   custom_hovertext = df,
-                   margins = c(50, 50, 50, 0)
-    )
-    
+    p <- plot_comp_as_heatmap(rval_mod$spill, name  = input$comp_mat)
     p$x$source <- "select_heatmap"
-    
     p
-    
   })
   
   ### React to heatmap events #########################################################################
@@ -519,51 +511,47 @@ Compensation <- function(input, output, session, rval) {
     }
   )
   
-  
-  
   return(rval)
   
-  
   }
 
-  matrix_equal <- function(x, y){
-    is.matrix(x) && is.matrix(y) && dim(x) == dim(y) && all(x == y)
-  }
+  
     
   ### Tests ##############################################################################################
-  # library(shiny)
-  # library(shinydashboard)
+  #  library(shiny)
+  #  library(shinydashboard)
+  #  
+  # if (interactive()){
   # 
-  if (interactive()){
-
-    ui <- dashboardPage(
-      dashboardHeader(title = "Compensation"),
-      sidebar = dashboardSidebar(disable = TRUE),
-      body = dashboardBody(
-        CompensationUI("module")
-      )
-    )
-
-    server <- function(input, output, session) {
-      rval <- reactiveValues()
-      observe({
-        fs <- read.ncdfFlowSet(files = "../flowR_utils/demo-data/JL04BMVLG-Valentin/Tumor_T_001_012.fcs")
-        rval$gating_set <- GatingSet(fs)
-        #utils::data("GvHD", package = "flowCore")
-        #rval$gating_set <- GatingSet(GvHD)
-        # load("../flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
-        # gs <- GatingSet(res$cluster$flow_set)
-        # gs@transformation <- res$cluster$transformation
-        # spill <- as.matrix(res$cluster$spill)
-        # spill_list <- lapply(pData(gs)$name, function(x){return(spill)})
-        # names(spill_list) <- pData(gs)$name
-        # gs@compensation <- spill_list
-        # rval$gating_set <- gs
-      })
-
-      res <- callModule(Compensation, "module", rval = rval)
-    }
-
-    shinyApp(ui, server)
-
-  }
+  #   ui <- dashboardPage(
+  #     dashboardHeader(title = "Compensation"),
+  #     sidebar = dashboardSidebar(disable = TRUE),
+  #     body = dashboardBody(
+  #       CompensationUI("module")
+  #     )
+  #   )
+  # 
+  #   server <- function(input, output, session) {
+  #     rval <- reactiveValues()
+  #     observe({
+  #       fs <- read.ncdfFlowSet(files = c("../flowR_utils/demo-data/JL04BMVLG-Valentin/Tumor_T_001_012.fcs",
+  #                                        "../flowR_utils/demo-data/JL04BMVLG-Valentin/Tumor_T_002_013.fcs"))
+  #       rval$gating_set <- GatingSet(fs)
+  #       #utils::data("GvHD", package = "flowCore")
+  #       #rval$gating_set <- GatingSet(GvHD)
+  #       # load("../flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
+  #       # gs <- GatingSet(res$cluster$flow_set)
+  #       # gs@transformation <- res$cluster$transformation
+  #       # spill <- as.matrix(res$cluster$spill)
+  #       # spill_list <- lapply(pData(gs)$name, function(x){return(spill)})
+  #       # names(spill_list) <- pData(gs)$name
+  #       # gs@compensation <- spill_list
+  #       # rval$gating_set <- gs
+  #     })
+  # 
+  #     res <- callModule(Compensation, "module", rval = rval)
+  #   }
+  # 
+  #   shinyApp(ui, server)
+  # 
+  # }
