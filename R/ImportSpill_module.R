@@ -106,7 +106,8 @@ ImportSpill <- function(input, output, session, rval) {
       if("SPILL" %in% names(desc)){
         comp_mat <- desc[["SPILL"]]
         row.names(comp_mat) <- colnames(comp_mat)
-        rval_mod$imported_matrix_list[[input$file$name[1]]] <- as.matrix(comp_mat)
+        name <- paste("SPILL", input$file$name[1], sep = "_")
+        rval_mod$imported_matrix_list[[name]] <- as.matrix(comp_mat)
       }else{
         showModal(modalDialog(
           title = "Error",

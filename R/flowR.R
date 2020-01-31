@@ -2606,10 +2606,10 @@ format_style_comp_matrix <- function(df, editable = 'none', rownames = TRUE){
     
     colors <- c(RColorBrewer::brewer.pal(n = 9, name = "Blues")[10-(1:9)], 
                 RColorBrewer::brewer.pal(n = 9, name = "Reds")[1:9])
-    colnames(df) <- unlist(lapply(strsplit(colnames(df), split="-"), function(x){
-      paste(unlist(x[2:(length(x)-1)]), collapse = "-")}))
-    row.names(df) <- unlist(lapply(strsplit(row.names(df), split="-"), function(x){
-      paste(unlist(x[2:(length(x)-1)]), collapse = "-")}))
+    # colnames(df) <- unlist(lapply(strsplit(colnames(df), split="-"), function(x){
+    #   paste(unlist(x[2:(length(x)-1)]), collapse = "-")}))
+    # row.names(df) <- unlist(lapply(strsplit(row.names(df), split="-"), function(x){
+    #   paste(unlist(x[2:(length(x)-1)]), collapse = "-")}))
     df <- DT::datatable(df*100,
                         rownames = rownames, 
                         selection = list(mode = 'single', target = 'cell'), 

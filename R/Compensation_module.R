@@ -63,6 +63,7 @@ CompensationUI <- function(id) {
                                         choices = NULL, selected = NULL),
                             selectInput(ns("yvar_comp"), label = "row (fluorophore)", 
                                         choices = NULL, selected = NULL),
+                            sliderInput(ns("slider_input"), "spillover (%)", min = -150, max = 150, value = 0),
                             numericInput(ns("spill_value"), 
                                          label = "spillover (%)", 
                                          value = 0, 
@@ -194,10 +195,16 @@ Compensation <- function(input, output, session, rval) {
   })
   
   observe({
+    choices <- colnames(rval_mod$spill)
+    print(choices)
+    print(choices()$plot_var)
+    if(!all(names(choices) %in% choices()$plot_var)){
+      choices <- unname(choices)
+    }
     updateSelectInput(session, "xvar_comp",
-                      choices = colnames(rval_mod$spill), selected = colnames(rval_mod$spill)[1])
+                      choices = choices, selected = choices[1])
     updateSelectInput(session, "yvar_comp", 
-                      choices = colnames(rval_mod$spill), selected = colnames(rval_mod$spill)[2])
+                      choices = choices, selected = choices[2])
   })
   
   ### Set GatingSet compensation #####################################################################
@@ -441,8 +448,25 @@ Compensation <- function(input, output, session, rval) {
     updateNumericInput(session, "spill_value", value = df[idx_y, idx_x]*100)
   })
   
+  observeEvent(input$slider_input, {
+    validate(need(input$spill_value, "missing input value"))
+    validate(need(input$slider_input, "missing input value"))
+    if(input$spill_value != input$slider_input){
+      updateNumericInput(session, "spill_value", value = input$slider_input)
+    }
+  })
+  
+  observeEvent(input$spill_value, {
+    validate(need(input$slider_input, "missing input value"))
+    validate(need(input$spill_value, "missing input value"))
+    if(input$spill_value != input$slider_input){
+      updateSliderInput(session, "slider_input", value = input$spill_value)
+    }
+  })
+  
   observe({
     updateNumericInput(session, "spill_value", step = input$step_size)
+    updateSliderInput(session, "slider_input", step = input$step_size)
   })
   
   ### Render compensation matrix #####################################################################
@@ -521,37 +545,37 @@ Compensation <- function(input, output, session, rval) {
   #  library(shiny)
   #  library(shinydashboard)
   #  
-  # if (interactive()){
-  # 
-  #   ui <- dashboardPage(
-  #     dashboardHeader(title = "Compensation"),
-  #     sidebar = dashboardSidebar(disable = TRUE),
-  #     body = dashboardBody(
-  #       CompensationUI("module")
-  #     )
-  #   )
-  # 
-  #   server <- function(input, output, session) {
-  #     rval <- reactiveValues()
-  #     observe({
-  #       fs <- read.ncdfFlowSet(files = c("../flowR_utils/demo-data/JL04BMVLG-Valentin/Tumor_T_001_012.fcs",
-  #                                        "../flowR_utils/demo-data/JL04BMVLG-Valentin/Tumor_T_002_013.fcs"))
-  #       rval$gating_set <- GatingSet(fs)
-  #       #utils::data("GvHD", package = "flowCore")
-  #       #rval$gating_set <- GatingSet(GvHD)
-  #       # load("../flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
-  #       # gs <- GatingSet(res$cluster$flow_set)
-  #       # gs@transformation <- res$cluster$transformation
-  #       # spill <- as.matrix(res$cluster$spill)
-  #       # spill_list <- lapply(pData(gs)$name, function(x){return(spill)})
-  #       # names(spill_list) <- pData(gs)$name
-  #       # gs@compensation <- spill_list
-  #       # rval$gating_set <- gs
-  #     })
-  # 
-  #     res <- callModule(Compensation, "module", rval = rval)
-  #   }
-  # 
-  #   shinyApp(ui, server)
-  # 
-  # }
+  if (interactive()){
+
+    ui <- dashboardPage(
+      dashboardHeader(title = "Compensation"),
+      sidebar = dashboardSidebar(disable = TRUE),
+      body = dashboardBody(
+        CompensationUI("module")
+      )
+    )
+
+    server <- function(input, output, session) {
+      rval <- reactiveValues()
+      observe({
+        #fs <- read.ncdfFlowSet(files = c("../flowR_utils/demo-data/JL04BMVLG-Valentin/Tumor_T_001_012.fcs",
+        #                                 "../flowR_utils/demo-data/JL04BMVLG-Valentin/Tumor_T_002_013.fcs"))
+        #rval$gating_set <- GatingSet(fs)
+        utils::data("GvHD", package = "flowCore")
+        rval$gating_set <- GatingSet(GvHD)
+        # load("../flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
+        # gs <- GatingSet(res$cluster$flow_set)
+        # gs@transformation <- res$cluster$transformation
+        # spill <- as.matrix(res$cluster$spill)
+        # spill_list <- lapply(pData(gs)$name, function(x){return(spill)})
+        # names(spill_list) <- pData(gs)$name
+        # gs@compensation <- spill_list
+        # rval$gating_set <- gs
+      })
+
+      res <- callModule(Compensation, "module", rval = rval)
+    }
+
+    shinyApp(ui, server)
+
+  }

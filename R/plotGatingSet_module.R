@@ -616,13 +616,17 @@ plotGatingSet <- function(input, output, session,
   
   ### Build raw plot ###############################################################################
   
-  observeEvent(c(params_update_plot_raw(),  data_plot_focus()), {
+  plot_raw <- eventReactive(c(params_update_plot_raw(),  data_plot_focus()),{
+    
+  #})
+  #observeEvent(c(params_update_plot_raw(),  data_plot_focus()), {
     
     print("raw")
     
     df <- data_plot_focus()
-    rval_mod$plot_list <- list()
-    rval_mod$count_raw <- rval_mod$count_raw + 1
+    plot_list <- list()
+    #rval_mod$plot_list <- list()
+    #rval_mod$count_raw <- rval_mod$count_raw + 1
     
     validate(need(rval_input$xvar %in% choices()$plot_var, "Please select x variable"))
     validate(need(rval_input$plot_type, "Please select plot type"))
@@ -650,18 +654,22 @@ plotGatingSet <- function(input, output, session,
           
           plot_args[[split_variable]] <- var
 
-          rval_mod$plot_list[[var]] <- call_plot_function(df=df,
+          #rval_mod$
+          plot_list[[var]] <- call_plot_function(df=df,
                                                         plot_type = rval_input$plot_type,
                                                         plot_args = plot_args)
     
     }
     
-    
+    return(plot_list)
   })
   
   ### Format plot ##################################################################################
   
-  observeEvent(params_update_plot_format(),  {
+  plot_format <- eventReactive( c(params_update_plot_format(), plot_raw()), {
+    
+  #})
+  #observeEvent(params_update_plot_format(),  {
     
     print("format")
     
@@ -682,20 +690,20 @@ plotGatingSet <- function(input, output, session,
       options$axis_limits <- choices()$axis_limits
     }
     
-    plist <- lapply( rval_mod$plot_list,
+    plist <- lapply( plot_raw(),
                      function(p){
                        format_plot(p,
                                    options = options)
                      })
-   
-    rval_mod$plot_list <- plist
-    rval_mod$count_format <- rval_mod$count_format + 1
+   return(plist)
+    #rval_mod$plot_list <- plist
+    #rval_mod$count_format <- rval_mod$count_format + 1
     #print("OK format")
   })
   
   ### Add gates corresponding to plot coordinates ##################################################
   
-  draw_gates <- eventReactive(rval_mod$count_format, {
+  draw_gates <- eventReactive(plot_format(), {
     
     print("gate")
     
@@ -713,10 +721,10 @@ plotGatingSet <- function(input, output, session,
       }
     }
     
-    plist <- rval_mod$plot_list
+    #plist <- rval_mod$plot_list
     #print(gate)
     
-    plist <- lapply( plist,
+    plist <- lapply( plot_format(),
                      function(p){
                        if(!is.null(gate)){
                          for(gate_name in setdiff(gate, "root")){
@@ -748,9 +756,8 @@ plotGatingSet <- function(input, output, session,
       polygon <- data.frame(x = polygon_gate$x,
                             y = polygon_gate$y)
 
-      plist <- draw_gates()
       
-      plist <- lapply(plist,
+      plist <- lapply( draw_gates(),
                       function(p){
                         if(!is.null(polygon$x)){
                           p <- add_polygon_layer(p, polygon = polygon)
@@ -765,7 +772,7 @@ plotGatingSet <- function(input, output, session,
                       })
 
       #print("OK poly")
-      plist
+      return(plist)
       
       
   })
