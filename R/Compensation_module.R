@@ -545,37 +545,37 @@ Compensation <- function(input, output, session, rval) {
   #  library(shiny)
   #  library(shinydashboard)
   #  
-  if (interactive()){
-
-    ui <- dashboardPage(
-      dashboardHeader(title = "Compensation"),
-      sidebar = dashboardSidebar(disable = TRUE),
-      body = dashboardBody(
-        CompensationUI("module")
-      )
-    )
-
-    server <- function(input, output, session) {
-      rval <- reactiveValues()
-      observe({
-        #fs <- read.ncdfFlowSet(files = c("../flowR_utils/demo-data/JL04BMVLG-Valentin/Tumor_T_001_012.fcs",
-        #                                 "../flowR_utils/demo-data/JL04BMVLG-Valentin/Tumor_T_002_013.fcs"))
-        #rval$gating_set <- GatingSet(fs)
-        utils::data("GvHD", package = "flowCore")
-        rval$gating_set <- GatingSet(GvHD)
-        # load("../flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
-        # gs <- GatingSet(res$cluster$flow_set)
-        # gs@transformation <- res$cluster$transformation
-        # spill <- as.matrix(res$cluster$spill)
-        # spill_list <- lapply(pData(gs)$name, function(x){return(spill)})
-        # names(spill_list) <- pData(gs)$name
-        # gs@compensation <- spill_list
-        # rval$gating_set <- gs
-      })
-
-      res <- callModule(Compensation, "module", rval = rval)
-    }
-
-    shinyApp(ui, server)
-
-  }
+  # if (interactive()){
+  # 
+  #   ui <- dashboardPage(
+  #     dashboardHeader(title = "Compensation"),
+  #     sidebar = dashboardSidebar(disable = TRUE),
+  #     body = dashboardBody(
+  #       CompensationUI("module")
+  #     )
+  #   )
+  # 
+  #   server <- function(input, output, session) {
+  #     rval <- reactiveValues()
+  #     observe({
+  #       #fs <- read.ncdfFlowSet(files = c("../flowR_utils/demo-data/JL04BMVLG-Valentin/Tumor_T_001_012.fcs",
+  #       #                                 "../flowR_utils/demo-data/JL04BMVLG-Valentin/Tumor_T_002_013.fcs"))
+  #       #rval$gating_set <- GatingSet(fs)
+  #       utils::data("GvHD", package = "flowCore")
+  #       rval$gating_set <- GatingSet(GvHD)
+  #       # load("../flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
+  #       # gs <- GatingSet(res$cluster$flow_set)
+  #       # gs@transformation <- res$cluster$transformation
+  #       # spill <- as.matrix(res$cluster$spill)
+  #       # spill_list <- lapply(pData(gs)$name, function(x){return(spill)})
+  #       # names(spill_list) <- pData(gs)$name
+  #       # gs@compensation <- spill_list
+  #       # rval$gating_set <- gs
+  #     })
+  # 
+  #     res <- callModule(Compensation, "module", rval = rval)
+  #   }
+  # 
+  #   shinyApp(ui, server)
+  # 
+  # }

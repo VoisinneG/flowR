@@ -807,7 +807,6 @@ get_parameters_gs <- function(gs){
   })
   
   plot_var <- params$name
-  
   names(plot_var) <- labels
   names(labels) <- params$name
   names(axis_limits) <- params$name
@@ -1176,6 +1175,7 @@ get_plot_data <- function(gs,
                                     metadata = metadata)
   }
   
+  print(vartype)
   if(!is.null(vartype)){
     for(var in names(vartype)){
       if(vartype[[var]] %in% c("factor", "integer", "character")){
@@ -2110,6 +2110,9 @@ format_plot <- function(p,
       labx <- ifelse(xvar %in% names(axis_labels), axis_labels[[xvar]], xvar)
       trans_x <- ifelse(xvar %in% names(transformation), transformation[[xvar]], default_trans)
       xlim <- axis_limits[[xvar]]
+      print(xvar)
+      print("type xvar")
+      print(typeof(p$data[[xvar]]))
       
       if(is.double(p$data[[xvar]])){
         p <- p + scale_x_continuous(name = labx, trans = trans_x, limits = xlim ) 

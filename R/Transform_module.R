@@ -50,6 +50,12 @@ TransformUI <- function(id) {
                   tabPanel(title = "Transform",
                            selectizeInput(ns("selected_params"), "Select parameters", 
                                           choices = NULL, selected = NULL, multiple = TRUE),
+                           selectInput(ns("param_vartype"), "Type of variable", 
+                                       choices = c("double", 
+                                                   "integer", 
+                                                   "factor"), 
+                                       selected = NULL),
+                           textInput(ns("param_desc"), label = "Description (desc)", value = ""),
                            selectInput(ns("trans"), "transformation", 
                                        choices = c("identity", 
                                                    "logicle", 
@@ -62,12 +68,18 @@ TransformUI <- function(id) {
                                         label = "apply to selected parameters"),
                            br()
                   ),
-                  tabPanel(title = "Edit",
-                           "Edit table (column 'desc' only)",
-                           br(),
-                           br(),
-                           div(style = 'overflow-x: scroll', DT::DTOutput(ns("parameters")))
-                  )
+                  # tabPanel(title = "Edit",
+                  #          selectizeInput(ns("selected_params_edit"), "Select parameters", 
+                  #                         choices = NULL, selected = NULL, multiple = FALSE),
+                  #          
+                  #          actionButton(ns("apply_edit"), 
+                  #                       label = "apply"),
+                  #          br()
+                  #          # "Edit table (column 'desc' only)",
+                  #          # br(),
+                  #          # br(),
+                  #          # div(style = 'overflow-x: scroll', DT::DTOutput(ns("parameters")))
+                  # )
            )
     ),
     column(width = 6,
@@ -101,7 +113,19 @@ TransformUI <- function(id) {
 #' @rdname TransformUI
 Transform <- function(input, output, session, rval) {
 
-  rval_mod <- reactiveValues(parameters = NULL)
+  rval_mod <- reactiveValues(parameters = NULL, trans_parameters = NULL)
+  
+  ### Default transform parameters values
+  observe({
+    rval_mod$trans_parameters <- list("base" = 1,
+                                      "length" = 256,
+                                      "w" = 0.5,
+                                      "t" = 262144,
+                                      "m" = 4.5,
+                                      "a" = 0
+                                      )
+  })
+  
   plot_params <- reactiveValues()
   
   ### Call modules ##########################################################################
@@ -115,26 +139,27 @@ Transform <- function(input, output, session, rval) {
   output$trans_param_ui <- renderUI({
     ns <- session$ns
     x <- list()
-    if(input$trans == 'asinh'){
-      x[[1]] <- h5("Parameters")
-      x[[2]] <- numericInput(ns("base_asinh"), label = "base", value = 1)
-    } else if(input$trans == 'flowjo_fasinh'){
-      x[[1]] <- h5("Parameters")
-      x[[2]] <- numericInput(ns("m"), label = "m", value = 5)
-      x[[3]] <- numericInput(ns("t"), label = "t", value = 12000)
-      x[[4]] <- numericInput(ns("a"), label = "a", value = 0.7)
-      x[[5]] <- numericInput(ns("length"), label = "length", value = 256)
+    if(input$trans %in% c('asinh', 'log')){
+      x[[1]] <- numericInput(ns("base"), label = "base", 
+                             value = rval_mod$trans_parameters[["base"]])
     } else if(input$trans == 'logicle'){
-      x[[1]] <- h5("Parameters")
-      x[[2]] <- numericInput(ns("w_logicle"), label = "w", value = 0.5)
-      x[[3]] <- numericInput(ns("t_logicle"), label = "t", value = 262144)
-      x[[4]] <- numericInput(ns("m_logicle"), label = "m", value = 4.5)
-      x[[5]] <- numericInput(ns("a_logicle"), label = "a", value = 0)
+      x[[1]] <- numericInput(ns("w"), label = "w", 
+                             value = rval_mod$trans_parameters[["w_logicle"]])
+      x[[2]] <- numericInput(ns("t"), label = "t", 
+                             value = rval_mod$trans_parameters[["t_logicle"]])
+      x[[3]] <- numericInput(ns("m"), label = "m", 
+                             value = rval_mod$trans_parameters[["m_logicle"]])
+      x[[4]] <- numericInput(ns("a"), label = "a", 
+                             value = rval_mod$trans_parameters[["a_logicle"]])
     } else if(input$trans == 'log'){
-      x[[1]] <- h5("Parameters")
-      x[[2]] <- numericInput(ns("base_log"), label = "base", value = 10)
+      x[[1]] <- numericInput(ns("base"), label = "base", 
+                             value = rval_mod$trans_parameters[["base"]])
     }
-    tagList(x)
+    
+    box(title = "Transform parameters", width = NULL, collapsible = TRUE, collapsed = FALSE,
+        tagList(x)
+    )
+    
   })
   
   observe({
@@ -155,7 +180,7 @@ Transform <- function(input, output, session, rval) {
       
       updateSelectizeInput(session, "selected_params",
                            selected = rval_mod$parameters$name[input$parameters_table_rows_selected])
-      
+
       #update plot_params
       for(var in intersect(names(res$params), names(plot_params))){
         plot_params[[var]] <- res$params[[var]]
@@ -209,6 +234,28 @@ Transform <- function(input, output, session, rval) {
     updateSelectizeInput(session, "selected_params", 
                          choices = choices()$plot_var, 
                          selected = NULL)
+  })
+  
+  observeEvent(input$selected_params, {
+    
+    idx <- match(input$selected_params[1], rval_mod$parameters$name)
+    updateSelectInput(session, "trans",
+                         selected = rval_mod$parameters$transform[idx])
+    
+    updateSelectInput(session, "param_vartype",
+                         selected = rval_mod$parameters$vartype[idx])
+    
+    updateTextInput(session, "param_desc",
+                         value = rval_mod$parameters$desc[idx])
+    
+    if(!is.null(rval$trans_parameters[[input$selected_params[1]]])){
+      var_trans <- names(rval$trans_parameters[[input$selected_params[1]]])
+      print(var_trans)
+      for(var in intersect(var_trans, names(rval_mod$trans_parameters))){
+        rval_mod$trans_parameters[var] <- rval$trans_parameters[[input$selected_params[1]]][var]
+      }
+    }
+
   })
   
   ### Update transformation ################################################################
@@ -414,25 +461,31 @@ Transform <- function(input, output, session, rval) {
 # library(shiny)
 # library(shinydashboard)
 # 
-# if (interactive()){
-# 
-#   ui <- dashboardPage(
-#     dashboardHeader(title = "Transform"),
-#     sidebar = dashboardSidebar(disable = TRUE),
-#     body = dashboardBody(
-#       TransformUI("module")
-#     )
-#   )
-# 
-#   server <- function(input, output, session) {
-#     rval <- reactiveValues()
-#     observe({
-#       utils::data("GvHD", package = "flowCore")
-#       rval$gating_set <- GatingSet(GvHD)
-#     })
-#     res <- callModule(Transform, "module", rval = rval)
-#   }
-# 
-#   shinyApp(ui, server)
-# 
-# }
+if (interactive()){
+
+  ui <- dashboardPage(
+    dashboardHeader(title = "Transform"),
+    sidebar = dashboardSidebar(disable = TRUE),
+    body = dashboardBody(
+      TransformUI("module")
+    )
+  )
+
+  server <- function(input, output, session) {
+    rval <- reactiveValues()
+    observe({
+      load("../flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
+      fs <- build_flowset_from_df(df = res$cluster$data, origin = res$cluster$flow_set)
+             gs <- GatingSet(fs)
+             gs@transformation <-  res$cluster$transformation
+             add_gates_flowCore(gs, res$cluster$gates)
+             rval$gating_set <- gs
+      #utils::data("GvHD", package = "flowCore")
+      #rval$gating_set <- GatingSet(GvHD)
+    })
+    res <- callModule(Transform, "module", rval = rval)
+  }
+
+  shinyApp(ui, server)
+
+}
