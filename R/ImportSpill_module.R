@@ -60,7 +60,6 @@ ImportSpillUI <- function(id) {
 #' @importFrom DT renderDT
 #' @importFrom utils read.table
 #' @importFrom  stats median
-#' @importFrom RcolorBrewer brewer.pal
 #' @rdname ImportSpillUI
 ImportSpill <- function(input, output, session, rval) {
 

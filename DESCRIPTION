@@ -43,6 +43,7 @@ Imports:
   magrittr,
   methods,
   reshape2,
+  RColorBrewer,
   FlowSOM
 LazyData: TRUE
 License: file LICENSE

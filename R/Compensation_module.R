@@ -144,7 +144,7 @@ Compensation <- function(input, output, session, rval) {
   spill_computed <- callModule(ComputeSpill, "compute_spill_module", rval = rval)
   spill_imported <- callModule(ImportSpill, "import_spill_module", rval = rval)
     
-  ### Get parameters from GatingSet ##################################################################
+  ### Get parameters from GatingSet #########################################################
   choices <- reactive({
     rval$update_gs
     validate(need(class(rval$gating_set) == "GatingSet", "No GatingSet available"))

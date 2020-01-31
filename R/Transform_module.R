@@ -56,18 +56,17 @@ TransformUI <- function(id) {
                                                    "factor"), 
                                        selected = NULL),
                            textInput(ns("param_desc"), label = "Description (desc)", value = ""),
-                           selectInput(ns("trans"), "transformation", 
+                           selectInput(ns("trans"), "transformation",
                                        choices = c("identity", 
                                                    "logicle", 
-                                                   "asinh", 
-                                                   "flowJo_asinh", 
+                                                   "asinh",
                                                    "log"), 
                                        selected = "identity"),
                            uiOutput(ns("trans_param_ui")),
                            actionButton(ns("apply_transformation"), 
                                         label = "apply to selected parameters"),
                            br()
-                  ),
+                  )
                   # tabPanel(title = "Edit",
                   #          selectizeInput(ns("selected_params_edit"), "Select parameters", 
                   #                         choices = NULL, selected = NULL, multiple = FALSE),
@@ -144,13 +143,13 @@ Transform <- function(input, output, session, rval) {
                              value = rval_mod$trans_parameters[["base"]])
     } else if(input$trans == 'logicle'){
       x[[1]] <- numericInput(ns("w"), label = "w", 
-                             value = rval_mod$trans_parameters[["w_logicle"]])
+                             value = rval_mod$trans_parameters[["w"]])
       x[[2]] <- numericInput(ns("t"), label = "t", 
-                             value = rval_mod$trans_parameters[["t_logicle"]])
+                             value = rval_mod$trans_parameters[["t"]])
       x[[3]] <- numericInput(ns("m"), label = "m", 
-                             value = rval_mod$trans_parameters[["m_logicle"]])
+                             value = rval_mod$trans_parameters[["m"]])
       x[[4]] <- numericInput(ns("a"), label = "a", 
-                             value = rval_mod$trans_parameters[["a_logicle"]])
+                             value = rval_mod$trans_parameters[["a"]])
     } else if(input$trans == 'log'){
       x[[1]] <- numericInput(ns("base"), label = "base", 
                              value = rval_mod$trans_parameters[["base"]])
@@ -474,14 +473,14 @@ if (interactive()){
   server <- function(input, output, session) {
     rval <- reactiveValues()
     observe({
-      load("../flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
-      fs <- build_flowset_from_df(df = res$cluster$data, origin = res$cluster$flow_set)
-             gs <- GatingSet(fs)
-             gs@transformation <-  res$cluster$transformation
-             add_gates_flowCore(gs, res$cluster$gates)
-             rval$gating_set <- gs
-      #utils::data("GvHD", package = "flowCore")
-      #rval$gating_set <- GatingSet(GvHD)
+      # load("../flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
+      # fs <- build_flowset_from_df(df = res$cluster$data, origin = res$cluster$flow_set)
+      #        gs <- GatingSet(fs)
+      #        gs@transformation <-  res$cluster$transformation
+      #        add_gates_flowCore(gs, res$cluster$gates)
+      #        rval$gating_set <- gs
+      utils::data("GvHD", package = "flowCore")
+      rval$gating_set <- GatingSet(GvHD)
     })
     res <- callModule(Transform, "module", rval = rval)
   }
