@@ -4,12 +4,12 @@
 \alias{asinh_transform}
 \title{Scaled hyperbolic arc-sine function}
 \usage{
-asinh_transform(b = 5, inverse = FALSE)
+asinh_transform(scale = 5, inverse = FALSE)
 }
 \arguments{
-\item{b}{scale}
-
 \item{inverse}{use inverse function?}
+
+\item{b}{scale}
 }
 \description{
 Scaled hyperbolic arc-sine function

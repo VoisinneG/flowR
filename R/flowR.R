@@ -454,11 +454,11 @@ flowJo_biexp_inverse_trans <- function (..., n = 6, equal.space = FALSE){
 #' Scaled hyperbolic arc-sine function
 #' @param b scale
 #' @param inverse use inverse function?
-asinh_transform <- function(b=5, inverse = FALSE){
+asinh_transform <- function(scale=5, inverse = FALSE){
   if(inverse){
-    function(x){b*sinh(x)} 
+    function(x){scale*sinh(x)} 
   }else{
-    function(x){asinh(x/b)} 
+    function(x){asinh(x/scale)} 
   }
 }
 
@@ -774,6 +774,8 @@ get_parameters_gs <- function(gs){
   ff <- gs@data[[1]]
   pdata <- flowWorkspace::pData(gs)
   params <- flowCore::parameters(ff)@data
+  params$name <- as.character(params$name)
+  params$desc <- as.character(params$desc)
   
   params$display <- unlist(sapply(rownames(params), FUN = function(x){
     kw <- substr(x, start = 2, stop = nchar(x))
@@ -2102,17 +2104,19 @@ format_plot <- function(p,
     default_trans <- scales::identity_trans()
   }
   
+  print(transformation[[1]])
+  
   ### transformations ###
   
   if(!is.null(xvar)){
     if(length(xvar) == 1){
       
       labx <- ifelse(xvar %in% names(axis_labels), axis_labels[[xvar]], xvar)
-      trans_x <- ifelse(xvar %in% names(transformation), transformation[[xvar]], default_trans)
+      trans_x <- default_trans
+      if(xvar %in% names(transformation)){
+        trans_x <- transformation[[xvar]]
+      }
       xlim <- axis_limits[[xvar]]
-      print(xvar)
-      print("type xvar")
-      print(typeof(p$data[[xvar]]))
       
       if(is.double(p$data[[xvar]])){
         p <- p + scale_x_continuous(name = labx, trans = trans_x, limits = xlim ) 
@@ -2131,7 +2135,10 @@ format_plot <- function(p,
     if(length(yvar) == 1){
       
       laby <- ifelse(yvar %in% names(options$axis_labels), options$axis_labels[[yvar]], yvar)
-      trans_y <- ifelse(yvar %in% names(transformation), transformation[[yvar]], default_trans)
+      trans_y <- default_trans
+      if(yvar %in% names(transformation)){
+        trans_y <- transformation[[xvar]]
+      }
       ylim <- axis_limits[[yvar]]
 
       if(is.double(p$data[[yvar]])){
@@ -2154,7 +2161,10 @@ format_plot <- function(p,
         if(length(color_var) == 1){
 
           label_color <- ifelse(color_var %in% names(options$axis_labels), options$axis_labels[[color_var]], color_var)
-          trans_col <- ifelse(color_var %in% names(transformation), transformation[[color_var]], default_trans)
+          trans_col <- default_trans
+          if(color_var %in% names(transformation)){
+            trans_col <- transformation[[color_var]]
+          }
           is_cont <- ifelse(color_var %in% names(p$data), is.double(p$data[[color_var]]), FALSE)
           
           if(is_cont){
