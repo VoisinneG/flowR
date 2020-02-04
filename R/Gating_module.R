@@ -73,7 +73,7 @@ GatingUI <- function(id) {
                                selected = NULL),
                    actionButton(ns("delete_gate"), "Delete")
                ),
-               box(title = "Rename",width = NULL, height = NULL, 
+               box(title = "Rename", width = NULL, height = NULL, 
                    collapsible = TRUE, collapsed = TRUE,
                    selectInput(ns("gate_to_rename"), 
                                label = "Select gate", 
@@ -81,6 +81,19 @@ GatingUI <- function(id) {
                                selected = NULL),
                    textInput(ns("new_name"), label = "Enter new name", value = ""),
                    actionButton(ns("rename_gate"), "rename gate")
+               ),
+               box(title = "Copy", width = NULL, height = NULL, 
+                   collapsible = TRUE, collapsed = TRUE,
+                   selectInput(ns("gate_to_copy"), 
+                               label = "Select gate to copy", 
+                               choices = NULL,
+                               selected = NULL),
+                   selectInput(ns("new_parent"), 
+                               label = "Select parent gate", 
+                               choices = NULL,
+                               selected = NULL),
+                   checkboxInput(ns("copy_children"), "Copy children gates", TRUE),
+                   actionButton(ns("copy_gate"), "copy gate")
                )
                   
                    
@@ -141,7 +154,7 @@ GatingUI <- function(id) {
                            box(title = "Preview", width = NULL, collapsible = TRUE, collapsed = TRUE,
                                verbatimTextOutput(ns("import_gh_summary"))
                            ),
-                           actionButton(ns("apply_gh"), label = "Apply Gating Hierarchy")
+                           actionButton(ns("apply_gh"), label = "Import gates")
                   )
                   
            )
@@ -228,6 +241,8 @@ Gating <- function(input, output, session, rval) {
     gates <- gs_get_pop_paths(rval$gating_set)
     updateSelectInput(session, "gate_to_delete", choices = setdiff(gates, "root"))
     updateSelectInput(session, "gate_to_rename", choices = setdiff(gates, "root"))
+    updateSelectInput(session, "gate_to_copy", choices = setdiff(gates, "root"))
+    updateSelectInput(session, "new_parent", choices = gates)
     updateSelectInput(session, "gate_selection", choices = gates)
   })
   
@@ -402,6 +417,32 @@ Gating <- function(input, output, session, rval) {
     
   })
 
+  ### Copy selected gate, update rval$gating_set ################################################
+  observeEvent(input$copy_gate, {
+    
+    
+    gs <- rval$gating_set
+    gs <- try(copy_gate(gs = gs, 
+                    name = input$gate_to_copy, 
+                    parent = input$new_parent, 
+                    copy_children_gates = input$copy_children), silent = TRUE)
+                                 
+                    
+    if(class(gs) == "try-error"){
+      showModal(modalDialog(
+        title = "Error",
+        print(gs),
+        easyClose = TRUE,
+        footer = NULL
+      ))
+    }else{
+      rval$gating_set <- gs
+      rval$update_gs <- rval$update_gs + 1
+    }
+    
+
+  })
+  
   ### Update plot parameters to show defining gate ################################################
   observeEvent(input$show_gate, {
     
@@ -598,14 +639,23 @@ Gating <- function(input, output, session, rval) {
   
   observeEvent(input$apply_gh, {
     validate(need(class(rval$gating_set)=="GatingSet", "No GatingSet available"))
-    validate(need(length(rval_mod$gating_hierarchy)>0, "No gating hierarchy to apply"))
+    validate(need(length(rval_mod$gating_hierarchy)>0, "No gates to import"))
     
-    old_gates <- gs_pop_get_children(obj = rval$gating_set[[1]], y = "root")
-    for(gate in old_gates){
-        flowWorkspace::gs_pop_remove(gs = rval$gating_set, node = gate)
-    }
+    # old_gates <- gs_pop_get_children(obj = rval$gating_set[[1]], y = "root")
+    # for(gate in old_gates){
+    #     flowWorkspace::gs_pop_remove(gs = rval$gating_set, node = gate)
+    # }
+    
     new_gates <- rval_mod$gating_hierarchy
-    add_gates_flowCore(gs = rval$gating_set, gates = new_gates)
+    res <- try(add_gates_flowCore(gs = rval$gating_set, gates = new_gates), silent = TRUE)
+    if(class(res) == "try-error"){
+      showModal(modalDialog(
+        title = "Error",
+        print(res),
+        easyClose = TRUE,
+        footer = NULL
+      ))
+    }
     rval$update_gs <- rval$update_gs + 1
 
   })
@@ -629,41 +679,41 @@ Gating <- function(input, output, session, rval) {
 # library(plotly)
 # library(ggridges)
 # 
-# if (interactive()){
-# 
-#   ui <- dashboardPage(
-#     dashboardHeader(title = "Gating"),
-#     sidebar = dashboardSidebar(disable = TRUE),
-#     body = dashboardBody(
-#       GatingUI("module")
-#     )
-#   )
-# 
-#   server <- function(input, output, session) {
-# 
-#     rval <- reactiveValues()
-# 
-#     observe({
-#       fs <- read.ncdfFlowSet(files = "../flowR_utils/demo-data/JL04BMVLG-Valentin/Tumor_T_001_012.fcs")
-#       rval$gating_set <- GatingSet(fs)
-#       #load("../flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
-#       #fs <- build_flowset_from_df(df = res$cluster$data, origin = res$cluster$flow_set)
-#       #gs <- GatingSet(fs)
-#       #gs@transformation <-  res$cluster$transformation
-#       #add_gates_flowCore(gs, res$cluster$gates)
-#       #rval$gating_set <- gs
-#       #plot_params$sample <- pData(gs)$name[1]
-#       #utils::data("GvHD", package = "flowCore")
-#       #rval$gating_set <- GatingSet(GvHD)
-#       #gs <- load_gs("./inst/ext/gs")
-#       #rval$gating_set <- gs
-#     })
-# 
-#     res <- callModule(Gating, "module", rval = rval)
-# 
-#   }
-# 
-#   shinyApp(ui, server)
-# 
-# }
+if (interactive()){
+
+  ui <- dashboardPage(
+    dashboardHeader(title = "Gating"),
+    sidebar = dashboardSidebar(disable = TRUE),
+    body = dashboardBody(
+      GatingUI("module")
+    )
+  )
+
+  server <- function(input, output, session) {
+
+    rval <- reactiveValues()
+
+    observe({
+      fs <- read.ncdfFlowSet(files = "../flowR_utils/demo-data/JL04BMVLG-Valentin/Tumor_T_001_012.fcs")
+      rval$gating_set <- GatingSet(fs)
+      #load("../flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
+      #fs <- build_flowset_from_df(df = res$cluster$data, origin = res$cluster$flow_set)
+      #gs <- GatingSet(fs)
+      #gs@transformation <-  res$cluster$transformation
+      #add_gates_flowCore(gs, res$cluster$gates)
+      #rval$gating_set <- gs
+      #plot_params$sample <- pData(gs)$name[1]
+      #utils::data("GvHD", package = "flowCore")
+      #rval$gating_set <- GatingSet(GvHD)
+      #gs <- load_gs("./inst/ext/gs")
+      #rval$gating_set <- gs
+    })
+
+    res <- callModule(Gating, "module", rval = rval)
+
+  }
+
+  shinyApp(ui, server)
+
+}
 

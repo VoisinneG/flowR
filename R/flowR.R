@@ -315,7 +315,10 @@ get_gates_from_ws <- function(ws_path, group = NULL){
   #print(SampleNode)
   gates <- lapply(xml_find_all(SampleNode, ".//Gate"), parseGate)
   
-  #print(gates)
+  if(length(gates)==0){
+    warning("Could not find gates defined in the first sample of the group")
+    return(list())
+  }
   
   gate_list <- list()
   
@@ -760,6 +763,44 @@ transform_gates <- function(gates,
   
 }
 
+#' Copy a gate and its children as children of another parent gate(optionnal)
+#' @param gs a GatingSet
+#' @param name name of the gate to copy
+#' @param parent name of the parent gate
+#' @param copy_children_gates logical. Should children gates be copied as well 
+#' (the hierarchy of children gates will be conserved)
+copy_gate <- function(gs, name, parent, copy_children_gates = TRUE){
+  
+  gates <- get_gates_from_gs(gs)
+  
+  preffix <- ifelse(parent == "root", "/", parent)
+  
+  new_name <- paste(preffix, basename(name), sep = "/")
+  gate <- list()
+  gate[[new_name]] <- gates[[name]]
+  gate[[new_name]]$parent <- parent
+  
+  if(copy_children_gates){
+    children <- get_all_descendants(gates, name)
+    children_gates <- gates[children]
+    children_gates <- lapply(children_gates, function(x){
+      x$parent <- gsub(pattern = name, 
+                       replacement = new_name, 
+                       x = x$parent, 
+                       fixed = TRUE)
+      return(x)
+    })
+    names(children_gates) <- gsub(pattern = name, 
+                                  replacement = new_name, 
+                                  x = names(children_gates), 
+                                  fixed = TRUE)
+    add_gates_flowCore(gs, c(gate, children_gates))
+  }else{
+    add_gates_flowCore(gs, gate)
+  }
+  
+  return(gs)
+}
 
 ### Getting data ###############################################################################
 
@@ -1237,7 +1278,6 @@ plot_hexagonal <- function(args = list()){
   bins <- 100
   use_log10_count <- TRUE
   option <- "viridis"
-  print("plot hex")
   if(length(unlist(args[c("xvar", "yvar")])) != 2 ){
     warning("Incorrect dimensions")
     return(NULL)
@@ -2104,8 +2144,6 @@ format_plot <- function(p,
     default_trans <- scales::identity_trans()
   }
   
-  print(transformation[[1]])
-  
   ### transformations ###
   
   if(!is.null(xvar)){
@@ -2137,7 +2175,7 @@ format_plot <- function(p,
       laby <- ifelse(yvar %in% names(options$axis_labels), options$axis_labels[[yvar]], yvar)
       trans_y <- default_trans
       if(yvar %in% names(transformation)){
-        trans_y <- transformation[[xvar]]
+        trans_y <- transformation[[yvar]]
       }
       ylim <- axis_limits[[yvar]]
 

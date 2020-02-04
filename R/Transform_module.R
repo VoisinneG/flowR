@@ -473,31 +473,31 @@ Transform <- function(input, output, session, rval) {
 # library(shiny)
 # library(shinydashboard)
 # 
-if (interactive()){
-
-  ui <- dashboardPage(
-    dashboardHeader(title = "Transform"),
-    sidebar = dashboardSidebar(disable = TRUE),
-    body = dashboardBody(
-      TransformUI("module")
-    )
-  )
-
-  server <- function(input, output, session) {
-    rval <- reactiveValues()
-    observe({
-       # load("../flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
-       # fs <- build_flowset_from_df(df = res$cluster$data, origin = res$cluster$flow_set)
-       #        gs <- GatingSet(fs)
-       #        gs@transformation <-  res$cluster$transformation
-       #        add_gates_flowCore(gs, res$cluster$gates)
-       #        rval$gating_set <- gs
-      utils::data("GvHD", package = "flowCore")
-      rval$gating_set <- GatingSet(GvHD)
-    })
-    res <- callModule(Transform, "module", rval = rval)
-  }
-
-  shinyApp(ui, server)
-
-}
+# if (interactive()){
+# 
+#   ui <- dashboardPage(
+#     dashboardHeader(title = "Transform"),
+#     sidebar = dashboardSidebar(disable = TRUE),
+#     body = dashboardBody(
+#       TransformUI("module")
+#     )
+#   )
+# 
+#   server <- function(input, output, session) {
+#     rval <- reactiveValues()
+#     observe({
+#        # load("../flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
+#        # fs <- build_flowset_from_df(df = res$cluster$data, origin = res$cluster$flow_set)
+#        #        gs <- GatingSet(fs)
+#        #        gs@transformation <-  res$cluster$transformation
+#        #        add_gates_flowCore(gs, res$cluster$gates)
+#        #        rval$gating_set <- gs
+#       utils::data("GvHD", package = "flowCore")
+#       rval$gating_set <- GatingSet(GvHD)
+#     })
+#     res <- callModule(Transform, "module", rval = rval)
+#   }
+# 
+#   shinyApp(ui, server)
+# 
+# }
