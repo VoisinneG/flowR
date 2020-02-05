@@ -104,6 +104,7 @@ flowR_server <- function(session, input, output, modules = NULL) {
                                                          list(id = module_id)))
         
         rval$menu_elements[[mod_name]] <- menuItem(mod_name,
+                                                   selected = TRUE,
                                                    tabName = module_tab_name, 
                                                    startExpanded = FALSE,
                                                    icon = icon("check-circle"))

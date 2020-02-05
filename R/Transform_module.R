@@ -319,9 +319,12 @@ Transform <- function(input, output, session, rval) {
     idx <- match(input$selected_params, rval_mod$parameters$name)
     
     # update parameters slot in GatingSet
-    for(i in 1:length(rval$gating_set)){
-      rval$gating_set@data[[i]]@parameters[["desc"]][idx[1]] <- input$param_desc
-    }        
+    if(nchar(input$param_desc) >0){
+      for(i in 1:length(rval$gating_set)){
+        rval$gating_set@data[[i]]@parameters[["desc"]][idx[1]] <- input$param_desc
+      }
+    }
+         
 
     # update description slot in GatingSet
     for(i in 1:length(rval$gating_set)){
