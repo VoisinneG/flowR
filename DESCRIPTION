@@ -11,7 +11,7 @@ Imports:
   shinydashboard,
   shinyjs,
   openCyto,
-  flowWorkspace (>= 3.34),
+  flowWorkspace (>= 3.34.1),
   flowCore,
   ncdfFlow,
   DT,
