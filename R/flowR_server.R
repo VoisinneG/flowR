@@ -10,6 +10,7 @@
 #' @importFrom flowCore fsApply each_col
 #' @importFrom flowWorkspace gs_get_pop_paths
 #' @importFrom shinydashboard renderValueBox
+#' @importFrom pryr object_size
 #' @export
 flowR_server <- function(session, input, output, modules = NULL) {
   
@@ -104,6 +105,7 @@ flowR_server <- function(session, input, output, modules = NULL) {
                                                          list(id = module_id)))
         
         rval$menu_elements[[mod_name]] <- menuItem(mod_name,
+                                                   selected = TRUE,
                                                    tabName = module_tab_name, 
                                                    startExpanded = FALSE,
                                                    icon = icon("check-circle"))
@@ -146,6 +148,12 @@ flowR_server <- function(session, input, output, modules = NULL) {
     }
     rval$update_gs <- rval$update_gs + 1
   
+  })
+  
+  observeEvent(rval$update_gs, {
+    print("size")
+    print(pryr::object_size(rval$gating_set_list))
+    print(pryr::mem_used())
   })
   
   ### Update GatingSet transformation ##########################################################

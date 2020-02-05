@@ -679,41 +679,41 @@ Gating <- function(input, output, session, rval) {
 # library(plotly)
 # library(ggridges)
 # 
-if (interactive()){
-
-  ui <- dashboardPage(
-    dashboardHeader(title = "Gating"),
-    sidebar = dashboardSidebar(disable = TRUE),
-    body = dashboardBody(
-      GatingUI("module")
-    )
-  )
-
-  server <- function(input, output, session) {
-
-    rval <- reactiveValues()
-
-    observe({
-      fs <- read.ncdfFlowSet(files = "../flowR_utils/demo-data/JL04BMVLG-Valentin/Tumor_T_001_012.fcs")
-      rval$gating_set <- GatingSet(fs)
-      #load("../flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
-      #fs <- build_flowset_from_df(df = res$cluster$data, origin = res$cluster$flow_set)
-      #gs <- GatingSet(fs)
-      #gs@transformation <-  res$cluster$transformation
-      #add_gates_flowCore(gs, res$cluster$gates)
-      #rval$gating_set <- gs
-      #plot_params$sample <- pData(gs)$name[1]
-      #utils::data("GvHD", package = "flowCore")
-      #rval$gating_set <- GatingSet(GvHD)
-      #gs <- load_gs("./inst/ext/gs")
-      #rval$gating_set <- gs
-    })
-
-    res <- callModule(Gating, "module", rval = rval)
-
-  }
-
-  shinyApp(ui, server)
-
-}
+# if (interactive()){
+# 
+#   ui <- dashboardPage(
+#     dashboardHeader(title = "Gating"),
+#     sidebar = dashboardSidebar(disable = TRUE),
+#     body = dashboardBody(
+#       GatingUI("module")
+#     )
+#   )
+# 
+#   server <- function(input, output, session) {
+# 
+#     rval <- reactiveValues()
+# 
+#     observe({
+#       fs <- read.ncdfFlowSet(files = "../flowR_utils/demo-data/JL04BMVLG-Valentin/Tumor_T_001_012.fcs")
+#       rval$gating_set <- GatingSet(fs)
+#       #load("../flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
+#       #fs <- build_flowset_from_df(df = res$cluster$data, origin = res$cluster$flow_set)
+#       #gs <- GatingSet(fs)
+#       #gs@transformation <-  res$cluster$transformation
+#       #add_gates_flowCore(gs, res$cluster$gates)
+#       #rval$gating_set <- gs
+#       #plot_params$sample <- pData(gs)$name[1]
+#       #utils::data("GvHD", package = "flowCore")
+#       #rval$gating_set <- GatingSet(GvHD)
+#       #gs <- load_gs("./inst/ext/gs")
+#       #rval$gating_set <- gs
+#     })
+# 
+#     res <- callModule(Gating, "module", rval = rval)
+# 
+#   }
+# 
+#   shinyApp(ui, server)
+# 
+# }
 
