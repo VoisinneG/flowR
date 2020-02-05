@@ -73,7 +73,7 @@ GatingUI <- function(id) {
                                selected = NULL),
                    actionButton(ns("delete_gate"), "Delete")
                ),
-               box(title = "Rename",width = NULL, height = NULL, 
+               box(title = "Rename", width = NULL, height = NULL, 
                    collapsible = TRUE, collapsed = TRUE,
                    selectInput(ns("gate_to_rename"), 
                                label = "Select gate", 
@@ -81,6 +81,19 @@ GatingUI <- function(id) {
                                selected = NULL),
                    textInput(ns("new_name"), label = "Enter new name", value = ""),
                    actionButton(ns("rename_gate"), "rename gate")
+               ),
+               box(title = "Copy", width = NULL, height = NULL, 
+                   collapsible = TRUE, collapsed = TRUE,
+                   selectInput(ns("gate_to_copy"), 
+                               label = "Select gate to copy", 
+                               choices = NULL,
+                               selected = NULL),
+                   selectInput(ns("new_parent"), 
+                               label = "Select parent gate", 
+                               choices = NULL,
+                               selected = NULL),
+                   checkboxInput(ns("copy_children"), "Copy children gates", TRUE),
+                   actionButton(ns("copy_gate"), "copy gate")
                )
                   
                    
@@ -102,7 +115,7 @@ GatingUI <- function(id) {
                            simpleDisplayUI(ns("simple_display_module"))
                   )
            ),
-           tabBox(title = "Gating hierarchy",
+           tabBox(title = "Hierarchy",
                   width = NULL, height = NULL,
                   tabPanel("Tree",
                            checkboxInput(ns("show_all_subsets"), 
@@ -120,19 +133,28 @@ GatingUI <- function(id) {
                            div(style = 'overflow-x: scroll', DT::DTOutput(ns("pop_stats"))),
                            br() 
                   ),
-                  tabPanel(title = "Import/Export",
+                  tabPanel(title = "Export",
                            br(),
                            downloadButton(ns("export_gh"), label = "Export Gating Hierarchy"),
                            br(),
-                           br(),
+                           br()
+                  ),
+                  tabPanel(title = "Import", 
                            fileInput(inputId = ns("import_gh"),
                                      label = "Import Gating Hierarchy",
-                                     multiple = FALSE),
-                           textInput(ns("pattern"), label = "Pattern", value  = "[\\<|\\>]"),
-                           textInput(ns("replacement"), label = "Replacement", value  = ""),
-                           numericInput(ns("time_step"), label = "Time step", value = 1),
-                           verbatimTextOutput(ns("import_gh_summary")),
-                           actionButton(ns("apply_gh"), label = "Apply Gating Hierarchy")
+                                     multiple = FALSE
+                           ),
+                           uiOutput(ns("import_options")),
+                           box(title = "Transform", width = NULL, collapsible = TRUE, collapsed = TRUE,
+                               textInput(ns("pattern"), label = "Pattern", value  = "Comp-"),
+                               textInput(ns("replacement"), label = "Replacement", value  = ""),
+                               numericInput(ns("time_step"), label = "Time step", value = 1),
+                               actionButton(ns("transform_gates"), label = "Apply transformation")
+                           ),
+                           box(title = "Preview", width = NULL, collapsible = TRUE, collapsed = TRUE,
+                               verbatimTextOutput(ns("import_gh_summary"))
+                           ),
+                           actionButton(ns("apply_gh"), label = "Import gates")
                   )
                   
            )
@@ -219,6 +241,8 @@ Gating <- function(input, output, session, rval) {
     gates <- gs_get_pop_paths(rval$gating_set)
     updateSelectInput(session, "gate_to_delete", choices = setdiff(gates, "root"))
     updateSelectInput(session, "gate_to_rename", choices = setdiff(gates, "root"))
+    updateSelectInput(session, "gate_to_copy", choices = setdiff(gates, "root"))
+    updateSelectInput(session, "new_parent", choices = gates)
     updateSelectInput(session, "gate_selection", choices = gates)
   })
   
@@ -393,6 +417,32 @@ Gating <- function(input, output, session, rval) {
     
   })
 
+  ### Copy selected gate, update rval$gating_set ################################################
+  observeEvent(input$copy_gate, {
+    
+    
+    gs <- rval$gating_set
+    gs <- try(copy_gate(gs = gs, 
+                    name = input$gate_to_copy, 
+                    parent = input$new_parent, 
+                    copy_children_gates = input$copy_children), silent = TRUE)
+                                 
+                    
+    if(class(gs) == "try-error"){
+      showModal(modalDialog(
+        title = "Error",
+        print(gs),
+        easyClose = TRUE,
+        footer = NULL
+      ))
+    }else{
+      rval$gating_set <- gs
+      rval$update_gs <- rval$update_gs + 1
+    }
+    
+
+  })
+  
   ### Update plot parameters to show defining gate ################################################
   observeEvent(input$show_gate, {
     
@@ -517,6 +567,22 @@ Gating <- function(input, output, session, rval) {
 
   ### Import/Export Gating Hierarchy ##############################################################
   
+  output$import_options <- renderUI({
+    ns <- session$ns
+    x <- list()
+    file_path <- input$import_gh$datapath
+    if(!is.null(file_path)){
+      if(file_ext(file_path) %in% c("xml")){
+        choices <- get_templates_from_ws_diva(file_path)
+        x[[1]] <- selectInput(ns("template"), "Template", choices = choices, selected = choices[1])
+      }else if(file_ext(file_path) %in% c("wsp")){
+        choices <- get_groups_from_ws(file_path)
+        x[[1]] <- selectInput(ns("group"), "Group", choices = choices, selected = choices[1])
+      }
+    }
+    tagList(x)
+  })
+  
   output$export_gh <- downloadHandler(
     filename = "gates.rda",
     content = function(file) {
@@ -525,13 +591,19 @@ Gating <- function(input, output, session, rval) {
     }
   )
   
-  observeEvent(input$import_gh, {
+  observeEvent(c(input$import_gh, input$template, input$group), {
     validate(
       need(input$import_gh$datapath, "Please select a file")
     )
     file_path <- input$import_gh$datapath
     if(file_ext(file_path) %in% c("wsp") ){
-      rval_mod$gating_hierarchy <- get_gates_from_ws(ws_path = file_path)
+      rval_mod$gating_hierarchy <- get_gates_from_ws(
+        ws_path = file_path,
+        group = input$group)
+    }else if(file_ext(file_path) %in% c("xml") ){
+      rval_mod$gating_hierarchy <- get_gates_from_ws_diva(
+        ws_path = file_path,
+        template = input$template)
     }else if(file_ext(file_path) %in% c("rda", "Rda") ){
       res_name <- load(file_path)
       res <- get(res_name)
@@ -544,7 +616,7 @@ Gating <- function(input, output, session, rval) {
   })
   
   output$import_gh_summary <- renderPrint({
-    print(paste(length(rval_mod$gating_hierarchy), "gates imported"))
+    print(paste("Number of gates imported :",length(rval_mod$gating_hierarchy)))
     print(rval_mod$gating_hierarchy)
   })
   
@@ -555,22 +627,35 @@ Gating <- function(input, output, session, rval) {
     updateNumericInput(session, "time_step", value = time_step)
   })
   
-  
-  observeEvent(input$apply_gh, {
+  observeEvent(input$transform_gates, {
     validate(need(length(rval_mod$gating_hierarchy)>0, "No gating hierarchy to apply"))
-    
-    old_gates <- gs_pop_get_children(obj = rval$gating_set[[1]], y = "root")
-    for(gate in old_gates){
-        flowWorkspace::gs_pop_remove(gs = rval$gating_set, node = gate)
-    }
-    new_gates <- rval_mod$gating_hierarchy
-    new_gates <- transform_gates(gates = new_gates, 
+    new_gates <- transform_gates(gates = rval_mod$gating_hierarchy, 
                                  transformation = NULL,
                                  pattern = input$pattern, 
                                  replacement = input$replacement,
                                  time_step = input$time_step)
+    rval_mod$gating_hierarchy <- new_gates
+  })
+  
+  observeEvent(input$apply_gh, {
+    validate(need(class(rval$gating_set)=="GatingSet", "No GatingSet available"))
+    validate(need(length(rval_mod$gating_hierarchy)>0, "No gates to import"))
     
-    add_gates_flowCore(gs = rval$gating_set, gates = new_gates)
+    # old_gates <- gs_pop_get_children(obj = rval$gating_set[[1]], y = "root")
+    # for(gate in old_gates){
+    #     flowWorkspace::gs_pop_remove(gs = rval$gating_set, node = gate)
+    # }
+    
+    new_gates <- rval_mod$gating_hierarchy
+    res <- try(add_gates_flowCore(gs = rval$gating_set, gates = new_gates), silent = TRUE)
+    if(class(res) == "try-error"){
+      showModal(modalDialog(
+        title = "Error",
+        print(res),
+        easyClose = TRUE,
+        footer = NULL
+      ))
+    }
     rval$update_gs <- rval$update_gs + 1
 
   })
@@ -609,6 +694,8 @@ Gating <- function(input, output, session, rval) {
 #     rval <- reactiveValues()
 # 
 #     observe({
+#       fs <- read.ncdfFlowSet(files = "../flowR_utils/demo-data/JL04BMVLG-Valentin/Tumor_T_001_012.fcs")
+#       rval$gating_set <- GatingSet(fs)
 #       #load("../flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
 #       #fs <- build_flowset_from_df(df = res$cluster$data, origin = res$cluster$flow_set)
 #       #gs <- GatingSet(fs)
@@ -616,8 +703,8 @@ Gating <- function(input, output, session, rval) {
 #       #add_gates_flowCore(gs, res$cluster$gates)
 #       #rval$gating_set <- gs
 #       #plot_params$sample <- pData(gs)$name[1]
-#       utils::data("GvHD", package = "flowCore")
-#       rval$gating_set <- GatingSet(GvHD)
+#       #utils::data("GvHD", package = "flowCore")
+#       #rval$gating_set <- GatingSet(GvHD)
 #       #gs <- load_gs("./inst/ext/gs")
 #       #rval$gating_set <- gs
 #     })

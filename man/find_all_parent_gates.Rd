@@ -2,13 +2,15 @@
 % Please edit documentation in R/flowR.R
 \name{find_all_parent_gates}
 \alias{find_all_parent_gates}
-\title{find all parent gates of a given Gate section, recursively}
+\title{find, in a recursive manner, all parent gates of a given Gate xml_node
+from a FlowJO wsp}
 \usage{
 find_all_parent_gates(x)
 }
 \arguments{
-\item{x}{a xml document}
+\item{x}{a Gate xml_node from a FlowJO wsp}
 }
 \description{
-find all parent gates of a given Gate section, recursively
+find, in a recursive manner, all parent gates of a given Gate xml_node
+from a FlowJO wsp
 }

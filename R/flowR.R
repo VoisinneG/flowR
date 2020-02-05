@@ -1,10 +1,229 @@
 utils::globalVariables(c("df", "xvar", "yvar", "x", "y"))
 
+###### Parse Diva workspace (.xml Diva workspace files) ######################################################
 
-###### Parse workspace and gates from xml files (.wsp flowJO workspace files) ###################
+#' Return the name of 'template' xml_node
+#' from a Diva xml workspace
+#' @param templateNode a 'template' xml_node from a Diva xml workspace
+#' @import xml2
+parseTemplatesNodesDiva <- function(templateNode){
+  x <- templateNode
+  attrs <- as.list(xml_attrs(x))
+  if("name" %in% names(attrs)){
+    return(attrs$name)
+  }else{return(NA)}
+}
 
-#' Return the name and ID of a SampleNode section
-#' @param x a xml document
+#' Return the names of all 'templates'
+#' from a Diva xml workspace
+#' @param ws_path path to the workspace
+#' @import xml2
+get_templates_from_ws_diva <- function(ws_path){
+  ws <- read_xml(ws_path)
+  templates <-  xml_find_all(ws, ".//worksheet_template")
+  template_names <- unlist(lapply(templates, parseTemplatesNodesDiva))
+  return(template_names[!is.na(template_names)])
+}
+
+#' Extract all gates from a Diva xml workspace
+#' @param ws_path path to the workspace
+#' @param template Names of the template to consider
+#' @import xml2
+#' @importFrom flowCore rectangleGate polygonGate
+get_gates_from_ws_diva <- function(ws_path, template = NULL){
+  xt <- read_xml(ws_path)
+  templates <-  xml_find_all(xt, ".//worksheet_template")
+  template_names <- unlist(lapply(templates, parseTemplatesNodesDiva))
+  
+  idx_template <- 1
+  if(!is.null(template)){
+    if(template %in% template_names){
+      idx_template <- which(template_names == template)
+    }
+  }
+  
+  gatesNode <- xml_find_first(templates[[idx_template]], ".//gates")
+  gate_set <- xml_find_all(gatesNode, ".//gate")
+  gates <- lapply(gate_set, parseGateDiva)
+  
+  gate_list <- list()
+  
+  for(i in 1:length(gates)){
+    if(!is.null(gates[[i]])){
+      parent <- gates[[i]]$parent_long
+      name <- gates[[i]]$name_long
+      
+      parent <- gsub(" ", "_", parent)
+      name <- gsub(" ", "_", name)
+      
+      if(gates[[i]]$type == "RectangleGate"){
+        boundaries <- gates[[i]]$boundaries
+        g <- flowCore::rectangleGate(.gate = boundaries, filterId = basename(name))
+        gate_list[[name]] <- list(gate = g, parent = parent)
+      }else if(gates[[i]]$type == "PolygonGate"){
+        polygon <- gates[[i]]$polygon
+        g <- flowCore::polygonGate(.gate = polygon, filterId = basename(name) )
+        gate_list[[name]] <- list(gate = g, parent = parent)
+      }else{
+        warning(paste("gate type", gates[[i]]$type, "not supported"))
+        #g <- NULL
+        #gate_list[[name_long]] <- list(gate = g, parent = parent)
+      }
+    }
+    
+  } 
+  return(gate_list)
+  
+  return(gates)
+}
+
+#' Return relevant info from a 'gate' xml_node
+#' from a Diva xml workspace
+#' @param gateNode a 'gate' xml_node from a Diva xml workspace
+#' @import xml2
+parseGateDiva <- function(gateNode){
+  
+  res <- list()
+  gate <- gateNode
+  
+  fullname <- xml_attr(gate, "fullname")
+  
+  if(fullname == "All Events"){
+    return(NULL)
+  }
+  
+  name_long <- gsub(fixed = FALSE, pattern = "\\\\", replacement = "/", x= fullname)
+  name_long <- gsub("All Events", "", name_long)
+  
+  name <- xml_text(xml_find_all(gate, ".//name"))
+  parent <- xml_text(xml_find_all(gate, ".//parent"))
+  
+  parent <- gsub(fixed = FALSE, pattern = "\\\\", replacement = "/", x= parent)
+  if(parent == "All Events"){
+    parent <- "root"
+  }else{
+    parent <- gsub("All Events", "", parent)
+  }
+  parent_long <- parent
+  parent <- basename(parent)
+  
+  
+  res <- c(res, list("name" = name,
+                     "parent" =  parent, 
+                     "name_long" = name_long, 
+                     "parent_long" = parent_long
+  ))
+  
+  region <- xml_find_all(gate, ".//region")
+  
+  xparm <- xml_attr(region, "xparm")
+  yparm <- xml_attr(region, "yparm")
+  type <- xml_attr(region, "type")
+  
+  region <- xml_find_all(gate, ".//region")
+  points <- xml_find_first(region, ".//points")
+  vertexes <- xml_find_all(points, ".//point")
+  
+  m <- do.call(rbind, lapply(vertexes, function(v){
+    x <- as.numeric(xml_attr(v, "x"))
+    y <- as.numeric(xml_attr(v, "y"))
+    return(data.frame(x = x,
+                      y = y))
+  }))
+  m <- as.matrix(m)
+  colnames(m) <- c(xparm, yparm)
+  
+  if(type == "INTERVAL_REGION"){
+    res <- c(res, list("type" = "RectangleGate",
+                       "boundaries" = rbind(m[1,1], m[2,1])
+    ))
+  }else if(type %in% c("RECTANGLE_REGION", "POLYGON_REGION")){
+    res <- c(res, list("type" = "PolygonGate",
+                       "polygon" = m
+    ))
+  }
+  
+  return(res)
+  
+}
+
+#' Extract spillover matrices from a Diva xml workspace
+#' @param ws_path path to the workspace
+#' @import xml2
+get_spillover_matrices_from_ws_diva <- function(ws_path){
+  ws <- read_xml(ws_path)
+  settingsNodes <-  xml_find_all(ws, ".//instrument_settings")
+  spill_list <- lapply(settingsNodes[1], parseSpilloverMatrixDiva)
+  spill_names <- unlist(lapply(settingsNodes[1], function(x){as.list(xml_attrs(x))$name}))
+  names(spill_list) <- spill_names
+  return(spill_list)
+}
+
+#' Return the spillover matrix associated with a 'instrument_settings' xml_node
+#' from a Diva xml workspace
+#' @param settingsNode a 'instrument_settings' xml_node from a Diva xml workspace
+#' @import xml2
+#' @importFrom reshape2 acast
+parseSpilloverMatrixDiva <- function(settingsNode){
+  x <- settingsNode
+  parameterNodes <- xml_find_all(x, ".//parameter")
+  
+  spill_parameters <- unlist(lapply(parameterNodes, function(x){
+    name <- as.list(xml_attrs(x))$name
+    can_be_comp <- xml_text(xml_find_first(x, ".//can_be_compensated"))
+    is_comp <- FALSE
+    if(!is.na(can_be_comp)){
+      if(can_be_comp == "true"){
+        is_comp <- TRUE
+      }
+    }
+    if(is_comp){
+      return(name)
+    }else{
+      return(NULL)
+    }
+  }))
+  
+  df_spillover_list <- lapply(parameterNodes, function(x){
+    name <- as.list(xml_attrs(x))$name
+    if(name %in% spill_parameters){
+      df <- parseCompensationDiva(x)
+      df$parameter <- spill_parameters
+      return(df)
+    }else{
+      return(NULL)
+    }
+  })
+  
+  df_spillover <- do.call(rbind, df_spillover_list)
+  compMat <- reshape2::acast(df_spillover, parameter ~ input)
+  return(compMat)
+}
+
+#' Return the spillover coefficients associated with a 'parameter' xml_node
+#' from a Diva xml workspace
+#' @param parameterNode a 'parameter' xml_node from a Diva xml workspace
+#' @import xml2
+parseCompensationDiva <- function(parameterNode){
+  x <- parameterNode
+  name <- as.list(xml_attrs(x))$name
+  compensationNode <- xml_find_first(x, ".//compensation")
+  coeffNodes <- xml_find_all(compensationNode, ".//compensation_coefficient")
+  coeffs <- unlist(lapply(coeffNodes, function(x){xml_double(x)}))
+  if(!is.null(coeffs)){
+    df <- data.frame(value = coeffs)
+    df$input <- name
+    return(df)
+  }else{
+    return(NULL)
+  }
+}
+
+###### Parse FlowJO workspace (.wsp flowJO workspace files) ##################################################
+
+#' Return the name and ID of a SampleNode xml_node 
+#' from a FlowJO wsp
+#' @param x a xml_document object 
 #' @import xml2
 parseSampleNodes <- function(x){
   name <- xml_text(xml_find_all(x, ".//@name"))[1]
@@ -12,8 +231,9 @@ parseSampleNodes <- function(x){
   return(list("name" = name, "sampleID" = sampleID))
 }
 
-#' Return the name and IDs of samples in a  GroupNode section
-#' @param x a xml document
+#' Return the name and IDs of samples in a  GroupNode xml_node
+#' from a flowJO wsp
+#' @param x a xml_document object
 #' @import xml2
 parseGroupNodes <- function(x){
   name <- xml_text(xml_find_all(x, ".//@name"))[1]
@@ -21,8 +241,9 @@ parseGroupNodes <- function(x){
   return(list("name" = name, "sampleID" = sampleID))
 }
 
-#' find all parent gates of a given Gate section, recursively
-#' @param x a xml document
+#' find, in a recursive manner, all parent gates of a given Gate xml_node
+#' from a FlowJO wsp
+#' @param x a Gate xml_node from a FlowJO wsp
 #' @import xml2
 find_all_parent_gates <- function(x){
   all_parents <- NULL
@@ -42,7 +263,20 @@ find_all_parent_gates <- function(x){
   return(all_parents)
 }
 
-#' Extract all gates from a flowJO workspace
+#' Return the names of all 'groups'
+#' from a FlowJO workspace
+#' @param ws_path path to the workspace
+#' @import xml2
+get_groups_from_ws <- function(ws_path){
+  ws <- read_xml(ws_path)
+  GroupNodes <- xml_find_all(ws, "//GroupNode")
+  group_names <- unlist(lapply(GroupNodes, function(x){
+    parseGroupNodes(x)$name
+    }))
+  return(group_names)
+}
+
+#' Extract all gates from a FlowJO workspace
 #' @param ws_path path to the workspace
 #' @param group Names of the sample groups to be considered
 #' @import xml2
@@ -81,7 +315,10 @@ get_gates_from_ws <- function(ws_path, group = NULL){
   #print(SampleNode)
   gates <- lapply(xml_find_all(SampleNode, ".//Gate"), parseGate)
   
-  #print(gates)
+  if(length(gates)==0){
+    warning("Could not find gates defined in the first sample of the group")
+    return(list())
+  }
   
   gate_list <- list()
   
@@ -113,8 +350,8 @@ get_gates_from_ws <- function(ws_path, group = NULL){
   
 }
 
-#' Return relevant info from a Gate section
-#' @param x a xml document
+#' Return relevant info from a Gate xml_node
+#' @param x a Gate xml_node from a FlowJO wsp
 #' @import xml2
 parseGate <- function(x){
   res <- list()
@@ -166,7 +403,46 @@ parseGate <- function(x){
   return(res)
 }
 
+#' Extract spillover matrices from a FlowJO workspace
+#' @param ws_path path to the workspace
+#' @import xml2
+get_spillover_matrices_from_ws <- function(ws_path){
+  ws <- read_xml(ws_path)
+  spilloverMatrixNodes <- xml_children(xml_find_first(ws, ".//Matrices"))
+  spill_list <- lapply(spilloverMatrixNodes, parseSpilloverMatrix)
+  spill_names <- unlist(lapply(spilloverMatrixNodes, function(x){as.list(xml_attrs(x))$name}))
+  names(spill_list) <- spill_names
+  return(spill_list)
+}
 
+#' Return the spillover matrix associated with a spilloverMatrix xml_node
+#' from a flowJO wsp
+#' @param x a spilloverMatrix xml_node from a FlowJO wsp
+#' @import xml2
+#' @importFrom reshape2 acast
+parseSpilloverMatrix <- function(x){
+  params_list <- xml_find_all(xml_find_first(x, ".//data-type:parameters"), ".//data-type:parameter")
+  parameters <- unlist(lapply(params_list, function(x){as.list(xml_attrs(x))$name}))
+  spilloverNodes <- xml_find_all(x, ".//transforms:spillover")
+  df_spillover_list <- lapply(spilloverNodes, parseSpillover)
+  df_spillover <- do.call(rbind, df_spillover_list)
+  compMat <- reshape2::acast(df_spillover, parameter ~ input)
+  return(compMat)
+}
+
+#' Return the spillover coefficients associated with a spillover xml_node
+#' from a flowJO wsp
+#' @param x a spillover xml_node from a FlowJO wsp
+#' @import xml2
+parseSpillover <- function(x){
+  parameter <- as.list(xml_attrs(x))$parameter
+  coeffNodes <- xml_find_all(x, ".//transforms:coefficient")
+  coeffs <- lapply(coeffNodes, function(x){xml_attrs(x)})
+  df <- as.data.frame(do.call(rbind, coeffs), stringsAsFactors = FALSE)
+  df$input <- parameter
+  df$value <- as.numeric(df$value)
+  return(df)
+}
 ###### Transformations #########################################################################
 
 
@@ -179,13 +455,13 @@ flowJo_biexp_inverse_trans <- function (..., n = 6, equal.space = FALSE){
 }
 
 #' Scaled hyperbolic arc-sine function
-#' @param b scale
+#' @param scale scale parameter
 #' @param inverse use inverse function?
-asinh_transform <- function(b=5, inverse = FALSE){
+asinh_transform <- function(scale=5, inverse = FALSE){
   if(inverse){
-    function(x){b*sinh(x)} 
+    function(x){scale*sinh(x)} 
   }else{
-    function(x){asinh(x/b)} 
+    function(x){asinh(x/scale)} 
   }
 }
 
@@ -487,6 +763,44 @@ transform_gates <- function(gates,
   
 }
 
+#' Copy a gate and its children as children of another parent gate(optionnal)
+#' @param gs a GatingSet
+#' @param name name of the gate to copy
+#' @param parent name of the parent gate
+#' @param copy_children_gates logical. Should children gates be copied as well 
+#' (the hierarchy of children gates will be conserved)
+copy_gate <- function(gs, name, parent, copy_children_gates = TRUE){
+  
+  gates <- get_gates_from_gs(gs)
+  
+  preffix <- ifelse(parent == "root", "/", parent)
+  
+  new_name <- paste(preffix, basename(name), sep = "/")
+  gate <- list()
+  gate[[new_name]] <- gates[[name]]
+  gate[[new_name]]$parent <- parent
+  
+  if(copy_children_gates){
+    children <- get_all_descendants(gates, name)
+    children_gates <- gates[children]
+    children_gates <- lapply(children_gates, function(x){
+      x$parent <- gsub(pattern = name, 
+                       replacement = new_name, 
+                       x = x$parent, 
+                       fixed = TRUE)
+      return(x)
+    })
+    names(children_gates) <- gsub(pattern = name, 
+                                  replacement = new_name, 
+                                  x = names(children_gates), 
+                                  fixed = TRUE)
+    add_gates_flowCore(gs, c(gate, children_gates))
+  }else{
+    add_gates_flowCore(gs, gate)
+  }
+  
+  return(gs)
+}
 
 ### Getting data ###############################################################################
 
@@ -501,6 +815,8 @@ get_parameters_gs <- function(gs){
   ff <- gs@data[[1]]
   pdata <- flowWorkspace::pData(gs)
   params <- flowCore::parameters(ff)@data
+  params$name <- as.character(params$name)
+  params$desc <- as.character(params$desc)
   
   params$display <- unlist(sapply(rownames(params), FUN = function(x){
     kw <- substr(x, start = 2, stop = nchar(x))
@@ -534,7 +850,6 @@ get_parameters_gs <- function(gs){
   })
   
   plot_var <- params$name
-  
   names(plot_var) <- labels
   names(labels) <- params$name
   names(axis_limits) <- params$name
@@ -870,6 +1185,8 @@ compute_stats <- function(df = NULL,
 #' @param Ncells number of cells to sample from the GatingSet
 #' @param spill spillover matrix. If NULL, uncompensated data is returned and used for gating.
 #' @param metadata a data.frame containing metadata associated to samples.
+#' @param vartype named character vector specifying variable type conversion.
+#' (either "factor", "integer" or "character")
 #' Must have a column \code{name} used for mapping.
 #' @return a data.frame
 get_plot_data <- function(gs,
@@ -958,8 +1275,8 @@ plot_hexagonal <- function(args = list()){
   bins <- 100
   use_log10_count <- TRUE
   option <- "viridis"
-  
   if(length(unlist(args[c("xvar", "yvar")])) != 2 ){
+    warning("Incorrect dimensions")
     return(NULL)
   }
   
@@ -1010,6 +1327,7 @@ plot_histogram <- function(args = list()){
   alpha <- 0.1
   
   if(is.null(args["xvar"])){
+    warning("Incorrect dimensions")
     return(NULL)
   }
   
@@ -1120,6 +1438,7 @@ plot_dots <-function(args = list()){
   size <- 0.1
   
   if(length(unlist(args[c("xvar", "yvar")])) != 2 ){
+    warning("Incorrect dimensions")
     return(NULL)
   }
   
@@ -1207,6 +1526,7 @@ plot_contour <-function(args = list()){
   show_outliers <- FALSE
   
   if(length(unlist(args[c("xvar", "yvar")])) != 2 ){
+    warning("Incorrect dimensions")
     return(NULL)
   }
   
@@ -1827,7 +2147,10 @@ format_plot <- function(p,
     if(length(xvar) == 1){
       
       labx <- ifelse(xvar %in% names(axis_labels), axis_labels[[xvar]], xvar)
-      trans_x <- ifelse(xvar %in% names(transformation), transformation[[xvar]], default_trans)
+      trans_x <- default_trans
+      if(xvar %in% names(transformation)){
+        trans_x <- transformation[[xvar]]
+      }
       xlim <- axis_limits[[xvar]]
       
       if(is.double(p$data[[xvar]])){
@@ -1847,7 +2170,10 @@ format_plot <- function(p,
     if(length(yvar) == 1){
       
       laby <- ifelse(yvar %in% names(options$axis_labels), options$axis_labels[[yvar]], yvar)
-      trans_y <- ifelse(yvar %in% names(transformation), transformation[[yvar]], default_trans)
+      trans_y <- default_trans
+      if(yvar %in% names(transformation)){
+        trans_y <- transformation[[yvar]]
+      }
       ylim <- axis_limits[[yvar]]
 
       if(is.double(p$data[[yvar]])){
@@ -1870,7 +2196,10 @@ format_plot <- function(p,
         if(length(color_var) == 1){
 
           label_color <- ifelse(color_var %in% names(options$axis_labels), options$axis_labels[[color_var]], color_var)
-          trans_col <- ifelse(color_var %in% names(transformation), transformation[[color_var]], default_trans)
+          trans_col <- default_trans
+          if(color_var %in% names(transformation)){
+            trans_col <- transformation[[color_var]]
+          }
           is_cont <- ifelse(color_var %in% names(p$data), is.double(p$data[[color_var]]), FALSE)
           
           if(is_cont){
@@ -2284,7 +2613,107 @@ scale_values <- function(df, id.vars = NULL){
   df_scale
 }
 
+### compensation ##################################################################################
 
+matrix_equal <- function(x, y){
+  is.matrix(x) && is.matrix(y) && dim(x) == dim(y) && all(x == y)
+}
+#' @importFrom htmlwidgets JS
+#' @importFrom DT datatable formatRound formatStyle styleInterval
+#' @importFrom RColorBrewer brewer.pal
+format_style_comp_matrix <- function(df, editable = 'none', rownames = TRUE){
+  
+  df <- as.matrix(df)
+  do_formatting <- is.numeric(df[1])
+  
+  if(do_formatting){
+    
+    headerCallback <- c(
+      "function(thead, data, start, end, display){",
+      "  var $ths = $(thead).find('th');",
+      "  $ths.css({'vertical-align': 'bottom', 'white-space': 'nowrap'});",
+      "  var betterCells = [];",
+      "  $ths.each(function(){",
+      "    var cell = $(this);",
+      "    var newDiv = $('<div>', {height: 'auto', width: cell.height()});",
+      "    var newInnerDiv = $('<div>', {text: cell.text()});",
+      "    newDiv.css({margin: 'auto'});",
+      "    newInnerDiv.css({",
+      "      transform: 'rotate(180deg)',",
+      "      'writing-mode': 'tb-rl',",
+      "      'white-space': 'nowrap'",
+      "    });",
+      "    newDiv.append(newInnerDiv);",
+      "    betterCells.push(newDiv);",
+      "  });",
+      "  $ths.each(function(i){",
+      "    $(this).html(betterCells[i]);",
+      "  });",
+      "}"
+    )
+    
+    colors <- c(RColorBrewer::brewer.pal(n = 9, name = "Blues")[10-(1:9)], 
+                RColorBrewer::brewer.pal(n = 9, name = "Reds")[1:9])
+    # colnames(df) <- unlist(lapply(strsplit(colnames(df), split="-"), function(x){
+    #   paste(unlist(x[2:(length(x)-1)]), collapse = "-")}))
+    # row.names(df) <- unlist(lapply(strsplit(row.names(df), split="-"), function(x){
+    #   paste(unlist(x[2:(length(x)-1)]), collapse = "-")}))
+    df <- DT::datatable(df*100,
+                        rownames = rownames, 
+                        selection = list(mode = 'single', target = 'cell'), 
+                        editable  = editable, 
+                        options = list(
+                          initComplete = htmlwidgets::JS(
+                            "function(settings, json) {",
+                            "$(this.api().table().container()).css({'font-size': '12px'});",
+                            "}"),
+                          headerCallback = htmlwidgets::JS(headerCallback),
+                          autoWidth = FALSE,
+                          scrollX=TRUE
+                          #columnDefs = list(list(width = '10px', targets = "_all"))
+                        )) %>%
+      DT::formatRound(columns = colnames(df), digits = 2, ) %>%
+      #DT::formatStyle(columns = colnames(df), fontSize = '50%') %>%
+      DT::formatStyle(
+        columns = colnames(df),
+        backgroundColor = DT::styleInterval(cuts = seq(-125, 125, 250/(length(colors)-2)), values = colors),
+      )
+    
+  }else{
+    df <- DT::datatable(df, rownames = rownames)
+  }
+  return(df)
+}
+
+
+plot_comp_as_heatmap <- function(df, name = ""){
+  
+  maxval <- 100*max(c(1.25, max(abs(df))))
+  limits <- c(-maxval, maxval)
+  df <- as.data.frame(100*df)
+  df <- signif(df, digits = 2)
+  df[df == 0] <- NA
+
+  colors <- c(RColorBrewer::brewer.pal(n = 9, name = "Blues")[10-(1:9)], 
+              RColorBrewer::brewer.pal(n = 9, name = "Reds")[1:9])
+  
+  p <- heatmaply::heatmaply(df,
+                            colors = colors,
+                            plot_method="plotly",
+                            limits = limits,
+                            Rowv = NULL,
+                            Colv = NULL,
+                            column_text_angle = 90,
+                            xlab = "detection channel",
+                            ylab = "emitting fluorophore",
+                            fontsize_row = 10,
+                            fontsize_col = 10,
+                            cellnote_size = 6,
+                            hide_colorbar = FALSE,
+                            main = paste(name, "spillover (%)"),
+                            margins = c(50, 50, 50, 0)
+  )
+}
 ### Dimensionality Reduction ###################################################################
 
 #' Perform dimensionality reduction
@@ -2299,7 +2728,8 @@ scale_values <- function(df, id.vars = NULL){
 #' @param perplexity t-SNE perplexity parameter (passed to \code{Rtsne:Rstne()})
 #' @param dims Number of dimensions (passed to \code{Rtsne:Rstne()})
 #' @param method Name of the method used. Either "tSNE" or "umap"
-#' @param check_duplicates logical. Checks whether duplicates are present (passed to \code{Rtsne:Rstne()})
+#' @param check_duplicates logical. Checks whether duplicates are 
+#' present (passed to \code{Rtsne:Rstne()})
 #' @return a data.frame with additionnal columns : 
 #' "tSNE1" and "tSNE2" for method 'tSNE', "UMAP1" and "UMAP2" for method 'umap'
 #' @importFrom Rtsne Rtsne
@@ -2314,6 +2744,8 @@ dim_reduction <- function(df,
                           dims = 2,
                           method = "tSNE",
                           check_duplicates = FALSE){
+  
+  yvar <- as.character(yvar)
   
   idx_cells_kept <- 1:dim(df)[1]
   
@@ -2401,8 +2833,6 @@ dim_reduction <- function(df,
 #' @param scale logical; Scale values before building SOM (for method 'FlowSOM' only)
 #' @return a data.frame with the additionnal column "cluster"
 #' @importFrom FlowSOM BuildSOM BuildMST MetaClustering
-#' @importFrom Rphenograph Rphenograph
-#' @importFrom ClusterX ClusterX
 #' @importFrom igraph membership
 #' @importFrom scales identity_trans
 get_cluster <- function(df,
@@ -2415,7 +2845,9 @@ get_cluster <- function(df,
                         k_meta = 8,
                         scale = FALSE,
                         method = "FlowSOM"){
-         
+  
+  yvar <- as.character(yvar)
+  
   idx_cells_kept <- 1:dim(df)[1]
   
   if(!is.null(y_trans) & is.null(transformation)){
@@ -2427,7 +2859,6 @@ get_cluster <- function(df,
   
   df_trans <- df
   df_filter <- df
-  
   
   for(i in 1:length(yvar)){
     df_trans[[yvar[i]]] <- transformation[[yvar[i]]]$transform(df[[yvar[i]]])
@@ -2470,27 +2901,9 @@ get_cluster <- function(df,
     df_filter$cluster <- as.integer(metaClustering_perCell)
     
     return(list(df = df_filter, keep = idx_cells_kept, fSOM = fSOM))
-    
-  }else if(method == "Rphenograph"){
-    # warning("Rphenograph is not supported")
-    # df_filter$cluster <- 1 
-    # return(list(df = df_filter, keep = idx_cells_kept))
-    message(paste("Clustering ", dim(df_trans)[1], " cells using 'Rphenograph' on ",  
-                  length(yvar), " parameters", sep = ""))
-    Rphenograph_out <- Rphenograph(df_trans[ , yvar], k = k)
-    df_filter$cluster <- as.integer(igraph::membership(Rphenograph_out[[2]]))
-  }else if(method == "ClusterX"){
-    # warning("ClusterX is not supported")
-    # df_filter$cluster <- 1 
-    # return(list(df = df_filter, keep = idx_cells_kept))
-    message(paste("Clustering ", dim(df_trans)[1], " cells using 'CluserX' on ",  
-                  length(yvar), " parameters", sep = ""))
-    DC <- ClusterX(df_trans[ , yvar], dc = dc, alpha = alpha)
-    df_filter$cluster <- as.integer(DC$cluster)
+  }else{
+    stop("Clustering method not supported")
   }
- 
-  return(list(df = df_filter, keep = idx_cells_kept))
-  
 }
 
 
@@ -2571,10 +2984,10 @@ build_flowset_from_df <- function(df,
             desc[[paste("$P",npar,"VARTYPE",sep="")]] <- typeof(df_sample[[param]])
           }
           
-          par@data$typeof <- sapply(par@data$name, function(x){typeof(df_sample[[x]])})
-          rn <- row.names(par@varMetadata)
-          par@varMetadata <- rbind(par@varMetadata, "type")
-          row.names(par@varMetadata)<- c(rn, "type")
+          # par@data$vartype <- sapply(par@data$name, function(x){typeof(df_sample[[x]])})
+          # rn <- row.names(par@varMetadata)
+          # par@varMetadata <- rbind(par@varMetadata, "vartype")
+          # row.names(par@varMetadata)<- c(rn, "vartype")
           
           
           desc[["$TOT"]] <- dim(df_sample)[1]

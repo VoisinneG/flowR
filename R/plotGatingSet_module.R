@@ -75,7 +75,6 @@ plotGatingSetInput <- function(id) {
   
 }
 
-
 #' plotGatingSet module server function
 #' @param input shiny input
 #' @param output shiny output
@@ -481,12 +480,11 @@ plotGatingSet <- function(input, output, session,
   })
 
   
-  ### Update plot ##################################################################################
-
   ### Control update of plot data ##################################################################
   
   params_update_data <- reactive({
     
+    #print("update data")
     if(!auto_update){
       input$update_plot
     }else{
@@ -508,6 +506,7 @@ plotGatingSet <- function(input, output, session,
   ### Control update of raw plot ###################################################################
   
   params_update_plot_raw <- reactive({
+    
     #print("update_raw")
     
     if(!auto_update){
@@ -602,7 +601,8 @@ plotGatingSet <- function(input, output, session,
       }
     }
     
-    print(spill)
+    vartype <- choices()$params$vartype
+    names(vartype) <- choices()$params$name
     
     df <- get_plot_data(gs = rval$gating_set,
                       sample = rval_input$sample,
@@ -610,7 +610,7 @@ plotGatingSet <- function(input, output, session,
                       spill = spill,
                       metadata = choices()$metadata,
                       Ncells = Ncells,
-                      vartype = choices()$params$vartype)
+                      vartype = vartype)
     
     return(df)
     
@@ -618,14 +618,13 @@ plotGatingSet <- function(input, output, session,
   
   ### Build raw plot ###############################################################################
   
-  observeEvent(c(params_update_plot_raw(),  data_plot_focus()), {
+  plot_raw <- eventReactive(c(params_update_plot_raw(),  data_plot_focus()),{
     
     #print("raw")
-    
     df <- data_plot_focus()
-    rval_mod$plot_list <- list()
-    rval_mod$count_raw <- rval_mod$count_raw + 1
+    plot_list <- list()
     
+    validate(need(df, "no cells in selection"))
     validate(need(rval_input$xvar %in% choices()$plot_var, "Please select x variable"))
     validate(need(rval_input$plot_type, "Please select plot type"))
     if(!is.null(rval_input$plot_type)){
@@ -642,22 +641,27 @@ plotGatingSet <- function(input, output, session,
       split_variable <- rval_input$split_var
     }
     
+    mono_var <- setdiff(c("xvar", "yvar", "color_var"), split_variable)
+    
+    for(var in mono_var){
+      plot_args[[var]] <- rval_input[[var]][1]
+    }
+    
     for(var in rval_input[[split_variable]]){
           
           plot_args[[split_variable]] <- var
 
-          rval_mod$plot_list[[var]] <- call_plot_function(df=df,
+          plot_list[[var]] <- call_plot_function(df=df,
                                                         plot_type = rval_input$plot_type,
                                                         plot_args = plot_args)
-    
     }
     
-    
+    return(plot_list)
   })
   
   ### Format plot ##################################################################################
   
-  observeEvent(params_update_plot_format(),  {
+  plot_format <- eventReactive( c(params_update_plot_format(), plot_raw()), {
     
     #print("format")
     
@@ -678,20 +682,17 @@ plotGatingSet <- function(input, output, session,
       options$axis_limits <- choices()$axis_limits
     }
     
-    plist <- lapply( rval_mod$plot_list,
+    plist <- lapply( plot_raw(),
                      function(p){
                        format_plot(p,
                                    options = options)
                      })
-   
-    rval_mod$plot_list <- plist
-    rval_mod$count_format <- rval_mod$count_format + 1
-    #print("OK format")
+   return(plist)
   })
   
   ### Add gates corresponding to plot coordinates ##################################################
   
-  draw_gates <- eventReactive(rval_mod$count_format, {
+  draw_gates <- eventReactive(plot_format(), {
     
     #print("gate")
     
@@ -709,10 +710,7 @@ plotGatingSet <- function(input, output, session,
       }
     }
     
-    plist <- rval_mod$plot_list
-    #print(gate)
-    
-    plist <- lapply( plist,
+    plist <- lapply( plot_format(),
                      function(p){
                        if(!is.null(gate)){
                          for(gate_name in setdiff(gate, "root")){
@@ -724,7 +722,6 @@ plotGatingSet <- function(input, output, session,
                        return(p)
                      })
 
-    #print("OK gate")
     return(plist)
   })
   
@@ -734,36 +731,33 @@ plotGatingSet <- function(input, output, session,
     
     #print("poly")
     
-      gate <- NULL
-      if(!is.null(rval_input$show_gates)){
-        if(rval_input$show_gates){
-          gate <- rval_input$subset
-        }
+    gate <- NULL
+    if(!is.null(rval_input$show_gates)){
+      if(rval_input$show_gates){
+        gate <- rval_input$subset
       }
-
-      polygon <- data.frame(x = polygon_gate$x,
-                            y = polygon_gate$y)
-
-      plist <- draw_gates()
-      
-      plist <- lapply(plist,
-                      function(p){
-                        if(!is.null(polygon$x)){
-                          p <- add_polygon_layer(p, polygon = polygon)
-                        }
-                        if(!is.null(gate)){
-                          for(gate_name in setdiff(gate, "root")){
-                            g <- choices()$gates[[gate_name]]$gate
-                            p <- add_gate(p, g)
-                          }
-                        }
-                        return(p)
-                      })
-
-      #print("OK poly")
-      plist
-      
-      
+    }
+    
+    polygon <- data.frame(x = polygon_gate$x,
+                          y = polygon_gate$y)
+    
+    
+    plist <- lapply( draw_gates(),
+                     function(p){
+                       if(!is.null(polygon$x)){
+                         p <- add_polygon_layer(p, polygon = polygon)
+                       }
+                       if(!is.null(gate)){
+                         for(gate_name in setdiff(gate, "root")){
+                           g <- choices()$gates[[gate_name]]$gate
+                           p <- add_gate(p, g)
+                         }
+                       }
+                       return(p)
+                     })
+    
+    return(plist)
+    
   })
   
   return( list(plot = draw_polygon, params = rval_input) )

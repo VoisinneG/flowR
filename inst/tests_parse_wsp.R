@@ -5,11 +5,17 @@ library(xml2)
 
 # Parse flowJO workspace
 
-ws <- read_xml("./data/tetra/workspace.wsp")
+ws <- read_xml("../flowR_utils/demo-data/JL04BMVLG-Valentin/Tumor-testFlowR.wsp")
 
+# parse spillover matrices from FlowJo wsp
+ws_path <- "../flowR_utils/demo-data/JL04BMVLG-Valentin/Tumor-testFlowR.wsp"
 
+ws <- read_xml(ws_path)
 
-gates <- get_gates_from_ws(ws_path = "./data/tetra/workspace.wsp", 
+spill_list <- get_spillover_matrices_from_ws("../flowR_utils/demo-data/JL04BMVLG-Valentin/Tumor-testFlowR.wsp")
+
+# parse gates
+gates <- get_gates_from_ws(ws_path = "../flowR_utils/demo-data/JL04BMVLG-Valentin/Tumor-testFlowR.wsp", 
                            group = "All Samples")
 
 gs <- parseWorkspace(ws,
@@ -17,8 +23,6 @@ gs <- parseWorkspace(ws,
                      execute = TRUE,
                      isNcdf = TRUE,
                      sampNloc = "sampleNode")
-
-
 
 # import diva worspace
 
@@ -32,29 +36,15 @@ gs <- parseWorkspace(ws,
                      sampNloc = "sampleNode")
 
 #Parse diva xml
-xt <- read_xml("./data/FE03BMGV/FE03BMGV.xml")
-gateNodes <- xml_find_all(xt, "//gates")
-gate_set <- xml_find_all(gateNodes[[1]], ".//gate")
+xt <- read_xml("../flowR_utils/demo-data/JL04BMVLG-Valentin/JL04BMVLG.xml")
+xt <- read_xml("~/test_diva_comp/JA22BMMVLG.xml")
 
-gate <- gate_set[[5]]
-fullname <- xml_attr(gate, "fullname")
-name <- xml_text(xml_find_all(gate, ".//name"))
-parent <- xml_text(xml_find_all(gate, ".//parent"))
-region <- xml_find_all(gate, ".//region")
-xparm <- xml_attr(region, "xparm")
-yparm <- xml_attr(region, "yparm")
-type <- xml_attr(region, "type")
-is_x_parameter_scaled <- xml_text(xml_find_all(gate, ".//is_x_parameter_scaled"))
-is_y_parameter_scaled <- xml_text(xml_find_all(gate, ".//is_y_parameter_scaled"))
-x_parameter_scale_value <- xml_integer(xml_find_all(gate, ".//x_parameter_scale_value"))
-y_parameter_scale_value <- xml_integer(xml_find_all(gate, ".//y_parameter_scale_value"))
-is_x_parameter_log <- xml_text(xml_find_all(gate, ".//is_x_parameter_log"))
-is_y_parameter_log <- xml_text(xml_find_all(gate, ".//is_y_parameter_log"))
+settingsNodes <-  xml_find_first(xt, ".//instrument_settings")
+parameters <- xml_find_all(settings, ".//parameter")
 
-points <- xml_find_first(region, ".//points")
-vertexes <- xml_find_all(points, ".//point")
-m <- do.call(rbind, lapply(vertexes, function(v){return(list(x=xml_attr(v, "x"), y =xml_attr(v, "y")))}))
+templates <-  xml_find_all(xt, ".//worksheet_template")
+gatesNode <- xml_find_first(wtNode[[2]], "//gates")
+gate_set <- xml_find_all(gatesNode, ".//gate")
 
-
-#####################################################33333
+spill_list <- get_spillover_matrices_from_ws_diva("~/test_diva_comp/JA22BMMVLG.xml")
 
