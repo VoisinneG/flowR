@@ -406,52 +406,9 @@ Transform <- function(input, output, session, rval) {
   })
   
   output$parameters_table <- DT::renderDT({
-    # if(!is.null(input$selected_params)){
-    #   selected <- match(input$selected_params, params_table()$name)
-    #   print(selected)
-    # }else{
-    #   selected <- NULL
-    # }
     DT::datatable(params_table(), rownames = TRUE, selection = list(mode = "multiple"))
   })
   
-  ### Edit parameters table ######################################################################
-  # output$parameters <- renderDT(
-  #   {validate(need(rval_mod$parameters, "No parameters")); rval_mod$parameters},
-  #   rownames = FALSE,
-  #   selection = 'none',
-  #   editable = 'cell',
-  #   server = TRUE)
-  #                          
-  # 
-  # proxy = dataTableProxy('parameters')
-  # 
-  # observeEvent(input$parameters_cell_edit, {
-  #   info = input$parameters_cell_edit
-  #   info$col <- info$col + 1
-  #   col_param <- names(params_table())[info$col]
-  #   if(col_param %in% c("desc", "vartype")){
-  #     
-  #     rval_mod$parameters <<- editData(rval_mod$parameters, info)
-  #     replaceData(proxy, rval_mod$parameters, resetPaging = FALSE)
-  #     
-  #     if(col_param == "desc"){
-  #       for(i in 1:length(rval$gating_set)){
-  #         rval$gating_set@data[[i]]@parameters[[col_param]] <- rval_mod$parameters[[col_param]]
-  #       }
-  #     }
-  #     
-  #     if(col_param == "vartype"){
-  #       for(i in 1:length(rval$gating_set)){
-  #         desc_field <- paste("$P", info$row, "VARTYPE", sep="")
-  #         rval$gating_set@data[[i]]@description[[desc_field]] <- rval_mod$parameters[[col_param]][info$row]
-  #       }
-  #     }
-  # 
-  #     rval$update_gs <- rval$update_gs + 1 
-  #     
-  #   }
-  # })
   
   return(rval)
   
