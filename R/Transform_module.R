@@ -174,7 +174,6 @@ Transform <- function(input, output, session, rval) {
 
     if(length(input$parameters_table_rows_selected)>0){
       
-      print("update_selected parameters")
       updateSelectizeInput(session, "selected_params",
                            selected = rval_mod$parameters$name[input$parameters_table_rows_selected])
     }
@@ -210,11 +209,6 @@ Transform <- function(input, output, session, rval) {
   choices <- reactive({
     rval$update_gs
     validate(need(class(rval$gating_set) == "GatingSet", "No GatingSet available"))
-    print(rval$gating_set@transformation)
-    print(names(rval$gating_set@transformation))
-    if("FL1-H" %in% names(rval$gating_set@transformation)){
-      print(rval$gating_set@transformation[["FL1-H"]]$transform(1:10))
-    }
     get_parameters_gs(rval$gating_set)
   })
   
@@ -222,10 +216,6 @@ Transform <- function(input, output, session, rval) {
     rval_mod$parameters <- choices()$params
   })
 
-  observe({
-    print(rval_mod$parameters)
-  })
-  
   ### Update UI ################################################################################
   
   observeEvent(choices()$sample, {
@@ -275,8 +265,6 @@ Transform <- function(input, output, session, rval) {
     
     
     if(length(new_par)>0){
-      print("init new parameter")
-      print(new_par)
       for(i in 1:length(new_par)){
         
         transformation[[new_par[i]]] <- switch(rval_mod$parameters$display[idx_new[i]],
@@ -360,7 +348,7 @@ Transform <- function(input, output, session, rval) {
                                                 a = input$a))
       
       
-      print("update transformation")
+      #print("update transformation")
       for(i in 1:length(var_name)){
         transformation[[var_name[i]]] <- trans
         trans_parameters[[var_name[i]]] <- trans_params
@@ -391,8 +379,6 @@ Transform <- function(input, output, session, rval) {
     
     transformation <- choices()$transformation
     trans_parameters <- rval$trans_parameters
-    
-    print(names(trans_parameters))
     
     trans_name <- sapply(transformation, function(x){x$name})
     trans_param <- sapply(trans_parameters, function(x){

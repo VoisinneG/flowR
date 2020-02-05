@@ -1218,12 +1218,9 @@ get_plot_data <- function(gs,
                                     metadata = metadata)
   }
   
-  print(vartype)
   if(!is.null(vartype)){
     for(var in names(vartype)){
       if(vartype[[var]] %in% c("factor", "integer", "character")){
-        print("convert")
-        print(vartype[var])
         df[[var]] <- do.call(paste("as.", vartype[[var]], sep = ""), args = list(df[[var]]) )
       }
     }
@@ -2769,8 +2766,6 @@ dim_reduction <- function(df,
   df_trans <- df
   df_filter <- df
   
-  print(trans_name)
-  
   for(i in 1:length(yvar)){
     df_trans[[yvar[i]]] <- transformation[[yvar[i]]]$transform(df[[yvar[i]]])
   }
@@ -2865,7 +2860,6 @@ get_cluster <- function(df,
   df_trans <- df
   df_filter <- df
   
-  print(trans_name)
   for(i in 1:length(yvar)){
     df_trans[[yvar[i]]] <- transformation[[yvar[i]]]$transform(df[[yvar[i]]])
   }
