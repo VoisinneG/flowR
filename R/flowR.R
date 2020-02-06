@@ -693,16 +693,23 @@ transform_gates <- function(gates,
                                     colnames(polygon))
         }
         
-        for(j in 1:length(colnames(polygon))){
-          if(colnames(polygon)[j] %in% names(transformation)){
-            polygon[,j] <- transformation[[colnames(polygon)[j]]]$transform(polygon[,j])
-          }
-          if(colnames(polygon)[j] == "Time"){
-            if(!is.null(time_step)){
+        if(!is.null(time_step)){
+          idx_time <- grep("^Time", colnames(polygon))
+          if(length(idx_time)>0){
+            for(j in idx_time){
               polygon[,j] <- polygon[,j]/time_step
             }
           }
         }
+        
+        if(!is.null(transformation)){
+          for(j in 1:length(colnames(polygon))){
+            if(colnames(polygon)[j] %in% names(transformation)){
+              polygon[,j] <- transformation[[colnames(polygon)[j]]]$transform(polygon[,j])
+            }
+          }
+        }
+
         
         trans_gate <- flowCore::polygonGate(.gate = polygon, filterId=g$gate@filterId)
       }
@@ -719,13 +726,19 @@ transform_gates <- function(gates,
                                     colnames(polygon))
         }
 
+        if(!is.null(time_step)){
+          idx_time <- grep("^Time", colnames(polygon))
+          if(length(idx_time)>0){
+            for(j in idx_time){
+              polygon[,j] <- polygon[,j]/time_step
+            }
+          }
+        }
         
         if(!is.null(transformation)){
           for(j in 1:length(colnames(polygon))){
-            polygon[,j] <- transformation[[colnames(polygon)[j]]]$transform(polygon[,j])
-            
-            if(colnames(polygon)[j] == "Time"){
-              polygon[,j] <- polygon[,j]/time_step
+            if(colnames(polygon)[j] %in% names(transformation)){
+              polygon[,j] <- transformation[[colnames(polygon)[j]]]$transform(polygon[,j])
             }
           }
         }
@@ -745,13 +758,19 @@ transform_gates <- function(gates,
                                     colnames(polygon))
         }
 
+        if(!is.null(time_step)){
+          idx_time <- grep("^Time", colnames(polygon))
+          if(length(idx_time)>0){
+            for(j in idx_time){
+              polygon[,j] <- polygon[,j]/time_step
+            }
+          }
+        }
         
         if(!is.null(transformation)){
           for(j in 1:length(colnames(polygon))){
-            polygon[,j] <- transformation[[colnames(polygon)[j]]]$transform(polygon[,j])
-            
-            if(colnames(polygon)[j] == "Time"){
-              polygon[,j] <- polygon[,j]/time_step
+            if(colnames(polygon)[j] %in% names(transformation)){
+              polygon[,j] <- transformation[[colnames(polygon)[j]]]$transform(polygon[,j])
             }
           }
         }
