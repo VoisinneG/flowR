@@ -682,6 +682,7 @@ transform_gates <- function(gates,
       
       g <- gates[[i]]
       
+      print(g)
       
       if(class(g$gate) == "polygonGate"){
         
@@ -709,9 +710,12 @@ transform_gates <- function(gates,
       if(class(g$gate) == "rectangleGate"){
         
         polygon <- rbind(g$gate@min, g$gate@max)
+        if(dim(polygon)[2]==1){
+          colnames(polygon) <- names(g$gate@parameters)
+        }
         if(!is.null(pattern)){
-          colnames(polygon) <- gsub(pattern = pattern, 
-                                    replacement = replacement, 
+          colnames(polygon) <- gsub(pattern = pattern,
+                                    replacement = replacement,
                                     colnames(polygon))
         }
 
