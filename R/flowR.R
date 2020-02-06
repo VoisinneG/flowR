@@ -455,7 +455,7 @@ flowJo_biexp_inverse_trans <- function (..., n = 6, equal.space = FALSE){
 }
 
 #' Scaled hyperbolic arc-sine function
-#' @param b scale
+#' @param scale scale parameter
 #' @param inverse use inverse function?
 asinh_transform <- function(scale=5, inverse = FALSE){
   if(inverse){
@@ -2663,11 +2663,11 @@ format_style_comp_matrix <- function(df, editable = 'none', rownames = TRUE){
                         selection = list(mode = 'single', target = 'cell'), 
                         editable  = editable, 
                         options = list(
-                          initComplete = JS(
+                          initComplete = htmlwidgets::JS(
                             "function(settings, json) {",
                             "$(this.api().table().container()).css({'font-size': '12px'});",
                             "}"),
-                          headerCallback = JS(headerCallback),
+                          headerCallback = htmlwidgets::JS(headerCallback),
                           autoWidth = FALSE,
                           scrollX=TRUE
                           #columnDefs = list(list(width = '10px', targets = "_all"))
@@ -2676,7 +2676,7 @@ format_style_comp_matrix <- function(df, editable = 'none', rownames = TRUE){
       #DT::formatStyle(columns = colnames(df), fontSize = '50%') %>%
       DT::formatStyle(
         columns = colnames(df),
-        backgroundColor = styleInterval(cuts = seq(-125, 125, 250/(length(colors)-2)), values = colors),
+        backgroundColor = DT::styleInterval(cuts = seq(-125, 125, 250/(length(colors)-2)), values = colors),
       )
     
   }else{

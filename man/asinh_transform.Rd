@@ -7,9 +7,9 @@
 asinh_transform(scale = 5, inverse = FALSE)
 }
 \arguments{
-\item{inverse}{use inverse function?}
+\item{scale}{scale parameter}
 
-\item{b}{scale}
+\item{inverse}{use inverse function?}
 }
 \description{
 Scaled hyperbolic arc-sine function
