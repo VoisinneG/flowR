@@ -85,9 +85,8 @@ ImportUI <- function(id) {
 #'   \item{gating_set_selected}{Name of the selected GatingSet}
 #' }
 #' @import shiny
-#' @importFrom flowWorkspace pData
+#' @importFrom flowWorkspace pData GatingSet
 #' @importFrom flowCore fsApply
-#' @importFrom CytoML open_flowjo_xml open_diva_xml flowjo_to_gatingset fj_ws_get_sample_groups diva_get_sample_groups
 #' @importFrom ncdfFlow read.ncdfFlowSet
 #' @importFrom DT renderDT
 #' @importFrom tools file_ext
@@ -143,7 +142,7 @@ Import <- function(input, output, session, rval) {
 
         for(name in names(res)){
           fs <- build_flowset_from_df(df = res[[name]]$data, origin = res[[name]]$flow_set)
-          gs <- GatingSet(fs)
+          gs <- flowWorkspace::GatingSet(fs)
           add_gates_flowCore(gs = gs, gates = res[[name]]$gates)
           gs@compensation <- res[[name]]$compensation
           gs@transformation <- res[[name]]$transformation
@@ -173,7 +172,7 @@ Import <- function(input, output, session, rval) {
         df$name <- basename(rval_mod$df_files$datapath[input$files_table_rows_selected[1]])
         df$subset <- "root"
         fs <- build_flowset_from_df(df)
-        gs <- GatingSet(fs)
+        gs <- flowWorkspace::GatingSet(fs)
         rval$gating_set_list[[input$gs_name]] <- list(gating_set = gs,
                                                       parent = NULL)
         rval$gating_set_selected <- input$gs_name
@@ -188,7 +187,7 @@ Import <- function(input, output, session, rval) {
                                             truncate_max_range = TRUE )
           
           flowWorkspace::pData(fs)$name <- basename(files[idx_fcs])
-          gs <- GatingSet(fs)
+          gs <- flowWorkspace::GatingSet(fs)
           rval$gating_set_list[[input$gs_name]] <- list(gating_set = gs,
                                                         parent = NULL)
           rval$gating_set_selected <- input$gs_name
@@ -203,7 +202,7 @@ Import <- function(input, output, session, rval) {
   observeEvent(input$import_gvhd, {
     
     utils::data("GvHD", package = "flowCore")
-    gs <- GatingSet(GvHD)
+    gs <- flowWorkspace::GatingSet(GvHD)
     rval$gating_set_list[["GvHD"]] <- list(gating_set = gs,
                                                   parent = NULL)
     rval$gating_set_selected <- "GvHD"

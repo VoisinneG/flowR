@@ -113,8 +113,10 @@ selection <- function(input, output, session,
     rval$update_gs
     
     validate(need(class(rval$gating_set) == "GatingSet", "input is not a GatingSet"))
-    choices$sample <- pData(rval$gating_set)$name
-    choices$subset <- gs_get_pop_paths(rval$gating_set)
+    gs_params <- get_parameters_gs(gs = rval$gating_set)
+    choices$sample <- gs_params$sample
+    choices$subset <- gs_params$subset
+
     if(multiple_subset){
       choices_pattern$sample <- choices$sample
       choices_pattern$subset <- choices$subset

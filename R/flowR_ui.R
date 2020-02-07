@@ -11,7 +11,7 @@ flowR_ui <- function() {
 
   sidebar <- {
     dashboardSidebar(
-      sidebarMenu(id = "tabs", menuItemOutput("menu"))
+      sidebarMenu(id = "sidebar_tabs", menuItemOutput("menu"))
   )}
   
   ui <- dashboardPage(header = dashboardHeader(title = "flowR"),

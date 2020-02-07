@@ -179,14 +179,28 @@ flowR_server <- function(session, input, output, modules = NULL) {
   #   }
   # })
   
+  
+  ### Get parameters from GatingSet ################################################################
+  
+  choices <- reactive({
+    rval$update_gs
+    validate(need(class(rval$gating_set) == "GatingSet", "input is not a GatingSet"))
+    get_parameters_gs(rval$gating_set)
+  })
+  
   ### Main Value boxes #########################################################################
   
   output$progressBox <- renderValueBox({
+    
     Nsamples <- 0
-    rval$update_gs
-    if(!is.null(rval$gating_set)){
-      Nsamples <- length(pData(rval$gating_set)$name)
+    if(class(rval$gating_set) == "GatingSet"){
+      Nsamples <- length(choices()$sample)
     }
+    
+    # rval$update_gs
+    # if(!is.null(rval$gating_set)){
+    #   Nsamples <- length(pData(rval$gating_set)$name)
+    # }
     valueBox(
       Nsamples, "samples",icon = icon("list"),
       color = "purple"
