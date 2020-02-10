@@ -115,7 +115,7 @@ plotGatingSetInput <- function(id) {
 #'   \item{plot}{a plot or a list of plots}
 #'   \item{params}{plot parameters}
 #' }
-#' @importFrom flowWorkspace gs_pop_get_children gh_pop_get_gate gs_get_pop_paths pData
+#' @importFrom flowWorkspace gs_pop_get_children gh_pop_get_gate
 #' @importFrom flowCore parameters
 #' @import shiny
 #' @export
@@ -579,10 +579,10 @@ plotGatingSet <- function(input, output, session,
     
     validate(need(rval$gating_set, "Empty GatingSet"))
     validate(need(rval_input$sample, "Please select samples"))
-    validate(need(all(rval_input$sample %in% pData(rval$gating_set)$name), 
+    validate(need(all(rval_input$sample %in% choices()$sample), 
                   "All samples not found in GatingSet"))
     validate(need(rval_input$subset, "Please select subsets"))
-    validate(need(all(rval_input$subset %in% gs_get_pop_paths(rval$gating_set)), 
+    validate(need(all(rval_input$subset %in% choices()$subset), 
                   "All subsets not found in GatingSet"))
    
     

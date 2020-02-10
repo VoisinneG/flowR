@@ -682,6 +682,7 @@ transform_gates <- function(gates,
       
       g <- gates[[i]]
       
+      print(g)
       
       if(class(g$gate) == "polygonGate"){
         
@@ -692,16 +693,23 @@ transform_gates <- function(gates,
                                     colnames(polygon))
         }
         
-        for(j in 1:length(colnames(polygon))){
-          if(colnames(polygon)[j] %in% names(transformation)){
-            polygon[,j] <- transformation[[colnames(polygon)[j]]]$transform(polygon[,j])
-          }
-          if(colnames(polygon)[j] == "Time"){
-            if(!is.null(time_step)){
+        if(!is.null(time_step)){
+          idx_time <- grep("^Time", colnames(polygon))
+          if(length(idx_time)>0){
+            for(j in idx_time){
               polygon[,j] <- polygon[,j]/time_step
             }
           }
         }
+        
+        if(!is.null(transformation)){
+          for(j in 1:length(colnames(polygon))){
+            if(colnames(polygon)[j] %in% names(transformation)){
+              polygon[,j] <- transformation[[colnames(polygon)[j]]]$transform(polygon[,j])
+            }
+          }
+        }
+
         
         trans_gate <- flowCore::polygonGate(.gate = polygon, filterId=g$gate@filterId)
       }
@@ -709,19 +717,28 @@ transform_gates <- function(gates,
       if(class(g$gate) == "rectangleGate"){
         
         polygon <- rbind(g$gate@min, g$gate@max)
+        if(dim(polygon)[2]==1){
+          colnames(polygon) <- names(g$gate@parameters)
+        }
         if(!is.null(pattern)){
-          colnames(polygon) <- gsub(pattern = pattern, 
-                                    replacement = replacement, 
+          colnames(polygon) <- gsub(pattern = pattern,
+                                    replacement = replacement,
                                     colnames(polygon))
         }
 
+        if(!is.null(time_step)){
+          idx_time <- grep("^Time", colnames(polygon))
+          if(length(idx_time)>0){
+            for(j in idx_time){
+              polygon[,j] <- polygon[,j]/time_step
+            }
+          }
+        }
         
         if(!is.null(transformation)){
           for(j in 1:length(colnames(polygon))){
-            polygon[,j] <- transformation[[colnames(polygon)[j]]]$transform(polygon[,j])
-            
-            if(colnames(polygon)[j] == "Time"){
-              polygon[,j] <- polygon[,j]/time_step
+            if(colnames(polygon)[j] %in% names(transformation)){
+              polygon[,j] <- transformation[[colnames(polygon)[j]]]$transform(polygon[,j])
             }
           }
         }
@@ -741,13 +758,19 @@ transform_gates <- function(gates,
                                     colnames(polygon))
         }
 
+        if(!is.null(time_step)){
+          idx_time <- grep("^Time", colnames(polygon))
+          if(length(idx_time)>0){
+            for(j in idx_time){
+              polygon[,j] <- polygon[,j]/time_step
+            }
+          }
+        }
         
         if(!is.null(transformation)){
           for(j in 1:length(colnames(polygon))){
-            polygon[,j] <- transformation[[colnames(polygon)[j]]]$transform(polygon[,j])
-            
-            if(colnames(polygon)[j] == "Time"){
-              polygon[,j] <- polygon[,j]/time_step
+            if(colnames(polygon)[j] %in% names(transformation)){
+              polygon[,j] <- transformation[[colnames(polygon)[j]]]$transform(polygon[,j])
             }
           }
         }
@@ -856,7 +879,7 @@ get_parameters_gs <- function(gs){
   
   return( 
     list(sample = pdata$name,
-         subset = gs_get_pop_paths(gs),
+         subset = flowWorkspace::gs_get_pop_paths(gs),
          plot_var = plot_var,
          labels = labels,
          axis_limits = axis_limits,
@@ -961,7 +984,8 @@ get_data_gs <- function(gs,
       
       idx_subset <- NULL
       if(!is.null(spill)){
-        idx_comp <- match(pData(gs)$name[idx[i]], pData(gs_comp)$name)
+        idx_comp <- match(flowWorkspace::pData(gs)$name[idx[i]], 
+                          flowWorkspace::pData(gs_comp)$name)
       }
       
       if(subset[k] != "root"){
@@ -988,7 +1012,7 @@ get_data_gs <- function(gs,
       
       if(dim(df_int)[1]>0){
         
-        df_int[["name"]] <- pData(gs)$name[idx[i]]
+        df_int[["name"]] <- flowWorkspace::pData(gs)$name[idx[i]]
         df_int[["subset"]] <- subset[k]
         #df <- rbind(df, df_int)
         
@@ -1015,7 +1039,7 @@ get_data_gs <- function(gs,
   
   df_tot <- do.call(rbind, df)
   df_tot[["subset"]] <- factor(df_tot[["subset"]], levels = subset)
-  df_tot[["name"]] <- factor(df_tot[["name"]], levels = pData(gs)$name[idx])
+  df_tot[["name"]] <- factor(df_tot[["name"]], levels = flowWorkspace::pData(gs)$name[idx])
   
   if(length(df_tot[["name"]]) > 0){
     return(df_tot)
@@ -1188,6 +1212,7 @@ compute_stats <- function(df = NULL,
 #' @param vartype named character vector specifying variable type conversion.
 #' (either "factor", "integer" or "character")
 #' Must have a column \code{name} used for mapping.
+#' @importFrom flowWorkspace pData
 #' @return a data.frame
 get_plot_data <- function(gs,
                           df=NULL, 
@@ -1210,7 +1235,7 @@ get_plot_data <- function(gs,
   }
   
   if(is.null(metadata) & !is.null(gs)){
-    metadata <- pData(gs)
+    metadata <- flowWorkspace::pData(gs)
   }
   
   if(!is.null(metadata)){
@@ -2053,6 +2078,37 @@ add_gate <- function(p, gate){
   
 }
 
+#' @param gates a named list. Each list element should contain a item 'parent' with 
+#' the name of its parent list element
+#' @importFrom graph addEdge nodes
+#' @importFrom Rgraphviz renderGraph layoutGraph
+#' @importFrom methods new
+plot_tree <- function(gates, fontsize = 12){
+  gR = methods::new("graphNEL", nodes = union("root", names(gates)), edgemode = "directed")
+  
+  for(i in 1:length(gates)){
+    if(!is.null(gates[[i]]$parent)){
+      gR = graph::addEdge(gates[[i]]$parent,  names(gates)[i], gR)
+    }
+  }
+  
+  nAttrs <- list()
+  nodeNames <- basename(graph::nodes(gR))
+  names(nodeNames) <- graph::nodes(gR)
+  nAttrs$label <- nodeNames
+  
+  p <- Rgraphviz::renderGraph(Rgraphviz::layoutGraph(gR,
+                                                     nodeAttrs=nAttrs,
+                                                     attrs=list(graph=list(rankdir="LR"),
+                                                                node=list(fixedsize = FALSE,
+                                                                          fillcolor = "gray",
+                                                                          fontsize = fontsize,
+                                                                          shape = "ellipse")
+                                                     )
+    )
+  )
+  return(p)
+}
 
 ### Format plot (legend, scale, labels ...) #####################################################
 
@@ -2439,7 +2495,7 @@ plot_stat <- function(df = NULL,
 #' @param plot_args  list of plot parameters passed to \code{plot_gs()}
 #' @param options  list of plot format options passed to \code{format_plot()}
 #' @return a list of ggplot objects
-#' @importFrom flowWorkspace gs_get_pop_paths gs_pop_get_parent gs_pop_get_children
+#' @importFrom flowWorkspace gs_get_pop_paths gs_pop_get_parent gs_pop_get_children pData
 plot_gh <- function( gs, 
                       df = NULL,
                       sample = NULL,
@@ -2450,9 +2506,9 @@ plot_gh <- function( gs,
                       plot_args = list(), 
                       options = list()){
   
-  if(is.null(sample)){sample = pData(gs)$name[1]}
+  if(is.null(sample)){sample = flowWorkspace::pData(gs)$name[1]}
   
-  idx <- match(sample, pData(gs)$name)
+  idx <- match(sample, flowWorkspace::pData(gs)$name)
   
   if(is.null(selected_subsets)){
     selected_subsets <- setdiff(flowWorkspace::gs_get_pop_paths(gs), "root")
@@ -2556,7 +2612,7 @@ plot_gh <- function( gs,
 #' @param plot_type name of the plot type
 #' @param plot_args  list of plot parameters passed to \code{plot_gs()}
 #' @param options  list of plot format options passed to \code{format_plot()}
-#' @importFrom flowWorkspace gh_pop_get_gate
+#' @importFrom flowWorkspace gh_pop_get_gate pData
 plot_gate <- function(gate_name,
                      df = NULL,
                      gs,
@@ -2575,7 +2631,7 @@ plot_gate <- function(gate_name,
   
   if(length(names(polygon))>1){plot_args$yvar <- names(polygon)[2]}
   
-  if(is.null(sample)) sample <-  pData(gs)$name[1]
+  if(is.null(sample)) sample <-  flowWorkspace::pData(gs)$name[1]
 
   df <- get_plot_data(df = df,
                       gs = gs, 

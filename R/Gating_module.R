@@ -120,7 +120,9 @@ GatingUI <- function(id) {
                   tabPanel("Tree",
                            checkboxInput(ns("show_all_subsets"), 
                                          "Show all subsets (including clusters and bins)", FALSE),
-                           plotOutput(ns("tree"))
+                           simpleDisplayUI(ns("simple_display_module_3"))
+                           #plotOutput(ns("tree"), width = 500, height = 500)
+                           #uiOutput(ns("tree_ui"))
                   ),
                   tabPanel(title = "Gates",
                            simpleDisplayUI(ns("simple_display_module_2"))
@@ -215,7 +217,17 @@ Gating <- function(input, output, session, rval) {
              nrow = 2, size = 200,
              params = display_params)
   
+  callModule(simpleDisplay, "simple_display_module_3", 
+             plot_list = graph,
+             size = 500)
   
+  ### Get parameters from GatingSet ################################################################
+  
+  choices <- reactive({
+    rval$update_gs
+    validate(need(class(rval$gating_set) == "GatingSet", "input is not a GatingSet"))
+    get_parameters_gs(rval$gating_set)
+  })
 
   ### Passing plot parameters to the gating hierarchy plot #######################################
   observe({
@@ -236,9 +248,7 @@ Gating <- function(input, output, session, rval) {
   })
   
   observe({
-    rval$update_gs
-    validate(need(class(rval$gating_set)=="GatingSet", "no gating set"))
-    gates <- gs_get_pop_paths(rval$gating_set)
+    gates <- choices()$subset
     updateSelectInput(session, "gate_to_delete", choices = setdiff(gates, "root"))
     updateSelectInput(session, "gate_to_rename", choices = setdiff(gates, "root"))
     updateSelectInput(session, "gate_to_copy", choices = setdiff(gates, "root"))
@@ -485,8 +495,9 @@ Gating <- function(input, output, session, rval) {
   gate_list <- reactive({
     rval$update_gs
     validate(need(class(rval$gating_set)=="GatingSet", "No GatingSet available"))
+    validate(need(setdiff(choices()$subset, "root"), "No gates to display"))
     gates <- get_gates_from_gs(rval$gating_set)
-    validate(need(names(gates), "Empty GatingSet"))
+    
     
     if(!input$show_all_subsets){
       idx_cluster <- grep("^cluster[0-9]+", basename(names(gates)))
@@ -503,35 +514,31 @@ Gating <- function(input, output, session, rval) {
     plot_params_gh$selected_subsets <- names(gate_list())
   })
   
-  output$tree <- renderPlot({
+  #output$tree <- renderPlot({
+  graph <- reactive({
     gates <- gate_list()
-
-    gR = methods::new("graphNEL", nodes = union("root", names(gates)), edgemode = "directed")
-
-    for(i in 1:length(gates)){
-      if(!is.null(gates[[i]]$parent)){
-        gR = graph::addEdge(gates[[i]]$parent,  names(gates)[i], gR)
-      }
-    }
-
-    nAttrs <- list()
-    nodeNames <- basename(graph::nodes(gR))
-    names(nodeNames) <- graph::nodes(gR)
-    nAttrs$label <- nodeNames
-    
-    Rgraphviz::renderGraph(Rgraphviz::layoutGraph(gR,
-                            nodeAttrs=nAttrs,
-                            attrs=list(graph=list(rankdir="LR", page=c(8.5,11)),
-                                       node=list(fixedsize = FALSE,
-                                                 fillcolor = "gray",
-                                                 fontsize = 12,
-                                                 shape = "ellipse")
-                            )
-    )
-    )
-    
+    p <- plot_tree(gates)
+    #print(class(p))
+    print("build graph")
+    print(p)
+    return(p)
   })
   
+  output$tree <- renderPlot({
+    print("ok render")
+    print(graph())
+    graph()    
+  })
+  
+  output$tree_ui <- renderUI({
+    ns <- session$ns
+    div( style = 'overflow-x: scroll',
+      plotOutput(ns("tree"), width = 500, height = 500,
+                 brush = ns("plot_brush"),
+                 click = ns("plot_click"),
+                 dblclick = ns("plot_dblclick"))
+    )
+  })
   ### Population statistics ######################################################################
   
   pop_stats <- reactive({
@@ -670,7 +677,7 @@ Gating <- function(input, output, session, rval) {
 # 
 # library(shiny)
 # library(shinydashboard)
-# library(flowWorkspace)
+#library(flowWorkspace)
 # library(flowCore)
 # library(viridis)
 # library(scales)
@@ -679,41 +686,41 @@ Gating <- function(input, output, session, rval) {
 # library(plotly)
 # library(ggridges)
 # 
-# if (interactive()){
-# 
-#   ui <- dashboardPage(
-#     dashboardHeader(title = "Gating"),
-#     sidebar = dashboardSidebar(disable = TRUE),
-#     body = dashboardBody(
-#       GatingUI("module")
-#     )
-#   )
-# 
-#   server <- function(input, output, session) {
-# 
-#     rval <- reactiveValues()
-# 
-#     observe({
-#       fs <- read.ncdfFlowSet(files = "../flowR_utils/demo-data/JL04BMVLG-Valentin/Tumor_T_001_012.fcs")
-#       rval$gating_set <- GatingSet(fs)
-#       #load("../flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
-#       #fs <- build_flowset_from_df(df = res$cluster$data, origin = res$cluster$flow_set)
-#       #gs <- GatingSet(fs)
-#       #gs@transformation <-  res$cluster$transformation
-#       #add_gates_flowCore(gs, res$cluster$gates)
-#       #rval$gating_set <- gs
-#       #plot_params$sample <- pData(gs)$name[1]
-#       #utils::data("GvHD", package = "flowCore")
-#       #rval$gating_set <- GatingSet(GvHD)
-#       #gs <- load_gs("./inst/ext/gs")
-#       #rval$gating_set <- gs
-#     })
-# 
-#     res <- callModule(Gating, "module", rval = rval)
-# 
-#   }
-# 
-#   shinyApp(ui, server)
-# 
-# }
+if (interactive()){
+
+  ui <- dashboardPage(
+    dashboardHeader(title = "Gating"),
+    sidebar = dashboardSidebar(disable = TRUE),
+    body = dashboardBody(
+      GatingUI("module")
+    )
+  )
+
+  server <- function(input, output, session) {
+
+    rval <- reactiveValues()
+
+    observe({
+      fs <- read.ncdfFlowSet(files = "~/2019-Exp-Tumor-042 (Lung Carcinoma)/DE17BMVLG/Tumor_Tube_001.fcs")
+      rval$gating_set <- flowWorkspace::GatingSet(fs)
+      #load("../flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
+      #fs <- build_flowset_from_df(df = res$cluster$data, origin = res$cluster$flow_set)
+      #gs <- flowWorkspace::GatingSet(fs)
+      #gs@transformation <-  res$cluster$transformation
+      #add_gates_flowCore(gs, res$cluster$gates)
+      #rval$gating_set <- gs
+      #plot_params$sample <- pData(gs)$name[1]
+      #utils::data("GvHD", package = "flowCore")
+      #rval$gating_set <- GatingSet(GvHD)
+      #gs <- load_gs("./inst/ext/gs")
+      #rval$gating_set <- gs
+    })
+
+    res <- callModule(Gating, "module", rval = rval)
+
+  }
+
+  shinyApp(ui, server)
+
+}
 

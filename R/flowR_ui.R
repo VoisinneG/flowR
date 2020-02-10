@@ -11,14 +11,12 @@ flowR_ui <- function() {
 
   sidebar <- {
     dashboardSidebar(
-      sidebarMenu(menuItemOutput("menu"))
+      sidebarMenu(id = "sidebar_tabs", menuItemOutput("menu"))
   )}
   
-  ui <- dashboardPage(
-    dashboardHeader(title = "flowR"),
-    sidebar,
-    body
-  )
+  ui <- dashboardPage(header = dashboardHeader(title = "flowR"),
+                      sidebar = sidebar,
+                      body = body)
   
   return(ui)
 }

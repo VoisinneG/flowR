@@ -42,6 +42,7 @@ flowR_server <- function(session, input, output, modules = NULL) {
     rval$modules <- union(rval$modules, "Modules")
   })
   
+  
   output$body <- renderUI({
     if(all(rval$modules %in% names(rval$tab_elements))){
       tagList(
@@ -59,6 +60,14 @@ flowR_server <- function(session, input, output, modules = NULL) {
       tagList(list())
     }
     
+  })
+  
+  # select first module loaded
+  observe({
+    validate(need(rval$modules, "No tab elements available"))
+    tab_selected <- rval$modules[1]
+    tab_selected <- paste(tab_selected, "tab", sep="_")
+    updateTabItems(inputId = "sidebar_tabs", selected = tab_selected, session = session)
   })
   
   output$menu <- renderMenu({
@@ -91,7 +100,7 @@ flowR_server <- function(session, input, output, modules = NULL) {
 
         mod_name_ui <- paste(mod_name, "UI", sep="")
         
-        module_server_function <-function(...){do.call(mod_name, list(...) )}
+        module_server_function <- function(...){do.call(mod_name, list(...) )}
         module_id <- paste(mod_name, "module", sep="_")
         module_tab_name <- paste(mod_name, "tab", sep="_")
         
@@ -170,14 +179,28 @@ flowR_server <- function(session, input, output, modules = NULL) {
   #   }
   # })
   
+  
+  ### Get parameters from GatingSet ################################################################
+  
+  choices <- reactive({
+    rval$update_gs
+    validate(need(class(rval$gating_set) == "GatingSet", "input is not a GatingSet"))
+    get_parameters_gs(rval$gating_set)
+  })
+  
   ### Main Value boxes #########################################################################
   
   output$progressBox <- renderValueBox({
+    
     Nsamples <- 0
-    rval$update_gs
-    if(!is.null(rval$gating_set)){
-      Nsamples <- length(pData(rval$gating_set)$name)
+    if(class(rval$gating_set) == "GatingSet"){
+      Nsamples <- length(choices()$sample)
     }
+    
+    # rval$update_gs
+    # if(!is.null(rval$gating_set)){
+    #   Nsamples <- length(pData(rval$gating_set)$name)
+    # }
     valueBox(
       Nsamples, "samples",icon = icon("list"),
       color = "purple"

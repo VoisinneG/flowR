@@ -5,7 +5,9 @@ library(xml2)
 
 # Parse flowJO workspace
 
-ws <- read_xml("../flowR_utils/demo-data/JL04BMVLG-Valentin/Tumor-testFlowR.wsp")
+ws <- read_xml("~/Classical analysis 06012020.wsp")
+gates <- get_gates_from_ws("~/Classical analysis 06012020.wsp")
+gates <- transform_gates(gates, pattern = "Comp-", replacement = "")
 
 # parse spillover matrices from FlowJo wsp
 ws_path <- "../flowR_utils/demo-data/JL04BMVLG-Valentin/Tumor-testFlowR.wsp"
