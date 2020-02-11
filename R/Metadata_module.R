@@ -254,8 +254,10 @@ Metadata <- function(input, output, session, rval) {
         }
       }
       
+      params <- colnames( gs_filter)[colnames(gs_filter) %in% names(rval$trans_parameters)]
       rval$gating_set_list[[input$gs_name]] <- list(gating_set = gs_filter,
-                                                    parent = rval$gating_set_selected)
+                                                    parent = rval$gating_set_selected,
+                                                    trans_parameters = rval$trans_parameters[params])
       rval$gating_set_selected <- input$gs_name
       rval$gating_set <- gs_filter
       rval$update_gs <- rval$update_gs + 1

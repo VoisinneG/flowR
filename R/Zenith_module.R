@@ -340,20 +340,27 @@ Zenith <- function(input, output, session, rval) {
     df[["mean_score_gluc_dep"]] <- df_metabo[["mean_score_gluc_dep"]][idx_match]
     df[["mean_score_mito_dep"]] <- df_metabo[["mean_score_mito_dep"]][idx_match]
     
-    fs <- build_flowset_from_df(df, 
-                                origin = rval$gating_set@data)
+    df <- cbind(df_raw[res$keep, setdiff(names(df_raw), names(res$df))], res$df)
     
-    gs <- GatingSet(fs)
-    gates <- get_gates_from_gs(rval$gating_set)
-    add_gates_flowCore(gs = gs, gates = gates)
-    gs@compensation <- choices()$compensation
-    gs@transformation <- choices()$transformation
+    gs <- build_gatingset_from_df(df = df, gs_origin = rval$gating_set)
+    
+    # fs <- build_flowset_from_df(df, 
+    #                             origin = rval$gating_set@data)
+    # 
+    # gs <- GatingSet(fs)
+    # gates <- get_gates_from_gs(rval$gating_set)
+    # add_gates_flowCore(gs = gs, gates = gates)
+    # gs@compensation <- choices()$compensation
+    # gs@transformation <- choices()$transformation
     
     if(!is.null(rval$gating_set_selected)){
       if(rval$gating_set_selected %in% names(rval$gating_set_list)){
-        rval$gating_set_list[[input$gs_name]] <- list(gating_set = gs,
-                                                      parent = rval$gating_set_selected)
+        params <- colnames(rval_mod$gs)[colnames(rval_mod$gs) %in% names(rval$trans_parameters)]
         
+        rval$gating_set_list[[input$gs_name]] <- list(gating_set = rval_mod$gs,
+                                                      parent = rval$gating_set_selected,
+                                                      trans_parameters = rval$trans_parameters[params]
+        )
         rval$gating_set_selected <- input$gs_name
         rval$update_gs <- rval$update_gs + 1
       }

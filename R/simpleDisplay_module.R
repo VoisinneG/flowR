@@ -57,15 +57,20 @@ simpleDisplayUI <- function(id){
   ns <- NS(id)
 
   tagList(
-    fluidRow(
-      box(title = "Plot", width = 12, collapsible = TRUE, collapsed = FALSE,
-          uiOutput(ns("ui_plot"))
-      )  
-    ),
-    fluidRow(
-      uiOutput(ns("ui_options"))
-    )
-    
+      #box(title = "Plot", width = 12, collapsible = TRUE, collapsed = FALSE,
+          
+          uiOutput(ns("ui_plot")),
+          br(),
+          br(),
+          fluidRow(
+            box(title = "Display options", width = 6, collapsible = TRUE, collapsed = TRUE,
+                uiOutput(ns("ui_options"))
+                ),
+            box(title = "Save", width = 6, collapsible = TRUE, collapsed = TRUE,
+                uiOutput(ns("ui_save"))
+                )
+          )
+      #) 
   )
 }
 
@@ -112,7 +117,8 @@ simpleDisplay <- function(input, output, session,
                               ncol_facet = 1,
                               nrow_facet = 1,
                               use_plotly = FALSE,
-                              top = "")
+                              top = "",
+                              zoom = 100)
   
   observe({
     for(var in names(params)){
@@ -126,9 +132,7 @@ simpleDisplay <- function(input, output, session,
     
   })
     
-  observe({
-    print(rval_plot$top)
-  })
+
   ### Layout plots ##########################################################################
   
   plot_display <- reactive({
@@ -166,7 +170,9 @@ simpleDisplay <- function(input, output, session,
                                            ncol = rval_plot$ncol, 
                                            top = rval_plot$top),
                        silent = TRUE)
-              
+              print("ok g")
+              print(rval_plot$top)
+              print(length(plot_list()))
               if("try-error" %in% class(g)){
                 showModal(modalDialog(
                   title = "Error",
@@ -175,7 +181,7 @@ simpleDisplay <- function(input, output, session,
                   footer = NULL
                 ))
               }         
-                      
+              print("ok g 2")        
               g
             }else if(n == 1){
               
@@ -209,7 +215,7 @@ simpleDisplay <- function(input, output, session,
    })
   
   plot_to_render <- reactive({
-    validate(need(plot_display(), "No plot to render"))
+    validate(need(plot_display(), "No plot to display"))
 
     if("graphNEL" %in% class(plot_display())){
       Rgraphviz::renderGraph(plot_display())
@@ -228,60 +234,68 @@ simpleDisplay <- function(input, output, session,
   
   ### Build UI for plot options #############################################################
   
-  ui_options_elements <- reactive({
+  output$ui_options <- renderUI({
     ns <- session$ns
-    x <- list()
     display_items <- list()
-    save_items <- list()
+    
     if(!rval_plot$use_plotly){
-      display_items[[1]] <- numericInput(ns("nrow_split"), 
-                                         label = "Number of rows", value = nrow)
-      display_items[[2]] <- sliderInput(ns("zoom"), 
-                                        label = "Zoom", min = 0, max = 200, step = 1, value = 100)
-      display_items[[3]] <- numericInput(ns("row_size"), 
-                                         label = "plot height (px)", value = size)
-      display_items[[4]] <- numericInput(ns("col_size"), 
-                                         label = "plot width (px)", value = size)
-      display_items[[5]] <- numericInput(ns("max_height"), 
-                                         label = "max height (px)", value = max_height)
-      if("top" %in% names(params) ){
-        display_items[[6]] <- checkboxInput(ns("show_title"), 
-                                            label = "show title", value = TRUE)
+      if(! "graphNEL" %in% class(plot_display())){
+        display_items[["nrow_split"]] <- numericInput(ns("nrow_split"),
+                                                      label = "Number of rows", value = nrow)
       }
-  
-      save_items[[1]] <-  downloadButton(ns("download_plot"), "Save plot")
-      
-      x[[1]]<-box(title = "Display options", width = 6, collapsible = TRUE, collapsed = TRUE,
-                  tagList(display_items))
-      
-      x[[2]] <- box(title = "Save", width = 6, collapsible = TRUE, collapsed = TRUE,
-                    tagList(save_items)
-      )
+      display_items[["zoom"]] <- sliderInput(ns("zoom"), 
+                                             label = "Zoom", min = 0, max = 800, step = 1, value = rval_plot$zoom)
+      display_items[["row_size"]] <- numericInput(ns("row_size"), 
+                                                  label = "plot height (px)", value = size)
+      display_items[["col_size"]] <- numericInput(ns("col_size"), 
+                                                  label = "plot width (px)", value = size)
+      display_items[["max_height"]] <- numericInput(ns("max_height"), 
+                                                    label = "max height (px)", value = max_height)
+      if("top" %in% names(params) ){
+        display_items[["show_title"]] <- checkboxInput(ns("show_title"), 
+                                                       label = "show title", value = TRUE)
+      }
+
     }
-    return(x)
+    return( tagList( display_items) )
   })
   
-  output$ui_options <- renderUI({
-    tagList(ui_options_elements())
+  output$ui_save <- renderUI({
+    ns <- session$ns
+    downloadButton(ns("download_plot"), "Save plot")
   })
   
   ### Display plot ##########################################################################
   
   ui_plot_elements <- reactive({
+    validate(need(plot_display(), "No plot to display"))
     
-    validate(need(input$row_size, "No input selected"))
     x <- list()
     ns <- session$ns
+    
+    if(is.null(input$row_size)){
+      row_size <- size
+    }else{
+      row_size <- input$row_size
+    }
+    if(is.null(input$col_size)){
+      col_size <- size
+    }else{
+      col_size <- input$col_size
+    }
+    if(is.null(input$zoom)){
+      zoom_factor <- 100
+    }else{
+      zoom_factor <- input$zoom
+    }
     
     if(rval_plot$use_plotly){
       x <- plotlyOutput(ns("plot_display_ly"), height = size)
     }else{
-      height <- rval_plot$nrow * rval_plot$nrow_facet * input$row_size * input$zoom/100
-      width <- rval_plot$ncol * rval_plot$ncol_facet * input$col_size * input$zoom/100
+      height <- rval_plot$nrow * rval_plot$nrow_facet * row_size * zoom_factor/100
+      width <- rval_plot$ncol * rval_plot$ncol_facet * col_size * zoom_factor/100
       width <- max(width, 150)
       height <- max(height, 150)
-      print(height)
-      print(width)
       x <- div(
         style = paste("overflow-y: scroll; overflow-x: scroll; height:", 
                       min(height, input$max_height) + 20, 'px',sep=""),
@@ -294,7 +308,6 @@ simpleDisplay <- function(input, output, session,
         )
       )
     }
-    print(x)
     return(x)
   })
   
@@ -310,8 +323,23 @@ simpleDisplay <- function(input, output, session,
   output$download_plot <- downloadHandler(
     filename = "plot.pdf",
     content = function(file) {
-      height <- rval_plot$nrow * rval_plot$nrow_facet * input$row_size * input$zoom/100
-      width <- rval_plot$ncol * rval_plot$ncol_facet * input$col_size * input$zoom/100
+      if(is.null(input$row_size)){
+        row_size <- size
+      }else{
+        row_size <- input$row_size
+      }
+      if(is.null(input$col_size)){
+        col_size <- size
+      }else{
+        col_size <- input$col_size
+      }
+      if(is.null(input$zoom)){
+        zoom_factor <- 100
+      }else{
+        zoom_factor <- input$zoom
+      }
+      height <- rval_plot$nrow * rval_plot$nrow_facet * row_size * zoom_factor/100
+      width <- rval_plot$ncol * rval_plot$ncol_facet * col_size * zoom_factor/100
       width <- max(width, 150)
       height <- max(height, 150)
       
@@ -351,26 +379,26 @@ simpleDisplay <- function(input, output, session,
 # 
 #   server <- function(input, output, session) {
 # 
-#     params <- reactiveValues(top = "Iris", use_plotly = FALSE)
+#     params <- reactiveValues(use_plotly = FALSE)
 # 
 #     plot_list <- reactive({
 # 
 # 
-#         # gates <- get_gates_from_ws(
-#         #      "~/2019-Exp-Tumor-042 (Lung Carcinoma)/Classical analysis 06012020.wsp")
-#         # p <- plot_tree(gates, fontsize = 40, rankdir = NULL, shape = "ellipse", fixedsize = TRUE)
-#         # p
+#         gates <- get_gates_from_ws(
+#              "~/2019-Exp-Tumor-042 (Lung Carcinoma)/Classical analysis 06012020.wsp")
+#         p <- plot_tree(gates, fontsize = 40, rankdir = NULL, shape = "ellipse", fixedsize = TRUE)
+#         p
 # 
 # 
-#       plist <- list()
-#       plist[[1]] <- ggplot(iris, aes(x=Sepal.Length, y = Sepal.Width, color = Species)) +
-#         geom_point(alpha = 0.5)
-#         #facet_wrap(~Species)
-# 
-#        plist[[2]] <- ggplot(iris, aes(x=Species, y = Sepal.Length, fill = Species)) +
-#          geom_col(alpha = 0.5)
-# 
-#       return(plist[1])
+#       # plist <- list()
+#       # plist[[1]] <- ggplot(iris, aes(x=Sepal.Length, y = Sepal.Width, color = Species)) +
+#       #   geom_point(alpha = 0.5)
+#       #   #facet_wrap(~Species)
+#       #
+#       #  plist[[2]] <- ggplot(iris, aes(x=Species, y = Sepal.Length, fill = Species)) +
+#       #    geom_col(alpha = 0.5)
+#       #
+#       # return(plist[1])
 # 
 #     })
 # 

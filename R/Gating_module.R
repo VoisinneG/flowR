@@ -118,11 +118,10 @@ GatingUI <- function(id) {
            tabBox(title = "Hierarchy",
                   width = NULL, height = NULL,
                   tabPanel("Tree",
-                           checkboxInput(ns("show_all_subsets"), 
-                                         "Show all subsets (including clusters and bins)", FALSE),
-                           simpleDisplayUI(ns("simple_display_module_3"))
-                           #plotOutput(ns("tree"), width = 500, height = 500)
-                           #uiOutput(ns("tree_ui"))
+                           simpleDisplayUI(ns("simple_display_module_tree")),
+                           box(title = "Plot Options", width = NULL, collapsible = TRUE, collapsed = TRUE,
+                               uiOutput(ns("tree_ui_options"))
+                           )
                   ),
                   tabPanel(title = "Gates",
                            simpleDisplayUI(ns("simple_display_module_2"))
@@ -217,7 +216,7 @@ Gating <- function(input, output, session, rval) {
              nrow = 2, size = 200,
              params = display_params)
   
-  callModule(simpleDisplay, "simple_display_module_3", 
+  res_tree <- callModule(simpleDisplay, "simple_display_module_tree", 
              plot_list = graph,
              size = 500)
   
@@ -499,46 +498,78 @@ Gating <- function(input, output, session, rval) {
     gates <- get_gates_from_gs(rval$gating_set)
     
     
-    if(!input$show_all_subsets){
-      idx_cluster <- grep("^cluster[0-9]+", basename(names(gates)))
-      idx_bins <- grep("^bin[0-9]+", basename(names(gates)))
-      idx_hide <- union(idx_cluster, idx_bins)
-      if(length(idx_hide)>0){
-        gates <- gates[-idx_hide]
-      }
-    }
+    # if(!input$show_all_subsets){
+    #   idx_cluster <- grep("^cluster[0-9]+", basename(names(gates)))
+    #   idx_bins <- grep("^bin[0-9]+", basename(names(gates)))
+    #   idx_hide <- union(idx_cluster, idx_bins)
+    #   if(length(idx_hide)>0){
+    #     gates <- gates[-idx_hide]
+    #   }
+    # }
     gates
   })
   
-  observe({
-    plot_params_gh$selected_subsets <- names(gate_list())
-  })
+  # observe({
+  #   plot_params_gh$selected_subsets <- names(gate_list())
+  # })
   
   #output$tree <- renderPlot({
   graph <- reactive({
+    print("OK")
     gates <- gate_list()
-    p <- plot_tree(gates)
-    #print(class(p))
-    print("build graph")
-    print(p)
+    rankdir <- NULL
+    if(!is.null(input$horizontal_tree)){
+      if(input$horizontal_tree){
+        rankdir <- "LR"
+      }
+    }
+
+    fontsize <- ifelse(is.null(input$fontsize), 40, input$fontsize)
+
+      
+    p <- plot_tree(gates, 
+                   fontsize = fontsize, 
+                   rankdir = rankdir,
+                   shape = ifelse(is.null(input$shape), "ellipse", input$shape), 
+                   fixedsize = ifelse(is.null(input$fixedsize), FALSE, input$fixedsize))
+    print("OK")
+    
     return(p)
   })
   
-  output$tree <- renderPlot({
-    print("ok render")
-    print(graph())
-    graph()    
+  # output$tree <- renderPlot({
+  #   print("ok render")
+  #   print(graph())
+  #   graph()    
+  # })
+  # 
+  # output$tree_ui <- renderUI({
+  #   ns <- session$ns
+  #   div( style = 'overflow-x: scroll',
+  #     plotOutput(ns("tree"), width = 500, height = 500,
+  #                brush = ns("plot_brush"),
+  #                click = ns("plot_click"),
+  #                dblclick = ns("plot_dblclick"))
+  #   )
+  # })
+  
+  output$tree_ui_options <- renderUI({
+    ns <- session$ns
+    x <- list()
+    x[["fontsize"]] <- numericInput(ns("fontsize"), "fontsize", value = 40)
+    x[["horizontal_tree"]] <- checkboxInput(ns("horizontal_tree"), label = "horizontal layout", TRUE)
+    x[["shape"]] <- selectInput(ns("shape"), "node shape", 
+                                choices = c("ellipse", "circle", "rectangle"), selected = "ellipse")
+    x[["fixedsize"]] <- checkboxInput(ns("fixedsize"), label = "fixed node size", FALSE)
+    
+    #tagList(
+      # box(title = "Plot options", collapsible = TRUE, collapsed = TRUE,
+      #     tagList(x)
+      #     )
+    #)
+      tagList(x)
   })
   
-  output$tree_ui <- renderUI({
-    ns <- session$ns
-    div( style = 'overflow-x: scroll',
-      plotOutput(ns("tree"), width = 500, height = 500,
-                 brush = ns("plot_brush"),
-                 click = ns("plot_click"),
-                 dblclick = ns("plot_dblclick"))
-    )
-  })
   ### Population statistics ######################################################################
   
   pop_stats <- reactive({
@@ -556,7 +587,7 @@ Gating <- function(input, output, session, rval) {
     df[['% parent']] <- sprintf("%.1f", df$Count / df$ParentCount * 100)
     df <- df[, c("name", "Population", "Parent", "% parent", "Count", "ParentCount")] 
     df <- dplyr::rename(df, subset = "Population")
-    df <- df[df$subset %in% plot_params_gh$selected_subsets, ]
+    #df <- df[df$subset %in% plot_params_gh$selected_subsets, ]
     df
   })
   
@@ -677,7 +708,7 @@ Gating <- function(input, output, session, rval) {
 # 
 # library(shiny)
 # library(shinydashboard)
-#library(flowWorkspace)
+# library(flowWorkspace)
 # library(flowCore)
 # library(viridis)
 # library(scales)
@@ -686,41 +717,41 @@ Gating <- function(input, output, session, rval) {
 # library(plotly)
 # library(ggridges)
 # 
-if (interactive()){
-
-  ui <- dashboardPage(
-    dashboardHeader(title = "Gating"),
-    sidebar = dashboardSidebar(disable = TRUE),
-    body = dashboardBody(
-      GatingUI("module")
-    )
-  )
-
-  server <- function(input, output, session) {
-
-    rval <- reactiveValues()
-
-    observe({
-      fs <- read.ncdfFlowSet(files = "~/2019-Exp-Tumor-042 (Lung Carcinoma)/DE17BMVLG/Tumor_Tube_001.fcs")
-      rval$gating_set <- flowWorkspace::GatingSet(fs)
-      #load("../flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
-      #fs <- build_flowset_from_df(df = res$cluster$data, origin = res$cluster$flow_set)
-      #gs <- flowWorkspace::GatingSet(fs)
-      #gs@transformation <-  res$cluster$transformation
-      #add_gates_flowCore(gs, res$cluster$gates)
-      #rval$gating_set <- gs
-      #plot_params$sample <- pData(gs)$name[1]
-      #utils::data("GvHD", package = "flowCore")
-      #rval$gating_set <- GatingSet(GvHD)
-      #gs <- load_gs("./inst/ext/gs")
-      #rval$gating_set <- gs
-    })
-
-    res <- callModule(Gating, "module", rval = rval)
-
-  }
-
-  shinyApp(ui, server)
-
-}
+# if (interactive()){
+# 
+#   ui <- dashboardPage(
+#     dashboardHeader(title = "Gating"),
+#     sidebar = dashboardSidebar(disable = TRUE),
+#     body = dashboardBody(
+#       GatingUI("module")
+#     )
+#   )
+# 
+#   server <- function(input, output, session) {
+# 
+#     rval <- reactiveValues()
+# 
+#     observe({
+#       fs <- read.ncdfFlowSet(files = "~/2019-Exp-Tumor-042 (Lung Carcinoma)/DE17BMVLG/Tumor_Tube_001.fcs")
+#       rval$gating_set <- flowWorkspace::GatingSet(fs)
+#       #load("../flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
+#       #fs <- build_flowset_from_df(df = res$cluster$data, origin = res$cluster$flow_set)
+#       #gs <- flowWorkspace::GatingSet(fs)
+#       #gs@transformation <-  res$cluster$transformation
+#       #add_gates_flowCore(gs, res$cluster$gates)
+#       #rval$gating_set <- gs
+#       #plot_params$sample <- pData(gs)$name[1]
+#       #utils::data("GvHD", package = "flowCore")
+#       #rval$gating_set <- GatingSet(GvHD)
+#       #gs <- load_gs("./inst/ext/gs")
+#       #rval$gating_set <- gs
+#     })
+# 
+#     res <- callModule(Gating, "module", rval = rval)
+# 
+#   }
+# 
+#   shinyApp(ui, server)
+# 
+# }
 

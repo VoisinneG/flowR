@@ -179,17 +179,19 @@ Subsample <- function(input, output, session, rval) {
     
     validate(need(length(df_sample)>0, "No cells in selection"))
     
-    fs <- build_flowset_from_df(df_sample, 
-                                origin = rval$gating_set@data)
+    # fs <- build_flowset_from_df(df_sample,
+    #                             origin = rval$gating_set@data)
+    # 
+    # rval_mod$gs <- GatingSet(fs)
+    # add_gates_flowCore(gs = rval_mod$gs, gates = choices()$gates)
+    # rval_mod$gs@compensation <- choices()$compensation
+    # rval_mod$gs@transformation <- choices()$transformation
+    rval_mod$gs <- build_gatingset_from_df(df = df_sample, gs_origin = rval$gating_set)
+    params <- colnames(rval_mod$gs)[colnames(rval_mod$gs) %in% names(rval$trans_parameters)]
     
-    rval_mod$gs <- GatingSet(fs)
-    add_gates_flowCore(gs = rval_mod$gs, gates = choices()$gates)
-    rval_mod$gs@compensation <- choices()$compensation
-    rval_mod$gs@transformation <- choices()$transformation
-    
-
     rval$gating_set_list[[input$gs_name]] <- list(gating_set = rval_mod$gs,
-                                                  parent = rval$gating_set_selected)
+                                                  parent = rval$gating_set_selected,
+                                                  trans_parameters = rval$trans_parameters[params])
     rval$gating_set_selected <- input$gs_name
     
   })

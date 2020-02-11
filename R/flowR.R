@@ -97,6 +97,19 @@ parseGateDiva <- function(gateNode){
   
   name <- xml_text(xml_find_all(gate, ".//name"))
   parent <- xml_text(xml_find_all(gate, ".//parent"))
+  is_x_parameter_log <- xml_text(xml_find_all(gate, ".//is_x_parameter_log"))
+  is_x_parameter_scaled <- xml_text(xml_find_all(gate, ".//is_x_parameter_scaled"))
+  x_parameter_scale_value <- xml_text(xml_find_all(gate, ".//x_parameter_scale_value"))
+  is_y_parameter_log <- xml_text(xml_find_all(gate, ".//is_y_parameter_log"))
+  is_y_parameter_scaled <- xml_text(xml_find_all(gate, ".//is_y_parameter_scaled"))
+  y_parameter_scale_value <- xml_text(xml_find_all(gate, ".//y_parameter_scale_value"))
+  print(name)
+   print(is_x_parameter_log)
+   print(is_x_parameter_scaled)
+   print(x_parameter_scale_value)
+   print(is_y_parameter_log)
+   print(is_y_parameter_scaled)
+   print(y_parameter_scale_value)
   
   parent <- gsub(fixed = FALSE, pattern = "\\\\", replacement = "/", x= parent)
   if(parent == "All Events"){
@@ -126,7 +139,9 @@ parseGateDiva <- function(gateNode){
   
   m <- do.call(rbind, lapply(vertexes, function(v){
     x <- as.numeric(xml_attr(v, "x"))
+    if(is_x_parameter_log == "true" & is_x_parameter_scaled == "false"){x <- 10^x}
     y <- as.numeric(xml_attr(v, "y"))
+    if(is_y_parameter_log == "true" & is_y_parameter_scaled == "false"){y <- 10^y}
     return(data.frame(x = x,
                       y = y))
   }))
@@ -493,10 +508,12 @@ get_gate_coordinates <- function(gate){
       polygon <- as.data.frame(gate@boundaries)
     }
   }else if(class(gate) == "rectangleGate"){
-    
-    polygon <- data.frame(x = c(gate@min[1], gate@max[1], gate@max[1], gate@min[1]),
-                          y = c(gate@min[2], gate@min[2], gate@max[2], gate@max[2]))
-    
+    if(length(gate@min)>1){
+      polygon <- data.frame(x = c(gate@min[1], gate@max[1], gate@max[1], gate@min[1]),
+                            y = c(gate@min[2], gate@min[2], gate@max[2], gate@max[2]))
+    }else{
+      polygon <- data.frame(x = c(gate@min[1], gate@max[1]))
+    }
     colnames(polygon) <- names(gate@min)
     
   }else if(class(gate) == "ellipsoidGate"){
@@ -682,7 +699,7 @@ transform_gates <- function(gates,
       
       g <- gates[[i]]
       
-      print(g)
+      #print(g)
       
       if(class(g$gate) == "polygonGate"){
         
@@ -2028,12 +2045,14 @@ add_polygon_layer <- function(p,
 #' @importFrom sp point.in.polygon
 #' @importFrom rlang quo_get_expr
 add_gate <- function(p, gate){
-  
-  if(is.null(gate) | p$plot_env$plot_type == "histogram"){
+  #print(p$plot_env$plot_type)
+  #if(is.null(gate) | p$plot_env$plot_type == "histogram"){
+  if(is.null(gate)){
     return(p)
   }
   
   polygon <- get_gate_coordinates(gate)
+  
   
   xvar <- NULL
   yvar <- NULL
@@ -2057,21 +2076,45 @@ add_gate <- function(p, gate){
     }
   }
   
+  print(yvar)
+  
   if(setequal(c(xvar, yvar), names(polygon))){ 
+    if(dim(polygon)[2] >1){
+      in_poly <- sp::point.in.polygon(p$data[[xvar]], 
+                                      p$data[[yvar]], 
+                                      polygon[[xvar]],
+                                      polygon[[yvar]], 
+                                      mode.checked=FALSE)
+      
+      perc_in_poly <- sprintf("%.1f", sum(in_poly)/length(in_poly)*100)
+      
+      idx_match <- match(c(xvar, yvar), names(polygon))
+      names(polygon)[idx_match] <- c("x", "y")
+      
+      label <- paste(gate@filterId, " (", perc_in_poly, "%)", sep="")
+      p <- add_polygon_layer(p, polygon = polygon, label = label)
+    }else{
+      p <- p + geom_area(data = data.frame(x = polygon[[xvar]], y = c(1,1)), 
+                         mapping = aes(x=x, y = y), 
+                         alpha = 0.2, 
+                         color = "red", fill = "red")
+      perc_in_poly <- sum(p$data[[xvar]] <= max(polygon[[xvar]]) & 
+                            p$data[[xvar]] >= min(polygon[[xvar]]))/ 
+        length(p$data[[xvar]])*100
+      perc_in_poly <- sprintf("%.1f", perc_in_poly)
+      label <- paste(gate@filterId, " (", perc_in_poly, "%)", sep="")
+      df_label <- data.frame(x=mean(polygon[[xvar]]), y= 0.5)
+      p <- p +  geom_label_repel(data = df_label, force = 4, inherit.aes = FALSE,
+                                 mapping = aes(x=x, y=y),
+                                 label = label,
+                                 fill = grDevices::rgb(1,1,1,0.85),
+                                 color = "red",
+                                 nudge_y = 0,
+                                 nudge_x =0,
+                                 point.padding = 0)
+      
+    }
     
-    in_poly <- sp::point.in.polygon(p$data[[xvar]], 
-                                p$data[[yvar]], 
-                                polygon[[xvar]],
-                                polygon[[yvar]], 
-                                mode.checked=FALSE)
-    
-    perc_in_poly <- sprintf("%.1f", sum(in_poly)/length(in_poly)*100)
-    
-    idx_match <- match(c(xvar, yvar), names(polygon))
-    names(polygon)[idx_match] <- c("x", "y")
-    
-    label <- paste(gate@filterId, " (", perc_in_poly, "%)", sep="")
-    p <- add_polygon_layer(p, polygon = polygon, label = label)
   }
   
   return(p)
@@ -2083,7 +2126,7 @@ add_gate <- function(p, gate){
 #' @importFrom graph addEdge nodes
 #' @importFrom Rgraphviz renderGraph layoutGraph
 #' @importFrom methods new
-plot_tree <- function(gates, fontsize = 12){
+plot_tree <- function(gates, fontsize = 40, rankdir = "LR", shape = "ellipse", fixedsize = FALSE){
   gR = methods::new("graphNEL", nodes = union("root", names(gates)), edgemode = "directed")
   
   for(i in 1:length(gates)){
@@ -2099,11 +2142,11 @@ plot_tree <- function(gates, fontsize = 12){
   
   p <- Rgraphviz::renderGraph(Rgraphviz::layoutGraph(gR,
                                                      nodeAttrs=nAttrs,
-                                                     attrs=list(graph=list(rankdir="LR"),
-                                                                node=list(fixedsize = FALSE,
+                                                     attrs=list(graph=list(rankdir=rankdir),
+                                                                node=list(fixedsize = fixedsize,
                                                                           fillcolor = "gray",
                                                                           fontsize = fontsize,
-                                                                          shape = "ellipse")
+                                                                          shape = shape)
                                                      )
     )
   )
@@ -2519,6 +2562,7 @@ plot_gh <- function( gs,
     subset <- union(subset, parent_subsets)
   }
   
+
   if(is.null(df)){
     
     df <- get_data_gs(gs = gs,
@@ -2531,6 +2575,7 @@ plot_gh <- function( gs,
   
   child_nodes <- flowWorkspace::gs_pop_get_children(gs[[idx[1]]], "root")
   child_nodes <- child_nodes[child_nodes %in% selected_subsets]
+  
   
   plist <- list()
   count <- 0
@@ -2573,14 +2618,20 @@ plot_gh <- function( gs,
         count <- count + 1
 
         plot_args$xvar <- par_nodes[[1]][1]
-        plot_args$yvar <- par_nodes[[1]][2]
+        plot_type_gate <- plot_type
+        if(length(par_nodes[[1]]) > 1){
+          plot_args$yvar <- par_nodes[[1]][2]
+        }else{
+          plot_type_gate <- "histogram"
+        }
         
-        plist[[count]] <- plot_gs(df = df, 
+        
+        plist[[count]] <- plot_gs(df = df,
                                    gs=gs, 
-                                   sample=sample, 
+                                   sample=sample,
                                    subset = parent, 
                                    gate_name = nodes_to_plot_parent[same_par], 
-                                   plot_type = plot_type,
+                                   plot_type = plot_type_gate,
                                    plot_args = plot_args,
                                    options = options)
         
@@ -2626,10 +2677,15 @@ plot_gate <- function(gate_name,
   gate <- flowWorkspace::gh_pop_get_gate(gs[[1]], gate_name)
   
   polygon <- get_gate_coordinates(gate)
+  
   subset <- flowWorkspace::gs_pop_get_parent(gs,  gate_name)
   plot_args[["xvar"]] <- names(polygon)[1]
   
-  if(length(names(polygon))>1){plot_args$yvar <- names(polygon)[2]}
+  if(length(names(polygon))>1){
+    plot_args$yvar <- names(polygon)[2]
+  }else{
+    plot_type = "histogram"
+  }
   
   if(is.null(sample)) sample <-  flowWorkspace::pData(gs)$name[1]
 
@@ -3081,3 +3137,16 @@ build_flowset_from_df <- function(df,
   
 }
 
+#' @importFrom flowWorkspace GatingSet
+build_gatingset_from_df <- function(df, gs_origin = NULL){
+  fs <- build_flowset_from_df(df = df, origin = gs_origin@data)
+  gs <- GatingSet(fs)
+  choices <- get_parameters_gs(gs)
+  gates <- get_gates_from_gs(gs_origin)
+  add_gates_flowCore(gs, gates)
+  sample <- choices$sample[choices$sample %in% names(gs_origin@compensation)]
+  gs@compensation <- gs_origin@compensation[sample]
+  params <- choices$params$name[choices$params$name %in% names(gs_origin@transformation)]
+  gs@transformation <- gs_origin@transformation[params]
+  return(gs)
+}

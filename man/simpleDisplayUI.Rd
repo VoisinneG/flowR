@@ -14,7 +14,8 @@ simpleDisplay(
   plot_list,
   params = reactiveValues(),
   nrow = 1,
-  size = 300
+  size = 300,
+  max_height = 500
 )
 }
 \arguments{

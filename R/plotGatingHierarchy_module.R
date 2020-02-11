@@ -147,17 +147,19 @@ plotGatingHierarchy <- function(input, output, session,
     options$axis_labels <- axis_labels
     options$axis_limits <- axis_limits
     
+print("OK gh")
+print(transformation)
 
     p <- plot_gh( gs = rval$gating_set,
                   df = NULL,
                   sample = rval_plot$sample,
-                  selected_subsets = rval_plot$selected_subsets,
+                  #selected_subsets = rval_plot$selected_subsets,
                   spill = spill,
                   Ncells =  Ncells,
                   plot_type = rval_plot$plot_type,
                   plot_args = reactiveValuesToList(rval_plot),
                   options = options)
-
+    print("OK gh2")
     p
     
   })

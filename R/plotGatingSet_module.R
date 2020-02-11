@@ -595,6 +595,7 @@ plotGatingSet <- function(input, output, session,
     
     
     spill <- choices()$compensation
+    #print(spill)
     if(!is.null(rval$apply_comp)){
       if(!rval$apply_comp){
         spill <- NULL
