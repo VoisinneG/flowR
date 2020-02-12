@@ -7,16 +7,7 @@
 \usage{
 simpleDisplayUI(id)
 
-simpleDisplay(
-  input,
-  output,
-  session,
-  plot_list,
-  params = reactiveValues(),
-  nrow = 1,
-  size = 300,
-  max_height = 500
-)
+simpleDisplay(input, output, session, plot_list, params = reactiveValues())
 }
 \arguments{
 \item{id}{shiny id}

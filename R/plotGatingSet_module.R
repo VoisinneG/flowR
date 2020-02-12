@@ -136,6 +136,7 @@ plotGatingSet <- function(input, output, session,
   rval_plot <- reactiveValues(plot_type = "hexagonal",
                               use_all_cells = FALSE,
                               auto_focus = FALSE,
+                              zoom_on_data_points = FALSE,
                               legend.position = "right",
                               theme = "gray",
                               show_gates = FALSE,
@@ -233,6 +234,8 @@ plotGatingSet <- function(input, output, session,
     
     x[["auto_focus"]] <- checkboxInput(ns("auto_focus"), "Auto-focus", rval_plot[["auto_focus"]])
     
+    x[["zoom_on_data_points"]] <- checkboxInput(ns("zoom_on_data_points"), "Zoom on data points", rval_plot[["zoom_on_data_points"]])
+
     x[["legend.position"]] <- selectInput(ns("legend.position"), label = "legend position",
                 choices = c("none", "right", "top", "left", "bottom"),
                 selected = rval_plot[["legend.position"]])
@@ -297,7 +300,8 @@ plotGatingSet <- function(input, output, session,
     }else if (rval_input$plot_type == 'contour'){
       vars <- c("show_gates", "show_outliers",  "bins", "alpha", "size")
     }
-    vars <- c("plot_type", "use_all_cells", "auto_focus", "legend.position", "theme", vars)
+    vars <- c("plot_type", "use_all_cells", "auto_focus", "zoom_on_data_points",
+              "legend.position", "theme", vars)
     
     tagList(rval_mod$plot_options[vars])
     
@@ -545,13 +549,15 @@ plotGatingSet <- function(input, output, session,
     if(!auto_update){
       input$update_plot
     }else{
-      update_params <- rval_mod$count_raw
+      #update_params <- rval_mod$count_raw
+      update_params <- NULL
       var_update <- c("facet_var",
                       "theme",
                       "legend",
                       "legend.position",
                       "option",
-                      "auto_focus")
+                      "auto_focus",
+                      "zoom_on_data_points")
       var_update <- var_update[var_update %in% names(rval_input)]
       for(var in var_update){
         update_params <- c(update_params, rval_input[[var]])
@@ -661,7 +667,9 @@ plotGatingSet <- function(input, output, session,
   })
   
   ### Format plot ##################################################################################
-  
+  observe({
+    print(rval_input$zoom_on_data_points)
+  })
   plot_format <- eventReactive( c(params_update_plot_format(), plot_raw()), {
     
     #print("format")
@@ -683,8 +691,19 @@ plotGatingSet <- function(input, output, session,
       options$axis_limits <- choices()$axis_limits
     }
     
+    
+    
     plist <- lapply( plot_raw(),
                      function(p){
+                       options$axis_limits <- list()
+                       if(!rval_input$auto_focus){
+                         options$axis_limits <- choices()$axis_limits
+                       }
+                       if(rval_input$zoom_on_data_points){
+                         data_range <- get_plot_data_range(p)
+                         options$axis_limits[names(data_range)] <- data_range
+                         #print(data_range)
+                       }
                        format_plot(p,
                                    options = options)
                      })
@@ -727,11 +746,11 @@ plotGatingSet <- function(input, output, session,
   })
   
   ### Add polygon layer ############################################################################
-  
+
   draw_polygon <- reactive({
     
     #print("poly")
-    
+
     gate <- NULL
     if(!is.null(rval_input$show_gates)){
       if(rval_input$show_gates){
@@ -754,10 +773,19 @@ plotGatingSet <- function(input, output, session,
                            p <- add_gate(p, g)
                          }
                        }
+                       if(rval_input$zoom_on_data_points){
+                         data_range <- get_plot_data_range(p)
+                         xlim <- NULL
+                         ylim <- NULL
+                         xlim <- data_range[[1]]
+                         if(length(data_range)>1){
+                           ylim <- data_range[[2]]
+                         }
+                         p <- p + coord_cartesian(xlim = xlim, ylim = ylim, expand = TRUE)
+                       }
                        return(p)
                      })
     
-    return(plist)
     
   })
   
@@ -778,52 +806,52 @@ plotGatingSet <- function(input, output, session,
 # library(plotly)
 # library(ggridges)
 # 
-# if (interactive()){
-# 
-#   ui <- dashboardPage(
-#     dashboardHeader(title = "plotGatingSet"),
-#     sidebar = dashboardSidebar(disable = TRUE),
-#     body = dashboardBody(
-#       fluidRow(
-#         column(4, box(width = NULL, title = "Parameters", collapsible = TRUE, collapsed = TRUE,
-#                       plotGatingSetInput("module"))),
-#         column(8, box(width = NULL, simpleDisplayUI("simple_display_module")))
-#       )
-#     )
-#   )
-# 
-#   server <- function(input, output, session) {
-# 
-#     rval <- reactiveValues()
-#     plot_params <- reactiveValues()
-# 
-#     observe({
-#        utils::data("GvHD", package = "flowCore")
-#        gs <- GatingSet(GvHD)
-#        rval$gating_set <- gs
-#       #plot_params$plot_type <- "histogram"
-#       #plot_params$xvar <- "cluster"
-#       #plot_params$yvar <- "FL4-H"
-#       #plot_params$sample <- pData(gs)$name[3]
-#       #plot_params$subset <- gs_get_pop_paths(gs)[1]
-#       plot_params$auto_focus <- FALSE
-#       plot_params$plot_type = "histogram"
-#       plot_params$xvar = "FL2-H"
-#       plot_params$option = "magma"
-# 
-#     })
-# 
-#     res <- callModule(plotGatingSet, "module",
-#                       rval = rval,
-#                       plot_params = plot_params,
-#                       show_gates = FALSE,
-#                       auto_update = TRUE,
-#                       simple_plot=TRUE)
-# 
-#     callModule(simpleDisplay, "simple_display_module", res$plot)
-# 
-#   }
-# 
-#   shinyApp(ui, server)
-# 
-# }
+if (interactive()){
+
+  ui <- dashboardPage(
+    dashboardHeader(title = "plotGatingSet"),
+    sidebar = dashboardSidebar(disable = TRUE),
+    body = dashboardBody(
+      fluidRow(
+        column(4, box(width = NULL, title = "Parameters", collapsible = TRUE, collapsed = TRUE,
+                      plotGatingSetInput("module"))),
+        column(8, box(width = NULL, simpleDisplayUI("simple_display_module")))
+      )
+    )
+  )
+
+  server <- function(input, output, session) {
+
+    rval <- reactiveValues()
+    plot_params <- reactiveValues()
+
+    observe({
+       utils::data("GvHD", package = "flowCore")
+       gs <- GatingSet(GvHD)
+       rval$gating_set <- gs
+      #plot_params$plot_type <- "histogram"
+      #plot_params$xvar <- "cluster"
+      #plot_params$yvar <- "FL4-H"
+      #plot_params$sample <- pData(gs)$name[3]
+      #plot_params$subset <- gs_get_pop_paths(gs)[1]
+      plot_params$auto_focus <- FALSE
+      plot_params$plot_type = "histogram"
+      plot_params$xvar = "FL2-H"
+      plot_params$option = "magma"
+
+    })
+
+    res <- callModule(plotGatingSet, "module",
+                      rval = rval,
+                      plot_params = plot_params,
+                      show_gates = FALSE,
+                      auto_update = TRUE,
+                      simple_plot=TRUE)
+
+    callModule(simpleDisplay, "simple_display_module", res$plot)
+
+  }
+
+  shinyApp(ui, server)
+
+}

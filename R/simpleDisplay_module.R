@@ -107,10 +107,7 @@ simpleDisplayUI <- function(id){
 #' @rdname simpleDisplayUI
 simpleDisplay <- function(input, output, session,
                           plot_list, 
-                          params = reactiveValues(),
-                          nrow = 1, 
-                          size = 300,
-                          max_height = 500) {
+                          params = reactiveValues()) {
   
   rval_plot <- reactiveValues(nrow = 1,
                               ncol = 1,
@@ -118,18 +115,47 @@ simpleDisplay <- function(input, output, session,
                               nrow_facet = 1,
                               use_plotly = FALSE,
                               top = "",
-                              zoom = 100)
+                              zoom = 100,
+                              width = 300,
+                              height = 300,
+                              max_height = 500,
+                              init = TRUE)
+  
+  observeEvent(input$zoom, {
+    rval_plot$zoom <- input$zoom
+  })
+  
+  observeEvent(input$width, {
+    rval_plot$width <- input$width
+  })
+  
+  observeEvent(input$height, {
+    rval_plot$height <- input$height
+  })
+  
+  observeEvent(input$max_height, {
+    rval_plot$max_height <- input$max_height
+  })
+  
+  observeEvent(input$nrow, {
+    rval_plot$nrow <- input$nrow
+  })
   
   observe({
-    for(var in names(params)){
-      rval_plot[[var]] <- params[[var]]
+    if(rval_plot$init){
+      for(var in names(params)){
+        rval_plot[[var]] <- params[[var]]
+      }
+      rval_plot$init <- FALSE
     }
+  })
+  
+  observe({
     if("show_title" %in% names(input)){
       if(!input$show_title){
         rval_plot$top <- ""
       }
     }
-    
   })
     
 
@@ -241,16 +267,16 @@ simpleDisplay <- function(input, output, session,
     if(!rval_plot$use_plotly){
       if(! "graphNEL" %in% class(plot_display())){
         display_items[["nrow_split"]] <- numericInput(ns("nrow_split"),
-                                                      label = "Number of rows", value = nrow)
+                                                      label = "Number of rows", value = rval_plot$nrow)
       }
       display_items[["zoom"]] <- sliderInput(ns("zoom"), 
-                                             label = "Zoom", min = 0, max = 800, step = 1, value = rval_plot$zoom)
-      display_items[["row_size"]] <- numericInput(ns("row_size"), 
-                                                  label = "plot height (px)", value = size)
-      display_items[["col_size"]] <- numericInput(ns("col_size"), 
-                                                  label = "plot width (px)", value = size)
+                                             label = "Zoom", min = 0, max = 200, step = 1, value = rval_plot$zoom)
+      display_items[["height"]] <- numericInput(ns("height"), 
+                                                  label = "plot height (px)", value = rval_plot$height)
+      display_items[["width"]] <- numericInput(ns("width"), 
+                                                  label = "plot width (px)", value = rval_plot$width)
       display_items[["max_height"]] <- numericInput(ns("max_height"), 
-                                                    label = "max height (px)", value = max_height)
+                                                    label = "max height (px)", value = rval_plot$max_height)
       if("top" %in% names(params) ){
         display_items[["show_title"]] <- checkboxInput(ns("show_title"), 
                                                        label = "show title", value = TRUE)
@@ -273,32 +299,16 @@ simpleDisplay <- function(input, output, session,
     x <- list()
     ns <- session$ns
     
-    if(is.null(input$row_size)){
-      row_size <- size
-    }else{
-      row_size <- input$row_size
-    }
-    if(is.null(input$col_size)){
-      col_size <- size
-    }else{
-      col_size <- input$col_size
-    }
-    if(is.null(input$zoom)){
-      zoom_factor <- 100
-    }else{
-      zoom_factor <- input$zoom
-    }
-    
     if(rval_plot$use_plotly){
       x <- plotlyOutput(ns("plot_display_ly"), height = size)
     }else{
-      height <- rval_plot$nrow * rval_plot$nrow_facet * row_size * zoom_factor/100
-      width <- rval_plot$ncol * rval_plot$ncol_facet * col_size * zoom_factor/100
+      height <- rval_plot$nrow * rval_plot$nrow_facet * rval_plot$height * rval_plot$zoom/100
+      width <- rval_plot$ncol * rval_plot$ncol_facet * rval_plot$width * rval_plot$zoom/100
       width <- max(width, 150)
       height <- max(height, 150)
       x <- div(
         style = paste("overflow-y: scroll; overflow-x: scroll; height:", 
-                      min(height, input$max_height) + 20, 'px',sep=""),
+                      min(height, rval_plot$max_height) + 20, 'px',sep=""),
         plotOutput(ns("plot_display"),
                    height = height, 
                    width = width,
@@ -323,23 +333,9 @@ simpleDisplay <- function(input, output, session,
   output$download_plot <- downloadHandler(
     filename = "plot.pdf",
     content = function(file) {
-      if(is.null(input$row_size)){
-        row_size <- size
-      }else{
-        row_size <- input$row_size
-      }
-      if(is.null(input$col_size)){
-        col_size <- size
-      }else{
-        col_size <- input$col_size
-      }
-      if(is.null(input$zoom)){
-        zoom_factor <- 100
-      }else{
-        zoom_factor <- input$zoom
-      }
-      height <- rval_plot$nrow * rval_plot$nrow_facet * row_size * zoom_factor/100
-      width <- rval_plot$ncol * rval_plot$ncol_facet * col_size * zoom_factor/100
+
+      height <- rval_plot$nrow * rval_plot$nrow_facet * rval_plot$height * rval_plot$zoom/100
+      width <- rval_plot$ncol * rval_plot$ncol_facet * rval_plot$width * rval_plot$zoom/100
       width <- max(width, 150)
       height <- max(height, 150)
       
@@ -379,13 +375,13 @@ simpleDisplay <- function(input, output, session,
 # 
 #   server <- function(input, output, session) {
 # 
-#     params <- reactiveValues(use_plotly = FALSE)
+#     params <- reactiveValues(use_plotly = FALSE, width = 500, height = 500)
 # 
 #     plot_list <- reactive({
 # 
 # 
 #         gates <- get_gates_from_ws(
-#              "~/2019-Exp-Tumor-042 (Lung Carcinoma)/Classical analysis 06012020.wsp")
+#              "../flowR_utils/demo-data/2019-Exp-Tumor-042 (Lung Carcinoma)/Classical analysis 06012020.wsp")
 #         p <- plot_tree(gates, fontsize = 40, rankdir = NULL, shape = "ellipse", fixedsize = TRUE)
 #         p
 # 
@@ -404,8 +400,7 @@ simpleDisplay <- function(input, output, session,
 # 
 #     callModule(simpleDisplay, "simple_display_module",
 #                plot_list = plot_list,
-#                params = params,
-#                size = 500)
+#                params = params)
 # 
 #   }
 # 

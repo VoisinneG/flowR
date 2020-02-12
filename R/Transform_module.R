@@ -309,19 +309,35 @@ Transform <- function(input, output, session, rval) {
     # update parameters slot in GatingSet
     if(nchar(input$param_desc) >0){
       for(i in 1:length(rval$gating_set)){
-        rval$gating_set@data[[i]]@parameters[["desc"]][idx[1]] <- input$param_desc
+        old_desc <- rval$gating_set@data[[i]]@parameters[["desc"]][idx[1]]
+        if(old_desc != input$param_desc){
+          rval$gating_set@data[[i]]@parameters[["desc"]][idx[1]] <- input$param_desc
+        }
       }
     }
          
-
+   
     # update description slot in GatingSet
-    for(i in 1:length(rval$gating_set)){
-      for(j in 1:length(idx)){
-        desc_field <- paste("$P", idx[j], "VARTYPE", sep="")
-        rval$gating_set@data[[i]]@description[[desc_field]] <- input$param_vartype
+    if(!is.null(input$param_vartype)){
+      for(i in 1:length(rval$gating_set)){
+        for(j in 1:length(idx)){
+          desc_field <- paste("$P", idx[j], "VARTYPE", sep="")
+          old_vartype <- rval$gating_set@data[[i]]@description[[desc_field]]
+          if(!is.null(old_vartype)){
+            if(old_vartype != input$param_vartype){
+              print("upadte")
+              rval$gating_set@data[[i]]@description[[desc_field]] <- input$param_vartype
+            }
+          }else{
+            if(input$param_vartype!="double"){
+              print("upadte2")
+              rval$gating_set@data[[i]]@description[[desc_field]] <- input$param_vartype
+            }
+          }
+        }
       }
     }
-
+    
     transformation <- choices()$transformation
     trans_parameters <- rval$trans_parameters
     

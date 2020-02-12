@@ -1966,6 +1966,8 @@ add_polygon_layer <- function(p,
         layer_info <- layer_scales(p)
         
         update_range_x <- FALSE
+        #print(layer_info)
+        #print(layer_info$x$limits)
         
         if(!is.null(layer_info$x$limits) & 
            "RangeContinuous" %in% class(layer_info$x$range) ){
@@ -1984,6 +1986,7 @@ add_polygon_layer <- function(p,
         }
         
         if(update_range_x){
+          
           p <- p + scale_x_continuous(name = layer_info$x$name, 
                                       trans = layer_info$x$trans, 
                                       limits = xrange)
@@ -1992,8 +1995,8 @@ add_polygon_layer <- function(p,
         
         update_range_y <- FALSE
         
-        if(!is.null(layer_info$x$limits) & 
-           "RangeContinuous" %in% class(layer_info$x$range) ){
+        if(!is.null(layer_info$y$limits) & 
+           "RangeContinuous" %in% class(layer_info$y$range) ){
           
           yrange <- layer_info$y$trans$inverse(layer_info$y$limits)
           if(!is.null(yrange)){
@@ -2007,7 +2010,8 @@ add_polygon_layer <- function(p,
             }
           }
         }
-        if(update_range_y){
+        if(update_range_y ){
+          
           p <- p + scale_y_continuous(name = layer_info$y$name, 
                                       trans = layer_info$y$trans, 
                                       limits = yrange)
@@ -2020,7 +2024,8 @@ add_polygon_layer <- function(p,
           geom_polygon(data=polygon, mapping = aes(x=x, y=y), 
                        inherit.aes = FALSE,
                        fill="red",
-                       alpha=0.05)
+                       alpha=0.05) +
+          geom_point(data = polygon, mapping = aes(x=x, y=y), color = "red", inherit.aes = FALSE, alpha = 0.5, size = 2)
         if(!is.null(label)){
           df_label <- data.frame(x=mean(polygon$x), y= mean(polygon$y))
           p <- p +  geom_label_repel(data = df_label, force = 4, inherit.aes = FALSE,
@@ -2119,6 +2124,47 @@ add_gate <- function(p, gate){
   
   return(p)
   
+}
+
+#' @importFrom sp point.in.polygon
+#' @importFrom rlang quo_get_expr
+#' @importFrom scales expand_range
+get_plot_data_range <- function(p){
+
+  xlim <- NULL
+  ylim <- NULL
+  xvar <- NULL
+  yvar <- NULL
+  
+  data_range <- list()
+  
+  if("x" %in% names(p$mapping)){
+    if("quosure" %in% class(p$mapping$x)){
+      xvar <- as.character(rlang::quo_get_expr(p$mapping$x))
+    }
+  }
+  
+  if("y" %in% names(p$mapping)){
+    if("quosure" %in% class(p$mapping$x)){
+      yvar <- as.character(rlang::quo_get_expr(p$mapping$y))
+    }
+  }
+  
+  if(!is.null(xvar)){
+    xlim <- range(p$data[[xvar]])
+    print(xlim)
+    data_range[[xvar]] <- scales::expand_range(xlim, add = 1)
+  }
+  if(!is.null(yvar)){
+    ylim <- range(p$data[[yvar]])
+    print(ylim)
+    data_range[[yvar]] <- scales::expand_range(ylim, add=1)
+  }
+  
+  #p <- p + coord_cartesian(ylim = ylim, xlim = xlim, expand = TRUE)
+  
+  #return(p)
+  return(data_range)
 }
 
 #' @param gates a named list. Each list element should contain a item 'parent' with 
