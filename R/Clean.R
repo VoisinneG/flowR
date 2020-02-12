@@ -109,7 +109,9 @@ Clean <- function(input, output, session, rval) {
     
     validate(need(class(rval$gating_set) == "GatingSet", "No GatingSet available"))
     validate(need(input$sample, "No sample selected"))
-    set <- rval$gating_set@data[[input$sample]]
+    fs <- rval$gating_set@data
+    idx <- which(pData(fs)$name == input$sample)
+    set <- rval$gating_set@data[[idx]]
     
     # if (input$goButton == 0)
     #   return()
@@ -814,25 +816,28 @@ addQC <- function(QCvector, sub_exprs, params, keyval){
 # library(shinydashboard)
 # library(flowWorkspace)
 # 
-# if (interactive()){
-# 
-#   ui <- dashboardPage(
-#     dashboardHeader(title = "flowAI"),
-#     sidebar = dashboardSidebar(disable = TRUE),
-#     body = dashboardBody(
-#       flowAIUI("module")
-#     )
-#   )
-# 
-#   server <- function(input, output, session) {
-#     rval <- reactiveValues()
-#     observe({
-#       utils::data("GvHD", package = "flowCore")
-#       rval$gating_set <- GatingSet(GvHD)
-#     })
-#     res <- callModule(flowAI, "module", rval = rval)
-#   }
-# 
-#   shinyApp(ui, server)
-# 
-# }
+if (interactive()){
+
+  ui <- dashboardPage(
+    dashboardHeader(title = "Clean"),
+    sidebar = dashboardSidebar(disable = TRUE),
+    body = dashboardBody(
+      CleanUI("module")
+    )
+  )
+
+  server <- function(input, output, session) {
+    rval <- reactiveValues()
+    observe({
+      #utils::data("GvHD", package = "flowCore")
+      #rval$gating_set <- GatingSet(GvHD)
+      utils::data("Bcells", package = "flowAI")
+      gs <- GatingSet(Bcells)
+      rval$gating_set <- gs
+    })
+    res <- callModule(Clean, "module", rval = rval)
+  }
+
+  shinyApp(ui, server)
+
+}
