@@ -1,7 +1,7 @@
 Package: flowR
 Title: R-shiny interface for the analysis of flow cytometry data
-Version: 0.4.4
-Date: 2019-06-19
+Version: 0.4.5
+Date: 2020-02-05
 Author: Guillaume Voisinne
 Maintainer: Guillaume Voisinne <voisinne@ciml.univ-mrs.fr>
 Description: An integration of tools to analyze flow cytometry data using R and shiny.
@@ -11,7 +11,7 @@ Imports:
   shinydashboard,
   shinyjs,
   openCyto,
-  flowWorkspace (>= 3.34),
+  flowWorkspace (>= 3.34.1),
   flowCore,
   ncdfFlow,
   DT,
@@ -44,6 +44,7 @@ Imports:
   methods,
   reshape2,
   RColorBrewer,
+  htmlwidgets,
   FlowSOM
 LazyData: TRUE
 License: file LICENSE

@@ -196,8 +196,7 @@ Compensation <- function(input, output, session, rval) {
   
   observe({
     choices <- colnames(rval_mod$spill)
-    print(choices)
-    print(choices()$plot_var)
+
     if(!all(names(choices) %in% choices()$plot_var)){
       choices <- unname(choices)
     }
@@ -241,7 +240,6 @@ Compensation <- function(input, output, session, rval) {
 
         compensation[[sample]] <- comp_mat
       }
-      print("update_gs")
       rval$gating_set@compensation <- compensation
       # update rval$gating_set_list
       if("gating_set_selected" %in% names(rval)){
@@ -333,8 +331,7 @@ Compensation <- function(input, output, session, rval) {
     idx_match_col <- colnames(df)[colnames(df) %in% choices()$params$name]
     
     df <- df[idx_match_row, idx_match_col]
-    print(df)
-    print(dim(df))
+
     if(dim(df)[1]!=dim(df)[2] || dim(df)[1]==0 || dim(df)[2]==0){
       showModal(modalDialog(
         title = "Error",
@@ -482,8 +479,6 @@ Compensation <- function(input, output, session, rval) {
   observeEvent(input$spill_table_cells_selected, {
     df <- rval_mod$spill
     idx <- input$spill_table_cells_selected
-    print(dim(idx))
-    print(rval_mod$spill_per_sample[res$params$sample])
     
     if(dim(idx)[1]>0 & dim(idx)[2]==2){
       

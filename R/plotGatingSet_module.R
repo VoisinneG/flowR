@@ -484,7 +484,7 @@ plotGatingSet <- function(input, output, session,
   
   params_update_data <- reactive({
     
-    print("update data")
+    #print("update data")
     if(!auto_update){
       input$update_plot
     }else{
@@ -507,7 +507,7 @@ plotGatingSet <- function(input, output, session,
   
   params_update_plot_raw <- reactive({
     
-    print("update_raw")
+    #print("update_raw")
     
     if(!auto_update){
       input$update_plot
@@ -540,7 +540,7 @@ plotGatingSet <- function(input, output, session,
   ### Control update of formatted plot #############################################################
   
   params_update_plot_format <- reactive({
-    print("update_format")
+    #print("update_format")
     
     if(!auto_update){
       input$update_plot
@@ -575,7 +575,7 @@ plotGatingSet <- function(input, output, session,
   
   data_plot_focus <- eventReactive(params_update_data(), {
     
-    print("data")
+    #print("data")
     
     validate(need(rval$gating_set, "Empty GatingSet"))
     validate(need(rval_input$sample, "Please select samples"))
