@@ -73,13 +73,17 @@ plotGatingHierarchy <- function(input, output, session,
                                  rval,
                                  plot_params = reactiveValues() ){
   
-  rval_plot <- reactiveValues()
+  rval_plot <- reactiveValues(init = TRUE)
   
   ### Set plot parameters ########################################################################
   
   observe({
-    rval_plot$sample <- choices()$sample[1]
-    rval_plot$plot_type <- "hexagonal"
+    if(rval_plot$init){
+      rval_plot$sample <- choices()$sample[1]
+      rval_plot$plot_type <- "hexagonal"
+      rval_plot$init <- FALSE
+    }
+    
   })
   
   observe({

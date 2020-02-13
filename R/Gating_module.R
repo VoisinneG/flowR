@@ -195,7 +195,7 @@ Gating <- function(input, output, session, rval) {
   plot_params_gh <- reactiveValues() # parameters controlling the gating hierarchy plot
   gate <- reactiveValues(x = NULL, y = NULL) # polygon gate represented on plot
   brush_coords <- reactiveValues(x = NULL, y = NULL)
-  display_params <- reactiveValues(nrow = 2, width = 200, heigth = 200)
+  display_params <- reactiveValues(nrow = 2, width = 200, height = 200)
   rval_mod <- reactiveValues()
   
   observe({
@@ -726,50 +726,51 @@ Gating <- function(input, output, session, rval) {
 # library(plotly)
 # library(ggridges)
 # 
-if (interactive()){
-
-  ui <- dashboardPage(
-    dashboardHeader(title = "Gating"),
-    sidebar = dashboardSidebar(disable = TRUE),
-    body = dashboardBody(
-      GatingUI("module")
-    )
-  )
-
-  server <- function(input, output, session) {
-
-    rval <- reactiveValues()
-
-    observe({
-      fs <- read.ncdfFlowSet(files = "../flowR_utils/demo-data/JL04BMVLG-Valentin/Tumor_T_001_012.fcs")
-      gates <- gates <- get_gates_from_ws_diva("../flowR_utils/demo-data/JL04BMVLG-Valentin/JL04BMVLG.xml", template = "Gating")
-      gs <- flowWorkspace::GatingSet(fs)
-      transfo <- lapply(colnames(gs), logicle_trans)
-      names(transfo) <- colnames(gs)
-      gs@transformation <- transfo
-      spill <- gs@data[[1]]@description[["SPILL"]]
-      comp <- lapply(pData(gs)$name, function(x){spill})
-      names(comp) <- pData(gs)$name
-      gs@compensation <- comp
-      rval$gating_set <- gs
-      #load("../flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
-      #fs <- build_flowset_from_df(df = res$cluster$data, origin = res$cluster$flow_set)
-      #gs <- flowWorkspace::GatingSet(fs)
-      #gs@transformation <-  res$cluster$transformation
-      #add_gates_flowCore(gs, res$cluster$gates)
-      #rval$gating_set <- gs
-      #plot_params$sample <- pData(gs)$name[1]
-      #utils::data("GvHD", package = "flowCore")
-      #rval$gating_set <- GatingSet(GvHD)
-      #gs <- load_gs("./inst/ext/gs")
-      #rval$gating_set <- gs
-    })
-
-    res <- callModule(Gating, "module", rval = rval)
-
-  }
-
-  shinyApp(ui, server)
-
-}
+# if (interactive()){
+# 
+#   ui <- dashboardPage(
+#     dashboardHeader(title = "Gating"),
+#     sidebar = dashboardSidebar(disable = TRUE),
+#     body = dashboardBody(
+#       GatingUI("module")
+#     )
+#   )
+# 
+#   server <- function(input, output, session) {
+# 
+#     rval <- reactiveValues()
+# 
+#     observe({
+#       fs <- read.ncdfFlowSet(files = "../flowR_utils/demo-data/JL04BMVLG-Valentin/Tumor_T_001_012.fcs")
+#       gates <- gates <- get_gates_from_ws_diva("../flowR_utils/demo-data/JL04BMVLG-Valentin/JL04BMVLG.xml", template = "Gating")
+#       gs <- flowWorkspace::GatingSet(fs)
+#       add_gates_flowCore(gs, gates = gates)
+#       transfo <- lapply(colnames(gs), logicle_trans)
+#       names(transfo) <- colnames(gs)
+#       gs@transformation <- transfo
+#       spill <- gs@data[[1]]@description[["SPILL"]]
+#       comp <- lapply(pData(gs)$name, function(x){spill})
+#       names(comp) <- pData(gs)$name
+#       gs@compensation <- comp
+#       rval$gating_set <- gs
+#       #load("../flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
+#       #fs <- build_flowset_from_df(df = res$cluster$data, origin = res$cluster$flow_set)
+#       #gs <- flowWorkspace::GatingSet(fs)
+#       #gs@transformation <-  res$cluster$transformation
+#       #add_gates_flowCore(gs, res$cluster$gates)
+#       #rval$gating_set <- gs
+#       #plot_params$sample <- pData(gs)$name[1]
+#       #utils::data("GvHD", package = "flowCore")
+#       #rval$gating_set <- GatingSet(GvHD)
+#       #gs <- load_gs("./inst/ext/gs")
+#       #rval$gating_set <- gs
+#     })
+# 
+#     res <- callModule(Gating, "module", rval = rval)
+# 
+#   }
+# 
+#   shinyApp(ui, server)
+# 
+# }
 

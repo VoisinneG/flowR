@@ -53,8 +53,8 @@ get_gates_from_ws_diva <- function(ws_path, template = NULL){
       parent <- gates[[i]]$parent_long
       name <- gates[[i]]$name_long
       
-      parent <- gsub(" ", "_", parent)
-      name <- gsub(" ", "_", name)
+      #parent <- gsub(" ", "_", parent)
+      #name <- gsub(" ", "_", name)
       
       if(gates[[i]]$type == "RectangleGate"){
         boundaries <- gates[[i]]$boundaries
@@ -342,8 +342,8 @@ get_gates_from_ws <- function(ws_path, group = NULL){
     parent <- gates[[i]]$parent_long
     name <- gates[[i]]$name_long
     
-    parent <- gsub(" ", "_", parent)
-    name <- gsub(" ", "_", name)
+    #parent <- gsub(" ", "_", parent)
+    #name <- gsub(" ", "_", name)
     
     if(gates[[i]]$type == "RectangleGate"){
       boundaries <- gates[[i]]$boundaries
@@ -873,7 +873,7 @@ get_parameters_gs <- function(gs){
     kw <- paste(x, "VARTYPE", sep = "")
     vartype <- ff@description[[kw]]
     if(is.null(vartype)){
-      vartype <- "double"
+      vartype <- "numeric"
     }
     return(vartype)
   }))
@@ -2959,14 +2959,14 @@ dim_reduction <- function(df,
     tSNE <- Rtsne(df_trans[ idx_cells , yvar], perplexity = perplexity, dims = dims, check_duplicates = check_duplicates)
     df_tSNE <- tSNE$Y
     colnames(df_tSNE) <- c("tSNE1","tSNE2")
-    return(list( df = cbind(df_filter[idx_cells, ], df_tSNE), keep = idx_cells_kept, vars = c("tSNE1","tSNE2")))
+    return(list( df = cbind(df_filter[idx_cells, ], df_tSNE), keep = idx_cells_kept, var_names = c("tSNE1","tSNE2")))
   }
   
   if(method == "umap"){
     df_umap <- umap(df_trans[ idx_cells , yvar])
     df_umap <- df_umap$layout
     colnames(df_umap) <- c("UMAP1","UMAP2")
-    return(list( df = cbind(df_filter[idx_cells, ], df_umap), keep = idx_cells_kept, vars = c("UMAP1","UMAP2")))
+    return(list( df = cbind(df_filter[idx_cells, ], df_umap), keep = idx_cells_kept, var_names = c("UMAP1","UMAP2")))
   }
   
   return(NULL)
@@ -3055,10 +3055,12 @@ get_cluster <- function(df,
                                           "metaClustering_consensus", max=k_meta)
     
     metaClustering_perCell <- fSOM$metaClustering[fSOM$map$mapping[,1]]
-    df_filter$cluster_fsom <- as.integer(fSOM$map$mapping[,1])
-    df_filter$cluster <- as.integer(metaClustering_perCell)
-    
-    return(list(df = df_filter, keep = idx_cells_kept, fSOM = fSOM))
+    df_filter$cluster_fsom <- as.factor(fSOM$map$mapping[,1])
+    df_filter$cluster <- as.factor(metaClustering_perCell)
+    print("ok factor")
+    print(class(df_filter$cluster_fsom))
+    var_names <- c("cluster", "cluster_fsom")
+    return(list(df = df_filter, keep = idx_cells_kept,  var_names = var_names, fSOM = fSOM))
   }else{
     stop("Clustering method not supported")
   }
@@ -3099,9 +3101,10 @@ build_flowset_from_df <- function(df,
     idx_cells <- which(df[[sample_col]] == sample)
     ncells <- length(idx_cells)
     if(ncells >0){
-      df_sample <- df[ idx_cells , chanel_col]
+      df_sample <- df[idx_cells , chanel_col]
       
-      M <- as.matrix(df_sample)
+      df_exprs <- data.frame(lapply(df_sample, as.numeric), check.names = FALSE)
+      M <- as.matrix(df_exprs)
       
       par <- NULL
       desc <- NULL
@@ -3125,11 +3128,11 @@ build_flowset_from_df <- function(df,
           
           for(i in 1:length(par@data$name)){
             param <- par@data$name[i]
-            desc[[paste("$P",i,"VARTYPE",sep="")]] <- typeof(df_sample[[param]])
+            desc[[paste("$P",i,"VARTYPE",sep="")]] <- class(df_sample[[param]])
           }
           
           for(param in new_par){
-            npar <- npar +1
+            npar <- npar + 1
             rg <- c(NA, NA)
             
             if(is.numeric(df_sample[[param]])){
@@ -3139,7 +3142,9 @@ build_flowset_from_df <- function(df,
             par@data <- rbind(par@data, c(param, NA, diff(rg), rg[1], rg[2]))
             rownames(par@data)[npar] <- paste("$P",npar, sep = "")
             desc[[paste("$P",npar,"DISPLAY",sep="")]] <- NA
-            desc[[paste("$P",npar,"VARTYPE",sep="")]] <- typeof(df_sample[[param]])
+            desc[[paste("$P",npar,"VARTYPE",sep="")]] <- class(df_sample[[param]])
+            print(class(df_sample[[param]]))
+            print(param)
           }
           
           # par@data$vartype <- sapply(par@data$name, function(x){typeof(df_sample[[x]])})
@@ -3154,7 +3159,7 @@ build_flowset_from_df <- function(df,
       
       if(!is.null(par) & !is.null(desc)){
         ff_list[[sample]] <- flowFrame(exprs = M,
-                                       parameters = par, 
+                                       parameters = par,
                                        description = desc)
       }else{
         ff_list[[sample]] <- flowFrame(exprs = M)

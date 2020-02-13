@@ -163,10 +163,10 @@ simpleDisplay <- function(input, output, session,
   
   plot_display <- reactive({
     
-    rval_plot$ncol_facet <- 1
-    rval_plot$nrow_facet <- 1
-    rval_plot$nrow <- 1
-    rval_plot$ncol <- 1
+  
+    #rval_plot$ncol_facet <- 1
+    #rval_plot$nrow_facet <- 1
+    
     
      if(class(plot_list())[1] == "list"){
        
@@ -188,17 +188,15 @@ simpleDisplay <- function(input, output, session,
             if(n > 1){
               
               rval_plot$use_plotly <- FALSE
-              rval_plot$nrow <- min(n, input$nrow_split)
+              rval_plot$nrow <- min(n, rval_plot$nrow)
               rval_plot$ncol <- ceiling(n/rval_plot$nrow)
-              
+
               g <- try(gridExtra::marrangeGrob(plot_list(), 
                                            nrow = rval_plot$nrow, 
                                            ncol = rval_plot$ncol, 
                                            top = rval_plot$top),
                        silent = TRUE)
-              print("ok g")
-              print(rval_plot$top)
-              print(length(plot_list()))
+
               if("try-error" %in% class(g)){
                 showModal(modalDialog(
                   title = "Error",
@@ -206,9 +204,8 @@ simpleDisplay <- function(input, output, session,
                   easyClose = TRUE,
                   footer = NULL
                 ))
-              }         
-              print("ok g 2")        
-              g
+              }
+              return(g)
             }else if(n == 1){
               
                 plot_list()[[1]]
@@ -266,7 +263,7 @@ simpleDisplay <- function(input, output, session,
     
     if(!rval_plot$use_plotly){
       if(! "graphNEL" %in% class(plot_display())){
-        display_items[["nrow_split"]] <- numericInput(ns("nrow_split"),
+        display_items[["nrow"]] <- numericInput(ns("nrow"),
                                                       label = "Number of rows", value = rval_plot$nrow)
       }
       display_items[["zoom"]] <- sliderInput(ns("zoom"), 
@@ -300,17 +297,20 @@ simpleDisplay <- function(input, output, session,
     ns <- session$ns
     
     if(rval_plot$use_plotly){
-      x <- plotlyOutput(ns("plot_display_ly"), height = size)
+      x <- plotlyOutput(ns("plot_display_ly"), height = rval_plot$height)
     }else{
-      height <- rval_plot$nrow * rval_plot$nrow_facet * rval_plot$height * rval_plot$zoom/100
-      width <- rval_plot$ncol * rval_plot$ncol_facet * rval_plot$width * rval_plot$zoom/100
+      
+      width <- rval_plot$width * rval_plot$zoom/100
+      height <- rval_plot$height * rval_plot$zoom/100
       width <- max(width, 150)
       height <- max(height, 150)
+      height <- rval_plot$nrow * rval_plot$nrow_facet * height
+      width <- rval_plot$ncol * rval_plot$ncol_facet * width
       x <- div(
         style = paste("overflow-y: scroll; overflow-x: scroll; height:", 
                       min(height, rval_plot$max_height) + 20, 'px',sep=""),
         plotOutput(ns("plot_display"),
-                   height = height, 
+                   height = height,
                    width = width,
                    brush = ns("plot_brush"),
                    click = ns("plot_click"),
@@ -333,11 +333,13 @@ simpleDisplay <- function(input, output, session,
   output$download_plot <- downloadHandler(
     filename = "plot.pdf",
     content = function(file) {
-
-      height <- rval_plot$nrow * rval_plot$nrow_facet * rval_plot$height * rval_plot$zoom/100
-      width <- rval_plot$ncol * rval_plot$ncol_facet * rval_plot$width * rval_plot$zoom/100
+      width <- rval_plot$width * rval_plot$zoom/100
+      height <- rval_plot$height * rval_plot$zoom/100
       width <- max(width, 150)
       height <- max(height, 150)
+      height <- rval_plot$nrow * rval_plot$nrow_facet * height
+      width <- rval_plot$ncol * rval_plot$ncol_facet * width
+      
       
       pdf(file, width = width * 5/400, height = height * 5/400)
       if("graphNEL" %in% class(plot_to_render())){
@@ -379,22 +381,26 @@ simpleDisplay <- function(input, output, session,
 # 
 #     plot_list <- reactive({
 # 
-# 
-#         gates <- get_gates_from_ws(
-#              "../flowR_utils/demo-data/2019-Exp-Tumor-042 (Lung Carcinoma)/Classical analysis 06012020.wsp")
-#         p <- plot_tree(gates, fontsize = 40, rankdir = NULL, shape = "ellipse", fixedsize = TRUE)
-#         p
+#       load("../flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
+#       fs <- build_flowset_from_df(df = res$cluster$data)
+#       gs <- GatingSet(fs)
+#       add_gates_flowCore(gs, res$cluster$gates)
+#       plot_gh(gs)
+#         # gates <- get_gates_from_ws(
+#         #      "../flowR_utils/demo-data/2019-Exp-Tumor-042 (Lung Carcinoma)/Classical analysis 06012020.wsp")
+#         # p <- plot_tree(gates, fontsize = 40, rankdir = NULL, shape = "ellipse", fixedsize = TRUE)
+#         # p
 # 
 # 
 #       # plist <- list()
 #       # plist[[1]] <- ggplot(iris, aes(x=Sepal.Length, y = Sepal.Width, color = Species)) +
-#       #   geom_point(alpha = 0.5)
-#       #   #facet_wrap(~Species)
-#       #
+#       #   geom_point(alpha = 0.5)+
+#       #   facet_wrap(~Species)
+#       # 
 #       #  plist[[2]] <- ggplot(iris, aes(x=Species, y = Sepal.Length, fill = Species)) +
 #       #    geom_col(alpha = 0.5)
-#       #
-#       # return(plist[1])
+#       # 
+#       # return(plist)
 # 
 #     })
 # 

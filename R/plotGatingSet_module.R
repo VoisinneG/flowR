@@ -330,7 +330,7 @@ plotGatingSet <- function(input, output, session,
                                            choices()$plot_var),
                                 c("none", "subset", 
                                   choices()$meta_var, 
-                                  choices()$plot_var[choices()$params$vartype != "double"]))
+                                  choices()$plot_var[choices()$params$vartype != "numeric"]))
     
     if(is.null(rval_plot[["color_var"]])){
       rval_plot[["color_var"]] <- color_var_choices[1]
@@ -368,7 +368,7 @@ plotGatingSet <- function(input, output, session,
                                        label = "group variable",
                                        choices = c("none", "subset", 
                                                    choices()$meta_var,
-                                                   choices()$plot_var[choices()$params$vartype != "double"]),
+                                                   choices()$plot_var[choices()$params$vartype != "numeric"]),
                                        selected = rval_plot[["group_var"]])
     
     rval_mod$plot_variables[["facet_var"]] <- selectizeInput(ns("facet_var"),
@@ -376,7 +376,7 @@ plotGatingSet <- function(input, output, session,
                                        label = "facet variables",
                                        choices = c("subset", 
                                                    choices()$meta_var, 
-                                                   choices()$plot_var[choices()$params$vartype != "double"]),
+                                                   choices()$plot_var[choices()$params$vartype != "numeric"]),
                                        selected = rval_plot[["facet_var"]]
     )
     
@@ -806,52 +806,52 @@ plotGatingSet <- function(input, output, session,
 # library(plotly)
 # library(ggridges)
 # 
-if (interactive()){
-
-  ui <- dashboardPage(
-    dashboardHeader(title = "plotGatingSet"),
-    sidebar = dashboardSidebar(disable = TRUE),
-    body = dashboardBody(
-      fluidRow(
-        column(4, box(width = NULL, title = "Parameters", collapsible = TRUE, collapsed = TRUE,
-                      plotGatingSetInput("module"))),
-        column(8, box(width = NULL, simpleDisplayUI("simple_display_module")))
-      )
-    )
-  )
-
-  server <- function(input, output, session) {
-
-    rval <- reactiveValues()
-    plot_params <- reactiveValues()
-
-    observe({
-       utils::data("GvHD", package = "flowCore")
-       gs <- GatingSet(GvHD)
-       rval$gating_set <- gs
-      #plot_params$plot_type <- "histogram"
-      #plot_params$xvar <- "cluster"
-      #plot_params$yvar <- "FL4-H"
-      #plot_params$sample <- pData(gs)$name[3]
-      #plot_params$subset <- gs_get_pop_paths(gs)[1]
-      plot_params$auto_focus <- FALSE
-      plot_params$plot_type = "histogram"
-      plot_params$xvar = "FL2-H"
-      plot_params$option = "magma"
-
-    })
-
-    res <- callModule(plotGatingSet, "module",
-                      rval = rval,
-                      plot_params = plot_params,
-                      show_gates = FALSE,
-                      auto_update = TRUE,
-                      simple_plot=TRUE)
-
-    callModule(simpleDisplay, "simple_display_module", res$plot)
-
-  }
-
-  shinyApp(ui, server)
-
-}
+# if (interactive()){
+# 
+#   ui <- dashboardPage(
+#     dashboardHeader(title = "plotGatingSet"),
+#     sidebar = dashboardSidebar(disable = TRUE),
+#     body = dashboardBody(
+#       fluidRow(
+#         column(4, box(width = NULL, title = "Parameters", collapsible = TRUE, collapsed = TRUE,
+#                       plotGatingSetInput("module"))),
+#         column(8, box(width = NULL, simpleDisplayUI("simple_display_module")))
+#       )
+#     )
+#   )
+# 
+#   server <- function(input, output, session) {
+# 
+#     rval <- reactiveValues()
+#     plot_params <- reactiveValues()
+# 
+#     observe({
+#        utils::data("GvHD", package = "flowCore")
+#        gs <- GatingSet(GvHD)
+#        rval$gating_set <- gs
+#       #plot_params$plot_type <- "histogram"
+#       #plot_params$xvar <- "cluster"
+#       #plot_params$yvar <- "FL4-H"
+#       #plot_params$sample <- pData(gs)$name[3]
+#       #plot_params$subset <- gs_get_pop_paths(gs)[1]
+#       plot_params$auto_focus <- FALSE
+#       plot_params$plot_type = "histogram"
+#       plot_params$xvar = "FL2-H"
+#       plot_params$option = "magma"
+# 
+#     })
+# 
+#     res <- callModule(plotGatingSet, "module",
+#                       rval = rval,
+#                       plot_params = plot_params,
+#                       show_gates = FALSE,
+#                       auto_update = TRUE,
+#                       simple_plot=TRUE)
+# 
+#     callModule(simpleDisplay, "simple_display_module", res$plot)
+# 
+#   }
+# 
+#   shinyApp(ui, server)
+# 
+# }

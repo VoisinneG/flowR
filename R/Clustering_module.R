@@ -126,7 +126,9 @@ Clustering <- function(input, output, session, rval) {
   ### Call modules #########################################################################
   
   selected <- callModule(selection, "selection_module", rval)
-  callModule(simpleDisplay, "simple_display_module", plot_list = plot_fSOM, size = 500)
+  callModule(simpleDisplay, "simple_display_module", 
+             plot_list = plot_fSOM, 
+             params = reactiveValues(width = 500, height = 500))
   
   ### Build UI with options ##################################################################
   
@@ -317,8 +319,14 @@ Clustering <- function(input, output, session, rval) {
         rval_mod$fSOM <- res$fSOM
       }
       
-      
-      df <- cbind(df_raw[res$keep, setdiff(names(df_raw), names(res$df))], res$df)
+      df <- df_raw[res$keep, ]
+      for(var in res$var_names){
+        print(var)
+        print(class(res$df[[var]]))
+        df[[var]] <- res$df[[var]]
+      }
+      #df_raw <- df_raw[ , setdiff(names(df_raw), c("cluster"))]
+      #df <- cbind(df_raw[res$keep, ], res$df[ , setdiff(names(res$df), names(df_raw))])
       
       rval_mod$gs <- build_gatingset_from_df(df = df, gs_origin = rval$gating_set)
       

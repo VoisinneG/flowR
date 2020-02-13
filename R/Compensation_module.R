@@ -140,7 +140,9 @@ Compensation <- function(input, output, session, rval) {
   ### Call modules ##########################################################################
   
   res <- callModule(plotGatingSet, "plot_module", rval, plot_params, simple_plot = FALSE)
-  callModule(simpleDisplay, "simple_display_module", res$plot, nrow = 2, size = 200 )
+  callModule(simpleDisplay, "simple_display_module", 
+             plot_list = res$plot, 
+             params = reactiveValues(nrow = 2,  width = 200, height = 200) )
   spill_computed <- callModule(ComputeSpill, "compute_spill_module", rval = rval)
   spill_imported <- callModule(ImportSpill, "import_spill_module", rval = rval)
     

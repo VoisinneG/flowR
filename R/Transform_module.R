@@ -51,8 +51,8 @@ TransformUI <- function(id) {
                            selectizeInput(ns("selected_params"), "Select parameters", 
                                           choices = NULL, selected = NULL, multiple = TRUE),
                            selectInput(ns("param_vartype"), "Type of variable", 
-                                       choices = c("double", 
-                                                   "integer", 
+                                       choices = c("numeric", 
+                                                   #"integer", 
                                                    "factor"), 
                                        selected = NULL),
                            textInput(ns("param_desc"), label = "Description (first parameter only)", value = ""),
@@ -329,7 +329,7 @@ Transform <- function(input, output, session, rval) {
               rval$gating_set@data[[i]]@description[[desc_field]] <- input$param_vartype
             }
           }else{
-            if(input$param_vartype!="double"){
+            if(input$param_vartype!="numeric"){
               print("upadte2")
               rval$gating_set@data[[i]]@description[[desc_field]] <- input$param_vartype
             }
