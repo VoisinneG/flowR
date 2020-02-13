@@ -235,6 +235,8 @@ CleanUI<-function(id){
 #' @importFrom flowCore exprs keyword
 #' @importFrom flowWorkspace pData
 #' @importFrom scales pretty_breaks
+#' @importFrom data.table setDT
+#' @importFrom plotly renderPlotly
 #' @import flowAI
 Clean <- function(input, output, session, rval) {
   
@@ -687,16 +689,18 @@ Clean <- function(input, output, session, rval) {
             
             Signal_acquisition <- FlowSignalQCList$sample[[i]]$Perc_bad_cells$badPerc_cp*100
             Flow_rate <- flowRateQCList$sample[[i]]$res_fr_QC$badPerc*100
-            Dynamic_range <- dynamic_range$aa[[i]]$badPerc*100
-            df <- rbind(df, data.frame(Flow_rate, Dynamic_range, Signal_acquisition )) 
+            #Dynamic_range <- dynamic_range$aa[[i]]$badPerc*100
+            df <- rbind(df, data.frame(Flow_rate, 
+                                       #Dynamic_range, 
+                                       Signal_acquisition )) 
             
           }
           rownames(df) <- names_sam
-          melted_data <- melt(setDT(df, keep.rownames = T))
+          melted_data <- melt(data.table::setDT(df, keep.rownames = T))
           print(melted_data)
-          library(plotly)
-          library(data.table)
-          output$plot_info_qc <- renderPlotly({
+          #library(plotly)
+          #library(data.table)
+          output$plot_info_qc <- plotly::renderPlotly({
             
             ggplot(data = melted_data, aes(y = rn, x = variable)) + geom_tile(aes(fill = value), colour = "black") +  
               scale_fill_gradient(low = "#77ff00", high = "red") +
@@ -1168,6 +1172,7 @@ addQC <- function(QCvector, sub_exprs, params, keyval){
 
 # ### Add function for automatic cleaning #####################################
 
+#' @importFrom mFilter cffilter
 anomaly_detection = function(x, max_anoms=0.49, direction='both', alpha=0.01, use_decomp = TRUE, period=1, verbose = FALSE){
 
   idNOzero <- which(x != 0)
@@ -1205,7 +1210,7 @@ anomaly_detection = function(x, max_anoms=0.49, direction='both', alpha=0.01, us
   ############## -- Main analysis: Perform C-H-ESD -- #################
   # -- Step 1: Decompose data. This will return two more components: trend and cycle
   if(use_decomp){
-    x_cf <- cffilter(x)
+    x_cf <- mFilter::cffilter(x)
     #med_t <- trunc(median(x_cf$trend))
     med_t <- trunc(median(x))
     sign_n <- sign(x_cf$trend - med_t)
@@ -1321,7 +1326,7 @@ flow_rate_bin_a <- function(x, second_fraction = 0.1, timeCh = timeCh,
 
 # # Detection of anomalies in the flow rate using the algorithm
 # # implemented in the package AnomalyDetection.
-flow_rate_check_a <- function(x, FlowRateData, alpha = alpha, use_decomp = use_decomp) {
+flow_rate_check_a <- function(x, FlowRateData, ...) {
 
   fr_frequences <- FlowRateData$frequencies
   fr_cellBinID <- FlowRateData$cellBinID
@@ -1331,7 +1336,7 @@ flow_rate_check_a <- function(x, FlowRateData, alpha = alpha, use_decomp = use_d
   if (length(unique(fr_frequences[, 2])) == 1) {
     fr_autoqc <- NULL
   } else {
-    fr_autoqc <- anomaly_detection(fr_frequences[, "tbCounts"], alpha = alpha, use_decomp = use_decomp)
+    fr_autoqc <- anomaly_detection(fr_frequences[, "tbCounts"], ...)
   }
 
   if (is.null(fr_autoqc) || is.null(fr_autoqc$anoms)) {
@@ -1609,6 +1614,7 @@ flow_signal_bin_a <- function(x, channels = NULL, binSize = 500,
 
 # Detection of shifts in the median intensity signal detected
 # by the laser of the flow cytometry over time
+#' @importFrom changepoint cpt.meanvar
 flow_signal_check_a <- function(x, FlowSignalData, ChannelExclude = NULL,
                                 pen_valueFS = pen_valueFS, maxSegmentFS = maxSegmentFS, outlier_remove = FALSE) {
 
@@ -1653,13 +1659,13 @@ flow_signal_check_a <- function(x, FlowSignalData, ChannelExclude = NULL,
       badPerc_out <- 0
     }
 
-    cpt_res <- suppressWarnings(cpt.meanvar(t(fs_res_adj),
+    cpt_res <- suppressWarnings(changepoint::cpt.meanvar(t(fs_res_adj),
                                             pen.value = pen_valueFS, Q = maxSegmentFS,
                                             penalty =  "Manual" , test.stat = "Normal",
                                             method = "BinSeg", param.estimates = FALSE))
   }else{
 
-    cpt_res <- suppressWarnings(cpt.meanvar(t(fs_res[, parms]),
+    cpt_res <- suppressWarnings(changepoint::cpt.meanvar(t(fs_res[, parms]),
                                             pen.value = pen_valueFS, Q = maxSegmentFS,
                                             penalty =  "Manual" , test.stat = "Normal",
                                             method = "BinSeg", param.estimates = FALSE))
@@ -1813,3 +1819,64 @@ if (interactive()){
   shinyApp(ui, server)
 
 }
+
+
+#### script ####
+
+library(flowAI)
+data("Bcells")
+
+
+time_chnl <- "Time"
+idx <- 1
+side <- "both"
+ChannelExclude <- time_chnl
+time_step <- 0.01
+second_fraction <- 0.1 # time interval used for averaging data
+binSize <- 500
+
+ordFCS <- ord_fcs_time(Bcells[[idx]], time_chnl)
+print(colnames(ordFCS))
+
+### margin ####
+res_margin <- flow_margin_check_a(ordFCS, 
+                                  ChannelExclude = ChannelExclude, 
+                                  side = side, 
+                                  neg_values = 1)
+flow_margin_plot_a(res_margin, binSize = binSize)
+
+### flow-rate ####
+
+flow_rate_data <- flow_rate_bin_a(x = ordFCS, 
+                                  second_fraction = second_fraction, 
+                                  timeCh = time_chnl, 
+                                  timestep = time_step)
+res_flow_rate_auto <- flow_rate_check_a(x = ordFCS, FlowRateData = flow_rate_data, 
+                                   alpha = 0.01, 
+                                   use_decomp = TRUE,
+                                   direction='neg')
+flow_rate_plot_a(res_flow_rate_auto)
+
+lowerTimeCut <- min(flow_rate_data$frequencies[,3]) - 0.1
+UpperTimeCut <- max(flow_rate_data$frequencies[,3]) + 0.1
+lowerRateThres <- min(flow_rate_data$frequencies[,4]) - 10
+upperRateThres <- max(flow_rate_data$frequencies[,4]) + 10
+
+res_flow_rate_qc <- flow_rate_check(flowRateData = flow_rate_data, 
+                                        lowerRateThres = lowerRateThres, 
+                                        upperRateThres = upperRateThres,
+                                        lowerTimeCut = lowerTimeCut, 
+                                        UpperTimeCut = UpperTimeCut)
+flow_rate_plot(flowRateData = flow_rate_data, 
+               lowerRateThres = lowerRateThres, 
+               upperRateThres = upperRateThres,
+               lowerTimeCut = lowerTimeCut, 
+               UpperTimeCut = UpperTimeCut)                              
+
+### signal ####
+
+flow_signal_data <- flow_signal_bin(ordFCS, channels = c("FSC-A", "SSC-A"), 
+                                    binSize=binSize, 
+                                    timeCh = time_chnl, 
+                                    timestep = time_step, 
+                                    TimeChCheck = NULL)
