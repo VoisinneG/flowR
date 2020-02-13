@@ -489,6 +489,7 @@ plotGatingSet <- function(input, output, session,
   params_update_data <- reactive({
     
     #print("update data")
+    
     if(!auto_update){
       input$update_plot
     }else{
@@ -544,12 +545,12 @@ plotGatingSet <- function(input, output, session,
   ### Control update of formatted plot #############################################################
   
   params_update_plot_format <- reactive({
+    
     #print("update_format")
     
     if(!auto_update){
       input$update_plot
     }else{
-      #update_params <- rval_mod$count_raw
       update_params <- NULL
       var_update <- c("facet_var",
                       "theme",
@@ -601,7 +602,6 @@ plotGatingSet <- function(input, output, session,
     
     
     spill <- choices()$compensation
-    #print(spill)
     if(!is.null(rval$apply_comp)){
       if(!rval$apply_comp){
         spill <- NULL
@@ -628,6 +628,7 @@ plotGatingSet <- function(input, output, session,
   plot_raw <- eventReactive(c(params_update_plot_raw(),  data_plot_focus()),{
     
     #print("raw")
+    
     df <- data_plot_focus()
     plot_list <- list()
     
@@ -667,9 +668,7 @@ plotGatingSet <- function(input, output, session,
   })
   
   ### Format plot ##################################################################################
-  observe({
-    print(rval_input$zoom_on_data_points)
-  })
+
   plot_format <- eventReactive( c(params_update_plot_format(), plot_raw()), {
     
     #print("format")
@@ -702,7 +701,6 @@ plotGatingSet <- function(input, output, session,
                        if(rval_input$zoom_on_data_points){
                          data_range <- get_plot_data_range(p)
                          options$axis_limits[names(data_range)] <- data_range
-                         #print(data_range)
                        }
                        format_plot(p,
                                    options = options)

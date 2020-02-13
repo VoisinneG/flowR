@@ -103,13 +103,14 @@ parseGateDiva <- function(gateNode){
   is_y_parameter_log <- xml_text(xml_find_all(gate, ".//is_y_parameter_log"))
   is_y_parameter_scaled <- xml_text(xml_find_all(gate, ".//is_y_parameter_scaled"))
   y_parameter_scale_value <- xml_text(xml_find_all(gate, ".//y_parameter_scale_value"))
-  print(name)
-   print(is_x_parameter_log)
-   print(is_x_parameter_scaled)
-   print(x_parameter_scale_value)
-   print(is_y_parameter_log)
-   print(is_y_parameter_scaled)
-   print(y_parameter_scale_value)
+  
+   # print(name)
+   # print(is_x_parameter_log)
+   # print(is_x_parameter_scaled)
+   # print(x_parameter_scale_value)
+   # print(is_y_parameter_log)
+   # print(is_y_parameter_scaled)
+   # print(y_parameter_scale_value)
   
   parent <- gsub(fixed = FALSE, pattern = "\\\\", replacement = "/", x= parent)
   if(parent == "All Events"){
@@ -607,7 +608,6 @@ get_gates_from_gs <- function(gs){
   
   for(node in setdiff(nodes, "root")){
     g <- flowWorkspace::gh_pop_get_gate(gs[[1]], node)
-    #print(names(g@parameters))
     parent <- flowWorkspace::gs_pop_get_parent(gs[[1]], node)
     gates[[node]] <- list(gate = g, parent = parent)
   } 
@@ -698,8 +698,6 @@ transform_gates <- function(gates,
     for(i in 1:ngates){
       
       g <- gates[[i]]
-      
-      #print(g)
       
       if(class(g$gate) == "polygonGate"){
         
@@ -1772,8 +1770,6 @@ plot_bar <-function(args = list()){
   id.vars <- names(df)[which(!sapply(df, is.numeric))]
   df_melt <- reshape2::melt(df, id.vars = id.vars)
   
-  #print(df_melt)
-  
   if(is.null(stat_var)){
     stat_var <- names(df)[which(sapply(df, is.numeric))]
   }
@@ -1839,8 +1835,6 @@ plot_tile <-function(args = list()){
   
   id.vars <- names(df)[which(!sapply(df, is.numeric))]
   df_melt <- reshape2::melt(df, id.vars = id.vars)
-  
-  #print(df_melt)
   
   if(is.null(stat_var)){
     stat_var <- names(df)[which(sapply(df, is.numeric))]
@@ -1966,8 +1960,6 @@ add_polygon_layer <- function(p,
         layer_info <- layer_scales(p)
         
         update_range_x <- FALSE
-        #print(layer_info)
-        #print(layer_info$x$limits)
         
         if(!is.null(layer_info$x$limits) & 
            "RangeContinuous" %in% class(layer_info$x$range) ){
@@ -2047,11 +2039,13 @@ add_polygon_layer <- function(p,
   
 }
 
+#' Add a gate layer to plot
+#' @param p a plot
+#' @param gate a gate object
 #' @importFrom sp point.in.polygon
 #' @importFrom rlang quo_get_expr
 add_gate <- function(p, gate){
-  #print(p$plot_env$plot_type)
-  #if(is.null(gate) | p$plot_env$plot_type == "histogram"){
+  
   if(is.null(gate)){
     return(p)
   }
@@ -2080,8 +2074,6 @@ add_gate <- function(p, gate){
       color_var <- as.character(rlang::quo_get_expr(p$mapping$colour))
     }
   }
-  
-  print(yvar)
   
   if(setequal(c(xvar, yvar), names(polygon))){ 
     if(dim(polygon)[2] >1){
@@ -2126,6 +2118,8 @@ add_gate <- function(p, gate){
   
 }
 
+#' Get data ranges from a plot
+#' @param p a plot
 #' @importFrom sp point.in.polygon
 #' @importFrom rlang quo_get_expr
 #' @importFrom scales expand_range
@@ -2152,21 +2146,17 @@ get_plot_data_range <- function(p){
   
   if(!is.null(xvar)){
     xlim <- range(p$data[[xvar]])
-    print(xlim)
     data_range[[xvar]] <- scales::expand_range(xlim, add = 1)
   }
   if(!is.null(yvar)){
     ylim <- range(p$data[[yvar]])
-    print(ylim)
     data_range[[yvar]] <- scales::expand_range(ylim, add=1)
   }
-  
-  #p <- p + coord_cartesian(ylim = ylim, xlim = xlim, expand = TRUE)
-  
-  #return(p)
+
   return(data_range)
 }
 
+#' Build a tree graph from a named list
 #' @param gates a named list. Each list element should contain a item 'parent' with 
 #' the name of its parent list element
 #' @importFrom graph addEdge nodes
@@ -2230,8 +2220,6 @@ format_plot <- function(p,
   xvar <- NULL
   yvar <- NULL
   
-  #print(names(p$mapping))
-
   if("x" %in% names(p$mapping)){
     if("quosure" %in% class(p$mapping$x)){
       xvar <- as.character(rlang::quo_get_expr(p$mapping$x))
@@ -3057,8 +3045,6 @@ get_cluster <- function(df,
     metaClustering_perCell <- fSOM$metaClustering[fSOM$map$mapping[,1]]
     df_filter$cluster_fsom <- as.factor(fSOM$map$mapping[,1])
     df_filter$cluster <- as.factor(metaClustering_perCell)
-    print("ok factor")
-    print(class(df_filter$cluster_fsom))
     var_names <- c("cluster", "cluster_fsom")
     return(list(df = df_filter, keep = idx_cells_kept,  var_names = var_names, fSOM = fSOM))
   }else{
@@ -3143,8 +3129,6 @@ build_flowset_from_df <- function(df,
             rownames(par@data)[npar] <- paste("$P",npar, sep = "")
             desc[[paste("$P",npar,"DISPLAY",sep="")]] <- NA
             desc[[paste("$P",npar,"VARTYPE",sep="")]] <- class(df_sample[[param]])
-            print(class(df_sample[[param]]))
-            print(param)
           }
           
           # par@data$vartype <- sapply(par@data$name, function(x){typeof(df_sample[[x]])})

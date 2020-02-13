@@ -150,9 +150,6 @@ plotGatingHierarchy <- function(input, output, session,
     options$transformation <- transformation
     options$axis_labels <- axis_labels
     options$axis_limits <- axis_limits
-    
-print("OK gh")
-print(transformation)
 
     p <- plot_gh( gs = rval$gating_set,
                   df = NULL,
@@ -163,7 +160,6 @@ print(transformation)
                   plot_type = rval_plot$plot_type,
                   plot_args = reactiveValuesToList(rval_plot),
                   options = options)
-    print("OK gh2")
     p
     
   })

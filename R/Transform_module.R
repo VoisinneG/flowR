@@ -325,12 +325,10 @@ Transform <- function(input, output, session, rval) {
           old_vartype <- rval$gating_set@data[[i]]@description[[desc_field]]
           if(!is.null(old_vartype)){
             if(old_vartype != input$param_vartype){
-              print("upadte")
               rval$gating_set@data[[i]]@description[[desc_field]] <- input$param_vartype
             }
           }else{
             if(input$param_vartype!="numeric"){
-              print("upadte2")
               rval$gating_set@data[[i]]@description[[desc_field]] <- input$param_vartype
             }
           }
@@ -363,8 +361,6 @@ Transform <- function(input, output, session, rval) {
                                                 t = input$t,
                                                 a = input$a))
       
-      
-      #print("update transformation")
       for(i in 1:length(var_name)){
         transformation[[var_name[i]]] <- trans
         trans_parameters[[var_name[i]]] <- trans_params

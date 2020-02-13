@@ -292,9 +292,6 @@ Clustering <- function(input, output, session, rval) {
     
     progress$set(message = "Clustering...", value = 50)
     
-    print("OK1")
-    print(transformation)
-    
     res <- try(get_cluster(df=df_cluster, 
                        yvar = parameters_table()$name[input$variables_table_rows_selected],
                        y_trans = y_trans,
@@ -321,12 +318,8 @@ Clustering <- function(input, output, session, rval) {
       
       df <- df_raw[res$keep, ]
       for(var in res$var_names){
-        print(var)
-        print(class(res$df[[var]]))
         df[[var]] <- res$df[[var]]
       }
-      #df_raw <- df_raw[ , setdiff(names(df_raw), c("cluster"))]
-      #df <- cbind(df_raw[res$keep, ], res$df[ , setdiff(names(res$df), names(df_raw))])
       
       rval_mod$gs <- build_gatingset_from_df(df = df, gs_origin = rval$gating_set)
       
@@ -338,20 +331,6 @@ Clustering <- function(input, output, session, rval) {
                                                     trans_parameters = rval$trans_parameters[params],
                                                     fSOM = res$fSOM)
       rval$gating_set_selected <- input$gs_name
-      
-      # fs <- build_flowset_from_df(df = df, 
-      #                             origin = rval$gating_set@data)
-      # 
-      # rval_mod$gs <- GatingSet(fs)
-      # gates <- get_gates_from_gs(rval$gating_set)
-      # add_gates_flowCore(gs = rval_mod$gs, gates = gates)
-      # rval_mod$gs@compensation <- choices()$compensation
-      # rval_mod$gs@transformation <- choices()$transformation
-      # 
-      # rval$gating_set_list[[input$gs_name]] <- list(gating_set = rval_mod$gs,
-      #                                               parent = rval$gating_set_selected,
-      #                                               fSOM = res$fSOM)
-      # rval$gating_set_selected <- input$gs_name
       
       rval$gating_set <- rval_mod$gs
       rval$update_gs <- rval$update_gs + 1

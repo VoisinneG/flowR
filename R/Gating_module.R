@@ -220,7 +220,6 @@ Gating <- function(input, output, session, rval) {
   
   callModule(simpleDisplay, "simple_display_module_2", 
              plot_list = plot_all_gates,
-             #nrow = 2, size = 200,
              params = display_params)
   
   res_tree <- callModule(simpleDisplay, "simple_display_module_tree", 
@@ -373,8 +372,7 @@ Gating <- function(input, output, session, rval) {
         #hpts <- grDevices::chull(polygon)
         #polygon <- polygon[hpts, ]
         polygon <- as.matrix(polygon)
-        print(polygon)
-        
+
         var_names <- c(res$params$xvar, res$params$yvar)
         names(var_names) <- NULL
         colnames(polygon) <- var_names
@@ -511,7 +509,6 @@ Gating <- function(input, output, session, rval) {
     validate(need(setdiff(choices()$subset, "root"), "No gates to display"))
     gates <- get_gates_from_gs(rval$gating_set)
     
-    
     # if(!input$show_all_subsets){
     #   idx_cluster <- grep("^cluster[0-9]+", basename(names(gates)))
     #   idx_bins <- grep("^bin[0-9]+", basename(names(gates)))
@@ -520,6 +517,7 @@ Gating <- function(input, output, session, rval) {
     #     gates <- gates[-idx_hide]
     #   }
     # }
+    
     gates
   })
   
@@ -527,7 +525,7 @@ Gating <- function(input, output, session, rval) {
   #   plot_params_gh$selected_subsets <- names(gate_list())
   # })
   
-  #output$tree <- renderPlot({
+
   graph <- reactive({
 
     gates <- gate_list()
@@ -548,22 +546,6 @@ Gating <- function(input, output, session, rval) {
     
     return(p)
   })
-  
-  # output$tree <- renderPlot({
-  #   print("ok render")
-  #   print(graph())
-  #   graph()    
-  # })
-  # 
-  # output$tree_ui <- renderUI({
-  #   ns <- session$ns
-  #   div( style = 'overflow-x: scroll',
-  #     plotOutput(ns("tree"), width = 500, height = 500,
-  #                brush = ns("plot_brush"),
-  #                click = ns("plot_click"),
-  #                dblclick = ns("plot_dblclick"))
-  #   )
-  # })
   
   output$tree_ui_options <- renderUI({
   

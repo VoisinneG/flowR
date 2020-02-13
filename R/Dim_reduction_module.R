@@ -310,8 +310,7 @@ Dim_reduction <- function(input, output, session, rval) {
       for(var in res$var_names){
         df[[var]] <- res$df[[var]]
       }
-      #df <- cbind( df_raw[res$keep, ], rval_mod$df_dim_red[ , setdiff(names(rval_mod$df_dim_red), names(df_raw))])
-      
+
       rval$dim_red_var <- res$vars
       
       if(!is.null(rval_mod$df_dim_red)){

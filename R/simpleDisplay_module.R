@@ -163,11 +163,10 @@ simpleDisplay <- function(input, output, session,
   
   plot_display <- reactive({
     
-  
-    #rval_plot$ncol_facet <- 1
-    #rval_plot$nrow_facet <- 1
-    
-    
+      rval_plot$ncol_facet <- 1
+      rval_plot$nrow_facet <- 1
+      rval_plot$ncol <- 1
+      
      if(class(plot_list())[1] == "list"){
        
          n <- length(plot_list())
