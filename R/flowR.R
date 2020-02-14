@@ -212,7 +212,7 @@ parseSpilloverMatrixDiva <- function(settingsNode){
   })
   
   df_spillover <- do.call(rbind, df_spillover_list)
-  compMat <- reshape2::acast(df_spillover, parameter ~ input)
+  compMat <- reshape2::acast(df_spillover,  parameter ~ input)
   return(compMat)
 }
 
@@ -442,7 +442,7 @@ parseSpilloverMatrix <- function(x){
   spilloverNodes <- xml_find_all(x, ".//transforms:spillover")
   df_spillover_list <- lapply(spilloverNodes, parseSpillover)
   df_spillover <- do.call(rbind, df_spillover_list)
-  compMat <- reshape2::acast(df_spillover, parameter ~ input)
+  compMat <- reshape2::acast(df_spillover, input ~ parameter)
   return(compMat)
 }
 

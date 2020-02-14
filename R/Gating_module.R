@@ -249,7 +249,11 @@ Gating <- function(input, output, session, rval) {
                                               "show_outliers")) ){
       plot_params_gh[[var]] <- res$params[[var]]
     }
-    display_params$top <- paste(res$params$sample, collapse = " + ")
+    display_params$title <- paste(res$params$sample, collapse = " + ")
+  })
+  
+  observe({
+    print(display_params$title)
   })
   
   observe({

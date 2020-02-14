@@ -114,16 +114,22 @@ simpleDisplay <- function(input, output, session,
                               ncol_facet = 1,
                               nrow_facet = 1,
                               use_plotly = FALSE,
-                              top = "",
+                              title = "",
                               zoom = 100,
                               width = 300,
                               height = 300,
-                              max_height = 500,
-                              init = TRUE)
+                              max_height = 1000,
+                              init = TRUE,
+                              show_title = TRUE)
   
   observeEvent(input$zoom, {
     rval_plot$zoom <- input$zoom
   })
+  
+  observeEvent(input$show_title, {
+    rval_plot$show_title <- input$show_title
+  })
+  
   
   observeEvent(input$width, {
     rval_plot$width <- input$width
@@ -137,27 +143,36 @@ simpleDisplay <- function(input, output, session,
     rval_plot$max_height <- input$max_height
   })
   
-  observeEvent(input$nrow, {
-    rval_plot$nrow <- input$nrow
+  observe({
+    if(class(plot_list())[1] == "list"){
+      n <- length(plot_list())
+      if(!is.null(input$nrow)){
+        rval_plot$nrow <- min(n, input$nrow)
+      }else{
+        rval_plot$nrow <- min(n, rval_plot$nrow)
+      }
+    }else{
+      rval_plot$nrow <- 1
+    }
   })
   
   observe({
-    if(rval_plot$init){
-      for(var in names(params)){
+      for(var in intersect(names(params), names(rval_plot))){
         rval_plot[[var]] <- params[[var]]
       }
-      rval_plot$init <- FALSE
+  })
+  
+  observe({
+    if(rval_plot$show_title){
+      rval_plot$top <- rval_plot$title
+    }else{
+      rval_plot$top <- ""
     }
   })
   
   observe({
-    if("show_title" %in% names(input)){
-      if(!input$show_title){
-        rval_plot$top <- ""
-      }
-    }
+    print(rval_plot$title)
   })
-    
 
   ### Layout plots ##########################################################################
   
@@ -166,7 +181,7 @@ simpleDisplay <- function(input, output, session,
       rval_plot$ncol_facet <- 1
       rval_plot$nrow_facet <- 1
       rval_plot$ncol <- 1
-      
+
      if(class(plot_list())[1] == "list"){
        
          n <- length(plot_list())
@@ -187,7 +202,6 @@ simpleDisplay <- function(input, output, session,
             if(n > 1){
               
               rval_plot$use_plotly <- FALSE
-              rval_plot$nrow <- min(n, rval_plot$nrow)
               rval_plot$ncol <- ceiling(n/rval_plot$nrow)
 
               g <- try(gridExtra::marrangeGrob(plot_list(), 
@@ -273,9 +287,9 @@ simpleDisplay <- function(input, output, session,
                                                   label = "plot width (px)", value = rval_plot$width)
       display_items[["max_height"]] <- numericInput(ns("max_height"), 
                                                     label = "max height (px)", value = rval_plot$max_height)
-      if("top" %in% names(params) ){
+      if("title" %in% names(params) ){
         display_items[["show_title"]] <- checkboxInput(ns("show_title"), 
-                                                       label = "show title", value = TRUE)
+                                                       label = "show title", value = rval_plot$show_title)
       }
 
     }
@@ -376,7 +390,7 @@ simpleDisplay <- function(input, output, session,
 # 
 #   server <- function(input, output, session) {
 # 
-#     params <- reactiveValues(use_plotly = FALSE, width = 500, height = 500)
+#     params <- reactiveValues(use_plotly = FALSE, width = 500, height = 500, nrow = 2, title = "samples")
 # 
 #     plot_list <- reactive({
 # 
@@ -395,10 +409,10 @@ simpleDisplay <- function(input, output, session,
 #       # plist[[1]] <- ggplot(iris, aes(x=Sepal.Length, y = Sepal.Width, color = Species)) +
 #       #   geom_point(alpha = 0.5)+
 #       #   facet_wrap(~Species)
-#       # 
+#       #
 #       #  plist[[2]] <- ggplot(iris, aes(x=Species, y = Sepal.Length, fill = Species)) +
 #       #    geom_col(alpha = 0.5)
-#       # 
+#       #
 #       # return(plist)
 # 
 #     })
