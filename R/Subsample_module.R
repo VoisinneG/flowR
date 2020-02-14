@@ -85,7 +85,7 @@ SubsampleUI <- function(id) {
 #'   \item{gating_set}{selected GatingSet}
 #'   \item{gating_set_selected}{Name of the selected GatingSet}
 #' }
-#' @importFrom flowWorkspace gs_get_pop_paths
+#' @importFrom flowWorkspace gs_get_pop_paths sampleNames
 #' @import shiny
 #' @importFrom shinydashboard renderValueBox
 #' @export
@@ -201,7 +201,7 @@ Subsample <- function(input, output, session, rval) {
   output$progressBox <- renderValueBox({
     Nsamples <- 0
     if(!is.null(rval_mod$gs)){
-      Nsamples <- length(pData(rval_mod$gs)$name)
+      Nsamples <- length(flowWorkspace::sampleNames(rval_mod$gs))
     }
     
     valueBox(

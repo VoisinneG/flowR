@@ -85,6 +85,11 @@ selection <- function(input, output, session,
   choices <- reactiveValues()
   choices_pattern <- reactiveValues()
   
+  ### Call module ###########################################################################
+  
+  res <- callModule(patternSelection, "pattern_module", choices = choices_pattern)
+  
+  ### Build UI ##############################################################################
   
   output$subset_input <- renderUI({
     ns <- session$ns
@@ -107,7 +112,8 @@ selection <- function(input, output, session,
     )
   })
   
-  # Get available samples and subsets from rval$gating_set
+  ### Get available samples and subsets from rval$gating_set #################################
+  
   observe({
     
     rval$update_gs
@@ -126,7 +132,8 @@ selection <- function(input, output, session,
     
   })
   
-  # Default values
+  ### Default values ##########################################################################
+  
   observe({
     updateSelectInput(session, "sample", choices = choices$sample, selected = choices$sample[1])
   })
@@ -138,9 +145,7 @@ selection <- function(input, output, session,
       }
     }
   })
-  
-  res <- callModule(patternSelection, "pattern_module", choices = choices_pattern)
-  
+
   observe({
     
     if(!is.null(res$variable)){

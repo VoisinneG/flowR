@@ -712,6 +712,9 @@ plotGatingSet <- function(input, output, session,
   
   draw_gates <- eventReactive(plot_format(), {
     
+    validate(need(rval_input$subset, "Please select subsets"))
+    validate(need(all(rval_input$subset %in% choices()$subset), 
+                  "All subsets not found in GatingSet"))
     #print("gate")
     
     gate <- NULL

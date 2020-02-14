@@ -348,6 +348,7 @@ Clustering <- function(input, output, session, rval) {
     
     validate(need(input$clustering_method == "FlowSOM", "No plot to display"))
     validate(need(rval_mod$fSOM, "No plot to display"))
+    validate(need("scale_node_size" %in% names(input), "UI not rendered"))
     
     fSOM <- rval_mod$fSOM
     

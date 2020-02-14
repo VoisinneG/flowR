@@ -113,7 +113,7 @@ Dim_reductionUI <- function(id) {
 #' @param rval A reactive values object
 #' @return The updated reactiveValues object \code{rval}
 #' @import shiny
-#' @importFrom flowWorkspace pData gs_get_pop_paths
+#' @importFrom flowWorkspace gs_get_pop_paths sampleNames
 #' @importFrom shinydashboard renderValueBox
 #' @importFrom DT renderDT datatable
 #' @importFrom scales identity_trans log10_trans
@@ -392,7 +392,7 @@ Dim_reduction <- function(input, output, session, rval) {
   output$progressBox <- renderValueBox({
     Nsamples <- 0
     if(!is.null(rval_mod$gs)){
-      Nsamples <- length(flowWorkspace::pData(rval_mod$gs)$name)
+      Nsamples <- length(flowWorkspace::sampleNames(rval_mod$gs))
     }
     
     valueBox(

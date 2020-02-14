@@ -49,7 +49,8 @@ ImportUI <- function(id) {
            ),
            box(title = "Example dataset",
              width = NULL, height = NULL,
-             actionButton(ns("import_gvhd"), "import dataset (GvHD)")
+             selectInput(ns("example_selected"), "Select dataset", choices=c("GvHD", "Bcells"), selected = "GvHD"),
+             actionButton(ns("import_example"), "Load dataset")
            )
     ),
     column(width = 6,
@@ -62,7 +63,7 @@ ImportUI <- function(id) {
                #                selected = NULL,
                #                multiple = FALSE),
                textInput(ns("gs_name"), "GatingSet name", "import"),
-               actionButton(ns("load"), label = "Load selected files")
+               actionButton(ns("load"), label = "Create GatingSet")
            )
     )
   )
@@ -91,6 +92,7 @@ ImportUI <- function(id) {
 #' @importFrom DT renderDT
 #' @importFrom tools file_ext
 #' @importFrom utils read.table data
+#' @import flowAI
 #' @export
 #' @rdname ImportUI
 Import <- function(input, output, session, rval) {
@@ -197,15 +199,24 @@ Import <- function(input, output, session, rval) {
 
   })
 
-  #### Import GvHD dataset ####
+  #### Import example dataset ####
   
-  observeEvent(input$import_gvhd, {
+  observeEvent(input$import_example, {
     
-    utils::data("GvHD", package = "flowCore")
-    gs <- flowWorkspace::GatingSet(GvHD)
-    rval$gating_set_list[["GvHD"]] <- list(gating_set = gs,
-                                                  parent = NULL)
-    rval$gating_set_selected <- "GvHD"
+    if(input$example_selected == "GvHD"){
+      utils::data("GvHD", package = "flowCore")
+      gs <- flowWorkspace::GatingSet(GvHD)
+      rval$gating_set_list[["GvHD"]] <- list(gating_set = gs,
+                                             parent = NULL)
+      rval$gating_set_selected <- "GvHD"
+    }else if(input$example_selected == "Bcells"){
+      utils::data("Bcells", package = "flowAI")
+      gs <- flowWorkspace::GatingSet(Bcells)
+      rval$gating_set_list[["Bcells"]] <- list(gating_set = gs,
+                                             parent = NULL)
+      rval$gating_set_selected <- "Bcells"
+    }
+    
   
   })
   
@@ -228,31 +239,31 @@ Import <- function(input, output, session, rval) {
 # library(shiny)
 # library(shinydashboard)
 # 
-# if (interactive()){
-# 
-#   ui <- dashboardPage(
-#     dashboardHeader(title = "Import"),
-#     sidebar = dashboardSidebar(disable = TRUE),
-#     body = dashboardBody(
-#       fluidRow(
-#         column(4, box(width = NULL, verbatimTextOutput("info"))),
-#         column(8, box(width = NULL, ImportUI("module")))
-#       )
-#     )
-#   )
-# 
-#   server <- function(input, output, session) {
-# 
-#     rval <- reactiveValues()
-# 
-#     rval <- callModule(Import, "module", rval = rval)
-# 
-#     output$info <- renderPrint({
-#       print(rval$gating_set_list)
-#     })
-# 
-#   }
-# 
-#   shinyApp(ui, server)
-# 
-# }
+if (interactive()){
+
+  ui <- dashboardPage(
+    dashboardHeader(title = "Import"),
+    sidebar = dashboardSidebar(disable = TRUE),
+    body = dashboardBody(
+      fluidRow(
+        column(4, box(width = NULL, verbatimTextOutput("info"))),
+        column(8, box(width = NULL, ImportUI("module")))
+      )
+    )
+  )
+
+  server <- function(input, output, session) {
+
+    rval <- reactiveValues()
+
+    rval <- callModule(Import, "module", rval = rval)
+
+    output$info <- renderPrint({
+      print(rval$gating_set_list)
+    })
+
+  }
+
+  shinyApp(ui, server)
+
+}

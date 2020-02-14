@@ -212,7 +212,7 @@ parseSpilloverMatrixDiva <- function(settingsNode){
   })
   
   df_spillover <- do.call(rbind, df_spillover_list)
-  compMat <- reshape2::acast(df_spillover,  parameter ~ input)
+  compMat <- reshape2::acast(df_spillover, input ~ parameter)
   return(compMat)
 }
 
@@ -845,7 +845,7 @@ copy_gate <- function(gs, name, parent, copy_children_gates = TRUE){
 #' Get parameters from a GatingSet
 #' @param gs a GatingSet
 #' @return a list
-#' @importFrom flowWorkspace pData gs_get_pop_paths
+#' @importFrom flowWorkspace pData gs_get_pop_paths sampleNames
 #' @importFrom flowCore parameters
 #' @export
 get_parameters_gs <- function(gs){
@@ -893,7 +893,7 @@ get_parameters_gs <- function(gs){
   names(axis_limits) <- params$name
   
   return( 
-    list(sample = pdata$name,
+    list(sample = flowWorkspace::sampleNames(gs),
          subset = flowWorkspace::gs_get_pop_paths(gs),
          plot_var = plot_var,
          labels = labels,
@@ -913,7 +913,7 @@ get_parameters_gs <- function(gs){
 #' @param spill spillover matrix. If NULL, uncompensated data is used for gating
 #' @param filter a filter object applied before computing statistics. Ignored if NULL.
 #' @importFrom flowCore Subset
-#' @importFrom flowWorkspace pData GatingSet gs_pop_get_count_fast
+#' @importFrom flowWorkspace GatingSet gs_pop_get_count_fast sampleNames
 getPopStatsPlus <- function(gs, spill = NULL, filter = NULL){
   
   fs <- gs@data
@@ -931,8 +931,7 @@ getPopStatsPlus <- function(gs, spill = NULL, filter = NULL){
   df <- flowWorkspace::gs_pop_get_count_fast(gs_comp)
   
   df$name <- sapply(df$name, function(x){strsplit(x, split = "_[0-9]+$")[[1]][1]})
-  df_root <- data.frame(name = flowWorkspace::pData(fs)$name)
-  #df_root$name <- flowWorkspace::pData(fs)$name
+  df_root <- data.frame(name = flowWorkspace::sampleNames(fs))
   df_root$Population <- "root"
   df_root$Count <- sapply(1:length(fs), function(x){dim(fs[[x]]@exprs)[1]})
   df_root$Parent <- NA
@@ -954,7 +953,7 @@ getPopStatsPlus <- function(gs, spill = NULL, filter = NULL){
 #' @param return_comp_data logical. Should compensated data be returned ?
 #' @param updateProgress function used in shiny to update a progress bar
 #' @return a data.frame
-#' @importFrom flowWorkspace pData gs_get_pop_paths colnames GatingSet gh_pop_get_indices pData
+#' @importFrom flowWorkspace sampleNames gs_get_pop_paths colnames GatingSet gh_pop_get_indices pData
 #' @importFrom flowCore compensate
 get_data_gs <- function(gs,
                         sample = NULL,
@@ -965,14 +964,13 @@ get_data_gs <- function(gs,
                         updateProgress = NULL
 ){
   
-  if(is.null(sample)){ sample <- flowWorkspace::pData(gs)$name}
+  if(is.null(sample)){sample <- flowWorkspace::sampleNames(gs)}
   if(is.null(subset)){subset <- flowWorkspace::gs_get_pop_paths(gs)}
   
-  idx <- match(sample, flowWorkspace::pData(gs)$name)
-  idx <- idx[!is.na(idx)]
-  
-  if(length(idx) != length(sample)){
-    stop("sample not found in gating set")
+  idx <- which(sample %in% flowWorkspace::sampleNames(gs))
+
+  if(length(idx) == 0){
+    return(NULL)
   }
   
   gs_comp <- gs
@@ -980,7 +978,7 @@ get_data_gs <- function(gs,
   
   if(!is.null(spill)){
     
-    if( setequal(names(spill),  flowWorkspace::pData(gs)$name) ){
+    if( setequal(names(spill),  flowWorkspace::sampleNames(gs)) ){
       gates <- get_gates_from_gs(gs)
       fs <- gs@data[idx]
       fs <- flowCore::compensate(fs, spill[idx])
@@ -999,8 +997,8 @@ get_data_gs <- function(gs,
       
       idx_subset <- NULL
       if(!is.null(spill)){
-        idx_comp <- match(flowWorkspace::pData(gs)$name[idx[i]], 
-                          flowWorkspace::pData(gs_comp)$name)
+        idx_comp <- match(flowWorkspace::sampleNames(gs)[idx[i]], 
+                          flowWorkspace::sampleNames(gs_comp))
       }
       
       if(subset[k] != "root"){
@@ -1027,7 +1025,7 @@ get_data_gs <- function(gs,
       
       if(dim(df_int)[1]>0){
         
-        df_int[["name"]] <- flowWorkspace::pData(gs)$name[idx[i]]
+        df_int[["name"]] <- flowWorkspace::sampleNames(gs)[idx[i]]
         df_int[["subset"]] <- subset[k]
         #df <- rbind(df, df_int)
         
@@ -1054,7 +1052,7 @@ get_data_gs <- function(gs,
   
   df_tot <- do.call(rbind, df)
   df_tot[["subset"]] <- factor(df_tot[["subset"]], levels = subset)
-  df_tot[["name"]] <- factor(df_tot[["name"]], levels = flowWorkspace::pData(gs)$name[idx])
+  df_tot[["name"]] <- factor(df_tot[["name"]], levels = flowWorkspace::sampleNames(gs)[idx])
   
   if(length(df_tot[["name"]]) > 0){
     return(df_tot)
@@ -2414,7 +2412,7 @@ format_plot <- function(p,
 #' @param options  list of plot format options passed to \code{format_plot()}
 #' @param gate_name Names of the gates to add to the plot (if it is compatible with plot parameters).
 #' Ignored if NULL.
-#' @importFrom flowWorkspace gs_get_pop_paths pData gh_pop_get_gate
+#' @importFrom flowWorkspace gs_get_pop_paths gh_pop_get_gate sampleNames
 #' @return a plot
 plot_gs <- function(gs,
                     df = NULL,
@@ -2435,7 +2433,7 @@ plot_gs <- function(gs,
     plot_args[["yvar"]] <- colnames(gs)[2]
   }
   
-  if(is.null(sample)) sample <-  flowWorkspace::pData(gs)$name[1]
+  if(is.null(sample)) sample <-  flowWorkspace::sampleNames(gs)[1]
   if(is.null(subset)) subset <- flowWorkspace::gs_get_pop_paths(gs)[1]
 
   df <- get_plot_data(df = df,
@@ -2485,7 +2483,7 @@ plot_gs <- function(gs,
 #' @param plot_args  list of plot parameters passed to the plot function. 
 #' Plot parameters depend on the plot type selected.
 #' @param options  list of plot format options passed to \code{format_plot()}
-#' @importFrom flowWorkspace gs_get_pop_paths pData
+#' @importFrom flowWorkspace gs_get_pop_paths sampleNames
 #' @importFrom scales identity_trans
 #' @return a list with a plot and the corresponding plot data
 plot_stat <- function(df = NULL,
@@ -2507,7 +2505,7 @@ plot_stat <- function(df = NULL,
                         
   
   
-  if(is.null(sample)) sample <- flowWorkspace::pData(gs)$name[1]
+  if(is.null(sample)) sample <- flowWorkspace::sampleNames(gs)[1]
   if(is.null(subset)) subset <- flowWorkspace::gs_get_pop_paths(gs)[1]
   
   if(is.null(df)){
@@ -2572,7 +2570,7 @@ plot_stat <- function(df = NULL,
 #' @param plot_args  list of plot parameters passed to \code{plot_gs()}
 #' @param options  list of plot format options passed to \code{format_plot()}
 #' @return a list of ggplot objects
-#' @importFrom flowWorkspace gs_get_pop_paths gs_pop_get_parent gs_pop_get_children pData
+#' @importFrom flowWorkspace gs_get_pop_paths gs_pop_get_parent gs_pop_get_children sampleNames
 plot_gh <- function( gs, 
                       df = NULL,
                       sample = NULL,
@@ -2583,9 +2581,9 @@ plot_gh <- function( gs,
                       plot_args = list(), 
                       options = list()){
   
-  if(is.null(sample)){sample = flowWorkspace::pData(gs)$name[1]}
+  if(is.null(sample)){sample = flowWorkspace::sampleNames(gs)[1]}
   
-  idx <- match(sample, flowWorkspace::pData(gs)$name)
+  idx <- match(sample, flowWorkspace::sampleNames(gs))
   
   if(is.null(selected_subsets)){
     selected_subsets <- setdiff(flowWorkspace::gs_get_pop_paths(gs), "root")
@@ -2697,7 +2695,7 @@ plot_gh <- function( gs,
 #' @param plot_type name of the plot type
 #' @param plot_args  list of plot parameters passed to \code{plot_gs()}
 #' @param options  list of plot format options passed to \code{format_plot()}
-#' @importFrom flowWorkspace gh_pop_get_gate pData
+#' @importFrom flowWorkspace gh_pop_get_gate sampleNames
 plot_gate <- function(gate_name,
                      df = NULL,
                      gs,
@@ -2721,7 +2719,7 @@ plot_gate <- function(gate_name,
     plot_type = "histogram"
   }
   
-  if(is.null(sample)) sample <-  flowWorkspace::pData(gs)$name[1]
+  if(is.null(sample)) sample <-  flowWorkspace::sampleNames(gs)[1]
 
   df <- get_plot_data(df = df,
                       gs = gs, 
@@ -3071,7 +3069,7 @@ get_cluster <- function(df,
 #' \dontrun{
 #' utils::data("GvHD", package = "flowCore")
 #' gs <- GatingSet(GvHD)
-#' df <- get_data_gs(gs = gs, sample = pData(gs)$name[1:3], subset = "root", Ncells = 1000)
+#' df <- get_data_gs(gs = gs, sample = flowWorkspace::sampleNames(gs)[1:3], subset = "root", Ncells = 1000)
 #' fs <- build_flowset_from_df(df = df, origin = gs@data)
 #' pData(fs)}
 build_flowset_from_df <- function(df,
@@ -3097,7 +3095,7 @@ build_flowset_from_df <- function(df,
       
       if(!is.null(origin)){
         
-        idx <- match(sample,flowWorkspace::pData(origin)$name)
+        idx <- match(sample, flowWorkspace::sampleNames(origin))
         
         if(!is.na(idx)){
           
@@ -3114,7 +3112,9 @@ build_flowset_from_df <- function(df,
           
           for(i in 1:length(par@data$name)){
             param <- par@data$name[i]
-            desc[[paste("$P",i,"VARTYPE",sep="")]] <- class(df_sample[[param]])
+            if(! paste("$P",i,"VARTYPE",sep="") %in% names(desc)){
+              desc[[paste("$P",i,"VARTYPE",sep="")]] <- class(df_sample[[param]])
+            }
           }
           
           for(param in new_par){
@@ -3129,6 +3129,7 @@ build_flowset_from_df <- function(df,
             rownames(par@data)[npar] <- paste("$P",npar, sep = "")
             desc[[paste("$P",npar,"DISPLAY",sep="")]] <- NA
             desc[[paste("$P",npar,"VARTYPE",sep="")]] <- class(df_sample[[param]])
+            print(class(df_sample[[param]]))
           }
           
           # par@data$vartype <- sapply(par@data$name, function(x){typeof(df_sample[[x]])})
@@ -3157,11 +3158,11 @@ build_flowset_from_df <- function(df,
     fs_new <- flowSet(ff_list)
     if("flowSet" %in% class(origin) ){
       pdata <- data.frame(flowWorkspace::pData(origin))
-      idx_match <- match(samples, pdata$name)
+      idx_match <- match(samples, flowWorkspace::pData(origin))
       if(length(colnames(pdata))>1){
         flowWorkspace::pData(fs_new) <- pdata[idx_match, ]
       }else{
-        flowWorkspace::pData(fs_new)$name <- pdata[idx_match, ]
+        flowWorkspace::pData(fs_new)$name <- pdata[idx_match, "name"]
       }
     }
   }else{

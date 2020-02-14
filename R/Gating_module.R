@@ -253,10 +253,6 @@ Gating <- function(input, output, session, rval) {
   })
   
   observe({
-    print(display_params$title)
-  })
-  
-  observe({
     gates <- choices()$subset
     updateSelectInput(session, "gate_to_delete", choices = setdiff(gates, "root"))
     updateSelectInput(session, "gate_to_rename", choices = setdiff(gates, "root"))
@@ -371,7 +367,7 @@ Gating <- function(input, output, session, rval) {
       ))
     }else{
       if(!is.null(gate$x)){
-        polygon <- data.frame(x =gate$x, y = gate$y)
+        polygon <- data.frame(x = gate$x, y = gate$y)
         
         #hpts <- grDevices::chull(polygon)
         #polygon <- polygon[hpts, ]
@@ -380,7 +376,7 @@ Gating <- function(input, output, session, rval) {
         var_names <- c(res$params$xvar, res$params$yvar)
         names(var_names) <- NULL
         colnames(polygon) <- var_names
-        
+        print(polygon)
         poly_gate <- flowCore::polygonGate(.gate = polygon, filterId=input$gate_name)
         rval$gate <- poly_gate
           

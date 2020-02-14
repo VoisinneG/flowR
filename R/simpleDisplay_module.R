@@ -145,7 +145,7 @@ simpleDisplay <- function(input, output, session,
   
   observe({
     if(class(plot_list())[1] == "list"){
-      n <- length(plot_list())
+      n <- max(1, length(plot_list()))
       if(!is.null(input$nrow)){
         rval_plot$nrow <- min(n, input$nrow)
       }else{
@@ -168,10 +168,6 @@ simpleDisplay <- function(input, output, session,
     }else{
       rval_plot$top <- ""
     }
-  })
-  
-  observe({
-    print(rval_plot$title)
   })
 
   ### Layout plots ##########################################################################

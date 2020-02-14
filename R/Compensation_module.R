@@ -76,10 +76,12 @@ CompensationUI <- function(id) {
                         box(title = "Table", width = NULL, height = NULL, collapsible = TRUE, collapsed = TRUE,
                             DT::DTOutput(ns("spill_table"))
                         ),
-                        box(title = "Duplicate", width = NULL, height = NULL, collapsible = TRUE, collapsed = TRUE,
-                            textInput(ns("new_name"), "CompMat name", value = "new name"),
+                        box(title = "Rename/Duplicate", width = NULL, height = NULL, collapsible = TRUE, collapsed = TRUE,
+                            textInput(ns("new_name"), "CompMat name", value = "newCompMat"),
+                            actionButton(ns("rename"), "rename"),
                             actionButton(ns("duplicate"), "duplicate")
                         ),
+                        actionButton(ns("delete"), "delete"),
                         downloadButton(ns("download_spill"))
                     )
              ),
@@ -180,6 +182,12 @@ Compensation <- function(input, output, session, rval) {
       plot_params[[var]] <- res$params[[var]]
     }
     
+    if(input$show_all_channels){
+      plot_params$xvar <- setdiff(choices()$plot_var, input$yvar_comp)
+    }else{
+      plot_params$xvar <- choices()$plot_var[1]
+    }
+    
     if(input$comp_mat %in% rval_mod$spill_per_sample[res$params$sample]){
       if(input$show_all_channels){
         plot_params$xvar <- setdiff(choices()$plot_var, input$yvar_comp)
@@ -222,18 +230,25 @@ Compensation <- function(input, output, session, rval) {
   ### Set GatingSet compensation ####################################################################
   
   observe({
-
+    print(choices()$sample)
     compensation <- choices()$compensation
+    print(names(compensation))
     comp_samples <- setdiff(choices()$sample, names(compensation))
 
     if(length(comp_samples) > 0){
       for(sample in comp_samples){
 
         desc <- flowCore::description(rval$gating_set@data[[sample]])
-        if("SPILL" %in% names(desc)){
+        spill_retrieved <- FALSE
+        if("SPILL" %in% names(desc) ){
           comp_mat <- desc[["SPILL"]]
-          row.names(comp_mat) <- colnames(comp_mat)
-        }else{
+          if(dim(comp_mat)[1] == dim(comp_mat)[2] & dim(comp_mat)[1]>0){
+            row.names(comp_mat) <- colnames(comp_mat)
+            spill_retrieved <- TRUE
+          }
+          
+        }
+        if(!spill_retrieved){
           m <- diag( length(choices()$params$name) )
           colnames(m) <- choices()$params$name
           row.names(m) <- colnames(m)
@@ -253,10 +268,10 @@ Compensation <- function(input, output, session, rval) {
 
   ### Match GatingSet compensation with loaded matrices ################################################
   
-  observeEvent(choices()$compensation, {
+  observeEvent(c(choices()$compensation, rval_mod$spill_list), {
     
     rval_mod$spill_per_sample <- list()
-    
+
     for( sample in choices()$sample ){
       comp_mat <- choices()$compensation[[sample]]
       is_matched <- FALSE
@@ -266,8 +281,14 @@ Compensation <- function(input, output, session, rval) {
       }
       idx_match <- which(is_matched)
       if(length(idx_match)==0){
-        idx <- length(rval_mod$spill_list) + 1
+        
+        idx <- 0
         comp_name <- paste0("CompMat", idx)
+        while(comp_name %in% names(rval_mod$spill_list)){
+          idx <- idx + 1
+          comp_name <- paste0("CompMat", idx)
+        }
+        
         rval_mod$spill_list[[comp_name]] <- comp_mat
         rval_mod$spill_per_sample[[sample]] <- comp_name
       }else{
@@ -313,7 +334,7 @@ Compensation <- function(input, output, session, rval) {
     
     
   observe({
-    if(length(rval_mod$spill_list) > 0 ){
+    #if(length(rval_mod$spill_list) > 0 ){
       updateSelectInput(session, "comp_mat", 
                         choices = names(rval_mod$spill_list), 
                         selected = names(rval_mod$spill_list))
@@ -321,7 +342,7 @@ Compensation <- function(input, output, session, rval) {
       updateSelectInput(session, "selected_matrix", 
                         choices = names(rval_mod$spill_list), 
                         selected = names(rval_mod$spill_list))
-    }
+    #}
   })
   
   observeEvent(input$apply_matrix, {
@@ -359,8 +380,15 @@ Compensation <- function(input, output, session, rval) {
     
   })
   
-  observeEvent(input$comp_mat, {
-    rval_mod$spill <- rval_mod$spill_list[[input$comp_mat]]
+  observe({
+    if(!is.null(input$comp_mat)){
+      if(input$comp_mat %in% names(rval_mod$spill_list)){
+        rval_mod$spill <- rval_mod$spill_list[[input$comp_mat]]
+      }else{
+        rval_mod$spill <- NULL
+      }
+    }
+
   })
       
   
@@ -370,6 +398,20 @@ Compensation <- function(input, output, session, rval) {
     }
   })
   
+  observeEvent(input$rename, {
+    idx <- which(names(rval_mod$spill_list) == input$comp_mat)
+    if(length(idx)==1){
+      names(rval_mod$spill_list)[idx] <- input$new_name
+    }
+  })
+  
+  observeEvent(input$delete, {
+    idx <- which(names(rval_mod$spill_list) == input$comp_mat)
+    if(length(idx)==1){
+      rval_mod$spill_list <- rval_mod$spill_list[-idx]
+    }
+    
+  })
   ### Compute compensation matrix ##################################################################
 
   observeEvent(spill_computed(), {
@@ -399,7 +441,7 @@ Compensation <- function(input, output, session, rval) {
       }else{
         showModal(modalDialog(
           title = "Matrix name already exists",
-          paste("Please choose another name", sep=""),
+          paste("Please delete or rename the imported matrix first", sep=""),
           easyClose = TRUE,
           footer = NULL
         ))
@@ -410,9 +452,9 @@ Compensation <- function(input, output, session, rval) {
   
   ### Edit spill parameter ###########################################################################
   
-  observeEvent(input$reset_comp, {
-    rval_mod$spill <- rval_mod$spill_list[[input$comp_mat]]
-  })
+  # observeEvent(input$reset_comp, {
+  #   rval_mod$spill <- rval_mod$spill_list[[input$comp_mat]]
+  # })
   
   observeEvent(input$set_spill_value, {
     df <- rval_mod$spill
