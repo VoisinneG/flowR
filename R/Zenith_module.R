@@ -14,6 +14,9 @@ ZenithUI <- function(id) {
   fluidRow(
     column(width = 4,
            box(width = NULL, height = NULL, title = "Parameters",
+               actionButton(ns("update"), "update"),
+               br(),
+               br(),
                box(collapsible = TRUE, collapsed = TRUE, width = NULL, height = NULL,
                    title = "Samples",
                    selectizeInput(ns("A_sample"),
@@ -213,7 +216,7 @@ Zenith <- function(input, output, session, rval) {
   
   ### Compute dependency on glycolysis and ox-phos #################################################
   
-  metabo_data <- reactive({
+  metabo_data <- eventReactive(input$update, {
     df <- reporter_data()
     df_melt <- reshape2::melt(df, id.vars = c("name", "subset"), measure.vars = "value")
     df_cast <- reshape2::dcast(df_melt, subset ~ name + variable, mean, na.rm = TRUE)
@@ -246,6 +249,8 @@ Zenith <- function(input, output, session, rval) {
   ### Plot results ##################################################################################
   
   plot_gluc_dep <- reactive({
+    validate(need(input$subset, "No subset selected"))
+    validate(need(all(input$subset %in% choices()$subset), "Undefined subsets"))
     df <- metabo_data()
     
     df[["ymin"]] <-  df[["mean_score_gluc_dep"]] -  df[["sd_score_gluc_dep"]]
@@ -340,8 +345,6 @@ Zenith <- function(input, output, session, rval) {
     df[["mean_score_gluc_dep"]] <- df_metabo[["mean_score_gluc_dep"]][idx_match]
     df[["mean_score_mito_dep"]] <- df_metabo[["mean_score_mito_dep"]][idx_match]
     
-    df <- cbind(df_raw[res$keep, setdiff(names(df_raw), names(res$df))], res$df)
-    
     gs <- build_gatingset_from_df(df = df, gs_origin = rval$gating_set)
     
     # fs <- build_flowset_from_df(df, 
@@ -373,9 +376,7 @@ Zenith <- function(input, output, session, rval) {
 }
 
 
-##################################################################################
-# Tests
-##################################################################################
+### Tests #######################################################################################
 # 
 # library(shiny)
 # library(shinydashboard)
@@ -383,35 +384,35 @@ Zenith <- function(input, output, session, rval) {
 # library(flowCore)
 # library(ggplot2)
 # library(plotly)
-# if (interactive()){
-# 
-#   ui <- dashboardPage(
-#     dashboardHeader(title = "Zenith"),
-#     sidebar = dashboardSidebar(disable = TRUE),
-#     body = dashboardBody(
-#       fluidRow(
-#         column(12, box(width = NULL, ZenithUI("module")))
-#       )
-#     )
-#   )
-# 
-#   server <- function(input, output, session) {
-# 
-#     rval <- reactiveValues()
-# 
-#     observe({
-#       load("../flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
-#       gs <- GatingSet(res$cluster$flow_set)
-#       add_gates_flowCore(gs, res$cluster$gates)
-#       rval$gating_set <- gs
-#       #utils::data("GvHD", package = "flowCore")
-#       #rval$gating_set <- GatingSet(GvHD)
-#     })
-# 
-#     rval <- callModule(Zenith, "module", rval = rval)
-# 
-#   }
-# 
-#   shinyApp(ui, server)
-# 
-# }
+ # if (interactive()){
+ # 
+ #  ui <- dashboardPage(
+ #    dashboardHeader(title = "Zenith"),
+ #    sidebar = dashboardSidebar(disable = TRUE),
+ #    body = dashboardBody(
+ #      fluidRow(
+ #        column(12, box(width = NULL, ZenithUI("module")))
+ #      )
+ #    )
+ #  )
+ # 
+ #  server <- function(input, output, session) {
+ # 
+ #    rval <- reactiveValues()
+ # 
+ #    observe({
+ #      # load("../flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
+ #      # gs <- GatingSet(res$cluster$flow_set)
+ #      # add_gates_flowCore(gs, res$cluster$gates)
+ #      # rval$gating_set <- gs
+ #      utils::data("GvHD", package = "flowCore")
+ #      rval$gating_set <- GatingSet(GvHD)
+ #    })
+ # 
+ #    rval <- callModule(Zenith, "module", rval = rval)
+ # 
+ #  }
+ # 
+ #  shinyApp(ui, server)
+ # 
+ # }

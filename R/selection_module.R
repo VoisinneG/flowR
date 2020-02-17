@@ -82,7 +82,6 @@ selection <- function(input, output, session,
                       rval, params = reactiveValues(), 
                       multiple_subset = TRUE) {
   
-  choices <- reactiveValues()
   choices_pattern <- reactiveValues()
   
   ### Call module ###########################################################################
@@ -93,12 +92,12 @@ selection <- function(input, output, session,
   
   output$subset_input <- renderUI({
     ns <- session$ns
-    selected <- choices$subset[1]
-    
+    selected_subset <- choices()$subset[1]
+
     if("subset" %in% names(params)){
       if(!is.null(params$subset)){
-        if(params$subset %in% choices$subset){
-          selected <- params$subset
+        if(params$subset %in% choices()$subset){
+          selected_subset <- params$subset
         }
       }
     }
@@ -106,28 +105,27 @@ selection <- function(input, output, session,
     tagList(
       selectizeInput(ns("subset"),
                    label = "subset",
-                   choices = choices$subset,
-                   selected = selected,
+                   choices = choices()$subset,
+                   selected = selected_subset,
                    multiple = multiple_subset)
     )
   })
   
   ### Get available samples and subsets from rval$gating_set #################################
   
-  observe({
-    
+  choices <- reactive({
     rval$update_gs
-    
     validate(need(class(rval$gating_set) == "GatingSet", "input is not a GatingSet"))
     gs_params <- get_parameters_gs(gs = rval$gating_set)
-    choices$sample <- gs_params$sample
-    choices$subset <- gs_params$subset
-
+  })
+  
+  observe({
+    
     if(multiple_subset){
-      choices_pattern$sample <- choices$sample
-      choices_pattern$subset <- choices$subset
+      choices_pattern$sample <- choices()$sample
+      choices_pattern$subset <- choices()$subset
     }else{
-      choices_pattern$sample <- choices$sample
+      choices_pattern$sample <- choices()$sample
     }
     
   })
@@ -135,13 +133,13 @@ selection <- function(input, output, session,
   ### Default values ##########################################################################
   
   observe({
-    updateSelectInput(session, "sample", choices = choices$sample, selected = choices$sample[1])
+    updateSelectInput(session, "sample", choices = choices()$sample, selected = choices()$sample[1])
   })
-  
+
   observeEvent(params$sample, {
     if("sample" %in% names(params)){
       if(!is.null(params$sample)){
-        updateSelectInput(session, "sample", choices = choices$sample, selected = params$sample)
+        updateSelectInput(session, "sample", choices = choices()$sample, selected = params$sample)
       }
     }
   })
@@ -150,7 +148,8 @@ selection <- function(input, output, session,
     
     if(!is.null(res$variable)){
       print(res$variable)
-      updateSelectizeInput(session, res$variable, choices = choices[[res$variable]], selected = res$values)
+      updateSelectizeInput(session, res$variable, 
+                           choices = choices()[[res$variable]], selected = res$values)
     }
   })
   
@@ -159,9 +158,7 @@ selection <- function(input, output, session,
 }
 
 
-##################################################################################
-# Tests
-##################################################################################
+### Tests #######################################################################################
 # 
 # library(shiny)
 # library(shinydashboard)
@@ -190,20 +187,22 @@ selection <- function(input, output, session,
 #       data("GvHD")
 #       rval$gating_set <- GatingSet(GvHD)
 #     })
-#     
+# 
 #     observeEvent(input$add_gate, {
-#       filter1 <- rectangleGate(gate = data.frame('SSC-A' = c(1,2), check.names = FALSE), 
+#       filter1 <- rectangleGate(gate = data.frame('SSC-A' = c(1,2), check.names = FALSE),
 #                                filterId =  as.character(rval$update_gs))
 #       flowWorkspace::gs_pop_add(rval$gating_set, filter1, parent= "root")
 #       #rval$update_gs <- rval$update_gs + 1
 #     })
-#     
+# 
 #     observe({
-#       gs <- load_gs("./inst/ext/gs")
-#       rval$gating_set <- gs
-#       #rval$update_gs <- 0
-#       params$sample <- pData(gs)$name[2]
-#       params$subset <- gs_get_pop_paths(gs)[3]
+#       # gs <- load_gs("./inst/ext/gs")
+#       # rval$gating_set <- gs
+#       # #rval$update_gs <- 0
+#       # params$sample <- pData(gs)$name[2]
+#       # params$subset <- gs_get_pop_paths(gs)[3]
+#       data("GvHD")
+#       rval$gating_set <- GatingSet(GvHD)
 #     })
 # 
 #     callModule(selection, "selection_module", rval, params = params, multiple_subset = TRUE)

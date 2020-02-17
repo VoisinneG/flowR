@@ -43,46 +43,36 @@ CompensationUI <- function(id) {
       column(width = 4,
              tabBox(title = "", width = NULL, height = NULL,
                     tabPanel(title = "Compensation",
-                             box(title = "Table", width = NULL, height = NULL, collapsible = TRUE, collapsed = FALSE,
-                                 br(),
-                                 div(style = 'overflow-x: scroll', DT::DTOutput(ns("spill_per_sample_table"))),
-                                 br() 
-                             ),
-                             box(title = "Edit", width = NULL, height = NULL, collapsible = TRUE, collapsed = TRUE,
-                                 selectizeInput(ns("selected_samples"), "Select samples", 
-                                                choices = NULL, selected = NULL, multiple = TRUE),
-                                 selectInput(ns("selected_matrix"), "Select matrix", choices = NULL, selected = NULL),
-                                 actionButton(ns("apply_matrix"), "Apply to selected samples")
-                             )
+                             uiOutput(ns("compensation_ui"))
                     ),
                     tabPanel(title = "Matrix",
-                        selectInput(ns("comp_mat"), "Select matrix",
-                                    choices = NULL, selected = NULL),
-                        box(title = "Edit", width = NULL, height = NULL, collapsible = TRUE, collapsed = TRUE,
-                            selectInput(ns("xvar_comp"), label = "column (channel)", 
-                                        choices = NULL, selected = NULL),
-                            selectInput(ns("yvar_comp"), label = "row (fluorophore)", 
-                                        choices = NULL, selected = NULL),
-                            sliderInput(ns("slider_input"), "spillover (%)", min = -150, max = 150, value = 0),
-                            numericInput(ns("spill_value"), 
-                                         label = "spillover (%)", 
-                                         value = 0, 
-                                         min = 0, 
-                                         max = 100, 
-                                         step = 1),
-                            numericInput(ns("step_size"), label = "step size", value = 1),
-                            actionButton(ns("set_spill_value"), "set value")
-                        ),
-                        box(title = "Table", width = NULL, height = NULL, collapsible = TRUE, collapsed = TRUE,
-                            DT::DTOutput(ns("spill_table"))
-                        ),
-                        box(title = "Rename/Duplicate", width = NULL, height = NULL, collapsible = TRUE, collapsed = TRUE,
-                            textInput(ns("new_name"), "CompMat name", value = "newCompMat"),
-                            actionButton(ns("rename"), "rename"),
-                            actionButton(ns("duplicate"), "duplicate")
-                        ),
-                        actionButton(ns("delete"), "delete"),
-                        downloadButton(ns("download_spill"))
+                             uiOutput(ns("comp_mat_ui")),
+                             box(title = "Edit", width = NULL, height = NULL, collapsible = TRUE, collapsed = TRUE,
+                                 selectInput(ns("xvar_comp"), label = "column (channel)",
+                                             choices = NULL, selected = NULL),
+                                 selectInput(ns("yvar_comp"), label = "row (fluorophore)",
+                                             choices = NULL, selected = NULL),
+                                 sliderInput(ns("slider_input"), "spillover (%)", min = -150, max = 150, value = 0),
+                                 numericInput(ns("spill_value"),
+                                              label = "spillover (%)",
+                                              value = 0,
+                                              min = 0,
+                                              max = 100,
+                                              step = 1),
+                                 numericInput(ns("step_size"), label = "step size", value = 1),
+                                 actionButton(ns("set_spill_value"), "set value")
+                             ),
+                             box(title = "Table", width = NULL, height = NULL, collapsible = TRUE, collapsed = TRUE,
+                                 DT::DTOutput(ns("spill_table"))
+                             ),
+                             box(title = "Rename/Duplicate", width = NULL, height = NULL, collapsible = TRUE, collapsed = TRUE,
+                                 textInput(ns("new_name"), "CompMat name", value = "newCompMat"),
+                                 actionButton(ns("rename"), "rename"),
+                                 actionButton(ns("duplicate"), "duplicate")
+                             ),
+                             actionButton(ns("delete"), "delete"),
+                             downloadButton(ns("download_spill"))
+                        
                     )
              ),
              box(title = "Import/Compute", width = NULL, height = NULL, collapsible = TRUE, collapsed = FALSE,
@@ -100,7 +90,6 @@ CompensationUI <- function(id) {
     ),
     column(width = 8,
            box(title = "Spillover Matrix", width = NULL, collapsible = TRUE, collapsed = FALSE,
-               #div(style = 'overflow-x: scroll', DT::DTOutput(ns("spill_table")))
                plotly::plotlyOutput(ns("heatmap_spill"))
            ),
            tabBox(title = "",
@@ -137,7 +126,11 @@ CompensationUI <- function(id) {
 Compensation <- function(input, output, session, rval) {
 
   plot_params <- reactiveValues()
-  rval_mod <- reactiveValues(spill = NULL, spill_list = list() )
+  rval_mod <- reactiveValues()
+  
+  # observe({
+  #   rval_mod$spill <- NULL
+  # })
   
   ### Call modules ##########################################################################
   
@@ -155,25 +148,44 @@ Compensation <- function(input, output, session, rval) {
     get_parameters_gs(rval$gating_set)
   })
 
+  ### Build UI ##############################################################################
+  
+  output$compensation_ui <- renderUI({
+    ns <- session$ns
+    tagList(
+      box(title = "Table", width = NULL, height = NULL, collapsible = TRUE, collapsed = FALSE,
+          br(),
+          div(style = 'overflow-x: scroll', DT::DTOutput(ns("spill_per_sample_table"))),
+          br() 
+      ),
+      box(title = "Edit", width = NULL, height = NULL, collapsible = TRUE, collapsed = TRUE,
+          selectizeInput(ns("selected_samples"), "Select samples", 
+                         choices = choices()$sample, 
+                         selected = choices()$sample[1], 
+                         multiple = TRUE),
+          selectInput(ns("selected_matrix"), "Select matrix", 
+                      choices = names(rval_mod$spill_list), 
+                      selected = rval_mod$spill_per_sample[1]),
+          actionButton(ns("apply_matrix"), "Apply to selected samples")
+      )
+    )
+  })
+  
+  output$comp_mat_ui <- renderUI({
+    ns <- session$ns
+    tagList(
+      selectInput(ns("comp_mat"), "Select matrix",
+                  choices = names(rval_mod$spill_list), 
+                  selected = rval_mod$spill_per_sample[1])
+      
+    )
+  })
+  
   ### Set plot parameters ###################################################################
 
   observe({
     plot_params$use_all_cells <- FALSE
   })
-  
-  # observe({
-  #   
-  #   validate(need(rval_mod$spill, "No compensation matrix"))
-  #   
-  #   #update plot_params
-  #   for(var in intersect(names(res$params), names(plot_params))){
-  #     plot_params[[var]] <- res$params[[var]]
-  #   }
-  #   
-  #   plot_params$xvar <- colnames(rval_mod$spill)[1]
-  #   plot_params$yvar <- colnames(rval_mod$spill)[2]
-  # 
-  # })
 
   observeEvent(c(input$xvar_comp, input$yvar_comp, input$show_all_channels), {
     
@@ -216,23 +228,12 @@ Compensation <- function(input, output, session, rval) {
                       choices = choices, selected = choices[2])
   })
   
-  ### Set GatingSet compensation #####################################################################
-  
-  # observe({
-  #   if(length(choices()$compensation)>0){
-  #     for(name in names(choices()$compensation)){
-  #       rval_mod$spill_list[[name]] <- choices()$compensation[[name]]
-  #     }
-  #   }else{
-  #   
-  # })
-  
   ### Set GatingSet compensation ####################################################################
   
   observe({
-    print(choices()$sample)
+    #print(choices()$sample)
     compensation <- choices()$compensation
-    print(names(compensation))
+    #print(names(compensation))
     comp_samples <- setdiff(choices()$sample, names(compensation))
 
     if(length(comp_samples) > 0){
@@ -266,6 +267,10 @@ Compensation <- function(input, output, session, rval) {
     }
   })
 
+  observe({
+    print(names(rval_mod$spill_list))
+  })
+  
   ### Match GatingSet compensation with loaded matrices ################################################
   
   observeEvent(c(choices()$compensation, rval_mod$spill_list), {
@@ -275,9 +280,11 @@ Compensation <- function(input, output, session, rval) {
     for( sample in choices()$sample ){
       comp_mat <- choices()$compensation[[sample]]
       is_matched <- FALSE
-      if(length(rval_mod$spill_list)>0){
-        is_matched <- unlist(lapply(rval_mod$spill_list,
-                                    function(x){matrix_equal(comp_mat, x)}))
+      if(!is.null(rval_mod$spill_list)){
+        if(length(rval_mod$spill_list)>0){
+          is_matched <- unlist(lapply(rval_mod$spill_list,
+                                      function(x){matrix_equal(comp_mat, x)}))
+        }
       }
       idx_match <- which(is_matched)
       if(length(idx_match)==0){
@@ -334,7 +341,6 @@ Compensation <- function(input, output, session, rval) {
     
     
   observe({
-    #if(length(rval_mod$spill_list) > 0 ){
       updateSelectInput(session, "comp_mat", 
                         choices = names(rval_mod$spill_list), 
                         selected = names(rval_mod$spill_list))
@@ -342,11 +348,9 @@ Compensation <- function(input, output, session, rval) {
       updateSelectInput(session, "selected_matrix", 
                         choices = names(rval_mod$spill_list), 
                         selected = names(rval_mod$spill_list))
-    #}
   })
   
   observeEvent(input$apply_matrix, {
-    #rval_mod$spill_per_sample[input$selected_samples] <- input$selected_matrix
     compensation <- rval$gating_set@compensation
     df <- rval_mod$spill_list[[input$selected_matrix]]
 
@@ -452,11 +456,8 @@ Compensation <- function(input, output, session, rval) {
   
   ### Edit spill parameter ###########################################################################
   
-  # observeEvent(input$reset_comp, {
-  #   rval_mod$spill <- rval_mod$spill_list[[input$comp_mat]]
-  # })
-  
   observeEvent(input$set_spill_value, {
+    validate(need(rval_mod$spill, "No spillover matrix defined"))
     df <- rval_mod$spill
     idx_x <- match(input$xvar_comp, colnames(df))
     idx_y <- match(input$yvar_comp, row.names(df))
@@ -474,7 +475,7 @@ Compensation <- function(input, output, session, rval) {
       }
       rval$gating_set@compensation <- compensation
       # update rval$gating_set_list
-      if("gating_set_selected" %in% names(rval)){
+      if("gating_set_selected" %in% names(rval$gating_set_list)){
         rval$gating_set_list[[rval$gating_set_selected]]$gating_set@compensation <- compensation
       }
       rval$update_gs <- rval$update_gs + 1
