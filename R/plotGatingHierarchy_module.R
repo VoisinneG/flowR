@@ -115,6 +115,9 @@ plotGatingHierarchy <- function(input, output, session,
     rval$update_gs
     validate(need(class(rval$gating_set) == "GatingSet", "Input is not a GatingSet"))
     validate(need(setdiff(choices()$subset, "root"), "No gates to display"))
+    validate(need(rval_plot$sample, "Please select samples"))
+    validate(need(all(rval_plot$sample %in% choices()$sample), 
+                  "All samples not found in GatingSet")) 
     
     axis_labels <- choices()$labels
     

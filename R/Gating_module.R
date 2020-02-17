@@ -205,7 +205,7 @@ Gating <- function(input, output, session, rval) {
   ### Call modules ###############################################################################
   res <- callModule(plotGatingSet, "plot_module", 
                     rval=rval,
-                    plot_params=plot_params,
+                    plot_params = plot_params,
                     simple_plot = TRUE, 
                     show_gates = TRUE,
                     polygon_gate = gate)
@@ -214,11 +214,11 @@ Gating <- function(input, output, session, rval) {
                             plot_list = res$plot, 
                             params = reactiveValues(width = 350, height = 350))
   
-  plot_all_gates <- callModule(plotGatingHierarchy, "plot_hierarchy_module", 
-                               rval = rval, 
+  plot_all_gates <- callModule(plotGatingHierarchy, "plot_hierarchy_module",
+                               rval = rval,
                                plot_params = plot_params_gh)
-  
-  callModule(simpleDisplay, "simple_display_module_2", 
+
+  callModule(simpleDisplay, "simple_display_module_2",
              plot_list = plot_all_gates,
              params = display_params)
   
@@ -537,13 +537,13 @@ Gating <- function(input, output, session, rval) {
     }
 
     fontsize <- ifelse(is.null(input$fontsize), 10, input$fontsize)
-
-    p <- plot_tree(gates, 
-                   fontsize = fontsize, 
-                   rankdir = rankdir,
-                   shape = ifelse(is.null(input$shape), "ellipse", input$shape), 
-                   fixedsize = ifelse(is.null(input$fixedsize), FALSE, input$fixedsize))
     
+    p <- plot_tree(gates,
+                   fontsize = fontsize,
+                   rankdir = rankdir,
+                   shape = ifelse(is.null(input$shape), "ellipse", input$shape),
+                   fixedsize = ifelse(is.null(input$fixedsize), FALSE, input$fixedsize))
+
     return(p)
   })
   
@@ -748,7 +748,7 @@ Gating <- function(input, output, session, rval) {
 #       #rval$gating_set <- gs
 #     })
 # 
-#     res <- callModule(Gating, "module", rval = rval)
+#     res <- callModule(Gating, "module", rval = rval, )
 # 
 #   }
 # 

@@ -583,8 +583,8 @@ plotGatingSet <- function(input, output, session,
   data_plot_focus <- eventReactive(params_update_data(), {
     
     #print("data")
-    
-    validate(need(rval$gating_set, "Empty GatingSet"))
+
+    validate(need(class(rval$gating_set) =="GatingSet", "No GatingSet"))
     validate(need(rval_input$sample, "Please select samples"))
     validate(need(all(rval_input$sample %in% choices()$sample), 
                   "All samples not found in GatingSet"))
@@ -592,7 +592,7 @@ plotGatingSet <- function(input, output, session,
     validate(need(all(rval_input$subset %in% choices()$subset), 
                   "All subsets not found in GatingSet"))
    
-    
+
     Ncells <- 30000
     if(!is.null(rval_input$use_all_cells)){
       if(rval_input$use_all_cells){
@@ -610,7 +610,7 @@ plotGatingSet <- function(input, output, session,
     
     vartype <- choices()$params$vartype
     names(vartype) <- choices()$params$name
-    
+
     df <- get_plot_data(gs = rval$gating_set,
                       sample = rval_input$sample,
                       subset = rval_input$subset,
@@ -618,7 +618,6 @@ plotGatingSet <- function(input, output, session,
                       metadata = choices()$metadata,
                       Ncells = Ncells,
                       vartype = vartype)
-    
     return(df)
     
   })
