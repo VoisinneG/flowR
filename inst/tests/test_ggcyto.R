@@ -5,22 +5,39 @@ dataDir <- system.file("extdata",package="flowWorkspaceData")
 gs_orig <- load_gs(list.files(dataDir, pattern = "gs_bcell_auto",full = TRUE))
 gs <- gs_clone(gs_orig)
 
+gs_get_pop_paths(gs)
 
-autoplot(gs, "CD3")
-p <- ggcyto(gs@data[sampleNames(gs)], aes_string(x=as.name('CD3'), y=as.name('FSC-A'))) + 
-  geom_histogram() + 
-  facet_wrap(NULL)
-p + geom_gate('CD3')
+fs <- gs_pop_get_data(gs, "nonDebris") # cannot get data from multiple susbsets
 
 
-p <- autoplot(gs[sampleNames(gs)[1]], "FSC-A", bins = 64)
-p
+transformation <- lapply(colnames(gs), logicle_trans)
+names(transformation) <- colnames(gs)
 
-p + ggcyto_par_set(limits = "data")
-p + labs_cyto("channel")
+spill_list <- lapply(sampleNames(fs), function(x){
+  spill <- description(fs[[x]])[["SPILL"]]
+  colnames(spill) <- parameters(fs[[x]])$name[match(colnames(spill), parameters(fs[[x]])$desc)]
+  return(spill)})
+names(spill_list) <- sampleNames(fs)
+fs <- flowCore::compensate(fs, spill_list)
+
+p <- call_plot_function(data = fs, 
+                        plot_type = "hexagonal", 
+                        plot_args = list(xvar = 'FSC-A', smooth = TRUE, ridges = TRUE,
+                                         yridges_var = "name", yvar = 'SSC-A', bins = 30, alpha = 0.5)
+                        )
+
+p1 <- format_plot(p, options = list(transformation = transformation))
+
+gate <- gs_pop_get_gate(gs, "lymph")
+p2 <- p + ggcyto::geom_gate(gate) + geom_stats()
 
 
-p + geom_overlay("IgD-CD27-", alpha = 0.5, size = 0.1, color = "purple")
+
+p2 + ggcyto_par_set(limits = "data")
+p2 + labs_cyto("channel")
+
+
+p3 <- p2 + ggcyto::geom_overlay(data = "CD20", size = 0.3, alpha = 0.7)
 
 
 # plot a population without gate

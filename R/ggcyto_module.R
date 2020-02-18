@@ -8,6 +8,7 @@ plotCytoUI <- function(id) {
   ns <- NS(id)
   
   tagList(
+    uiOutput(ns("ui_update")),
     box(collapsible = TRUE, collapsed = TRUE, width = NULL, height = NULL,
         title = "Sample/Subset",
         selectionInput(ns("selection_module"))
@@ -26,7 +27,7 @@ plotCytoUI <- function(id) {
   
 }
 
-#' plotGatingSet module server function
+#' plotCyto module server function
 #' @param input shiny input
 #' @param output shiny output
 #' @param session shiny session
@@ -66,16 +67,20 @@ plotCytoUI <- function(id) {
 #'   \item{plot}{a plot or a list of plots}
 #'   \item{params}{plot parameters}
 #' }
-#' @importFrom flowWorkspace gs_pop_get_children gh_pop_get_gate
+#' @importFrom flowWorkspace gs_pop_get_children gh_pop_get_gate gs_pop_get_data
 #' @importFrom flowCore parameters
 #' @import shiny
 #' @import ggcyto
 #' @export
-#' @rdname plotGatingSetInput
+#' @rdname plotCytoUI
 plotCyto <- function(input, output, session,
                      rval,
                      plot_params = reactiveValues(),
-                     simple_plot = TRUE) {
+                     simple_plot = TRUE,
+                     auto_update = TRUE,
+                     show_gates = FALSE,
+                     polygon_gate = NULL
+                     ) {
                           
   
   ### module specific reactiveValues ###############################################################
@@ -152,6 +157,19 @@ plotCyto <- function(input, output, session,
     rval$update_gs
     validate(need(class(rval$gating_set) == "GatingSet", "input is not a GatingSet"))
     get_parameters_gs(rval$gating_set)
+  })
+  
+  ### Build UI #####################################################################################
+  
+  output$ui_update <- renderUI({
+    ns <- session$ns
+    if(!auto_update){
+      tagList(
+        actionButton(ns("update_plot"), "update"),
+        br(),
+        br()
+      )
+    }
   })
   
   ### Define and initialize plot options ###########################################################
@@ -558,29 +576,93 @@ plotCyto <- function(input, output, session,
   
   ### Build raw plot ###############################################################################
   
-  plot_raw <- reactive({
+  # plot_raw <- reactive({
+  #   
+  #   validate(need(class(rval$gating_set) =="GatingSet", "No GatingSet"))
+  #   validate(need(rval_input$sample, "Please select samples"))
+  #   validate(need(all(rval_input$sample %in% choices()$sample),
+  #                   "All samples not found in GatingSet"))
+  #   validate(need(rval_input$subset, "Please select subsets"))
+  #   validate(need(all(rval_input$subset %in% choices()$subset),
+  #                   "All subsets not found in GatingSet"))
+  #   validate(need(rval_input$xvar %in% choices()$plot_var, "Please select x variable"))
+  #   validate(need(rval_input$plot_type, "Please select plot type"))
+  #   if(!is.null(rval_input$plot_type)){
+  #     if(rval_input$plot_type != "histogram"){
+  #       validate(need(rval_input$yvar %in% choices()$plot_var, "Please select y variable"))
+  #     }
+  #   }
+  #   
+  #   p <- ggcyto::ggcyto(rval$gating_set@data[rval_input$sample],
+  #               aes_string(x=as.name(rval_input$xvar), y=as.name(rval_input$yvar))) + 
+  #     geom_hex() + 
+  #     facet_wrap(NULL)
+  #   
+  #  p <- ggcyto::as.ggplot(p)
+  #  
+  #  return(p)
+  #   
+  # })
+  
+  #plot_raw <- eventReactive(c(params_update_plot_raw(),  data_plot_focus()),{
+  
+    plot_raw <- reactive({
+      plot_list <- list()
+      
+        validate(need(class(rval$gating_set) =="GatingSet", "No GatingSet"))
+        validate(need(rval_input$sample, "Please select samples"))
+        validate(need(all(rval_input$sample %in% choices()$sample),
+                        "All samples not found in GatingSet"))
+        validate(need(rval_input$subset, "Please select subsets"))
+        validate(need(all(rval_input$subset %in% choices()$subset),
+                        "All subsets not found in GatingSet"))
+        validate(need(rval_input$xvar %in% choices()$plot_var, "Please select x variable"))
+        validate(need(rval_input$plot_type, "Please select plot type"))
+        if(!is.null(rval_input$plot_type)){
+          if(rval_input$plot_type != "histogram"){
+            validate(need(rval_input$yvar %in% choices()$plot_var, "Please select y variable"))
+          }
+        }
+        
+    #print("raw")
     
-    validate(need(class(rval$gating_set) =="GatingSet", "No GatingSet"))
-    validate(need(rval_input$sample, "Please select samples"))
-    validate(need(all(rval_input$sample %in% choices()$sample),
-                    "All samples not found in GatingSet"))
-    validate(need(rval_input$subset, "Please select subsets"))
-    validate(need(all(rval_input$subset %in% choices()$subset),
-                    "All subsets not found in GatingSet"))
-    validate(need(rval_input$xvar %in% choices()$plot_var, "Please select x variable"))
-    validate(need(rval_input$plot_type, "Please select plot type"))
-    if(!is.null(rval_input$plot_type)){
-      if(rval_input$plot_type != "histogram"){
-        validate(need(rval_input$yvar %in% choices()$plot_var, "Please select y variable"))
-      }
+    #df <- data_plot_focus()
+    
+    
+    # validate(need(df, "no cells in selection"))
+    # validate(need(rval_input$xvar %in% choices()$plot_var, "Please select x variable"))
+    # validate(need(rval_input$plot_type, "Please select plot type"))
+    # if(!is.null(rval_input$plot_type)){
+    #   if(rval_input$plot_type != "histogram"){
+    #     validate(need(rval_input$yvar %in% choices()$plot_var, "Please select y variable"))
+    #   }
+    # }
+    
+    fs <- flowWorkspace::gs_pop_get_data(rval$gating_set[rval_input$sample], rval_input$subset)
+    
+    plot_args <- reactiveValuesToList(rval_input)
+    
+    split_variable  <- "xvar"
+    if("split_var" %in% names(rval_input)){
+      split_variable <- rval_input$split_var
     }
     
-    p <- ggcyto::ggcyto(rval$gating_set@data[rval_input$sample],
-                aes_string(x=as.name(rval_input$xvar), y=as.name(rval_input$yvar))) + 
-      geom_hex() + 
-      facet_wrap(NULL)
-   p <- ggcyto::as.ggplot(p)
-   return(p)
+    mono_var <- setdiff(c("xvar", "yvar", "color_var"), split_variable)
+    
+    for(var in mono_var){
+      plot_args[[var]] <- rval_input[[var]][1]
+    }
+    
+    for(var in rval_input[[split_variable]]){
+      
+      plot_args[[split_variable]] <- var
+      
+      plot_list[[var]] <- call_plot_function(data=fs,
+                                             plot_type = rval_input$plot_type,
+                                             plot_args = plot_args)
+    }
+    
+    return(plot_list)
     
   })
   
@@ -707,7 +789,7 @@ plotCyto <- function(input, output, session,
     
   })
   
-  return( list(plot = plot_raw, params = rval_input) )
+  return( list(plot = plot_format, params = rval_input) )
   
 }
 
@@ -724,50 +806,50 @@ plotCyto <- function(input, output, session,
 # library(plotly)
 # library(ggridges)
 # 
-if (interactive()){
-
-  ui <- dashboardPage(
-    dashboardHeader(title = "plotCyto"),
-    sidebar = dashboardSidebar(disable = TRUE),
-    body = dashboardBody(
-      fluidRow(
-        column(4, box(width = NULL, title = "Parameters", collapsible = TRUE, collapsed = TRUE,
-                      plotCytoUI("module"))),
-        column(8, box(width = NULL, simpleDisplayUI("simple_display_module")))
-      )
-    )
-  )
-
-  server <- function(input, output, session) {
-
-    rval <- reactiveValues()
-    plot_params <- reactiveValues()
-
-    observe({
-       utils::data("GvHD", package = "flowCore")
-       gs <- GatingSet(GvHD)
-       rval$gating_set <- gs
-      #plot_params$plot_type <- "histogram"
-      #plot_params$xvar <- "cluster"
-      #plot_params$yvar <- "FL4-H"
-      #plot_params$sample <- pData(gs)$name[3]
-      #plot_params$subset <- gs_get_pop_paths(gs)[1]
-      plot_params$auto_focus <- FALSE
-      plot_params$plot_type = "histogram"
-      plot_params$xvar = "FL2-H"
-      plot_params$option = "magma"
-
-    })
-
-    res <- callModule(plotCyto, "module",
-                      rval = rval,
-                      plot_params = plot_params
-                      )
-
-    callModule(simpleDisplay, "simple_display_module", res$plot)
-
-  }
-
-  shinyApp(ui, server)
-
-}
+# if (interactive()){
+# 
+#   ui <- dashboardPage(
+#     dashboardHeader(title = "plotCyto"),
+#     sidebar = dashboardSidebar(disable = TRUE),
+#     body = dashboardBody(
+#       fluidRow(
+#         column(4, box(width = NULL, title = "Parameters", collapsible = TRUE, collapsed = TRUE,
+#                       plotCytoUI("module"))),
+#         column(8, box(width = NULL, simpleDisplayUI("simple_display_module")))
+#       )
+#     )
+#   )
+# 
+#   server <- function(input, output, session) {
+# 
+#     rval <- reactiveValues()
+#     plot_params <- reactiveValues()
+# 
+#     observe({
+#        utils::data("GvHD", package = "flowCore")
+#        gs <- GatingSet(GvHD)
+#        rval$gating_set <- gs
+#       #plot_params$plot_type <- "histogram"
+#       #plot_params$xvar <- "cluster"
+#       #plot_params$yvar <- "FL4-H"
+#       #plot_params$sample <- pData(gs)$name[3]
+#       #plot_params$subset <- gs_get_pop_paths(gs)[1]
+#       plot_params$auto_focus <- FALSE
+#       plot_params$plot_type = "histogram"
+#       plot_params$xvar = "FL2-H"
+#       plot_params$option = "magma"
+# 
+#     })
+# 
+#     res <- callModule(plotCyto, "module",
+#                       rval = rval,
+#                       plot_params = plot_params
+#                       )
+# 
+#     callModule(simpleDisplay, "simple_display_module", res$plot)
+# 
+#   }
+# 
+#   shinyApp(ui, server)
+# 
+# }

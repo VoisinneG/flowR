@@ -1284,13 +1284,13 @@ get_plot_data <- function(gs,
 #' as the plot type with the preffix 'plot_' (for instance 'plot_hexagonal()')
 #' @param plot_args list of arguments passed to the plot function
 #' @return a plot (plot class depends on the plot function)
-call_plot_function <- function(df,
+call_plot_function <- function(data,
                          plot_type,
                          plot_args = list()
                          ){
   
   p <- do.call(paste("plot", plot_type, sep="_"), 
-               list(args = c(list(df=df), plot_args)))
+               list(args = c(list(data=data), plot_args)))
 
   return(p)
 }
@@ -1306,6 +1306,7 @@ call_plot_function <- function(df,
 #' 'use_log10_count' : logical, transform bin counts using log10
 #' 'option' : name of the viridis palette
 #' @import ggplot2
+#' @import ggcyto
 #' @importFrom viridis scale_fill_viridis
 plot_hexagonal <- function(args = list()){
   
@@ -1322,10 +1323,18 @@ plot_hexagonal <- function(args = list()){
     assign(var, args[[var]])
   }
   
-  p <- ggplot(df,
-              aes_(x = as.name( xvar ), 
-                   y = as.name( yvar ) ) ) +
-    geom_hex(bins = bins)
+  print(class(data))
+  if(class(data) %in% c("ncdfFlowSet", "flowSet")){
+    p <- ggcyto::ggcyto(data,
+                        aes_(x = as.name( xvar ), 
+                             y = as.name( yvar ) ) ) 
+  }else{
+    p <- ggplot(data,
+                        aes_(x = as.name( xvar ), 
+                             y = as.name( yvar ) ) )
+  }
+  
+  p <- p + geom_hex(bins = bins)
   
   if(use_log10_count){
     p <- p + scale_fill_viridis(trans = log10_trans(), option = option)
@@ -1350,6 +1359,7 @@ plot_hexagonal <- function(args = list()){
 #' (If 'smooth' is TRUE, the inverse of 'bins' is used as the value for the bandwidth parameter 'bw')
 #' 'alpha' : transparency (between 0 and 1)
 #' @import ggplot2
+#' @import ggcyto
 #' @importFrom ggridges geom_density_ridges
 plot_histogram <- function(args = list()){
   
@@ -1373,8 +1383,18 @@ plot_histogram <- function(args = list()){
     assign(var, args[[var]])
   }
   
-  p <- ggplot(df,
-              aes_(x = as.name( xvar )))
+  print(class(data))
+  
+  if(class(data) %in% c("ncdfFlowSet", "flowSet")){
+    p <- ggcyto::ggcyto(data,
+                        aes_(x = as.name( xvar )))
+    df <- data.frame(exprs(data[[1]]), check.names = FALSE)
+  }else{
+    p <- ggplot(data, aes_(x = as.name( xvar )))
+    df <- data
+  }
+  
+  
   
   if(typeof(df[[xvar]])!= "double"){
     warning("Cannot plot histogram : x variable is not continuous.")
@@ -1464,6 +1484,7 @@ plot_histogram <- function(args = list()){
 #' 'id.vars' : variable defining groups for which a label should be displayed 
 #' (superseded by 'color_var' and 'group_var')
 #' @import ggplot2
+#' @import ggcyto
 #' @importFrom ggrepel geom_label_repel
 plot_dots <-function(args = list()){
   
@@ -1482,6 +1503,12 @@ plot_dots <-function(args = list()){
   
   for(var in names(args)){
     assign(var, args[[var]])
+  }
+  
+  if(! class(data) %in% c("ncdfFlowSet", "flowSet")){
+    df <- data.frame(exprs(data[[1]]), check.names = FALSE)
+  }else{
+    df <- data
   }
   
   if(!is.null(color_var)){
@@ -1515,26 +1542,38 @@ plot_dots <-function(args = list()){
       group_var <- as.name(group_var)
     }
   }
-  p <- ggplot(df,
-              aes_string(x = as.name( xvar ), 
-                         y = as.name( yvar ),
-                         colour = color_var,
-                         group = group_var)) + 
-    geom_point(alpha = alpha, 
-               size = size)
-  if(show_label){
-    df_stat <- compute_stats(df = df,
-                             stat_function = "median",
-                             yvar = c(xvar, yvar),
-                             id.vars = id.vars)
-    
-    p <- p + geom_label_repel(mapping = aes_string(x = as.name( xvar ), 
-                                                  y = as.name( yvar ),
-                                                  color = id.vars,
-                                                  label = id.vars), 
-                             data = df_stat,
-                             fill = "white")
+  
+  if(! class(data) %in% c("ncdfFlowSet", "flowSet")){
+    p <- ggcyto::ggcyto(data,
+                        aes_string(x = as.name( xvar ), 
+                                   y = as.name( yvar ),
+                                   colour = color_var,
+                                   group = group_var)) 
+  }else{
+    p <- ggplot(data,
+                        aes_string(x = as.name( xvar ), 
+                                   y = as.name( yvar ),
+                                   colour = color_var,
+                                   group = group_var)) 
   }
+  
+  p <- p +   geom_point(alpha = alpha, 
+               size = size)
+  
+  # if(show_label){
+  #   df_stat <- compute_stats(df = df,
+  #                            stat_function = "median",
+  #                            yvar = c(xvar, yvar),
+  #                            id.vars = id.vars)
+  #   
+  #   p <- p + geom_label_repel(mapping = aes_string(x = as.name( xvar ), 
+  #                                                 y = as.name( yvar ),
+  #                                                 color = id.vars,
+  #                                                 label = id.vars), 
+  #                            data = df_stat,
+  #                            fill = "white")
+  # }
+  
   return(p)
   
 }
@@ -1572,6 +1611,12 @@ plot_contour <-function(args = list()){
     assign(var, args[[var]])
   }
   
+  if(! class(data) %in% c("ncdfFlowSet", "flowSet")){
+    df <- data.frame(exprs(data[[1]]), check.names = FALSE)
+  }else{
+    df <- data
+  }
+  
   if(!is.null(color_var)){
     if(color_var == "none" ){
       color_var <- NULL
@@ -1596,14 +1641,19 @@ plot_contour <-function(args = list()){
     }
   }
   
-  
-  p <- ggplot(df,
-              aes_string(x = as.name( xvar ),
-                         y = as.name( yvar ),
-                         colour = color_var,
-                         group = group_var))
-
-
+  if(! class(data) %in% c("ncdfFlowSet", "flowSet")){
+    p <- ggcyto::ggcyto(df,
+                aes_string(x = as.name( xvar ),
+                           y = as.name( yvar ),
+                           colour = color_var,
+                           group = group_var))
+  }else{
+    p <- ggplot(df,
+                aes_string(x = as.name( xvar ),
+                           y = as.name( yvar ),
+                           colour = color_var,
+                           group = group_var))
+  }
   
   if(show_outliers){
     p <- p + geom_point(size = size, alpha = alpha)
@@ -2238,7 +2288,7 @@ format_plot <- function(p,
   axis_limits <- list()
   
   color_var <- as.character(p$plot_env$color_var)
-  
+
   facet_yvar <- NULL
   if(!is.null(p$plot_env$plot_type)){
     if(p$plot_env$plot_type == "bar"){
@@ -2274,8 +2324,16 @@ format_plot <- function(p,
   
   ### transformations ###
   
+  
+  
   if(!is.null(xvar)){
     if(length(xvar) == 1){
+      
+      if(class(p$data) %in% c("ncdfFlowSet", "flowset")){
+        xvalues <- exprs(p$data[[1]])[xvar]
+      }else{
+        xvalues <- p$data[[xvar]]
+      }
       
       labx <- ifelse(xvar %in% names(axis_labels), axis_labels[[xvar]], xvar)
       trans_x <- default_trans
@@ -2284,9 +2342,9 @@ format_plot <- function(p,
       }
       xlim <- axis_limits[[xvar]]
       
-      if(is.double(p$data[[xvar]])){
+      if(is.double(xvalues)){
         p <- p + scale_x_continuous(name = labx, trans = trans_x, limits = xlim ) 
-      }else if(is.integer(p$data[[xvar]])){
+      }else if(is.integer(xvalues)){
         limits <- NULL
         if(!is.null(xlim)){limits <- seq(xlim[1], xlim[2])}
         p <- p + scale_x_discrete(name = labx,  limits = limits) 
@@ -2299,7 +2357,11 @@ format_plot <- function(p,
   
   if(!is.null(yvar)){
     if(length(yvar) == 1){
-      
+      if(class(p$data) %in% c("ncdfFlowSet", "flowset")){
+        yvalues <- exprs(p$data[[1]])[yvar]
+      }else{
+        yvalues <- p$data[[yvar]]
+      }
       laby <- ifelse(yvar %in% names(options$axis_labels), options$axis_labels[[yvar]], yvar)
       trans_y <- default_trans
       if(yvar %in% names(transformation)){
@@ -2307,9 +2369,9 @@ format_plot <- function(p,
       }
       ylim <- axis_limits[[yvar]]
 
-      if(is.double(p$data[[yvar]])){
+      if(is.double(yvalues)){
         p <- p + scale_y_continuous(name = laby, trans = trans_y, limits = ylim) 
-      }else if(is.integer(p$data[[yvar]])){
+      }else if(is.integer(yvalues)){
         limits <- NULL
         if(!is.null(ylim)){limits <- seq(ylim[1], ylim[2])}
         p <- p + scale_y_discrete(name = laby,  limits = limits) 
@@ -2331,7 +2393,18 @@ format_plot <- function(p,
           if(color_var %in% names(transformation)){
             trans_col <- transformation[[color_var]]
           }
-          is_cont <- ifelse(color_var %in% names(p$data), is.double(p$data[[color_var]]), FALSE)
+          
+          is_cont <- FALSE
+          if(class(p$data) %in% c("ncdfFlowSet", "flowset")){
+            if(color_var %in% colnames(exprs(p$data[[1]]))){
+              is_cont <- is.double(exprs(p$data[[1]])[color_var])
+            }
+          }else{
+            if(color_var %in% names(p$data)){
+              is_cont <- is.double(p$data[[color_var]])
+            }
+          }
+          #is_cont <- ifelse(color_var %in% names(p$data), is.double(p$data[[color_var]]), FALSE)
           
           if(is_cont){
             p <- p + viridis::scale_colour_viridis(trans = trans_col,
@@ -2358,14 +2431,16 @@ format_plot <- function(p,
     formula_facet <- stats::as.formula(paste(left_formula, "~", right_formula))
     
     p <- p + facet_grid(formula_facet,
-                        labeller = label_both, 
+                        labeller = label_both,
                         #scales = scale_y,
                         scales = scales)
   }
   
   ### theme ###
-  if(length(unique(p$data$subset))==1){
-    p <- p + ggtitle(unique(p$data$subset))
+  if(! class(p$data) %in% c("ncdfFlowSet", "flowset")){
+    if(length(unique(p$data$subset))==1){
+      p <- p + ggtitle(unique(p$data$subset))
+    }
   }
   
   if("theme" %in% names(options)){
@@ -2392,6 +2467,208 @@ format_plot <- function(p,
   
 }
 
+#' Format a ggplot object
+#' @param p a ggplot object
+#' @param options  list of plot format options. Names of options include:
+#' xlim : x-axis range
+#' ylim : y-axis range
+#' transformation : named list of trans objects 
+#' default_trans : default trans object (set to 'identity_trans()' by default). 
+#' Used only if 'transformation' is not an element of 'options'.
+#' axis_labels : named list with axis labels (each element should be named after a plot variable)
+#' color_var_name : name to display for color variable
+#' facet_var : names of the variables used for facetting plots along the x-axis
+#' facet_yvar : names of the variables used for facetting plots along the y-axis
+#' scales : control scaling across facets (passed to 'facet_grid()'), Set to "fixed" by default
+#' option : name of the viridis palette
+#' theme : name of the ggplot theme ("gray" by default)
+#' legend.position : legend position
+#' @import ggplot2
+#' @import viridis
+#' @importFrom flowWorkspace logicle_trans
+#' @importFrom stats as.formula
+#' @importFrom rlang quo_get_expr
+#' @importFrom scales identity_trans
+#' @return a ggplot object
+format_ggcyto_plot <- function(p,
+                        options = list()){
+  
+  xvar <- NULL
+  yvar <- NULL
+  
+  if("x" %in% names(p$mapping)){
+    if("quosure" %in% class(p$mapping$x)){
+      xvar <- as.character(rlang::quo_get_expr(p$mapping$x))
+    }
+  }
+  
+  if("y" %in% names(p$mapping)){
+    if("quosure" %in% class(p$mapping$x)){
+      yvar <- as.character(rlang::quo_get_expr(p$mapping$y))
+    }
+  }
+  
+  xlim <- NULL
+  ylim <- NULL
+  
+  transformation <- list()
+  axis_labels <- list()
+  axis_limits <- list()
+  
+  color_var <- as.character(p$plot_env$color_var)
+  
+  facet_yvar <- NULL
+  if(!is.null(p$plot_env$plot_type)){
+    if(p$plot_env$plot_type == "bar"){
+      facet_yvar <- "variable"
+    }
+  }
+  
+  
+  #### default parameters ###
+  
+  var_options <- c("xlim", "ylim", "transformation", "default_trans",
+                   "axis_labels", "axis_limits", "color_var_name", "facet_var", "facet_yvar",
+                   "scales", "option", "theme", "legend.position")
+  
+  for(var in intersect(names(options), var_options)){
+    assign(var, options[[var]])
+  }
+  
+  #facet scales
+  if(is.null(options$scales)){
+    scales <- "fixed"
+  }
+  
+  #default viridis palette
+  if(is.null(options$option)){
+    option <- "viridis"
+  }
+  
+  #default transformation
+  if(is.null(options$default_trans)){
+    default_trans <- scales::identity_trans()
+  }
+  
+  ### transformations ###
+  
+  if(!is.null(xvar)){
+    if(length(xvar) == 1){
+      
+      labx <- ifelse(xvar %in% names(axis_labels), axis_labels[[xvar]], xvar)
+      trans_x <- default_trans
+      if(xvar %in% names(transformation)){
+        trans_x <- transformation[[xvar]]
+      }
+      xlim <- axis_limits[[xvar]]
+      
+      if(is.double(p$data[[xvar]])){
+        p <- p + scale_x_continuous(name = labx, trans = trans_x, limits = xlim ) 
+      }else if(is.integer(p$data[[xvar]])){
+        limits <- NULL
+        if(!is.null(xlim)){limits <- seq(xlim[1], xlim[2])}
+        p <- p + scale_x_discrete(name = labx,  limits = limits) 
+      }else{
+        p <- p + scale_x_discrete(name = labx) 
+      }
+      
+    }
+  }
+  
+  if(!is.null(yvar)){
+    if(length(yvar) == 1){
+      
+      laby <- ifelse(yvar %in% names(options$axis_labels), options$axis_labels[[yvar]], yvar)
+      trans_y <- default_trans
+      if(yvar %in% names(transformation)){
+        trans_y <- transformation[[yvar]]
+      }
+      ylim <- axis_limits[[yvar]]
+      
+      if(is.double(p$data[[yvar]])){
+        p <- p + scale_y_continuous(name = laby, trans = trans_y, limits = ylim) 
+      }else if(is.integer(p$data[[yvar]])){
+        limits <- NULL
+        if(!is.null(ylim)){limits <- seq(ylim[1], ylim[2])}
+        p <- p + scale_y_discrete(name = laby,  limits = limits) 
+      }else{
+        p <- p + scale_y_discrete(name = laby) 
+      }
+      
+    }
+  }
+  
+  if(!is.null(p$plot_env$plot_type)){
+    if(p$plot_env$plot_type == "dots"){
+      
+      if(!is.null(color_var)){
+        if(length(color_var) == 1){
+          
+          label_color <- ifelse(color_var %in% names(options$axis_labels), options$axis_labels[[color_var]], color_var)
+          trans_col <- default_trans
+          if(color_var %in% names(transformation)){
+            trans_col <- transformation[[color_var]]
+          }
+          is_cont <- ifelse(color_var %in% names(p$data), is.double(p$data[[color_var]]), FALSE)
+          
+          if(is_cont){
+            p <- p + viridis::scale_colour_viridis(trans = trans_col,
+                                                   name = label_color,
+                                                   option = option)
+          }
+        }
+      }
+    }
+  }
+  
+  ### facet ###
+  if(!is.null(options$facet_var) | !is.null(facet_yvar)){
+    
+    left_formula <- paste(facet_yvar, collapse = " + ")
+    right_formula <- "."
+    if(!is.null(options$facet_var)){
+      if(options$facet_var != ""){
+        right_formula <- paste(options$facet_var, collapse = " + ")
+      }
+    }
+    
+    #print(paste(left_formula, "~", right_formula))
+    formula_facet <- stats::as.formula(paste(left_formula, "~", right_formula))
+    
+    p <- p + facet_grid(formula_facet,
+                        labeller = label_both, 
+                        #scales = scale_y,
+                        scales = scales)
+  }
+  
+  ### theme ###
+  # if(length(unique(p$data$subset))==1){
+  #   p <- p + ggtitle(unique(p$data$subset))
+  # }
+  
+  if("theme" %in% names(options)){
+    if(!is.null(options$theme)){
+      if(options$theme != ""){
+        theme_name = paste("theme_", options$theme, sep = "")
+        theme_function <- function(...){
+          do.call(theme_name, list(...))
+        }
+        p <- p + theme_function()
+      }
+    }
+    
+  }
+  
+  
+  if(!is.null(options$legend.position)){
+    p <- p + theme(legend.position = options$legend.position)
+  }
+  
+  p <- p + theme(plot.title = element_text(face = "bold"))
+  
+  return(p)
+  
+}
 ### Main plot functions #######################################################################
 
 

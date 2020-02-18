@@ -658,7 +658,7 @@ plotGatingSet <- function(input, output, session,
           
           plot_args[[split_variable]] <- var
 
-          plot_list[[var]] <- call_plot_function(df=df,
+          plot_list[[var]] <- call_plot_function(data=df,
                                                         plot_type = rval_input$plot_type,
                                                         plot_args = plot_args)
     }

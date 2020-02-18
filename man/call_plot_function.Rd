@@ -4,11 +4,9 @@
 \alias{call_plot_function}
 \title{Generates a plot from data}
 \usage{
-call_plot_function(df, plot_type, plot_args = list())
+call_plot_function(data, plot_type, plot_args = list())
 }
 \arguments{
-\item{df}{data.frame with plot data (as returned by \code{get_plot_data})}
-
 \item{plot_type}{Name of the type of plot to generate. 
 Available types are 'hexagonal', 'histogram', 'dots', 'contour' (for single cell data) and 
 'heatmap', 'bar', 'tile', 'pca' (for aggregated data). 
@@ -16,6 +14,8 @@ The plot function corresponding to a given plot type must have the same name
 as the plot type with the preffix 'plot_' (for instance 'plot_hexagonal()')}
 
 \item{plot_args}{list of arguments passed to the plot function}
+
+\item{df}{data.frame with plot data (as returned by \code{get_plot_data})}
 }
 \value{
 a plot (plot class depends on the plot function)
