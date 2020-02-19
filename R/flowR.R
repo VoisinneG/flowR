@@ -1489,7 +1489,7 @@ plot_histogram <- function(args = list()){
 plot_dots <-function(args = list()){
   
   plot_type <- "dots"
-  id.vars <- "subset"
+  id.vars <- NULL
   show_label <- FALSE
   color_var <- NULL
   group_var <- NULL
@@ -1505,8 +1505,9 @@ plot_dots <-function(args = list()){
     assign(var, args[[var]])
   }
   
-  if(! class(data) %in% c("ncdfFlowSet", "flowSet")){
+  if(class(data) %in% c("ncdfFlowSet", "flowSet")){
     df <- data.frame(exprs(data[[1]]), check.names = FALSE)
+    print(names(df))
   }else{
     df <- data
   }
@@ -1543,12 +1544,12 @@ plot_dots <-function(args = list()){
     }
   }
   
-  if(! class(data) %in% c("ncdfFlowSet", "flowSet")){
+  if(class(data) %in% c("ncdfFlowSet", "flowSet")){
     p <- ggcyto::ggcyto(data,
-                        aes_string(x = as.name( xvar ), 
+                        aes_string(x = as.name( xvar ),
                                    y = as.name( yvar ),
                                    colour = color_var,
-                                   group = group_var)) 
+                                   group = group_var))
   }else{
     p <- ggplot(data,
                         aes_string(x = as.name( xvar ), 
@@ -1611,7 +1612,7 @@ plot_contour <-function(args = list()){
     assign(var, args[[var]])
   }
   
-  if(! class(data) %in% c("ncdfFlowSet", "flowSet")){
+  if(class(data) %in% c("ncdfFlowSet", "flowSet")){
     df <- data.frame(exprs(data[[1]]), check.names = FALSE)
   }else{
     df <- data
@@ -1641,14 +1642,14 @@ plot_contour <-function(args = list()){
     }
   }
   
-  if(! class(data) %in% c("ncdfFlowSet", "flowSet")){
-    p <- ggcyto::ggcyto(df,
+  if(class(data) %in% c("ncdfFlowSet", "flowSet")){
+    p <- ggcyto::ggcyto(data,
                 aes_string(x = as.name( xvar ),
                            y = as.name( yvar ),
                            colour = color_var,
                            group = group_var))
   }else{
-    p <- ggplot(df,
+    p <- ggplot(data,
                 aes_string(x = as.name( xvar ),
                            y = as.name( yvar ),
                            colour = color_var,
@@ -1997,7 +1998,8 @@ add_polygon_layer <- function(p,
                              polygon = NULL,
                              label = NULL){
   
-  if(p$plot_env$plot_type != "histogram" & setequal(names(polygon), c("x", "y"))){
+  #if(p$plot_env$plot_type != "histogram" & setequal(names(polygon), c("x", "y"))){
+  if(setequal(names(polygon), c("x", "y"))){
     if(!is.null(polygon$x)){
       if(length(polygon$x)>1){
         polygon <- data.frame(x = polygon$x, y = polygon$y)
@@ -2193,14 +2195,25 @@ get_plot_data_range <- function(p){
   }
   
   if(!is.null(xvar)){
-    xlim <- range(p$data[[xvar]])
+    if(class(p$data) %in% c("ncdfFlowSet", "flowset")){
+      xvalues <- exprs(p$data[[1]])[,xvar]
+    }else{
+      xvalues <- p$data[[xvar]]
+    }
+    xlim <- range(xvalues)
     data_range[[xvar]] <- scales::expand_range(xlim, add = 1)
   }
+  
   if(!is.null(yvar)){
-    ylim <- range(p$data[[yvar]])
+    if(class(p$data) %in% c("ncdfFlowSet", "flowset")){
+      yvalues <- exprs(p$data[[1]])[,yvar]
+    }else{
+      yvalues <- p$data[[yvar]]
+    }
+    ylim <- range(yvalues)
     data_range[[yvar]] <- scales::expand_range(ylim, add=1)
   }
-
+  
   return(data_range)
 }
 
@@ -2330,7 +2343,7 @@ format_plot <- function(p,
     if(length(xvar) == 1){
       
       if(class(p$data) %in% c("ncdfFlowSet", "flowset")){
-        xvalues <- exprs(p$data[[1]])[xvar]
+        xvalues <- exprs(p$data[[1]])[,xvar]
       }else{
         xvalues <- p$data[[xvar]]
       }
@@ -2358,7 +2371,7 @@ format_plot <- function(p,
   if(!is.null(yvar)){
     if(length(yvar) == 1){
       if(class(p$data) %in% c("ncdfFlowSet", "flowset")){
-        yvalues <- exprs(p$data[[1]])[yvar]
+        yvalues <- exprs(p$data[[1]])[,yvar]
       }else{
         yvalues <- p$data[[yvar]]
       }
@@ -2397,7 +2410,7 @@ format_plot <- function(p,
           is_cont <- FALSE
           if(class(p$data) %in% c("ncdfFlowSet", "flowset")){
             if(color_var %in% colnames(exprs(p$data[[1]]))){
-              is_cont <- is.double(exprs(p$data[[1]])[color_var])
+              is_cont <- is.double(exprs(p$data[[1]])[,color_var])
             }
           }else{
             if(color_var %in% names(p$data)){

@@ -734,9 +734,14 @@ plotCyto <- function(input, output, session,
                      function(p){
                        if(!is.null(gate)){
                          for(gate_name in setdiff(gate, "root")){
-                           gate_int <- flowWorkspace::gh_pop_get_gate(rval$gating_set[[1]],
+                           gate_int <- flowWorkspace::gs_pop_get_gate(rval$gating_set,
                                                                       gate_name)
-                           p <- add_gate(p = p, gate = gate_int)
+                           #p <- add_gate(p = p, gate = gate_int)
+                           print(gate_int)
+                           #print(get_gate_coordinates(gate_int))
+                           p <- p + geom_gate(gate_int) + geom_stats(gate = gate_int, 
+                                                                     type = c("gate_name", "percent"), 
+                                                                     fill = grDevices::rgb(1,1,1,0.75))
                          }
                        }
                        return(p)
@@ -751,28 +756,35 @@ plotCyto <- function(input, output, session,
     
     #print("poly")
 
-    gate <- NULL
-    if(!is.null(rval_input$show_gates)){
-      if(rval_input$show_gates){
-        gate <- rval_input$subset
-      }
-    }
+    # gate <- NULL
+    # if(!is.null(rval_input$show_gates)){
+    #   if(rval_input$show_gates){
+    #     gate <- rval_input$subset
+    #   }
+    # }
     
     polygon <- data.frame(x = polygon_gate$x,
                           y = polygon_gate$y)
     
+    print(polygon)
     
     plist <- lapply( draw_gates(),
                      function(p){
+                       
+                       p <- as.ggplot(p)
+                       
+                       print("OK")
+                       print(polygon$x)
                        if(!is.null(polygon$x)){
                          p <- add_polygon_layer(p, polygon = polygon)
                        }
-                       if(!is.null(gate)){
-                         for(gate_name in setdiff(gate, "root")){
-                           g <- choices()$gates[[gate_name]]$gate
-                           p <- add_gate(p, g)
-                         }
-                       }
+                       # if(!is.null(gate)){
+                       #   for(gate_name in setdiff(gate, "root")){
+                       #     g <- choices()$gates[[gate_name]]$gate
+                       #     p <- add_gate(p, g)
+                       #   }
+                       # }
+                       print("OK")
                        if(rval_input$zoom_on_data_points){
                          data_range <- get_plot_data_range(p)
                          xlim <- NULL
@@ -783,13 +795,14 @@ plotCyto <- function(input, output, session,
                          }
                          p <- p + coord_cartesian(xlim = xlim, ylim = ylim, expand = TRUE)
                        }
+                       print("OK")
                        return(p)
                      })
     
     
   })
   
-  return( list(plot = plot_format, params = rval_input) )
+  return( list(plot = draw_polygon, params = rval_input) )
   
 }
 
@@ -806,50 +819,53 @@ plotCyto <- function(input, output, session,
 # library(plotly)
 # library(ggridges)
 # 
-# if (interactive()){
-# 
-#   ui <- dashboardPage(
-#     dashboardHeader(title = "plotCyto"),
-#     sidebar = dashboardSidebar(disable = TRUE),
-#     body = dashboardBody(
-#       fluidRow(
-#         column(4, box(width = NULL, title = "Parameters", collapsible = TRUE, collapsed = TRUE,
-#                       plotCytoUI("module"))),
-#         column(8, box(width = NULL, simpleDisplayUI("simple_display_module")))
-#       )
-#     )
-#   )
-# 
-#   server <- function(input, output, session) {
-# 
-#     rval <- reactiveValues()
-#     plot_params <- reactiveValues()
-# 
-#     observe({
-#        utils::data("GvHD", package = "flowCore")
-#        gs <- GatingSet(GvHD)
-#        rval$gating_set <- gs
-#       #plot_params$plot_type <- "histogram"
-#       #plot_params$xvar <- "cluster"
-#       #plot_params$yvar <- "FL4-H"
-#       #plot_params$sample <- pData(gs)$name[3]
-#       #plot_params$subset <- gs_get_pop_paths(gs)[1]
-#       plot_params$auto_focus <- FALSE
-#       plot_params$plot_type = "histogram"
-#       plot_params$xvar = "FL2-H"
-#       plot_params$option = "magma"
-# 
-#     })
-# 
-#     res <- callModule(plotCyto, "module",
-#                       rval = rval,
-#                       plot_params = plot_params
-#                       )
-# 
-#     callModule(simpleDisplay, "simple_display_module", res$plot)
-# 
-#   }
-# 
-#   shinyApp(ui, server)
-# 
-# }
+if (interactive()){
+
+  ui <- dashboardPage(
+    dashboardHeader(title = "plotCyto"),
+    sidebar = dashboardSidebar(disable = TRUE),
+    body = dashboardBody(
+      fluidRow(
+        column(4, box(width = NULL, title = "Parameters", collapsible = TRUE, collapsed = TRUE,
+                      plotCytoUI("module"))),
+        column(8, box(width = NULL, simpleDisplayUI("simple_display_module")))
+      )
+    )
+  )
+
+  server <- function(input, output, session) {
+
+    rval <- reactiveValues()
+    plot_params <- reactiveValues()
+
+    observe({
+      dataDir <- system.file("extdata",package="flowWorkspaceData")
+      gs <- load_gs(list.files(dataDir, pattern = "gs_bcell_auto",full = TRUE))
+       #utils::data("GvHD", package = "flowCore")
+       #gs <- GatingSet(GvHD)
+       rval$gating_set <- gs
+      #plot_params$plot_type <- "histogram"
+      #plot_params$xvar <- "cluster"
+      #plot_params$yvar <- "FL4-H"
+      #plot_params$sample <- pData(gs)$name[3]
+      #plot_params$subset <- gs_get_pop_paths(gs)[1]
+      #plot_params$auto_focus <- FALSE
+      #plot_params$plot_type = "histogram"
+      #plot_params$xvar = "FL2-H"
+      #plot_params$option = "magma"
+
+    })
+
+    res <- callModule(plotCyto, "module",
+                      rval = rval,
+                      plot_params = plot_params,
+                      show_gates = TRUE
+                      )
+
+    callModule(simpleDisplay, "simple_display_module", res$plot)
+
+  }
+
+  shinyApp(ui, server)
+
+}

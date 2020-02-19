@@ -21,17 +21,21 @@ names(spill_list) <- sampleNames(fs)
 fs <- flowCore::compensate(fs, spill_list)
 
 p <- call_plot_function(data = fs, 
-                        plot_type = "hexagonal", 
+                        plot_type = "dots", 
                         plot_args = list(xvar = 'FSC-A', smooth = TRUE, ridges = TRUE,
                                          yridges_var = "name", yvar = 'SSC-A', bins = 30, alpha = 0.5)
                         )
+p <- ggplot(fs, aes(x=`FSC-A`, y=`SSC-A`)) + geom_point()
+
 
 p1 <- format_plot(p, options = list(transformation = transformation))
 
 gate <- gs_pop_get_gate(gs, "lymph")
-p2 <- p + ggcyto::geom_gate(gate) + geom_stats()
+p2 <- p + ggcyto::geom_gate(gate) + 
+  ggcyto::geom_stats(gate = gate, type = c("gate_name", "percent"), 
+                     fill = grDevices::rgb(1,1,1,0.75))
 
-
+as.ggplot(p2)
 
 p2 + ggcyto_par_set(limits = "data")
 p2 + labs_cyto("channel")
