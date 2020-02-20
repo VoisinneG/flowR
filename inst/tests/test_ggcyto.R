@@ -2,16 +2,15 @@ library(ggcyto)
 library(flowWorkspaceData)
 
 dataDir <- system.file("extdata",package="flowWorkspaceData")
-gs_orig <- load_gs(list.files(dataDir, pattern = "gs_bcell_auto",full = TRUE))
-gs <- gs_clone(gs_orig)
+gs <- load_gs(list.files(dataDir, pattern = "gs_bcell_auto",full = TRUE))
 
 gs_get_pop_paths(gs)
+gates <- get_gates_from_gs(gs)
+fs <- gs_pop_get_data(gs, "Live") # cannot get data from multiple susbsets
 
-fs <- gs_pop_get_data(gs, "nonDebris") # cannot get data from multiple susbsets
 
-
-transformation <- lapply(colnames(gs), logicle_trans)
-names(transformation) <- colnames(gs)
+transformation <- lapply(colnames(gs@data), logicle_trans)
+names(transformation) <- colnames(gs@data)
 
 spill_list <- lapply(sampleNames(fs), function(x){
   spill <- description(fs[[x]])[["SPILL"]]
@@ -21,16 +20,19 @@ names(spill_list) <- sampleNames(fs)
 fs <- flowCore::compensate(fs, spill_list)
 
 p <- call_plot_function(data = fs, 
-                        plot_type = "dots", 
-                        plot_args = list(xvar = 'FSC-A', smooth = TRUE, ridges = TRUE,
-                                         yridges_var = "name", yvar = 'SSC-A', bins = 30, alpha = 0.5)
+                        plot_type = "hexagonal", 
+                        plot_args = list(xvar = 'Live', smooth = TRUE, ridges = TRUE,
+                                         yridges_var = "name", yvar = 'FSC-A', bins = 30, alpha = 0.5)
                         )
 p <- ggplot(fs, aes(x=`FSC-A`, y=`SSC-A`)) + geom_point()
 
 
 p1 <- format_plot(p, options = list(transformation = transformation))
 
-gate <- gs_pop_get_gate(gs, "lymph")
+gate <- gs_pop_get_gate(gs, "CD19andCD20")
+
+p2 <- add_gate_to_plot(p, gate)
+
 p2 <- p + ggcyto::geom_gate(gate) + 
   ggcyto::geom_stats(gate = gate, type = c("gate_name", "percent"), 
                      fill = grDevices::rgb(1,1,1,0.75))

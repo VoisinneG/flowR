@@ -15,7 +15,7 @@ transform_gates(
 \arguments{
 \item{gates}{a named list representing the gating hierarchy.}
 
-\item{transformation}{A list of trans objects. 
+\item{transformation}{A list of trans objects.
 Each element must be named after a parameter and contain the transfomation 
 to apply for this parameter.}
 

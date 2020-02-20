@@ -67,7 +67,7 @@ plotCytoUI <- function(id) {
 #'   \item{plot}{a plot or a list of plots}
 #'   \item{params}{plot parameters}
 #' }
-#' @importFrom flowWorkspace gs_pop_get_children gh_pop_get_gate gs_pop_get_data
+#' @importFrom flowWorkspace gs_pop_get_children gs_pop_get_data
 #' @importFrom flowCore parameters
 #' @import shiny
 #' @import ggcyto
@@ -79,7 +79,8 @@ plotCyto <- function(input, output, session,
                      simple_plot = TRUE,
                      auto_update = TRUE,
                      show_gates = FALSE,
-                     polygon_gate = NULL
+                     polygon_gate = NULL,
+                     use_ggcyto = FALSE
                      ) {
                           
   
@@ -103,7 +104,7 @@ plotCyto <- function(input, output, session,
                               size = 0.3,
                               color_var = "none",
                               group_var = "none",
-                              facet_var = NULL,
+                              facet_var = "name",
                               split_var = "xvar",
                               show_label = FALSE,
                               show_outliers = FALSE,
@@ -149,7 +150,7 @@ plotCyto <- function(input, output, session,
   ### Sample and subset selection module ###########################################################
   
   selected <- callModule(selection, "selection_module", rval, 
-                         params = plot_params, multiple_subset = !simple_plot)
+                         params = plot_params, multiple_subset = !(simple_plot | use_ggcyto) )
 
   ### Get parameters from GatingSet ################################################################
   
@@ -438,61 +439,61 @@ plotCyto <- function(input, output, session,
   
   ### Control update of plot data ##################################################################
   
-  # params_update_data <- reactive({
-  #   
-  #   #print("update data")
-  #   
-  #   if(!auto_update){
-  #     input$update_plot
-  #   }else{
-  #     update_params <- c(rval$update_gs,
-  #                        rval_input$sample,
-  #                        rval_input$subset,
-  #                        choices()$params,
-  #                        choices()$metadata,
-  #                        choices()$gates,
-  #                        rval_input$use_all_cells
-  #     )
-  #     
-  #     update_params <- c(update_params, choices()$compensation, rval$apply_comp)
-  # 
-  #     update_params
-  #   }
-  # })
+  params_update_data <- reactive({
+
+    #print("update data")
+
+    if(!auto_update){
+      input$update_plot
+    }else{
+      update_params <- c(rval$update_gs,
+                         rval_input$sample,
+                         rval_input$subset,
+                         choices()$params,
+                         choices()$metadata,
+                         choices()$gates,
+                         rval_input$use_all_cells
+      )
+
+      update_params <- c(update_params, choices()$compensation, rval$apply_comp)
+
+      update_params
+    }
+  })
   
   ### Control update of raw plot ###################################################################
   
-  # params_update_plot_raw <- reactive({
-  #   
-  #   #print("update_raw")
-  #   
-  #   if(!auto_update){
-  #     input$update_plot
-  #   }else{
-  #     update_params <- NULL
-  #     var_update <- c("plot_type",
-  #                     "xvar",
-  #                     "yvar",
-  #                     "color_var",
-  #                     "group_var",
-  #                     "bins",
-  #                     "size", 
-  #                     "alpha", 
-  #                     "norm_density", 
-  #                     "smooth", 
-  #                     "ridges", 
-  #                     "yridges_var",
-  #                     "show_label",
-  #                     "show_outliers",
-  #                     "option",
-  #                     "split_var")
-  #     var_update <- var_update[var_update %in% names(rval_input)]
-  #     for(var in var_update){
-  #       update_params <- c(update_params, rval_input[[var]])
-  #     }
-  #     update_params
-  #   }
-  # })
+  params_update_plot_raw <- reactive({
+
+    #print("update_raw")
+
+    if(!auto_update){
+      input$update_plot
+    }else{
+      update_params <- NULL
+      var_update <- c("plot_type",
+                      "xvar",
+                      "yvar",
+                      "color_var",
+                      "group_var",
+                      "bins",
+                      "size",
+                      "alpha",
+                      "norm_density",
+                      "smooth",
+                      "ridges",
+                      "yridges_var",
+                      "show_label",
+                      "show_outliers",
+                      "option",
+                      "split_var")
+      var_update <- var_update[var_update %in% names(rval_input)]
+      for(var in var_update){
+        update_params <- c(update_params, rval_input[[var]])
+      }
+      update_params
+    }
+  })
   
   ### Control update of formatted plot #############################################################
   
@@ -532,82 +533,105 @@ plotCyto <- function(input, output, session,
   
   ### Get plot data ################################################################################
   
-  # data_plot_focus <- eventReactive(params_update_data(), {
-  #   
-  #   #print("data")
-  # 
-  #   validate(need(class(rval$gating_set) =="GatingSet", "No GatingSet"))
-  #   validate(need(rval_input$sample, "Please select samples"))
-  #   validate(need(all(rval_input$sample %in% choices()$sample), 
-  #                 "All samples not found in GatingSet"))
-  #   validate(need(rval_input$subset, "Please select subsets"))
-  #   validate(need(all(rval_input$subset %in% choices()$subset), 
-  #                 "All subsets not found in GatingSet"))
-  #  
-  # 
-  #   Ncells <- 30000
-  #   if(!is.null(rval_input$use_all_cells)){
-  #     if(rval_input$use_all_cells){
-  #       Ncells <- NULL
-  #     }
-  #   }
-  #   
-  #   
-  #   spill <- choices()$compensation
-  #   if(!is.null(rval$apply_comp)){
-  #     if(!rval$apply_comp){
-  #       spill <- NULL
-  #     }
-  #   }
-  #   
-  #   vartype <- choices()$params$vartype
-  #   names(vartype) <- choices()$params$name
-  # 
-  #   df <- get_plot_data(gs = rval$gating_set,
-  #                     sample = rval_input$sample,
-  #                     subset = rval_input$subset,
-  #                     spill = spill,
-  #                     metadata = choices()$metadata,
-  #                     Ncells = Ncells,
-  #                     vartype = vartype)
-  #   return(df)
-  #   
-  # })
+  data_plot_focus <- eventReactive(params_update_data(), {
+
+    #print("data")
+
+    validate(need(class(rval$gating_set) =="GatingSet", "No GatingSet"))
+    validate(need(rval_input$sample, "Please select samples"))
+    validate(need(all(rval_input$sample %in% choices()$sample),
+                  "All samples not found in GatingSet"))
+    validate(need(rval_input$subset, "Please select subsets"))
+    validate(need(all(rval_input$subset %in% choices()$subset),
+                  "All subsets not found in GatingSet"))
+
+
+    Ncells <- 30000
+    if(!is.null(rval_input$use_all_cells)){
+      if(rval_input$use_all_cells){
+        Ncells <- NULL
+      }
+    }
+
+
+    spill <- choices()$compensation
+    if(!is.null(rval$apply_comp)){
+      if(!rval$apply_comp){
+        spill <- NULL
+      }
+    }
+
+    vartype <- choices()$params$vartype
+    names(vartype) <- choices()$params$name
+
+    df <- get_plot_data(gs = rval$gating_set,
+                      sample = rval_input$sample,
+                      subset = rval_input$subset,
+                      spill = spill,
+                      metadata = choices()$metadata,
+                      Ncells = Ncells,
+                      vartype = vartype)
+    return(df)
+
+  })
   
   ### Build raw plot ###############################################################################
   
-  # plot_raw <- reactive({
-  #   
-  #   validate(need(class(rval$gating_set) =="GatingSet", "No GatingSet"))
-  #   validate(need(rval_input$sample, "Please select samples"))
-  #   validate(need(all(rval_input$sample %in% choices()$sample),
-  #                   "All samples not found in GatingSet"))
-  #   validate(need(rval_input$subset, "Please select subsets"))
-  #   validate(need(all(rval_input$subset %in% choices()$subset),
-  #                   "All subsets not found in GatingSet"))
-  #   validate(need(rval_input$xvar %in% choices()$plot_var, "Please select x variable"))
-  #   validate(need(rval_input$plot_type, "Please select plot type"))
-  #   if(!is.null(rval_input$plot_type)){
-  #     if(rval_input$plot_type != "histogram"){
-  #       validate(need(rval_input$yvar %in% choices()$plot_var, "Please select y variable"))
-  #     }
-  #   }
-  #   
-  #   p <- ggcyto::ggcyto(rval$gating_set@data[rval_input$sample],
-  #               aes_string(x=as.name(rval_input$xvar), y=as.name(rval_input$yvar))) + 
-  #     geom_hex() + 
-  #     facet_wrap(NULL)
-  #   
-  #  p <- ggcyto::as.ggplot(p)
-  #  
-  #  return(p)
-  #   
-  # })
+  plot_raw <- eventReactive(c(params_update_plot_raw(),  data_plot_focus()),{
+    if(use_ggcyto){
+      return(list())
+    }
+    print("raw")
+    
+    df <- data_plot_focus()
+    plot_list <- list()
+    
+    validate(need(df, "no cells in selection"))
+    validate(need(rval_input$xvar %in% choices()$plot_var, "Please select x variable"))
+    validate(need(rval_input$plot_type, "Please select plot type"))
+    if(!is.null(rval_input$plot_type)){
+      if(rval_input$plot_type != "histogram"){
+        validate(need(rval_input$yvar %in% choices()$plot_var, "Please select y variable"))
+      }
+    }
+    
+    
+    plot_args <- reactiveValuesToList(rval_input)
+    
+    split_variable  <- "xvar"
+    if("split_var" %in% names(rval_input)){
+      split_variable <- rval_input$split_var
+    }
+    
+    mono_var <- setdiff(c("xvar", "yvar", "color_var"), split_variable)
+    
+    for(var in mono_var){
+      plot_args[[var]] <- rval_input[[var]][1]
+    }
+    
+    for(var in rval_input[[split_variable]]){
+      
+      plot_args[[split_variable]] <- var
+      
+      plot_list[[var]] <- call_plot_function(data=df,
+                                             plot_type = rval_input$plot_type,
+                                             plot_args = plot_args)
+    }
+    
+    return(plot_list)
+  })
   
-  #plot_raw <- eventReactive(c(params_update_plot_raw(),  data_plot_focus()),{
+  ### Build raw plot using ggcyto #########################################################
   
-    plot_raw <- reactive({
+  plot_raw_ggcyto <- reactive({
+      
+    if(!use_ggcyto){
+      return(list())
+    }
+      print("raw ggcyto")
+      
       plot_list <- list()
+      
       
         validate(need(class(rval$gating_set) =="GatingSet", "No GatingSet"))
         validate(need(rval_input$sample, "Please select samples"))
@@ -623,22 +647,24 @@ plotCyto <- function(input, output, session,
             validate(need(rval_input$yvar %in% choices()$plot_var, "Please select y variable"))
           }
         }
-        
-    #print("raw")
-    
-    #df <- data_plot_focus()
-    
-    
-    # validate(need(df, "no cells in selection"))
-    # validate(need(rval_input$xvar %in% choices()$plot_var, "Please select x variable"))
-    # validate(need(rval_input$plot_type, "Please select plot type"))
-    # if(!is.null(rval_input$plot_type)){
-    #   if(rval_input$plot_type != "histogram"){
-    #     validate(need(rval_input$yvar %in% choices()$plot_var, "Please select y variable"))
-    #   }
-    # }
-    
+
     fs <- flowWorkspace::gs_pop_get_data(rval$gating_set[rval_input$sample], rval_input$subset)
+    
+    spill <- choices()$compensation
+    print(spill)
+    if(!is.null(rval$apply_comp)){
+      if(!rval$apply_comp){
+        spill <- NULL
+      }
+    }
+      
+    if(!is.null(spill)){
+      if(all(sampleNames(fs) %in% names(spill))){
+        fs <- compensate(fs, spill)
+      }else{
+        message("Could not compensate data")
+      }
+    }
     
     plot_args <- reactiveValuesToList(rval_input)
     
@@ -668,7 +694,9 @@ plotCyto <- function(input, output, session,
   
   ### Format plot ##################################################################################
 
-  plot_format <- eventReactive( c(params_update_plot_format(), plot_raw()), {
+  plot_format <- eventReactive( c(params_update_plot_format(), 
+                                  plot_raw(), 
+                                  plot_raw_ggcyto()), {
     
     #print("format")
     
@@ -689,10 +717,21 @@ plotCyto <- function(input, output, session,
       options$axis_limits <- choices()$axis_limits
     }
     
+    if(use_ggcyto){
+      
+      print("use_ggcyto")
+      plist <- plot_raw_ggcyto()
+    }else{
+      plist <- plot_raw()
+    }
+   
     
-    
-    plist <- lapply( plot_raw(),
+    plist <- lapply( plist,
                      function(p){
+                       if(length(rval_input$subset)==1){
+                         options$title <- rval_input$subset
+                       }
+                       
                        options$axis_limits <- list()
                        if(!rval_input$auto_focus){
                          options$axis_limits <- choices()$axis_limits
@@ -710,6 +749,10 @@ plotCyto <- function(input, output, session,
   ### Add gates corresponding to plot coordinates ##################################################
   
   draw_gates <- eventReactive(plot_format(), {
+    
+    if(!use_ggcyto){
+      return(plot_format())
+    }
     
     validate(need(rval_input$subset, "Please select subsets"))
     validate(need(all(rval_input$subset %in% choices()$subset), 
@@ -739,9 +782,7 @@ plotCyto <- function(input, output, session,
                            #p <- add_gate(p = p, gate = gate_int)
                            print(gate_int)
                            #print(get_gate_coordinates(gate_int))
-                           p <- p + geom_gate(gate_int) + geom_stats(gate = gate_int, 
-                                                                     type = c("gate_name", "percent"), 
-                                                                     fill = grDevices::rgb(1,1,1,0.75))
+                           p <- add_gate_to_plot(p, gate_int)
                          }
                        }
                        return(p)
@@ -753,6 +794,8 @@ plotCyto <- function(input, output, session,
   ### Add polygon layer ############################################################################
 
   draw_polygon <- reactive({
+    
+    
     
     #print("poly")
 
@@ -771,12 +814,15 @@ plotCyto <- function(input, output, session,
     plist <- lapply( draw_gates(),
                      function(p){
                        
-                       p <- as.ggplot(p)
+                       
                        
                        print("OK")
                        print(polygon$x)
-                       if(!is.null(polygon$x)){
-                         p <- add_polygon_layer(p, polygon = polygon)
+                       if(use_ggcyto){
+                         p <- as.ggplot(p)
+                         if(!is.null(polygon$x)){
+                           p <- add_polygon_layer(p, polygon = polygon)
+                         }
                        }
                        # if(!is.null(gate)){
                        #   for(gate_name in setdiff(gate, "root")){
@@ -819,53 +865,55 @@ plotCyto <- function(input, output, session,
 # library(plotly)
 # library(ggridges)
 # 
-if (interactive()){
-
-  ui <- dashboardPage(
-    dashboardHeader(title = "plotCyto"),
-    sidebar = dashboardSidebar(disable = TRUE),
-    body = dashboardBody(
-      fluidRow(
-        column(4, box(width = NULL, title = "Parameters", collapsible = TRUE, collapsed = TRUE,
-                      plotCytoUI("module"))),
-        column(8, box(width = NULL, simpleDisplayUI("simple_display_module")))
-      )
-    )
-  )
-
-  server <- function(input, output, session) {
-
-    rval <- reactiveValues()
-    plot_params <- reactiveValues()
-
-    observe({
-      dataDir <- system.file("extdata",package="flowWorkspaceData")
-      gs <- load_gs(list.files(dataDir, pattern = "gs_bcell_auto",full = TRUE))
-       #utils::data("GvHD", package = "flowCore")
-       #gs <- GatingSet(GvHD)
-       rval$gating_set <- gs
-      #plot_params$plot_type <- "histogram"
-      #plot_params$xvar <- "cluster"
-      #plot_params$yvar <- "FL4-H"
-      #plot_params$sample <- pData(gs)$name[3]
-      #plot_params$subset <- gs_get_pop_paths(gs)[1]
-      #plot_params$auto_focus <- FALSE
-      #plot_params$plot_type = "histogram"
-      #plot_params$xvar = "FL2-H"
-      #plot_params$option = "magma"
-
-    })
-
-    res <- callModule(plotCyto, "module",
-                      rval = rval,
-                      plot_params = plot_params,
-                      show_gates = TRUE
-                      )
-
-    callModule(simpleDisplay, "simple_display_module", res$plot)
-
-  }
-
-  shinyApp(ui, server)
-
-}
+# if (interactive()){
+# 
+#   ui <- dashboardPage(
+#     dashboardHeader(title = "plotCyto"),
+#     sidebar = dashboardSidebar(disable = TRUE),
+#     body = dashboardBody(
+#       fluidRow(
+#         column(4, box(width = NULL, title = "Parameters", collapsible = TRUE, collapsed = TRUE,
+#                       plotCytoUI("module"))),
+#         column(8, box(width = NULL, simpleDisplayUI("simple_display_module")))
+#       )
+#     )
+#   )
+# 
+#   server <- function(input, output, session) {
+# 
+#     rval <- reactiveValues()
+#     plot_params <- reactiveValues()
+# 
+#     observe({
+#       dataDir <- system.file("extdata",package="flowWorkspaceData")
+#       gs <- load_gs(list.files(dataDir, pattern = "gs_bcell_auto",full = TRUE))
+#        #utils::data("GvHD", package = "flowCore")
+#        #gs <- GatingSet(GvHD)
+#        rval$gating_set <- gs
+#       #plot_params$plot_type <- "histogram"
+#       #plot_params$xvar <- "cluster"
+#       #plot_params$yvar <- "FL4-H"
+#       #plot_params$sample <- pData(gs)$name[3]
+#       #plot_params$subset <- gs_get_pop_paths(gs)[1]
+#       #plot_params$auto_focus <- FALSE
+#       #plot_params$plot_type = "histogram"
+#       #plot_params$xvar = "FL2-H"
+#       #plot_params$option = "magma"
+# 
+#     })
+# 
+#     res <- callModule(plotCyto, "module",
+#                       rval = rval,
+#                       plot_params = plot_params,
+#                       simple_plot = FALSE,
+#                       show_gates = TRUE,
+#                       use_ggcyto = TRUE
+#                       )
+# 
+#     callModule(simpleDisplay, "simple_display_module", res$plot)
+# 
+#   }
+# 
+#   shinyApp(ui, server)
+# 
+# }

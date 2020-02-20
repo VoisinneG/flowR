@@ -207,7 +207,8 @@ Gating <- function(input, output, session, rval) {
                     rval=rval,
                     plot_params = plot_params,
                     simple_plot = TRUE, 
-                    show_gates = FALSE,
+                    show_gates = TRUE,
+                    use_ggcyto = TRUE,
                     polygon_gate = gate)
   
   res_display <- callModule(simpleDisplay, "simple_display_module", 
@@ -246,6 +247,7 @@ Gating <- function(input, output, session, rval) {
                                               "alpha", 
                                               "option",
                                               "color_var",
+                                              "facet_var",
                                               "show_outliers")) ){
       plot_params_gh[[var]] <- res$params[[var]]
     }
@@ -478,14 +480,17 @@ Gating <- function(input, output, session, rval) {
       }
       plot_params$subset <- gates[[res$params$subset]]$parent
       
-      gate_params <- names(rval$gate@parameters)
+      if(class(rval$gate[[1]]) != "booleanFilter"){
+        gate_params <- names(rval$gate[[1]]@parameters)
+        
+        if(length(gate_params) > 0){
+          plot_params$xvar <- gate_params[1]
+        }
+        if(length(gate_params) > 1){
+          plot_params$yvar <- gate_params[2]
+        }
+      }
       
-      if(length(gate_params) > 0){
-        plot_params$xvar <- gate_params[1]
-      }
-      if(length(gate_params) > 1){
-        plot_params$yvar <- gate_params[2]
-      }
       
       gate$x <- NULL
       gate$y <- NULL
@@ -723,19 +728,22 @@ if (interactive()){
     rval <- reactiveValues()
 
     observe({
-      dataDir <- system.file("extdata",package="flowWorkspaceData")
-      gs <- load_gs(list.files(dataDir, pattern = "gs_bcell_auto",full = TRUE))
-      # fs <- read.ncdfFlowSet(files = "../flowR_utils/demo-data/JL04BMVLG-Valentin/Tumor_T_001_012.fcs")
-      # gates <- gates <- get_gates_from_ws_diva("../flowR_utils/demo-data/JL04BMVLG-Valentin/JL04BMVLG.xml", template = "Gating")
-      # gs <- flowWorkspace::GatingSet(fs)
-      # add_gates_flowCore(gs, gates = gates)
-      # transfo <- lapply(colnames(gs), logicle_trans)
-      # names(transfo) <- colnames(gs)
-      # gs@transformation <- transfo
-      # spill <- gs@data[[1]]@description[["SPILL"]]
-      # comp <- lapply(pData(gs)$name, function(x){spill})
-      # names(comp) <- pData(gs)$name
-      # gs@compensation <- comp
+      #dataDir <- system.file("extdata",package="flowWorkspaceData")
+      #gs <- load_gs(list.files(dataDir, pattern = "gs_bcell_auto",full = TRUE))
+       fs <- read.ncdfFlowSet(files = "../flowR_utils/demo-data/JL04BMVLG-Valentin/Tumor_T_001_012.fcs")
+       #gates <- gates <- get_gates_from_ws_diva("../flowR_utils/demo-data/JL04BMVLG-Valentin/JL04BMVLG.xml", template = "Gating")
+       gates <- get_gates_from_ws("../flowR_utils/demo-data/JL04BMVLG-Valentin/Tumor-testFlowR.wsp", group = "Tumor")
+       gates <- transform_gates(gates, pattern = "Comp-", replacement = "")
+       gs <- flowWorkspace::GatingSet(fs)
+       
+       add_gates_flowCore(gs, gates = gates)
+      transfo <- lapply(colnames(gs), logicle_trans)
+      names(transfo) <- colnames(gs)
+      gs@transformation <- transfo
+      spill <- gs@data[[1]]@description[["SPILL"]]
+      comp <- lapply(pData(gs)$name, function(x){spill})
+      names(comp) <- pData(gs)$name
+      gs@compensation <- comp
       rval$gating_set <- gs
       #load("../flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
       #fs <- build_flowset_from_df(df = res$cluster$data, origin = res$cluster$flow_set)
