@@ -8,227 +8,316 @@ library(reshape2)
 
 #' @param id shiny id
 #' @import shiny
+#' @importFrom DT
 CleanUI<-function(id){
   
   ns <- NS(id)
   
   
   fluidPage(
+    
+    h1("Automatic & interactive quality control for Flow Cytometry Data"),
     # titlePanel("Interactive Quality Control for Flow Cytometry Data"),
     
-    tabsetPanel(type ="pills", tabPanel("Manual", fluidRow(
-      column(3,
-             
-             h4("Input:"),
-             selectInput(ns("sample"), "Select sample", choices = NULL, selected = NULL, multiple = FALSE),
-             
-             hr(),
-             h4("Summary:"),
-             textOutput(ns("summaryText1")),
-             textOutput(ns("summaryText2")),
-             
-             hr(),
-             h4("Parameters:"),
-             numericInput(ns("timeLenth"), label = h5("Time step (sec)"), value = 0.1, step = 0.1),
-             uiOutput(ns("signalBinSize")),
-             
-             hr(),
-             h4("Download Output:"),
-             downloadButton(ns('downloadQCFCS'),   'FCS with QC'),
-             br(),
-             downloadButton(ns('downloadGoodFCS'), 'High Q FCS'),
-             br(),
-             downloadButton(ns('downloadBadFCS'),  'Low Q FCS'),
-             
-             hr(),
-             div(style = "margin-top: 30px; width: 200px; ", HTML("Citation")),
-             div(style = "margin-top: 10px; ",
-                 HTML("Monaco,G. et al. (2016) flowAI: automatic and interactive anomaly discerning tools for flow cytometry data.
-                      Bioinformatics. 2016 Aug 15;32(16):2473-80."))
-                 ),
-      column(9,
-             tabsetPanel(type = "pills",
-                         
-                         tabPanel("Flow Rate", fluidPage(
-                           hr(),
-                           textOutput(ns("flowRateSummary")),
-                           hr(),
-                           plotOutput(ns("flowRatePlot")),
-                           hr(),
-                           fluidRow(
-                             column(4, offset = 1,
-                                    uiOutput(ns("timeSlider"))
-                             ),
-                             column(4, offset = 2,
-                                    uiOutput(ns("rateSlider"))
-                             )
-                           )
-                         )),
-                         
-                         tabPanel("Signal Acquisition", fluidPage(
-                           hr(),
-                           textOutput(ns("flowSignalSummary")),
-                           hr(),
-                           uiOutput(ns("signalBinSlider")),
-                           hr(),
-                           plotOutput(ns("flowSignalPlot"), height = "800px")
-                         )),
-                         
-                         tabPanel("Dynamic Range", fluidPage(
-                           hr(),
-                           fluidRow(
-                             column(5,
-                                    textOutput(ns("flowMarginSummary"))
-                             ),
-                             column(3, offset = 2,
-                                    checkboxInput(ns("checkbox"), label = "Apply Margins Check", value = TRUE)
-                             )
-                           ),
-                           hr(),
-                           plotOutput(ns("flowMarginPlot"))
-                         ))
-             )
-      )
-      )
-    ),
-    tabPanel("Automatique", 
-             
-               fluidRow(
+    # tabsetPanel(type ="pills", tabPanel("Manual", fluidRow(
+    #   column(3,
+    #          
+    #          h4("Input:"),
+    #          selectInput(ns("sample"), "Select sample", choices = NULL, selected = NULL, multiple = FALSE),
+    #          
+    #          hr(),
+    #          h4("Summary:"),
+    #          textOutput(ns("summaryText1")),
+    #          textOutput(ns("summaryText2")),
+    #          
+    #          hr(),
+    #          h4("Parameters:"),
+    #          numericInput(ns("timeLenth"), label = h5("Time step (sec)"), value = 0.1, step = 0.1),
+    #          uiOutput(ns("signalBinSize")),
+    #          
+    #          hr(),
+    #          h4("Download Output:"),
+    #          downloadButton(ns('downloadQCFCS'),   'FCS with QC'),
+    #          br(),
+    #          downloadButton(ns('downloadGoodFCS'), 'High Q FCS'),
+    #          br(),
+    #          downloadButton(ns('downloadBadFCS'),  'Low Q FCS'),
+    #          
+    #          hr(),
+    #          div(style = "margin-top: 30px; width: 200px; ", HTML("Citation")),
+    #          div(style = "margin-top: 10px; ",
+    #              HTML("Monaco,G. et al. (2016) flowAI: automatic and interactive anomaly discerning tools for flow cytometry data.
+    #                   Bioinformatics. 2016 Aug 15;32(16):2473-80."))
+    #              ),
+    #   column(9,
+    #          tabsetPanel(type = "pills",
+    #                      
+    #                      tabPanel("Flow Rate", fluidPage(
+    #                        hr(),
+    #                        textOutput(ns("flowRateSummary")),
+    #                        hr(),
+    #                        plotOutput(ns("flowRatePlot")),
+    #                        hr(),
+    #                        fluidRow(
+    #                          column(4, offset = 1,
+    #                                 uiOutput(ns("timeSlider"))
+    #                          ),
+    #                          column(4, offset = 2,
+    #                                 uiOutput(ns("rateSlider"))
+    #                          )
+    #                        )
+    #                      )),
+    #                      
+    #                      tabPanel("Signal Acquisition", fluidPage(
+    #                        hr(),
+    #                        textOutput(ns("flowSignalSummary")),
+    #                        hr(),
+    #                        uiOutput(ns("signalBinSlider")),
+    #                        hr(),
+    #                        plotOutput(ns("flowSignalPlot"), height = "800px")
+    #                      )),
+    #                      
+    #                      tabPanel("Dynamic Range", fluidPage(
+    #                        hr(),
+    #                        fluidRow(
+    #                          column(5,
+    #                                 textOutput(ns("flowMarginSummary"))
+    #                          ),
+    #                          column(3, offset = 2,
+    #                                 checkboxInput(ns("checkbox"), label = "Apply Margins Check", value = TRUE)
+    #                          )
+    #                        ),
+    #                        hr(),
+    #                        plotOutput(ns("flowMarginPlot"))
+    #                      ))
+    #          )
+    #   )
+    #   )
+    # ),
+    # tabPanel("Automatique", 
+    
+    fluidRow(
+      br(),
+      column(4, 
+             box(width = 12,
+                 
+                 # radioButtons(ns("select_mod_parameter_input"), 
+                 #              label = "Choose type of parameters",
+                 #              choices = list("Default" = "default",
+                 #                             "For advanced user" = "advanced")),
                  br(),
-                 column(6, 
-                        # fileInput(ns("file"), label = "Fichier FCS", multiple = T, accept = ".fcs"),
-                        box(width = 12,
-                            
-                          textOutput(ns("load_text")),
-                        
-                        radioButtons(ns("select_mod_parameter_input"), 
-                                     label = "Choose type of parameters",
-                                     choices = list("Default" = "default",
-                                                    "For advanced user" = "advanced")),
-                        br(),
-                        
-                        
-                       
-                        actionButton(ns("auto_qc_button_input"), 
-                                     label = "Clean data"),
-                        br(),
-                        br()),
-                        # uiOutput(ns("show_information_render"))
-                        conditionalPanel(condition = "input.auto_qc_button_input%2==1", ns = ns, 
-                                         box(title = "Cleaning quality",
-                                             width = 12,
-                                             # div(style="display: inline-block;vertical-align:top; width: 500px;", cat("The current data selected is ", textOutput(ns("current_data_input")))),
-                                             verbatimTextOutput(ns("info")),
-                                             plotlyOutput(ns("plot_info_qc"))
-                                             )
-                                         )
-
+                 
+                 # uiOutput(ns("render_select_input")),
+                 selectInput(inputId = ns("choice_channel_input"), label = "Select time channel",
+                             choices = NULL),
+                 
+                 selectInput(inputId = ns("choice_sample_input"),
+                             label = "Select sample",
+                             multiple = T,
+                             choices = NULL,
+                             selected = NULL),
+                 
+                 
+                 
+                 actionButton(ns("clean_selected_sample_input"),
+                              label = "Clean sample selected"),
+                 
+                 actionButton(ns("auto_qc_button_input"), 
+                              label = "Clean all sample")
+             ),
+             box(width = 12,
+                 title = "Cleaning options",
+                 box(title = "Flow rate",
+                     collapsible = T,
+                     collapsed = T,
+                     numericInput(ns("alpha"),
+                                  label = "Anomalies acceptation (ESD Method)",
+                                  min = 0,
+                                  max = 1,
+                                  value = 0.01,
+                                  step = 0.01),
+                     radioButtons(ns("direction"), label = "Anomalies direction",
+                                  choices = list("Both tails" = "both",
+                                                 "lower-tail only (negative going anomalies)" = "neg",
+                                                 "upper-tail only (positive going anomalies)" = "pos"),
+                                  # checkboxInput(ns("use_decomp"), label = "Without usage of flow rate cytometry")
+                                  ),
+                     
+                     ),
+                 box(title = "Dynamic range",
+                     collapsible = T,
+                     collapsed = T,
+                     selectInput(ns("options_chExclude"), label = "Channel to exclude", multiple = T, choices = NULL),
+                     radioButtons(ns("neg_values"), label = "Negative values", choices = list("Remove negative outliers" = 1,
+                                                                   "Truncate the negative values to the cut-off" = 2)),
+                     radioButtons(ns("side"), label = "Select limits", choices = list("both"= "both",
+                                                             "upper" = "upper",
+                                                             "lower" = "lower"))
+                     ),
+                 box(title = "Signal acquisition",
+                     collapsed = T,
+                     collapsible = T,
+                     numericInput(ns("binSize"),
+                                  label = "Number of events per bin",
+                                  min = 0,
+                                  step = 100,
+                                  value = 500),
+                     selectInput(ns("options_chExclude2"), label = "Channel to exclude", multiple = T, choices = NULL),
+                     
+                     checkboxInput(ns("remove_outlier"),
+                                   label = "Remove outlier",
+                                   value = F))
+                 
+                 )
+      ),
+      
+      
+      
+      ### Plot visualization of cleaning ####
+      column(8,
+             box(title = "Cleaning visualization",
+                 width = 12,
+                 tabsetPanel(type ="pills",
+                             tabPanel("Flow rate",
+                                      plotOutput(ns("flow_rate_plot_output"))
+                             ),
+                             tabPanel("Dynamic range",
+                                      plotOutput(ns("dynamic_plot_output"))
+                             ),
+                             tabPanel("Signal acquisition",
+                                      plotOutput(ns("signal_acquisition_plot_output"))
+                             )
+                             
                  ),
-               
-               ### Options panels ####
-               column(6,
-                      conditionalPanel(condition = "input.select_mod_parameter_input != 'default'", ns = ns,
-                      box(title = "Options",
-                          width = 12,
-                        ### remove from (Anomalies) select choices ####
-                        selectInput(ns("Remove_anomalies"), 
-                                    label = "Remove anomalies",
-                                    choices = list("all",
-                                                   "FR_FS",
-                                                   "FR_FM",
-                                                   "FS_FM",
-                                                   "FR",
-                                                   "FS",
-                                                   "FM")),
-                        helpText("remove anomalies only on a subset of the steps where FR stands for the flow rate, FS for the signal acquisition and FM for dynamic range ('all' by default)"),
-                        
-                        ### button output choices #### 
-                        radioButtons(ns("button_output"), label = "Output choices",
-                                     choices= list("high quality event" = 1,
-                                                   "low quality with value higher than 10 000" = 2,
-                                                   "Id list of low quality" = 3)),
-                        helpText("By default you have the highest quality event"),
-                        
-                        ### second fraction choice ####
-                        numericInput(ns("sd_frac_c"),
-                                     label = "Choice timestep",
-                                     min = 0.01,
-                                     max = 1,
-                                     step = 0.01,
-                                     value = 0.1),
-                        helpText("by default the timestep is 0.1"),
-                        
-                        ### alphaFR statistical signifiant value ####
-                        numericInput(ns("sg_input_value"),
-                                     label = "statistical value to detect anomalies by method ESD",
-                                     value = 0.01,
-                                     min = 0,
-                                     max = 1,
-                                     step = 0.001),
-                        
-                        ### decomp the flow rate in the trend and the cyclical componants
-                        checkboxInput(ns("decomp_input"),
-                                      label = "Decomposate the flow rate",
-                                      value = T),
-                        checkboxInput(ns("outlier_bin"),
-                                      label = "Remove outlier bins",
-                                      value = F),
-                        numericInput(ns("pen_valueFS_input"),
-                                     label = "penality value for the changepoint detection algorithm",
-                                     min = 0,
-                                     value = 500
-                        ),
-                        sliderInput(ns("max_cptsFS_input"),
-                                    label = "Maximum number of changepoints can be detected for each channel",
-                                    min = 0,
-                                    max = 25,
-                                    step = 1,
-                                    value = 3),
-                        selectInput(ns("sideFM_input"),
-                                    label = "select dynamic range",
-                                    choices = list("Both" = "both",
-                                                   "Upper" = "upper",
-                                                   "Lower" = "lower")),
-                        radioButtons(ns("neg_valuesFM_input"),
-                                     label = "Scalar method",
-                                     choices = list("remove outliers" = 1,
-                                                    "truncate the negative value" = 2),
-                                     inline = T),
-                        box(title = "Report options",
-                            collapsible = T,
-                            collapsed = T,
-                            width = 12,
-                            
-                            checkboxInput(ns("html_report_input"),
-                                          label = "Make an html report",
-                                          value = T),
-                            checkboxInput(ns("mini_report_input"),
-                                          label = "Make a TXT mini report",
-                                          value = T),
-                            checkboxInput(ns("fcs_QC_input"),
-                                          label = "Add to the new fcs the quality event",
-                                          value = T),
-                            checkboxInput(ns("fcs_highQ_input"),
-                                          label = "Add only the event that passed the quality control",
-                                          value = F),
-                            checkboxInput(ns("fcs_lowQ_input"),
-                                          label = "Add the event that didn't pass the quality control",
-                                          value = F),
-                            checkboxInput(ns("folder_result_input"),
-                                          label = "Create a file resultQC",
-                                          value = T)),
-                        
-                        
-                        
-                        uiOutput(ns("ChExcludeFS"))
-                      )
-                      )
-               )
-               )
+                 box(title = "Options",
+                     collapsed = T,
+                     collapsible = T,
+                     selectInput(inputId = ns("select_one_sample"),
+                                 label = "Select sample for visualization",
+                                 choices = NULL)
+                 )
+                 # )
+                 
+             ),
+             box(title = "Result",
+                 width = 12,
+                 collapsed = T,
+                 collapsible = T,
+                 tabsetPanel(type = "pills",
+                   tabPanel("Heatmap cleaning",
+                            verbatimTextOutput(ns("info")),
+                            plotlyOutput(ns("plot_info_qc"), height = "auto"),
+                            box(title = "Options",
+                                width = 12,
+                                collapsible = T,
+                                collapsed = T,
+                                
+                                selectInput(ns("colorpalette_select"), label = "Color option", choices = list("Default (fill Green to Red)" = "Default",
+                                                                                                              "Viridis" = "D",
+                                                                                                              "Magma" = "A",
+                                                                                                              "Inferno" = "B",
+                                                                                                              "Plasma" = "C")),
+                                sliderInput(inputId = ns("change_height"), 
+                                            label = "Change height heatmap representation", 
+                                            min = 400, 
+                                            max = 2000, 
+                                            value = 600, 
+                                            step = 50)
+                            )
+                   ),
+                   
+                   tabPanel("Frame",
+                            DT::dataTableOutput(ns("result_output"))
+                   )
+                 )
              )
-             
+      )
+      ### Options panels ####
+      # fluidRow(
+      #   
+      #   conditionalPanel(condition = "input.select_mod_parameter_input != 'default'", ns = ns,
+      #                    box(title = "Options",
+      #                        width = 12,
+      #                        ### remove from (Anomalies) select choices ####
+      #                        selectInput(ns("Remove_anomalies"),
+      #                                    label = "Remove anomalies",
+      #                                    choices = list("all",
+      #                                                   "FR_FS",
+      #                                                   "FR_FM",
+      #                                                   "FS_FM",
+      #                                                   "FR",
+      #                                                   "FS",
+      #                                                   "FM")),
+      #                        
+      #                        helpText("remove anomalies only on a subset of the steps where FR stands for the flow rate, FS for the signal acquisition and FM for dynamic range ('all' by default)"),
+      #                        
+      #                        ### button output choices ####
+      #                        radioButtons(ns("button_output"), label = "Output choices",
+      #                                     choices= list("high quality event" = 1,
+      #                                                   "low quality with value higher than 10 000" = 2,
+      #                                                   "Id list of low quality" = 3)),
+      #                        
+      #                        helpText("By default you have the highest quality event"),
+      #                        
+      #                        ### second fraction choice ####
+      #                        
+      #                        numericInput(ns("sd_frac_c"),
+      #                                     label = "Choice timestep",
+      #                                     min = 0.01,
+      #                                     max = 1,
+      #                                     step = 0.01,
+      #                                     value = 0.1),
+      #                        
+      #                        helpText("by default the timestep is 0.1"),
+      #                        
+      #                        ### alphaFR statistical signifiant value ####
+      #                        
+      #                        numericInput(ns("sg_input_value"),
+      #                                     label = "statistical value to detect anomalies by method ESD",
+      #                                     value = 0.01,
+      #                                     min = 0,
+      #                                     max = 1,
+      #                                     step = 0.001),
+      #                        
+      #                        ### decomp the flow rate in the trend and the cyclical componants
+      #                        
+      #                        checkboxInput(ns("decomp_input"),
+      #                                      label = "Decomposate the flow rate",
+      #                                      value = T),
+      #                        checkboxInput(ns("outlier_bin"),
+      #                                      label = "Remove outlier bins",
+      #                                      value = F),
+      #                        numericInput(ns("pen_valueFS_input"),
+      #                                     label = "penality value for the changepoint detection algorithm",
+      #                                     min = 0,
+      #                                     value = 500
+      #                        ),
+      #                        sliderInput(ns("max_cptsFS_input"),
+      #                                    label = "Maximum number of changepoints can be detected for each channel",
+      #                                    min = 0,
+      #                                    max = 25,
+      #                                    step = 1,
+      #                                    value = 3),
+      #                        selectInput(ns("sideFM_input"),
+      #                                    label = "select dynamic range",
+      #                                    choices = list("Both" = "both",
+      #                                                   "Upper" = "upper",
+      #                                                   "Lower" = "lower")),
+      #                        radioButtons(ns("neg_valuesFM_input"),
+      #                                     label = "Scalar method",
+      #                                     choices = list("remove outliers" = 1,
+      #                                                    "truncate the negative value" = 2),
+      #                                     inline = T),
+      #                        
+      #                        uiOutput(ns("ChExcludeFS"))
+      #                    )
+      #   )
+      # )
+      
     )
-    )
+  
+  )
+
 }
 
 ### server ####################################################################################
@@ -240,538 +329,636 @@ CleanUI<-function(id){
 #' @import flowAI
 Clean <- function(input, output, session, rval) {
   
-  observe({
-    rval$update_gs
-    validate(need(class(rval$gating_set) == "GatingSet", "No GatingSet available"))
-    choices <- flowWorkspace::pData(rval$gating_set)$name
-    updateSelectInput(session, "sample", choices = choices, selected = choices[1])
-  })
-  
-  ## load flowset data
-  set <- reactive({
-    
-    validate(need(class(rval$gating_set) == "GatingSet", "No GatingSet available"))
-    validate(need(input$sample, "No sample selected"))
-    set <- rval$gating_set@data[[input$sample]]
-    
-    # if (input$goButton == 0)
-    #   return()
-    # isolate({fcsFiles <- input$fcsFiles
-    # if (is.null(fcsFiles))
-    #   return(NULL)
-    # set <- read.FCS(fcsFiles$datapath)
-    # set@description$FILENAME <- fcsFiles$name})
-    return(set)
-  })
-  
-  ## time channel name
-  timeChannel <- reactive({
-    if(is.null(set()))
-      return(NULL)
-    x <- set()
-    time <- findTimeChannel(x)
-    return(time)
-  })
-  
-  ## time step
-  timeStep <- reactive({
-    if(is.null(set()))
-      return(NULL)
-    word <- which(grepl("TIMESTEP", names(set()@description),
-                        ignore.case = TRUE))
-    timestep <- as.numeric(set()@description[[word[1]]])
-    if( !length(timestep) ){
-      warning("The timestep keyword was not found in the FCS file and it was set to 0.01. Graphs labels indicating time might not be correct", call. =FALSE)
-      timestep <- 0.01
-    }
-    return(timestep)
-  })
-  
-  
-  TimeChCheck <- reactive({
-    if (!is.null(timeChannel())) {
-      if (length(unique(flowCore::exprs(set())[, timeChannel()])) == 1){
-        TimeChCheck <- "single_value"
-      }else{
-        TimeChCheck <- NULL 
-      }
-    }else{
-      TimeChCheck <- "NoTime"
-    }
-    return(TimeChCheck)
-  })
-  
-  
-  ## order fcs expression according acquisition time
-  ordFCS <- reactive({
-    if(is.null(set()))
-      return(NULL)
-    if(is.null(TimeChCheck())){
-      ordFCS <- ord_fcs_time(set(), timeChannel())
-    }else{
-      ordFCS <- set()
-    }
-    return(ordFCS)
-  })
-  
-  
-  ## signal bin size UI
-  output$signalBinSize <- renderUI({
-    
-    ns <- session$ns
-    
-    if(is.null(set())){
-      optSize <- NULL
-      maxSize <- Inf
-    }else{
-      maxSize <- nrow(ordFCS())
-      optSize <- min(max(1, floor(maxSize/100)), 500)
-    }
-    numericInput(ns("signalBinSize"), label = h5("Number of events per bin:"),
-                 value = optSize, min = 1, max = maxSize)
-  })
-  
-  
-  ## cell quality check
-  cellCheck <- reactive({
-    if(is.null(ordFCS()))
-      return(NULL)
-    if(is.null(TimeChCheck())){
-      flowRateData <- flow_rate_bin(ordFCS(), second_fraction = input$timeLenth,
-                                    timeCh = timeChannel(), timestep = timeStep())
-    }else{
-      flowRateData <- list()
-    }
-    flowSignalData <- flow_signal_bin(ordFCS(), channels = NULL, 
-                                      binSize = input$signalBinSize, timeCh = timeChannel(), 
-                                      timestep = timeStep(), TimeChCheck = TimeChCheck() )
-    
-    flowMarginData <- flow_margin_check(ordFCS())
-    
-    res <- list(flowRateData, flowSignalData, flowMarginData)
-    return(res)
-  })
-  
-  
-  ## flow rate time slider UI and check sliders. if they are null, a default value is returned for the QC
-  sliders <- reactive({
-    flowRateData <- cellCheck()[[1]]
-    flowSignalData <- cellCheck()[[2]]
-    return(c(
-      min(flowRateData$frequencies[,3]) - 0.1,
-      max(flowRateData$frequencies[,3]) + 0.1,
-      min(flowRateData$frequencies[,4]) - 10,
-      max(flowRateData$frequencies[,4]) + 10,
-      0,
-      nrow(flowSignalData$exprsBin) + 1)
-    )
-  })
-  
-  output$timeSlider <- renderUI({
-    ns <- session$ns
-    
-    if(is.null(set()) || is.null(cellCheck()) || !is.null(TimeChCheck()))
-      return(NULL)
-    sliderInput(ns("timeSlider"), strong("Time cut:"),
-                min = sliders()[1], max = sliders()[2], 
-                value = c(sliders()[1], sliders()[2]), step = 0.1)
-  })
-  timeSlider <- reactive({
-    if(is.null(input$timeSlider)){
-      return(c(sliders()[1], sliders()[2]))
-    }else{
-      return(c(input$timeSlider[1],  input$timeSlider[2]))
-    }
-    
-  })
-  
-  output$rateSlider <- renderUI({
-    ns <- session$ns
-    if(is.null(set()) || is.null(cellCheck()) || !is.null(TimeChCheck()))
-      return(NULL)
-    
-    sliderInput(ns("rateSlider"), strong("Flow rate cut:"),
-                min = sliders()[3], max = sliders()[4], 
-                value = c(sliders()[3], sliders()[4]), step = 0.1)
-  })
-  rateSlider <- reactive({
-    if(is.null(input$rateSlider)){
-      flowRateData <- cellCheck()[[1]]
-      return(c(sliders()[3], sliders()[4]))
-    }else{
-      return(c(input$rateSlider[1],  input$rateSlider[2]))
-    }
-    
-  })
-  
-  output$signalBinSlider <- renderUI({
-    ns <- session$ns
-    if(is.null(set()) || is.null(cellCheck()))
-      return(NULL)
-    sliderInput(ns("signalBinSlider"), strong("Signal acquisition cut:"), width = "90%",
-                min = sliders()[5], max = sliders()[6], 
-                value = c(sliders()[5], sliders()[6]), step = 1)
-  })
-  signalSlider <- reactive({
-    if(is.null(input$signalBinSlider)){
-      return(c(sliders()[5], sliders()[6]))
-    }else{
-      return(c(input$signalBinSlider[1],  input$signalBinSlider[2]))
-    }
-  }) 
-  
-  
-  ## plot
-  output$flowRatePlot <- renderPlot({
-    if(is.null(ordFCS()) || is.null(cellCheck()) || !is.null(TimeChCheck()))
-      return(NULL)
-    flowRateData <- cellCheck()[[1]]
-    frp <- flow_rate_plot(flowRateData, input$rateSlider[1], input$rateSlider[2],
-                          input$timeSlider[1], input$timeSlider[2])
-    print(frp)
-  })
-  
-  output$flowSignalPlot <- renderPlot({
-    if(is.null(set()) || is.null(cellCheck()))
-      return(NULL)
-    flowSignalData <- cellCheck()[[2]]
-    fsp <- flow_signal_plot(flowSignalData, input$signalBinSlider[1], input$signalBinSlider[2])
-    print(fsp)
-  })
-  
-  output$flowMarginPlot <- renderPlot({
-    if(is.null(set()) || is.null(cellCheck()))
-      return(NULL)
-    flowMarginData <- cellCheck()[[3]]
-    fmp <- flow_margin_plot(flowMarginData, input$signalBinSize)
-    print(fmp)
-  })
-  
-  
-  
-  ## check results
-  checkRes <- reactive({
-    if(is.null(set()) || is.null(cellCheck()))
-      return(NULL)
-    
-    ordFCS <- ordFCS()
-    totalCellNum <- nrow(ordFCS)
-    origin_cellIDs <- 1:totalCellNum
-    if(is.null(TimeChCheck())){
-      FlowRateQC <- flow_rate_check(cellCheck()[[1]], rateSlider()[1], rateSlider()[2],
-                                    timeSlider()[1], timeSlider()[2])
-    }else{
-      FlowRateQC <- origin_cellIDs
-    }
-    FlowSignalQC <- flow_signal_check(cellCheck()[[2]], signalSlider()[1], signalSlider()[2])
-    
-    if(input$checkbox[1] == TRUE){
-      FlowMarginQC <- cellCheck()[[3]]$goodCellIDs
-    }else{
-      FlowMarginQC <- origin_cellIDs
-    }
-    
-    goodCellIDs <- intersect(FlowRateQC, intersect(FlowSignalQC, FlowMarginQC))
-    badCellIDs <- setdiff(origin_cellIDs, goodCellIDs)
-    
-    flowRatePerc <- 1 - length(FlowRateQC)/length(origin_cellIDs)
-    flowSignalPerc <- 1 - length(FlowSignalQC)/length(origin_cellIDs)
-    flowMarginPerc <- 1 - length(FlowMarginQC)/length(origin_cellIDs)
-    totalBadPerc <- length(badCellIDs)/length(origin_cellIDs)
-    
-    params <- parameters(ordFCS)
-    keyval <- flowCore::keyword(ordFCS)
-    sub_exprs <- flowCore::exprs(ordFCS)
-    
-    good_sub_exprs <- sub_exprs[goodCellIDs, ]
-    goodfcs <- flowFrame(exprs = good_sub_exprs, parameters = params, description = keyval)
-    
-    bad_sub_exprs <- sub_exprs[badCellIDs, ]
-    badfcs <- flowFrame(exprs = bad_sub_exprs, parameters = params,description = keyval)
-    
-    tempQCvector <- cellCheck()[[2]]
-    QCvector <- tempQCvector$cellBinID[,"binID"]
-    QCvector[badCellIDs] <- runif(length(badCellIDs), min=10000, max=20000) 
-    QCfcs <- addQC(QCvector, sub_exprs, params, keyval)
-    
-    return(list(totalCellNum, totalBadPerc, goodfcs, badfcs,
-                flowRatePerc, flowSignalPerc, flowMarginPerc, QCfcs))
-  })
-  
-  ## summary text
-  output$summaryText1 <- renderText({
-    if(is.null(checkRes()))
-      return(NULL)
-    paste0("Total number of events: ", checkRes()[[1]])
-  })
-  
-  output$summaryText2 <- renderText({
-    if(is.null(checkRes()))
-      return(NULL)
-    paste0("Percentage of low-Q events: ", round(checkRes()[[2]]*100,2), "%")
-  })
-  
-  output$flowRateSummary <- renderText({
-    if(is.null(checkRes()))
-      return(NULL)
-    if(is.null(TimeChCheck())){
-      paste0("Percentage of low-Q events in flow rate check: ", round(checkRes()[[5]]*100,2), "%")
-    }else if(!is.null(TimeChCheck()) && TimeChCheck() == "NoTime"){
-      "It is not possible to recreate the flow rate because the time channel is missing."
-    }else if(!is.null(TimeChCheck()) && TimeChCheck() == "single_value"){
-      "It is not possible to recreate the flow rate because the time channel contains a single value."
-    }
-  })
-  
-  output$flowSignalSummary <- renderText({
-    if(is.null(checkRes()))
-      return(NULL)
-    paste0("Percentage of low-Q events in signal acquisition check: ", round(checkRes()[[6]]*100,2), "%")
-  })
-  
-  output$flowMarginSummary <- renderText({
-    if(is.null(checkRes()))
-      return(NULL)
-    paste0("Percentage of low-Q events in dynamic range check: ", round(checkRes()[[7]]*100,2), "%")
-  })
-  
-  file_base <- reactive({
-    file_ext <- flowCore::description(ordFCS())$FILENAME
-    file_base <- sub("^([^.]*).*", "\\1", file_ext)
-    return(file_base)
-  })
-  
-  ## download processed FCS files
-  output$downloadGoodFCS <- downloadHandler(
-    filename = function(){
-      paste0(file_base(), "_HighQ.fcs")
-    },
-    
-    content = function(file){
-      data <- checkRes()[[3]]
-      if(is.null(data)){
-        return(NULL)
-      }
-      write.FCS(data, file)
-      #tar(tarfile = file, files = tempdir)
-    }
-  )
-  
-  output$downloadBadFCS <- downloadHandler(
-    filename = function(){
-      paste0(file_base(), "_LowQ.fcs")
-    },
-    
-    content = function(file){
-      data <- checkRes()[[4]]
-      if(is.null(data)){
-        return(NULL)
-      }
-      write.FCS(data, file)
-      #tar(tarfile = file, files = tempdir)
-    }
-  )
-  
-  
-  ## download processed FCS files
-  output$downloadQCFCS <- downloadHandler(
-    filename = function(){
-      paste(file_base(), "_QC.fcs", sep='')
-    },
-    
-    content = function(file){
-      data <- checkRes()[[8]]
-      if(is.null(data)){
-        return(NULL)
-      }
-      write.FCS(data, file)
-      #tar(tarfile = file, files = tempdir)
-    }
-  )
-  ### automatic part ####
-  # observeEvent(input$auto_qc_button_input, {
-  #   output$show_information_render <- renderUI({
-  #     box(id = "box_information", width = 12, 
-  #         # div(style="display: inline-block;vertical-align:top; width: 500px;", cat("The current data selected is ", textOutput(ns("current_data_input")))),
-  #         verbatimTextOutput("information"))
-  #   })
+  # observe({
+  #   rval$update_gs
+  #   validate(need(class(rval$gating_set) == "GatingSet", "No GatingSet available"))
+  #   choices <- flowWorkspace::pData(rval$gating_set)$name
+  #   updateSelectInput(session, "sample", choices = choices, selected = choices[1])
   # })
   # 
-
-  
-  
-  # output$show_information_render <- renderUI({
-  #   if(input$auto_qc_button_input %%2){
-  #     box(width = 12,
-  #             # div(style="display: inline-block;vertical-align:top; width: 500px;", cat("The current data selected is ", textOutput(ns("current_data_input")))),
-  #             verbatimTextOutput(ns("info")))
-  #     
+  # ## load flowset data
+  # set <- reactive({
+  # 
+  #   validate(need(class(rval$gating_set) == "GatingSet", "No GatingSet available"))
+  #   validate(need(input$sample, "No sample selected"))
+  #   set <- rval$gating_set@data[[input$sample]]
+  # 
+  #   # if (input$goButton == 0)
+  #   #   return()
+  #   # isolate({fcsFiles <- input$fcsFiles
+  #   # if (is.null(fcsFiles))
+  #   #   return(NULL)
+  #   # set <- read.FCS(fcsFiles$datapath)
+  #   # set@description$FILENAME <- fcsFiles$name})
+  #   return(set)
+  # })
+  # 
+  # ## time channel name
+  # timeChannel <- reactive({
+  #   if(is.null(set()))
+  #     return(NULL)
+  #   x <- set()
+  #   time <- findTimeChannel(x)
+  #   return(time)
+  # })
+  # 
+  # ## time step
+  # timeStep <- reactive({
+  #   if(is.null(set()))
+  #     return(NULL)
+  #   word <- which(grepl("TIMESTEP", names(set()@description),
+  #                       ignore.case = TRUE))
+  #   timestep <- as.numeric(set()@description[[word[1]]])
+  #   if( !length(timestep) ){
+  #     warning("The timestep keyword was not found in the FCS file and it was set to 0.01. Graphs labels indicating time might not be correct", call. =FALSE)
+  #     timestep <- 0.01
+  #   }
+  #   return(timestep)
+  # })
+  # 
+  # 
+  # TimeChCheck <- reactive({
+  #   if (!is.null(timeChannel())) {
+  #     if (length(unique(flowCore::exprs(set())[, timeChannel()])) == 1){
+  #       TimeChCheck <- "single_value"
+  #     }else{
+  #       TimeChCheck <- NULL
+  #     }
+  #   }else{
+  #     TimeChCheck <- "NoTime"
+  #   }
+  #   return(TimeChCheck)
+  # })
+  # 
+  # 
+  # ## order fcs expression according acquisition time
+  # ordFCS <- reactive({
+  #   if(is.null(set()))
+  #     return(NULL)
+  #   if(is.null(TimeChCheck())){
+  #     ordFCS <- ord_fcs_time(set(), timeChannel())
+  #   }else{
+  #     ordFCS <- set()
+  #   }
+  #   return(ordFCS)
+  # })
+  # 
+  # 
+  # ## signal bin size UI
+  # output$signalBinSize <- renderUI({
+  # 
+  #   ns <- session$ns
+  # 
+  #   if(is.null(set())){
+  #     optSize <- NULL
+  #     maxSize <- Inf
+  #   }else{
+  #     maxSize <- nrow(ordFCS())
+  #     optSize <- min(max(1, floor(maxSize/100)), 500)
+  #   }
+  #   numericInput(ns("signalBinSize"), label = h5("Number of events per bin:"),
+  #                value = optSize, min = 1, max = maxSize)
+  # })
+  # 
+  # 
+  # ## cell quality check
+  # cellCheck <- reactive({
+  #   if(is.null(ordFCS()))
+  #     return(NULL)
+  #   if(is.null(TimeChCheck())){
+  #     flowRateData <- flow_rate_bin(ordFCS(), second_fraction = input$timeLenth,
+  #                                   timeCh = timeChannel(), timestep = timeStep())
+  #   }else{
+  #     flowRateData <- list()
+  #   }
+  #   flowSignalData <- flow_signal_bin(ordFCS(), channels = NULL,
+  #                                     binSize = input$signalBinSize, timeCh = timeChannel(),
+  #                                     timestep = timeStep(), TimeChCheck = TimeChCheck() )
+  # 
+  #   flowMarginData <- flow_margin_check(ordFCS())
+  # 
+  #   res <- list(flowRateData, flowSignalData, flowMarginData)
+  #   return(res)
+  # })
+  # 
+  # 
+  # ## flow rate time slider UI and check sliders. if they are null, a default value is returned for the QC
+  # sliders <- reactive({
+  #   flowRateData <- cellCheck()[[1]]
+  #   flowSignalData <- cellCheck()[[2]]
+  #   return(c(
+  #     min(flowRateData$frequencies[,3]) - 0.1,
+  #     max(flowRateData$frequencies[,3]) + 0.1,
+  #     min(flowRateData$frequencies[,4]) - 10,
+  #     max(flowRateData$frequencies[,4]) + 10,
+  #     0,
+  #     nrow(flowSignalData$exprsBin) + 1)
+  #   )
+  # })
+  # 
+  # output$timeSlider <- renderUI({
+  #   ns <- session$ns
+  # 
+  #   if(is.null(set()) || is.null(cellCheck()) || !is.null(TimeChCheck()))
+  #     return(NULL)
+  #   sliderInput(ns("timeSlider"), strong("Time cut:"),
+  #               min = sliders()[1], max = sliders()[2],
+  #               value = c(sliders()[1], sliders()[2]), step = 0.1)
+  # })
+  # timeSlider <- reactive({
+  #   if(is.null(input$timeSlider)){
+  #     return(c(sliders()[1], sliders()[2]))
+  #   }else{
+  #     return(c(input$timeSlider[1],  input$timeSlider[2]))
+  #   }
+  # 
+  # })
+  # 
+  # output$rateSlider <- renderUI({
+  #   ns <- session$ns
+  #   if(is.null(set()) || is.null(cellCheck()) || !is.null(TimeChCheck()))
+  #     return(NULL)
+  # 
+  #   sliderInput(ns("rateSlider"), strong("Flow rate cut:"),
+  #               min = sliders()[3], max = sliders()[4],
+  #               value = c(sliders()[3], sliders()[4]), step = 0.1)
+  # })
+  # rateSlider <- reactive({
+  #   if(is.null(input$rateSlider)){
+  #     flowRateData <- cellCheck()[[1]]
+  #     return(c(sliders()[3], sliders()[4]))
+  #   }else{
+  #     return(c(input$rateSlider[1],  input$rateSlider[2]))
+  #   }
+  # 
+  # })
+  # 
+  # output$signalBinSlider <- renderUI({
+  #   ns <- session$ns
+  #   if(is.null(set()) || is.null(cellCheck()))
+  #     return(NULL)
+  #   sliderInput(ns("signalBinSlider"), strong("Signal acquisition cut:"), width = "90%",
+  #               min = sliders()[5], max = sliders()[6],
+  #               value = c(sliders()[5], sliders()[6]), step = 1)
+  # })
+  # signalSlider <- reactive({
+  #   if(is.null(input$signalBinSlider)){
+  #     return(c(sliders()[5], sliders()[6]))
+  #   }else{
+  #     return(c(input$signalBinSlider[1],  input$signalBinSlider[2]))
   #   }
   # })
-  # Read the gatingSet object and make the automatic cleaning & show the result in a box
+  # 
+  # 
+  # ## plot
+  # output$flowRatePlot <- renderPlot({
+  #   if(is.null(ordFCS()) || is.null(cellCheck()) || !is.null(TimeChCheck()))
+  #     return(NULL)
+  #   flowRateData <- cellCheck()[[1]]
+  #   frp <- flow_rate_plot(flowRateData, input$rateSlider[1], input$rateSlider[2],
+  #                         input$timeSlider[1], input$timeSlider[2])
+  #   print(frp)
+  # })
+  # 
+  # output$flowSignalPlot <- renderPlot({
+  #   if(is.null(set()) || is.null(cellCheck()))
+  #     return(NULL)
+  #   flowSignalData <- cellCheck()[[2]]
+  #   fsp <- flow_signal_plot(flowSignalData, input$signalBinSlider[1], input$signalBinSlider[2])
+  #   print(fsp)
+  # })
+  # 
+  # output$flowMarginPlot <- renderPlot({
+  #   if(is.null(set()) || is.null(cellCheck()))
+  #     return(NULL)
+  #   flowMarginData <- cellCheck()[[3]]
+  #   fmp <- flow_margin_plot(flowMarginData, input$signalBinSize)
+  #   print(fmp)
+  # })
+  # 
+  # 
+  # 
+  # ## check results
+  # checkRes <- reactive({
+  #   if(is.null(set()) || is.null(cellCheck()))
+  #     return(NULL)
+  # 
+  #   ordFCS <- ordFCS()
+  #   totalCellNum <- nrow(ordFCS)
+  #   origin_cellIDs <- 1:totalCellNum
+  #   if(is.null(TimeChCheck())){
+  #     FlowRateQC <- flow_rate_check(cellCheck()[[1]], rateSlider()[1], rateSlider()[2],
+  #                                   timeSlider()[1], timeSlider()[2])
+  #   }else{
+  #     FlowRateQC <- origin_cellIDs
+  #   }
+  #   FlowSignalQC <- flow_signal_check(cellCheck()[[2]], signalSlider()[1], signalSlider()[2])
+  # 
+  #   if(input$checkbox[1] == TRUE){
+  #     FlowMarginQC <- cellCheck()[[3]]$goodCellIDs
+  #   }else{
+  #     FlowMarginQC <- origin_cellIDs
+  #   }
+  # 
+  #   goodCellIDs <- intersect(FlowRateQC, intersect(FlowSignalQC, FlowMarginQC))
+  #   badCellIDs <- setdiff(origin_cellIDs, goodCellIDs)
+  # 
+  #   flowRatePerc <- 1 - length(FlowRateQC)/length(origin_cellIDs)
+  #   flowSignalPerc <- 1 - length(FlowSignalQC)/length(origin_cellIDs)
+  #   flowMarginPerc <- 1 - length(FlowMarginQC)/length(origin_cellIDs)
+  #   totalBadPerc <- length(badCellIDs)/length(origin_cellIDs)
+  # 
+  #   params <- parameters(ordFCS)
+  #   keyval <- flowCore::keyword(ordFCS)
+  #   sub_exprs <- flowCore::exprs(ordFCS)
+  # 
+  #   good_sub_exprs <- sub_exprs[goodCellIDs, ]
+  #   goodfcs <- flowFrame(exprs = good_sub_exprs, parameters = params, description = keyval)
+  # 
+  #   bad_sub_exprs <- sub_exprs[badCellIDs, ]
+  #   badfcs <- flowFrame(exprs = bad_sub_exprs, parameters = params,description = keyval)
+  # 
+  #   tempQCvector <- cellCheck()[[2]]
+  #   QCvector <- tempQCvector$cellBinID[,"binID"]
+  #   QCvector[badCellIDs] <- runif(length(badCellIDs), min=10000, max=20000)
+  #   QCfcs <- addQC(QCvector, sub_exprs, params, keyval)
+  # 
+  #   return(list(totalCellNum, totalBadPerc, goodfcs, badfcs,
+  #               flowRatePerc, flowSignalPerc, flowMarginPerc, QCfcs))
+  # })
+  # 
+  # ## summary text
+  # output$summaryText1 <- renderText({
+  #   if(is.null(checkRes()))
+  #     return(NULL)
+  #   paste0("Total number of events: ", checkRes()[[1]])
+  # })
+  # 
+  # output$summaryText2 <- renderText({
+  #   if(is.null(checkRes()))
+  #     return(NULL)
+  #   paste0("Percentage of low-Q events: ", round(checkRes()[[2]]*100,2), "%")
+  # })
+  # 
+  # output$flowRateSummary <- renderText({
+  #   if(is.null(checkRes()))
+  #     return(NULL)
+  #   if(is.null(TimeChCheck())){
+  #     paste0("Percentage of low-Q events in flow rate check: ", round(checkRes()[[5]]*100,2), "%")
+  #   }else if(!is.null(TimeChCheck()) && TimeChCheck() == "NoTime"){
+  #     "It is not possible to recreate the flow rate because the time channel is missing."
+  #   }else if(!is.null(TimeChCheck()) && TimeChCheck() == "single_value"){
+  #     "It is not possible to recreate the flow rate because the time channel contains a single value."
+  #   }
+  # })
+  # 
+  # output$flowSignalSummary <- renderText({
+  #   if(is.null(checkRes()))
+  #     return(NULL)
+  #   paste0("Percentage of low-Q events in signal acquisition check: ", round(checkRes()[[6]]*100,2), "%")
+  # })
+  # 
+  # output$flowMarginSummary <- renderText({
+  #   if(is.null(checkRes()))
+  #     return(NULL)
+  #   paste0("Percentage of low-Q events in dynamic range check: ", round(checkRes()[[7]]*100,2), "%")
+  # })
+  # 
+  # file_base <- reactive({
+  #   file_ext <- flowCore::description(ordFCS())$FILENAME
+  #   file_base <- sub("^([^.]*).*", "\\1", file_ext)
+  #   return(file_base)
+  # })
+  # 
+  # ## download processed FCS files
+  # output$downloadGoodFCS <- downloadHandler(
+  #   filename = function(){
+  #     paste0(file_base(), "_HighQ.fcs")
+  #   },
+  # 
+  #   content = function(file){
+  #     data <- checkRes()[[3]]
+  #     if(is.null(data)){
+  #       return(NULL)
+  #     }
+  #     write.FCS(data, file)
+  #     #tar(tarfile = file, files = tempdir)
+  #   }
+  # )
+  # 
+  # output$downloadBadFCS <- downloadHandler(
+  #   filename = function(){
+  #     paste0(file_base(), "_LowQ.fcs")
+  #   },
+  # 
+  #   content = function(file){
+  #     data <- checkRes()[[4]]
+  #     if(is.null(data)){
+  #       return(NULL)
+  #     }
+  #     write.FCS(data, file)
+  #     #tar(tarfile = file, files = tempdir)
+  #   }
+  # )
+  # 
+  # 
+  # ## download processed FCS files
+  # output$downloadQCFCS <- downloadHandler(
+  #   filename = function(){
+  #     paste(file_base(), "_QC.fcs", sep='')
+  #   },
+  # 
+  #   content = function(file){
+  #     data <- checkRes()[[8]]
+  #     if(is.null(data)){
+  #       return(NULL)
+  #     }
+  #     write.FCS(data, file)
+  #     #tar(tarfile = file, files = tempdir)
+  #   }
+  # )
+  ### automatic part ####
   
+  ### reactive choice for sample with adding idx ####
+  observe({
+    if(!is.null(rval$gating_set)){
+      chNames <- flowWorkspace::colnames(rval$gating_set)
+      pattern <- c("FCS|SSC")
+      grepCh<- grep(pattern, chNames, value = TRUE)
+      
+      grepFilterCh <- chNames[!chNames %in% grepCh]
+      currentCh <- c(grepFilterCh, "NULL")
+      updateSelectInput(session = session, inputId = "options_chExclude", 
+                        choices = currentCh,
+                        select = currentCh[length(currentCh)])
+      
+      
+      updateSelectInput(session = session, inputId = "options_chExclude2", 
+                        choices = currentCh,
+                        select = currentCh[length(currentCh)])
+    }
+    
+    
+  })
+  
+  choice_sample_idx <- reactive({
+    if(!is.null(rval$gating_set)){
+      names_list <- list(flowCore::sampleNames(rval$gating_set@data))
+      
+      # get all sample associated with a number row (idx)
+      melt_list <- melt(names_list)
+      melt_list <- melt_list["value"]
+      colnames(melt_list) <- "sample"
+      
+      id_melted_sample<- cbind(melt_list, "idx" = 1:length(flowCore::sampleNames(rval$gating_set@data)))
+      get_idx_for_sample <- setNames(id_melted_sample$idx, id_melted_sample$sample)
+      
+      return(get_idx_for_sample)
+    }
+    else{
+      message("need gating set")
+    }
+  })
+
+  #'@importFrom flowWorkspace colnames
+  
+  ## update channel
+  observe({
+  updateSelectInput(session, "choice_channel_input", label = "Select time channel",
+                    choices = flowWorkspace::colnames(rval$gating_set))
+  })
+  
+  ## Update the sample from the flowSet 
+  observe({
+    updateSelectInput(session, "choice_sample_input",
+                      label = paste("Select sample"),
+                      choices = choice_sample_idx(),
+                      selected = choice_sample_idx()[1])
+  })
+  
+  observeEvent(input$auto_qc_button_input, {
+    updateSelectInput(session, "select_one_sample",
+                      label = paste("Select sample for visualization"),
+                      choices = choice_sample_idx(),
+                      selected = choice_sample_idx()[1]
+                      )
+  })
+
+  
+  # reactive({
+  #   print(input$select_sample_input)
+  #   
+  #  
+  # })
+  
+  # observeEvent(input$clean_selected_sample_input, {
+  #   print(input$choice_sample_input)
+  #   print("ok")
+  #   print(input$choice_channel_input)
+  #   
+  # })
   
   observe({
     observeEvent(input$auto_qc_button_input, {
      
-      # library(flowAI)
-      # if(!is.null(rval$gating_set)){
-      #   rval_data <- rval$gating_set@data
-      #   
-      #   ## Show actual dataset selected from import ####
-      #   output$current_data_input <- renderText({
-      #     rval$gating_set_selected
-      #   })
-      #   
-      # } else {
-      #     rval_data <- NULL}
 
       if(!is.null(rval$gating_set@data)){
-        # output$load_text <- renderText({
-        #   "fichier charger check console"
-        #   })
-      # output$ChExcludeFS <- renderUI({
-      #   selectInput("chExclude",
-      #               choices = colnames(#file))
-      # })
+        # showTab(inputId = "tab_result_cleaning_all_sample", target = "Heatmap cleaning")
 
         ### flow_auto_qc automatic analyse for all gating_set object data available #####
-        # output$info <- renderPrint({
-        #   N <- 10
           withProgress(message = 'The data cleaning is running..', {
-            # for(i in 1:N){
-            #   
-            #   # Long Running Task
-            #   Sys.sleep(0.1)
-            #   
-            #   # Update progress
-            #   incProgress(1/N)
-            
+
           
           ## get the sample name from the gating set
+            
           names_sam <- flowCore::sampleNames(rval$gating_set)
           
           ## apply Flow rate parameter (Quality content) & bin arg
-          FR_QC_arg <- list(alpha = 0.1, use_decomp = F)
-          FR_bin_arg <- list( second_fraction = 1, timeCh = "Time",
+    
+          FR_QC_arg <- list(alpha = input$alpha, use_decomp = F)
+          FR_bin_arg <- list( second_fraction = 1, timeCh = input$choice_channel_input,
                               timestep = 0.1)
+          
           ## apply signal acquisition parameters 
           
-          FS_bin_arg <- list( binSize = 50, timeCh = NULL, timestep = 0.1, TimeChCheck = 0.1)
-          FS_QC_arg <- list(ChannelExclude = c("FSC", "SSC"), 500, 3, F)
+          FS_bin_arg <- list( binSize = input$binSize, timeCh = input$choice_channel_input, timestep = 0.1, TimeChCheck = 0.1)
+          FS_QC_arg <- list(ChannelExclude = input$options_chExclude, 500, 3, input$remove_outlier)
           
           ## get the cleaning for dynamic range / flow rate / signal acquisition in list
-          flow_margin_data_list <- list() 
+    
           flowRateQCList <- list()
           FlowSignalQCList <- list()
+          dynamic_range <- list()
           
           for(i in 1:length(rval$gating_set@data)){
             
-            
-            flow_margin_data_list$aa[names_sam[i]] <- list(flow_margin_check_a(rval$gating_set@data[[i]], side = "both"))
+            ### ICI ####
+            dynamic_range$aa[names_sam[i]] <- list(flow_margin_check(rval$gating_set@data[[i]], side = input$side))
             # ordFCS_list[names_sam[i]] <- ord_fcs_time(GvHD[[i]], "Time")
-            ordFCS <- ord_fcs_time(rval$gating_set@data[[i]], "Time")
+            ordFCS <- ord_fcs_time(rval$gating_set@data[[i]], input$choice_channel_input)
             
             # flow rate process
-            flowRateData <- do.call(flow_rate_bin_a, c(ordFCS, FR_bin_arg))
+            flowRateData <- do.call(flow_rate_bin, c(ordFCS, FR_bin_arg))
             flowRateQCList$sample[[names_sam[i]]]<- do.call(flow_rate_check_a, c(ordFCS,list(flowRateData), FR_QC_arg))
             
             # signal acquisition process
-            FlowSignalData <- do.call(flow_signal_bin_a, c(ordFCS,FS_bin_arg))
+            FlowSignalData <- do.call(flow_signal_bin, c(ordFCS,FS_bin_arg))
             FlowSignalQCList$sample[[names_sam[i]]] <- do.call(flow_signal_check_a, c(ordFCS,list(FlowSignalData),FS_QC_arg))
             
-            
+            incProgress(1/i, detail = paste("(current sample : ", i, ")"))
           }
           
           ## Creating dataframe for the heatmap ("showing the quality content")
+          
           df <- NULL
           for(i in 1:length(rval$gating_set@data)){
             
             Signal_acquisition <- FlowSignalQCList$sample[[i]]$Perc_bad_cells$badPerc_cp*100
             Flow_rate <- flowRateQCList$sample[[i]]$res_fr_QC$badPerc*100
-            #Dynamic_range <- dynamic_range$aa[[i]]$badPerc*100
+            Dynamic_range <- dynamic_range$aa[[i]]$badPerc*100
             df <- rbind(df, data.frame(Flow_rate, 
-                                       #Dynamic_range, 
+                                       Dynamic_range,
                                        Signal_acquisition )) 
             
           }
           rownames(df) <- names_sam
           melted_data <- melt(data.table::setDT(df, keep.rownames = T))
-          print(melted_data)
-          #library(plotly)
-          #library(data.table)
-          output$plot_info_qc <- plotly::renderPlotly({
+          # print(melted_data)
+          
+          ### Heatmap for all samples ####
+          color_selection <- reactive({
+            if(input$colorpalette_select == "Default"){
+              pal_fill<- scale_fill_gradient(low = "#77ff00", high = "red")
+              return(pal_fill)
+            } 
+            else if(input$colorpalette_select == "A"){
+              pal_fill <- scale_fill_viridis_c(option = "A")
+            }
+            else if(input$colorpalette_select == "B"){
+              scale_fill_viridis_c(option = "B")
+            }
+            else if(input$colorpalette_select == "C"){
+              scale_fill_viridis_c(option = "C")
+            }
+            else{
+              scale_fill_viridis_c(option = "D")
+            }
+          })
+          
+          height_dynamic <- reactive({
+            val <- input$change_height
+            print(val)
+            return(val)
+            })
+          if(!is.null(melted_data)){
             
-            ggplot(data = melted_data, aes(y = rn, x = variable)) + geom_tile(aes(fill = value), colour = "black") +  
-              scale_fill_gradient(low = "#77ff00", high = "red") +
-              scale_x_discrete("", expand = c(0, 0)) + 
-              scale_y_discrete("", expand = c(0, 0)) +
+            colnames(melted_data)[which(names(melted_data) == "rn")] <- "sample"
+            colnames(melted_data)[which(names(melted_data) == "value")] <- "cleaning_pourcentage"
+            
+            output$plot_info_qc <- plotly::renderPlotly({
               
-              theme(
-                    # axis.ticks = element_blank(), 
-                    axis.text.x = element_text(angle = 330, hjust = 0)
-                    )
+              all_smp_plot <- ggplot(data = melted_data, aes(y = sample, x = variable)) + geom_tile(aes(fill = cleaning_pourcentage), size = 0.25,colour = "black") +
+                # scale_x_discrete("", expand = c(0, 0)) + 
+                scale_y_discrete("", expand = c(0, 0)) +
+                
+                theme(
+                  # axis.ticks = element_blank(), 
+                  axis.text.x = element_text(angle = 330, hjust = 0)
+                ) +
+                color_selection() +
+                xlab(NULL) + 
+                ylab(NULL) 
+               
+              
+              plotly::ggplotly(all_smp_plot, height = height_dynamic())
+              
+              
+            })
+            
+            ### Plot for all sample ########
+            sample_name_for_plot <- reactive({
+              names <- flowCore::sampleNames(rval$gating_set)
+              # print(names)
+              
+              return(names)
+            })
+            
+            ## reactive dynamic range plot 
+            dyna_range_plot <- reactive({
+              value <- dynamic_range$aa[[sample_name_for_plot()[as.numeric(input$select_one_sample)]]]
+              # print(value) 
+              
+              return(value)
+            })
+            
+            output$flow_rate_plot_output <- renderPlot({
+              # print(flowRateQCList$sample[[flowCore::sampleNames(rval$gating_set)[1]]])
+              # flow_rate_plot_a(flowRateQCList$sample[sample_name_for_plot()[as.numeric(input$select_one_sample)]])
+              flow_rate_plot_a(flowRateQCList$sample[[sample_name_for_plot()[as.numeric(input$select_one_sample)]]])
+            })
+            
+            output$dynamic_plot_output <-renderPlot({
+              flow_margin_plot(dyna_range_plot())
+            })
+            
+            output$signal_acquisition_plot_output <- renderPlot({
+              # print(FlowSignalQCList$sample[[1]])
+              flow_signal_plot_a(FlowSignalQCList$sample[[as.numeric(input$select_one_sample)]])
+              
+            })
+          }
           })
-          # for(i in 1:length(rval_data)){
-          # resQC <- flow_auto_qc(rval_data[[i]],
-          #                       remove_from = input$Remove_anomalies,
-          #                       output = input$button_output,
-          #                       second_fractionFR = input$sd_frac_c,
-          #                       alphaFR = input$sg_input_value,
-          #                       decompFR = input$decomp_input,
-          #                       # ChExcludeFS = ,
-          #                       outlier_binsFS = input$outlier_bin,
-          #                       pen_valueFS = input$pen_valueFS_input,
-          #                       max_cptFS = input$max_cptsFS_input,
-          #                       # ChExcludeFM =
-          #                       sideFM = input$sideFM_input,
-          #                       neg_valuesFM = input$neg_valuesFM_input,
-          #                       html_report = F,
-          #                       mini_report = F,
-          #                       fcs_QC = F,
-          #                       fcs_highQ = input$fcs_highQ_input,
-          #                       # fcs_lowQ = input$fcs_lowQ_input,
-          #                       folder_results = F
-          # )
-          # flow_auto_clicked()
-          # cat("\n")
-          # print(flow_auto_clicked()[1]['name' == "FSC-H"])
-         
-           # resQC <- flow_auto_clicked()
-          # print(rval$gating_set@data$s5a01)
-          # print(resQC[[1]])
-          # print(table(rval$gating_set@data$s5a01@exprs %in% resQC[[1]]@exprs ))
-          
-          # sample_names <- (rownames(rval$gating_set@data@phenoData))
-          # print(sample_names) 
-          # print(getElement(rval$gating_set@data@frames, sample_names[i]))
-
-          # }
-          # print(names(resQC@frames))
-          # print(paste0("Value of the output : " , input$button_output))
-          # print(paste0("Anomalies to remove choice : ", input$Remove_anomalies))
-          # print(paste0("Second_fractionFR value : ", input$sd_frac_c))
-          # print(paste0("alphaFR value : " , input$sg_input_value))
-          # print(paste0("decompFR value : ", input$decomp_input))
-          # print(paste0("outlier_binsFS value : " , input$outlier_bin))
-          # print(paste0("pen_valueFS value : " , input$pen_valueFS_input))
-          # print(paste0("max_cptFS value : ", input$max_cptsFS_input))
-   
-          # print("____________________________________________________")
-          # print(resQC)
-          # print("____________________________________________________")
-          
-          # print(names(rval))
-          # print(rval$gating_set@data)
-          # print(length(rval$gating_set@data))
-          # print(resQC)
-          
-          })
-        # })
-
         
+        frame_result <- reactive({
+          df_result_output <- NULL
+          for(i in 1:length(rval$gating_set)){
+            
+            ### FRAME ALL SAMPLE ####
+            
+            Sample <- sample_name_for_plot()[i]
+            Signal_acquisition <- FlowSignalQCList$sample[[i]]$Perc_bad_cells$badPerc_cp*100
+            Flow_rate <- flowRateQCList$sample[[i]]$res_fr_QC$badPerc*100
+            Dynamic_range <- dynamic_range$aa[[i]]$badPerc*100
+            
+            
+            Number_flowRate_good_cells <- length(flowRateQCList$sample[[i]]$goodCellIDs)
+            Number_sig_acq_good_cells <- length(FlowSignalQCList$sample[[i]]$goodCellIDs)
+            
+            Number_margin_good_cells <- length(dynamic_range$aa[[i]]$goodCellIDs)
+            tot_bad_cells_margin <- length(dynamic_range$aa[[i]]$bad_lowerIDs) + length(dynamic_range$aa[[i]]$bad_upperIDs)
+            Number_margin_bad_cells <- tot_bad_cells_margin
+            
+            df_result_output <- rbind(df_result_output, data.frame(Sample,
+                                                                   Flow_rate, 
+                                                                   Dynamic_range,
+                                                                   Signal_acquisition,
+                                                                   Number_flowRate_good_cells,
+                                                                   Number_sig_acq_good_cells,
+                                                                   Number_margin_good_cells,
+                                                                   Number_margin_bad_cells))  
+          }
+          colnames(df_result_output)[which(names(df_result_output) == "Sample")] <- "Samples names"
+          colnames(df_result_output)[which(names(df_result_output) == "Signal_acquisition")] <- "Signal acquisition bad cells(%)"
+          colnames(df_result_output)[which(names(df_result_output) == "Flow_rate")] <- "Flow rate bad cells(%)"
+          colnames(df_result_output)[which(names(df_result_output) == "Dynamic_range")] <- "Dynamic range bad cells(%)"
+          colnames(df_result_output)[which(names(df_result_output) == "Number_flowRate_good_cells")] <- "Goods cells flowRate"
+          colnames(df_result_output)[which(names(df_result_output) == "Number_sig_acq_good_cells")] <- "Signal Acquisition goods cells"
+          colnames(df_result_output)[which(names(df_result_output) == "Number_margin_good_cells")] <- "Dynamic range goods cells"
+          colnames(df_result_output)[which(names(df_result_output) == "Number_margin_bad_cells")] <- "Dynamic range bad cells"
+          
+          data_table <- datatable(df_result_output, options = list(scrollX = T, scrollCollapse=TRUE))
+          return(data_table)
+        })
+        
+        output$result_output <- DT::renderDataTable({
+          frame_result()
+        })
+        
+          
 
-    }
+      }
+      
+      
     else{
       rval_data <- NULL
       message("Aucun fichier")
@@ -779,35 +966,271 @@ Clean <- function(input, output, session, rval) {
       })
   })
   
-  # flow_auto_clicked <- reactive({
-  #   # in a resQC list adding the cleaning data which the corresponding sample name
-  #   resQC <- list()
-  #   for(i in 1:length(rval$gating_set@data)){
-  #     resQC[rownames(rval$gating_set@data@phenoData[i])] <- flow_auto_qc(rval$gating_set@data[[i]],
-  #                           remove_from = input$Remove_anomalies,
-  #                           output = input$button_output,
-  #                           second_fractionFR = input$sd_frac_c,
-  #                           alphaFR = input$sg_input_value,
-  #                           decompFR = input$decomp_input,
-  #                           # ChExcludeFS = ,
-  #                           outlier_binsFS = input$outlier_bin,
-  #                           pen_valueFS = input$pen_valueFS_input,
-  #                           max_cptFS = input$max_cptsFS_input,
-  #                           # ChExcludeFM =
-  #                           sideFM = input$sideFM_input,
-  #                           neg_valuesFM = input$neg_valuesFM_input,
-  #                           html_report = F,
-  #                           mini_report = F,
-  #                           fcs_QC = F,
-  #                           fcs_highQ = input$fcs_highQ_input,
-  #                           # fcs_lowQ = input$fcs_lowQ_input,
-  #                           folder_results = F
-  #     )
-  #     cat("\n")
-  #   }
-  #     return(resQC)
+  ### Running the cleaning only on the selected samples ####
+  ## update select input ####
+  
+  # observeEvent(input$clean_selected_sample_input, {
+    observe({
+      if(!is.null(rval$gating_set)){
+        
     
-  # })
+      names_samp <- flowCore::sampleNames(rval$gating_set)
+      current_sample <- names_samp[as.numeric(input$choice_sample_input)]
+      
+      updateSelectInput(session, "select_one_sample",
+                        label = paste("Select sample for visualization"),
+                        choices = current_sample,
+                        selected = current_sample[1])
+      }
+      else{ message("missing data...")}
+      
+  })
+  
+  observe({
+    if(!is.null(rval$gating_set)){
+      
+    
+    observeEvent(input$clean_selected_sample_input, {
+      withProgress(message = 'Selected samples cleaning is running..', value = 0 , {
+        
+        # parameters
+        j <- 1
+        time_chnl <- input$choice_channel_input
+        side <- input$side
+        neg_values <- input$neg_values
+        
+        time_step <- 0.01
+        second_fraction <- 0.1 # time interval used for averaging data
+        binSize <- input$binSize
+        maxSegmentFS <- 3
+        pen_values <- 500
+        
+        direction <- input$direction
+        alpha <- input$alpha
+        outlier_remove <- input$remove_outlier
+        
+        chExclude <- input$options_chExclude
+        chExclude2 <- input$options_chExclude2
+        ordFCS_selected <- list()
+        
+        for(i in input$choice_sample_input){
+          # print(as.numeric(i))
+          ordFCS_selected[[j]] <- ord_fcs_time(rval$gating_set@data[[as.numeric(i)]], time_chnl) # get selected samples from the index position
+          
+          j <- j + 1
+        }
+        
+        
+        
+        # get the names samples actually selected by users
+        current_sample <- reactive({
+          names_samp <- flowCore::sampleNames(rval$gating_set)
+          current_s<- names_samp[as.numeric(input$choice_sample_input)]
+          return(current_s)
+        })
+        
+        # dynamically get the sample for plot
+        select_sample_reactive <- reactive({
+          val <- input$select_one_sample
+          return(val)
+        })
+        
+        ## clean for selected sample flow check .. ####
+        k <- 1
+        res_margin_dynamic_range <- list()
+        res_flow <- list()
+        res_sig_acqui <- list()
+        
+        while(k < length(ordFCS_selected) + 1 ){
+          
+          res_margin_dynamic_range$sample[[current_sample()[[k]]]] <- flow_margin_check(ordFCS_selected[[k]],
+                                                                                        ChannelExclude = chExclude,
+                                                                                        side = side,
+                                                                                        neg_values = neg_values)
+          
+          flow_rate_data <- flow_rate_bin(ordFCS_selected[[k]],
+                                          second_fraction = second_fraction,
+                                          timeCh = time_chnl,
+                                          timestep = time_step)
+          
+          res_flow$sample[[current_sample()[[k]]]] <- flow_rate_check_a(x = ordFCS_selected[[k]], 
+                                                                        FlowRateData = flow_rate_data,
+                                                                        alpha = alpha,
+                                                                        use_decomp = TRUE,
+                                                                        direction = direction)
+          
+          
+          
+          flow_signal_data <- flow_signal_bin(ordFCS_selected[[k]], channels = NULL,
+                                              binSize=binSize,
+                                              timeCh = time_chnl,
+                                              timestep = time_step,
+                                              TimeChCheck = 0.1)
+          
+          
+          res_sig_acqui$sample[[current_sample()[[k]]]] <- flow_signal_check_a(ordFCS_selected[[k]],FlowSignalData = flow_signal_data, 
+                                                                               ChannelExclude = chExclude2,
+                                                                               pen_valueFS = pen_signal,
+                                                                               maxSegmentFS = maxSegmentFS, 
+                                                                               outlier_remove = outlier_remove)
+          
+          
+          k <- k + 1 
+          incProgress(1/k, detail = paste("(current sample : ", k, ")"))
+          # print(k)
+        }
+        
+        # sample dynamic selection for plot
+        plot_margin <- reactive({
+          res_margin <- res_margin_dynamic_range$sample[[select_sample_reactive()]]
+          return(res_margin)
+        })
+        
+        # plot rendering from selected sample
+        output$dynamic_plot_output <- renderPlot({
+          flow_margin_plot(plot_margin())
+          
+        })
+        
+        # ChannelExclude <- input$channel_exclude_input
+        # side <- input$side_input
+        # neg_values <- input$neg_values_input # default value = 1
+        
+        ## Flow rate for selected sample (plot) ####
+        
+        plot_flow_rate <- reactive({
+          value <- res_flow$sample[[select_sample_reactive()]]
+        })
+        
+        output$flow_rate_plot_output <- renderPlot({
+          flow_rate_plot_a(plot_flow_rate())
+        })
+        
+        ## Signal Acquisition for selected sample (plot) ####
+        
+        plot_sig_acqui <- reactive({
+          value <- res_sig_acqui$sample[[select_sample_reactive()]]
+        })
+        
+        output$signal_acquisition_plot_output <- renderPlot({
+          flow_signal_plot_a(plot_sig_acqui())
+        })
+        
+        ### Heatmap selected sample ####
+        
+        # modify height size of plot 
+        height_dynamic <- reactive({
+          val <- input$change_height
+          print(val)
+          return(val)
+        })
+        
+        color_selection <- reactive({
+          if(input$colorpalette_select == "Default"){
+            pal_fill<- scale_fill_gradient(low = "#77ff00", high = "red")
+            return(pal_fill)
+          } 
+          else if(input$colorpalette_select == "A"){
+            pal_fill <- scale_fill_viridis_c(option = "A")
+          }
+          else if(input$colorpalette_select == "B"){
+            scale_fill_viridis_c(option = "B")
+          }
+          else if(input$colorpalette_select == "C"){
+            scale_fill_viridis_c(option = "C")
+          }
+          else{
+            scale_fill_viridis_c(option = "D")
+          }
+        })
+        
+        # Get cleaning dataframe value in % 
+        df <- NULL
+        for(i in 1:length(ordFCS_selected)){
+          Signal_acquisition <- res_sig_acqui$sample[[i]]$Perc_bad_cells$badPerc_cp*100
+          Flow_rate <- res_flow$sample[[i]]$res_fr_QC$badPerc*100
+          Dynamic_range <- res_margin_dynamic_range$sample[[i]]$badPerc*100
+          df <- rbind(df, data.frame(Flow_rate, 
+                                     Dynamic_range,
+                                     Signal_acquisition )) 
+        }
+        rownames(df) <- current_sample()
+        melted_data <- melt(data.table::setDT(df, keep.rownames = T))
+        colnames(melted_data)[which(names(melted_data) == "rn")] <- "sample"
+        colnames(melted_data)[which(names(melted_data) == "value")] <- "cleaning_pourcentage"
+        
+        if(!is.null(melted_data)){
+          output$plot_info_qc <- plotly::renderPlotly({
+            
+            select_smp_plot <- ggplot(data = melted_data, aes(y = sample, x = variable)) + geom_tile(aes(fill = cleaning_pourcentage), colour = "white") +
+              # scale_fill_gradient(low = "#77ff00", high = "red") +
+              scale_x_discrete("", expand = c(0, 0)) + 
+              scale_y_discrete("", expand = c(0, 0)) +
+              
+              theme(
+                # axis.ticks = element_blank(), 
+                axis.text.x = element_text(angle = 330, hjust = 0)
+              ) 
+              color_selection()
+            plotly::ggplotly(select_smp_plot, height = height_dynamic())
+            
+          })
+          
+        }
+        ## frame result of selected sample ####
+        frame_result <- reactive({
+          df_result_output <- NULL
+          for(i in 1:length(ordFCS_selected)){
+            
+            
+            Sample <- current_sample()[i]
+            Flow_rate <- res_flow$sample[[i]]$res_fr_QC$badPerc*100
+            Dynamic_range <- res_margin_dynamic_range$sample[[i]]$badPerc*100
+            Signal_acquisition<- res_sig_acqui$sample[[i]]$Perc_bad_cells$badPerc_cp*100
+            
+            Number_flowRate_good_cells <- length(res_flow$sample[[i]]$goodCellIDs)
+            Number_sig_acq_good_cells <- length(res_sig_acqui$sample[[i]]$goodCellIDs)
+            
+            Number_margin_good_cells <- length(res_margin_dynamic_range$sample[[i]]$goodCellIDs)
+            tot_bad_cells_margin <- length(res_margin_dynamic_range$sample[[i]]$bad_lowerIDs) + length(res_margin_dynamic_range$sample[[i]]$bad_upperIDs)
+            Number_margin_bad_cells <- tot_bad_cells_margin
+            
+            df_result_output <- rbind(df_result_output, data.frame(Sample,
+                                                                   Flow_rate, 
+                                                                   Dynamic_range,
+                                                                   Signal_acquisition,
+                                                                   Number_flowRate_good_cells,
+                                                                   Number_sig_acq_good_cells,
+                                                                   Number_margin_good_cells,
+                                                                   Number_margin_bad_cells)) 
+            
+          }
+          
+          # Rename column 
+          colnames(df_result_output)[which(names(df_result_output) == "Sample")] <- "Samples names"
+          colnames(df_result_output)[which(names(df_result_output) == "Signal_acquisition")] <- "Signal acquisition bad cells(%)"
+          colnames(df_result_output)[which(names(df_result_output) == "Flow_rate")] <- "Flow rate bad cells(%)"
+          colnames(df_result_output)[which(names(df_result_output) == "Dynamic_range")] <- "Dynamic range bad cells(%)"
+          colnames(df_result_output)[which(names(df_result_output) == "Number_flowRate_good_cells")] <- "Goods cells flowRate"
+          colnames(df_result_output)[which(names(df_result_output) == "Number_sig_acq_good_cells")] <- "Signal Acquisition goods cells"
+          colnames(df_result_output)[which(names(df_result_output) == "Number_margin_good_cells")] <- "Dynamic range goods cells"
+          colnames(df_result_output)[which(names(df_result_output) == "Number_margin_bad_cells")] <- "Dynamic range bad cells"
+          
+          data_table <- datatable(df_result_output, options = list(scrollX = T, scrollCollapse=TRUE))
+          return(data_table)
+        })
+        
+        output$result_output <-  DT::renderDataTable({
+          frame_result()
+        })
+        Sys.sleep(0.75)
+      })
+      
+
+    })
+    }else { 
+      message("Missing data...")}
+  })
   return(rval)
 }
 
@@ -996,99 +1419,6 @@ flow_signal_check <- function(flowSignalData, lowerBinThres, upperBinThres) {
   cat("flow signal check: ", length(FlowSignalQC), "\n")
   return(FlowSignalQC)
 }
-
-
-flow_margin_check <- function(x,  margin_channels = NULL, side = "both") {
-  
-  if (is.null(margin_channels)) {
-    teCh <- grep("Time|time|Event|event", colnames(x), value = T)
-    parms <- setdiff(colnames(x), teCh)
-  } else {
-    if (!all(margin_channels %in% colnames(x)))
-      stop("Invalid channel(s)")
-    parms <- margin_channels
-  }
-  scatter_parms <- grep("FSC|SSC", parms, value = T)
-  
-  xx <- c(1:nrow(x))
-  yy <- x@exprs[, parms]
-  range <- range(x)
-  lenx <- length(xx)
-  
-  ## lower check
-  if (side == "lower" || side == "both") {
-    
-    out_neg_range <- apply(yy, 2, function(x) {
-      neg <- which(x < 0)
-      # Zscores <- (0.6745*(x[neg] + median(x[neg])))/mad(x[neg]) ## it
-      # calculates the Zscore outneg <- neg[which(Zscores < -3.5)]
-      min_value <- (-3.5 * mad(x[neg]) + (0.6745 * median(x[neg])))/0.6745  # -3.5 is the default threshold
-      if (is.na(min_value)) {
-        min(x) - 1
-      } else {
-        min_value
-      }
-    })
-  }
-  
-  # n. bad cells for each channel
-  if (side == "lower" || side == "both") {
-    neg_bad_len <- sapply(parms, function(x) length(xx[yy[, x] <= out_neg_range[x]]))
-  }
-  if (side == "upper" || side == "both") {
-    pos_bad_len <- sapply(parms, function(x) length(xx[yy[, x] >= range[2,
-                                                                        x]]))
-  }
-  
-  # badcellIDs
-  if (side == "lower" || side == "both") {
-    lowID <- do.call(c, lapply(parms, function(ch) {
-      xx[yy[, ch] <= out_neg_range[ch]]
-    }))
-    if(length(scatter_parms) != 0){   ### check for values less than 0 in scatter parameters
-      minSc <- apply(yy[,scatter_parms], 1, function(x){
-        min(x)
-      })
-      low_scatter_ID <- which(minSc < 0)
-      lowID <- unique(c(lowID, low_scatter_ID))
-    }
-  }
-  if (side == "upper" || side == "both") {
-    upID <- do.call(c, lapply(parms, function(ch) {
-      xx[yy[, ch] >= range[2, ch]]
-    }))
-  }
-  
-  if (side == "lower") {
-    summary_bad_cells <- data.frame(lower_range = c(neg_bad_len,
-                                                    total_SUM = length(lowID), total_UNIQUE = length(unique(lowID))))
-    bad_lowerIDs <- unique(lowID)
-    bad_upperIDs <- NULL
-    badCellIDs <- unique(lowID)
-  } else if (side == "upper") {
-    summary_bad_cells <- data.frame(upper_range = c(pos_bad_len,
-                                                    total_SUM = length(upID), total_UNIQUE = length(unique(upID))))
-    bad_lowerIDs <- NULL
-    bad_upperIDs <- unique(upID)
-    badCellIDs <- unique(upID)
-  } else {
-    summary_bad_cells <- data.frame(lower_range = c(neg_bad_len,
-                                                    total_SUM = length(lowID), total_UNIQUE = length(unique(lowID))),
-                                    upper_range = c(pos_bad_len,
-                                                    total_SUM = length(upID), total_UNIQUE = length(unique(upID))))
-    bad_lowerIDs <- unique(lowID)
-    bad_upperIDs <- unique(upID)
-    badCellIDs <- unique(c(lowID,upID))
-  }
-  
-  goodCellIDs <- setdiff(xx, badCellIDs)
-  
-  cat("margin check:", length(goodCellIDs), "\n")
-  
-  return(list(goodCellIDs = goodCellIDs, bad_lowerIDs = bad_lowerIDs,
-              bad_upperIDs = bad_upperIDs, events = lenx))
-}
-
 
 ###  graph showing where the anomalies mostly happened
 flow_margin_plot <- function(FlowMarginData, binSize = 500) {
@@ -1294,34 +1624,34 @@ anomaly_detection = function(x, max_anoms=0.49, direction='both', alpha=0.01, us
 }
 
 
-flow_rate_bin_a <- function(x, second_fraction = 0.1, timeCh = timeCh,
-                            timestep = timestep){
-
-  xx <- exprs(x)[, timeCh]
-  idx <- c(1:nrow(x))
-
-  endsec <- ceiling(timestep * max(xx))  # total seconds of the experiment
-
-  lenx <- length(xx)  # num of time ticks
-
-  tbins <- seq(0, endsec/timestep, by = as.numeric(second_fraction)/timestep)  # time bins
-  secbin <- seq(0, endsec, by = as.numeric(second_fraction))  # bin expressed in seconds
-  minbin <- round(secbin/60, 3)  # bin expressed in minutes
-  nrBins <- length(tbins) - 1
-  tbCounts <- c(0, hist(xx, tbins, plot = FALSE)$counts)  # number of events per time bin
-  expEv <- lenx/(nrBins)  ##median(tbCounts) # expected number of events per bin
-  binID <- do.call(c, mapply(rep, x = 1:length(tbCounts), times = tbCounts,
-                             SIMPLIFY = FALSE))
-
-  if (length(idx) != length(binID))
-    stop("length of cell ID not equal length of bin ID")
-
-  timeFlowData <- list(frequencies = cbind(tbins, minbin, secbin, tbCounts),
-                       cellBinID = data.frame(cellID = idx, binID = binID),
-                       info = data.frame(second_fraction = second_fraction,
-                                         expFrequency = expEv, bins = nrBins))
-  return(timeFlowData)
-}
+# flow_rate_bin_a <- function(x, second_fraction = 0.1, timeCh = timeCh,
+#                             timestep = timestep){
+#
+#   xx <- exprs(x)[, timeCh]
+#   idx <- c(1:nrow(x))
+#
+#   endsec <- ceiling(timestep * max(xx))  # total seconds of the experiment
+#
+#   lenx <- length(xx)  # num of time ticks
+#
+#   tbins <- seq(0, endsec/timestep, by = as.numeric(second_fraction)/timestep)  # time bins
+#   secbin <- seq(0, endsec, by = as.numeric(second_fraction))  # bin expressed in seconds
+#   minbin <- round(secbin/60, 3)  # bin expressed in minutes
+#   nrBins <- length(tbins) - 1
+#   tbCounts <- c(0, hist(xx, tbins, plot = FALSE)$counts)  # number of events per time bin
+#   expEv <- lenx/(nrBins)  ##median(tbCounts) # expected number of events per bin
+#   binID <- do.call(c, mapply(rep, x = 1:length(tbCounts), times = tbCounts,
+#                              SIMPLIFY = FALSE))
+#
+#   if (length(idx) != length(binID))
+#     stop("length of cell ID not equal length of bin ID")
+#
+#   timeFlowData <- list(frequencies = cbind(tbins, minbin, secbin, tbCounts),
+#                        cellBinID = data.frame(cellID = idx, binID = binID),
+#                        info = data.frame(second_fraction = second_fraction,
+#                                          expFrequency = expEv, bins = nrBins))
+#   return(timeFlowData)
+# }
 
 
 # # Detection of anomalies in the flow rate using the algorithm
@@ -1392,7 +1722,7 @@ flow_rate_plot_a <- function(FlowRateQC) {
 # # Retrieves the number of events for each FCS file and creates
 # # a bar plot.
 # #
-flow_set_qc_a <- function(set){
+flow_set_qc <- function(set){
   if (!is(set, "flowSet"))
     stop("'set' needs to be of class 'flowSet'")
 
@@ -1416,7 +1746,7 @@ flow_set_plot_a <- function(N_cell_set, area){
 # # The events on the upper margin and the outlier in the negative
 # # range of values are detected and removed.
 # #
-flow_margin_check_a <- function(x,  ChannelExclude = NULL,
+flow_margin_check <- function(x,  ChannelExclude = NULL,
                                 side = "both", neg_values = 1) {
 
   teCh <- grep("Time|time|TIME|Event|event|EVENT", colnames(x), value = TRUE)
@@ -1573,44 +1903,44 @@ flow_margin_plot_a <- function(FlowMarginData, binSize = 500) {
   }
 }
 
-flow_signal_bin_a <- function(x, channels = NULL, binSize = 500,
-                              timeCh = timeCh, timestep = timestep, TimeChCheck = TimeChCheck) {
-
-  ## some sanity checking
-  if (!is(x, "flowFrame"))
-    stop("'x' needs to be of class 'flowFrame'")
-
-  if (is.null(channels) || missing(channels) || is.na(channels)) {
-    parms <- setdiff(colnames(x), timeCh)
-  } else {
-    if (!all(channels %in% colnames(x)))
-      stop("Invalid channel(s)")
-    parms <- channels
-  }
-
-  ### Retriving time and expression info
-  exp <- exprs(x)
-  if (!is.null(TimeChCheck)) {
-    timex <- seq(from = 0, length.out = nrow(x), by = 0.1)
-  }else{
-    timex <- exp[, timeCh]
-  }
-  yy <- exp[, parms]  # channels data
-  idx <- c(1:nrow(x))
-  seconds <- timex * timestep
-  lenSec <- length(seconds)  # num of time ticks
-  uniSeconds <- unique(seconds)  # num of unique time tick
-  nrBins <- floor(lenSec/binSize)  # num of bins
-
-  cf <- c(rep(1:nrBins, each = binSize), rep(nrBins + 1, lenSec - nrBins * binSize))  # id bins
-  stopifnot(length(cf) == lenSec)
-  tmpx <- split(seconds, cf)
-  xx2 <- sapply(tmpx, mean)  # mean of each time bin  (x axis)
-  yy2 <- as.matrix(ddply(as.data.frame(yy), .(cf), colwise(median)))[, -1]
-
-  return(list(exprsBin = cbind(timeSec = xx2, yy2), cellBinID = data.frame(cellID = idx, binID = cf),
-              bins = length(unique(cf)), binSize = binSize))
-}
+# flow_signal_bin_a <- function(x, channels = NULL, binSize = 500,
+#                               timeCh = timeCh, timestep = timestep, TimeChCheck = TimeChCheck) {
+#
+#   ## some sanity checking
+#   if (!is(x, "flowFrame"))
+#     stop("'x' needs to be of class 'flowFrame'")
+#
+#   if (is.null(channels) || missing(channels) || is.na(channels)) {
+#     parms <- setdiff(colnames(x), timeCh)
+#   } else {
+#     if (!all(channels %in% colnames(x)))
+#       stop("Invalid channel(s)")
+#     parms <- channels
+#   }
+#
+#   ### Retriving time and expression info
+#   exp <- exprs(x)
+#   if (!is.null(TimeChCheck)) {
+#     timex <- seq(from = 0, length.out = nrow(x), by = 0.1)
+#   }else{
+#     timex <- exp[, timeCh]
+#   }
+#   yy <- exp[, parms]  # channels data
+#   idx <- c(1:nrow(x))
+#   seconds <- timex * timestep
+#   lenSec <- length(seconds)  # num of time ticks
+#   uniSeconds <- unique(seconds)  # num of unique time tick
+#   nrBins <- floor(lenSec/binSize)  # num of bins
+#
+#   cf <- c(rep(1:nrBins, each = binSize), rep(nrBins + 1, lenSec - nrBins * binSize))  # id bins
+#   stopifnot(length(cf) == lenSec)
+#   tmpx <- split(seconds, cf)
+#   xx2 <- sapply(tmpx, mean)  # mean of each time bin  (x axis)
+#   yy2 <- as.matrix(ddply(as.data.frame(yy), .(cf), colwise(median)))[, -1]
+#
+#   return(list(exprsBin = cbind(timeSec = xx2, yy2), cellBinID = data.frame(cellID = idx, binID = cf),
+#               bins = length(unique(cf)), binSize = binSize))
+# }
 
 # Detection of shifts in the median intensity signal detected
 # by the laser of the flow cytometry over time
@@ -1776,8 +2106,8 @@ flow_signal_plot_a <- function(FlowSignalQC) {
     theme(strip.text.y = element_text(angle = 0,
                                       hjust = 1), axis.text.y = element_text(size = 6),
           legend.position = "none") +
-    scale_x_continuous(breaks= pretty_breaks(n =10)) +
-    scale_y_continuous(breaks= pretty_breaks(n =3)) +
+    scale_x_continuous(breaks= scales::pretty_breaks(n =10)) +
+    scale_y_continuous(breaks= scales::pretty_breaks(n =3)) +
     geom_rect(aes(xmin = segm[1], xmax = segm[2], ymin = -Inf,
                   ymax = Inf), fill = "khaki1", linetype = 0) + geom_line()
   # Add anoms to the plot as circles.
@@ -1821,7 +2151,7 @@ if (interactive()){
 }
 
 
-#### script ####
+### script ####
 
 library(flowAI)
 data("Bcells")
@@ -1835,26 +2165,29 @@ time_step <- 0.01
 second_fraction <- 0.1 # time interval used for averaging data
 binSize <- 500
 
+
+
 ordFCS <- ord_fcs_time(Bcells[[idx]], time_chnl)
-print(colnames(ordFCS))
+# print(colnames(ordFCS))
 
 ### margin ####
-res_margin <- flow_margin_check_a(ordFCS, 
-                                  ChannelExclude = ChannelExclude, 
-                                  side = side, 
+res_margin <- flow_margin_check(ordFCS,
+                                  ChannelExclude = ChannelExclude,
+                                  side = "both",
                                   neg_values = 1)
-flow_margin_plot_a(res_margin, binSize = binSize)
+flow_margin_plot(res_margin, binSize = binSize)
+
 
 ### flow-rate ####
 
-flow_rate_data <- flow_rate_bin_a(x = ordFCS, 
-                                  second_fraction = second_fraction, 
-                                  timeCh = time_chnl, 
+flow_rate_data <- flow_rate_bin(x = ordFCS,
+                                  second_fraction = second_fraction,
+                                  timeCh = time_chnl,
                                   timestep = time_step)
-res_flow_rate_auto <- flow_rate_check_a(x = ordFCS, FlowRateData = flow_rate_data, 
-                                   alpha = 0.01, 
+res_flow_rate_auto <- flow_rate_check_a(x = ordFCS, FlowRateData = flow_rate_data,
+                                   alpha = 0.01,
                                    use_decomp = TRUE,
-                                   direction='neg')
+                                   direction= "neg")
 flow_rate_plot_a(res_flow_rate_auto)
 
 lowerTimeCut <- min(flow_rate_data$frequencies[,3]) - 0.1
@@ -1862,21 +2195,27 @@ UpperTimeCut <- max(flow_rate_data$frequencies[,3]) + 0.1
 lowerRateThres <- min(flow_rate_data$frequencies[,4]) - 10
 upperRateThres <- max(flow_rate_data$frequencies[,4]) + 10
 
-res_flow_rate_qc <- flow_rate_check(flowRateData = flow_rate_data, 
-                                        lowerRateThres = lowerRateThres, 
+res_flow_rate_qc <- flow_rate_check(flowRateData = flow_rate_data,
+                                        lowerRateThres = lowerRateThres,
                                         upperRateThres = upperRateThres,
-                                        lowerTimeCut = lowerTimeCut, 
+                                        lowerTimeCut = lowerTimeCut,
                                         UpperTimeCut = UpperTimeCut)
-flow_rate_plot(flowRateData = flow_rate_data, 
-               lowerRateThres = lowerRateThres, 
+flow_rate_plot(flowRateData = flow_rate_data,
+               lowerRateThres = lowerRateThres,
                upperRateThres = upperRateThres,
-               lowerTimeCut = lowerTimeCut, 
-               UpperTimeCut = UpperTimeCut)                              
+               lowerTimeCut = lowerTimeCut,
+               UpperTimeCut = UpperTimeCut)
 
 ### signal ####
+pen_signal <- 500
 
-flow_signal_data <- flow_signal_bin(ordFCS, channels = c("FSC-A", "SSC-A"), 
-                                    binSize=binSize, 
-                                    timeCh = time_chnl, 
-                                    timestep = time_step, 
+flow_signal_data <- flow_signal_bin(ordFCS, channels = c("FSC-A", "SSC-A"),
+                                    binSize=binSize,
+                                    timeCh = time_chnl,
+                                    timestep = time_step,
                                     TimeChCheck = NULL)
+
+# flow_signal_check_a(ordFCS, flow_signal_data, pen_signal, 3 )
+# install.packages("mFilter") installer
+
+
