@@ -44,7 +44,10 @@ Imports:
   reshape2,
   RColorBrewer,
   htmlwidgets,
-  FlowSOM
+  FlowSOM,
+  mFilter,
+  changepoint,
+  pryr
 LazyData: TRUE
 License: file LICENSE
 RoxygenNote: 7.0.2

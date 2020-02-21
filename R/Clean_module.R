@@ -1,14 +1,10 @@
 ## Directly adapted from the flowAI shiny app
 
-library(plyr)
-library(ggplot2)
-library(flowCore)
-library(reshape2)
 ### UI ########################################################################################
 
 #' @param id shiny id
 #' @import shiny
-#' @importFrom DT
+#' @import DT
 CleanUI<-function(id){
   
   ns <- NS(id)
@@ -1066,14 +1062,14 @@ Clean <- function(input, output, session, rval) {
                                               timeCh = time_chnl,
                                               timestep = time_step,
                                               TimeChCheck = 0.1)
-          
-          
-          res_sig_acqui$sample[[current_sample()[[k]]]] <- flow_signal_check_a(ordFCS_selected[[k]],FlowSignalData = flow_signal_data, 
+
+
+          res_sig_acqui$sample[[current_sample()[[k]]]] <- flow_signal_check_a(ordFCS_selected[[k]],FlowSignalData = flow_signal_data,
                                                                                ChannelExclude = chExclude2,
                                                                                pen_valueFS = pen_signal,
-                                                                               maxSegmentFS = maxSegmentFS, 
+                                                                               maxSegmentFS = maxSegmentFS,
                                                                                outlier_remove = outlier_remove)
-          
+
           
           k <- k + 1 
           incProgress(1/k, detail = paste("(current sample : ", k, ")"))
@@ -2123,99 +2119,99 @@ flow_signal_plot_a <- function(FlowSignalQC) {
 
 #### Tests ####
 
-library(shiny)
-library(shinydashboard)
-library(flowWorkspace)
-
-if (interactive()){
-
-  ui <- dashboardPage(
-    dashboardHeader(title = "flowAI"),
-    sidebar = dashboardSidebar(disable = TRUE),
-    body = dashboardBody(
-      CleanUI("module")
-    )
-  )
-
-  server <- function(input, output, session) {
-    rval <- reactiveValues()
-    observe({
-      utils::data("GvHD", package = "flowCore")
-      rval$gating_set <- GatingSet(GvHD)
-    })
-    res <- callModule(Clean, "module", rval = rval)
-  }
-
-  shinyApp(ui, server)
-
-}
-
-
-### script ####
-
-library(flowAI)
-data("Bcells")
-
-
-time_chnl <- "Time"
-idx <- 1
-side <- "both"
-ChannelExclude <- time_chnl
-time_step <- 0.01
-second_fraction <- 0.1 # time interval used for averaging data
-binSize <- 500
-
-
-
-ordFCS <- ord_fcs_time(Bcells[[idx]], time_chnl)
-# print(colnames(ordFCS))
-
-### margin ####
-res_margin <- flow_margin_check(ordFCS,
-                                  ChannelExclude = ChannelExclude,
-                                  side = "both",
-                                  neg_values = 1)
-flow_margin_plot(res_margin, binSize = binSize)
-
-
-### flow-rate ####
-
-flow_rate_data <- flow_rate_bin(x = ordFCS,
-                                  second_fraction = second_fraction,
-                                  timeCh = time_chnl,
-                                  timestep = time_step)
-res_flow_rate_auto <- flow_rate_check_a(x = ordFCS, FlowRateData = flow_rate_data,
-                                   alpha = 0.01,
-                                   use_decomp = TRUE,
-                                   direction= "neg")
-flow_rate_plot_a(res_flow_rate_auto)
-
-lowerTimeCut <- min(flow_rate_data$frequencies[,3]) - 0.1
-UpperTimeCut <- max(flow_rate_data$frequencies[,3]) + 0.1
-lowerRateThres <- min(flow_rate_data$frequencies[,4]) - 10
-upperRateThres <- max(flow_rate_data$frequencies[,4]) + 10
-
-res_flow_rate_qc <- flow_rate_check(flowRateData = flow_rate_data,
-                                        lowerRateThres = lowerRateThres,
-                                        upperRateThres = upperRateThres,
-                                        lowerTimeCut = lowerTimeCut,
-                                        UpperTimeCut = UpperTimeCut)
-flow_rate_plot(flowRateData = flow_rate_data,
-               lowerRateThres = lowerRateThres,
-               upperRateThres = upperRateThres,
-               lowerTimeCut = lowerTimeCut,
-               UpperTimeCut = UpperTimeCut)
-
-### signal ####
-pen_signal <- 500
-
-flow_signal_data <- flow_signal_bin(ordFCS, channels = c("FSC-A", "SSC-A"),
-                                    binSize=binSize,
-                                    timeCh = time_chnl,
-                                    timestep = time_step,
-                                    TimeChCheck = NULL)
-
-# flow_signal_check_a(ordFCS, flow_signal_data, pen_signal, 3 )
-# install.packages("mFilter") installer
+# library(shiny)
+# library(shinydashboard)
+# library(flowWorkspace)
+# 
+# if (interactive()){
+# 
+#   ui <- dashboardPage(
+#     dashboardHeader(title = "flowAI"),
+#     sidebar = dashboardSidebar(disable = TRUE),
+#     body = dashboardBody(
+#       CleanUI("module")
+#     )
+#   )
+# 
+#   server <- function(input, output, session) {
+#     rval <- reactiveValues()
+#     observe({
+#       utils::data("GvHD", package = "flowCore")
+#       rval$gating_set <- GatingSet(GvHD)
+#     })
+#     res <- callModule(Clean, "module", rval = rval)
+#   }
+# 
+#   shinyApp(ui, server)
+# 
+# }
+# 
+# 
+# ### script ####
+# 
+# library(flowAI)
+# data("Bcells")
+# 
+# 
+# time_chnl <- "Time"
+# idx <- 1
+# side <- "both"
+# ChannelExclude <- time_chnl
+# time_step <- 0.01
+# second_fraction <- 0.1 # time interval used for averaging data
+# binSize <- 500
+# 
+# 
+# 
+# ordFCS <- ord_fcs_time(Bcells[[idx]], time_chnl)
+# # print(colnames(ordFCS))
+# 
+# ### margin ####
+# res_margin <- flow_margin_check(ordFCS,
+#                                   ChannelExclude = ChannelExclude,
+#                                   side = "both",
+#                                   neg_values = 1)
+# flow_margin_plot(res_margin, binSize = binSize)
+# 
+# 
+# ### flow-rate ####
+# 
+# flow_rate_data <- flow_rate_bin(x = ordFCS,
+#                                   second_fraction = second_fraction,
+#                                   timeCh = time_chnl,
+#                                   timestep = time_step)
+# res_flow_rate_auto <- flow_rate_check_a(x = ordFCS, FlowRateData = flow_rate_data,
+#                                    alpha = 0.01,
+#                                    use_decomp = TRUE,
+#                                    direction= "neg")
+# flow_rate_plot_a(res_flow_rate_auto)
+# 
+# lowerTimeCut <- min(flow_rate_data$frequencies[,3]) - 0.1
+# UpperTimeCut <- max(flow_rate_data$frequencies[,3]) + 0.1
+# lowerRateThres <- min(flow_rate_data$frequencies[,4]) - 10
+# upperRateThres <- max(flow_rate_data$frequencies[,4]) + 10
+# 
+# res_flow_rate_qc <- flow_rate_check(flowRateData = flow_rate_data,
+#                                         lowerRateThres = lowerRateThres,
+#                                         upperRateThres = upperRateThres,
+#                                         lowerTimeCut = lowerTimeCut,
+#                                         UpperTimeCut = UpperTimeCut)
+# flow_rate_plot(flowRateData = flow_rate_data,
+#                lowerRateThres = lowerRateThres,
+#                upperRateThres = upperRateThres,
+#                lowerTimeCut = lowerTimeCut,
+#                UpperTimeCut = UpperTimeCut)
+# 
+# ### signal ####
+# pen_signal <- 500
+# 
+# flow_signal_data <- flow_signal_bin(ordFCS, channels = c("FSC-A", "SSC-A"),
+#                                     binSize=binSize,
+#                                     timeCh = time_chnl,
+#                                     timestep = time_step,
+#                                     TimeChCheck = NULL)
+# 
+# # flow_signal_check_a(ordFCS, flow_signal_data, pen_signal, 3 )
+# # install.packages("mFilter") installer
 
 
