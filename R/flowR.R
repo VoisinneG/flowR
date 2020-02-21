@@ -595,6 +595,19 @@ get_all_ancestors <- function(named_list, names){
   
 }
 
+#' @param gh a GatingHierarchy
+#' @importFrom flowWorkspace gs_pop_get_children
+gh_get_gate_names <- function(gh){
+  children <- flowWorkspace::gs_pop_get_children(gh, "root")
+  children_all <- c("root", children)
+  while(length(children)>0){
+    children <- unlist(sapply(children, 
+                       function(x){flowWorkspace::gs_pop_get_children(gh, x)}))
+    children_all <- unique(c(children_all, children))
+  }
+  return(children_all)  
+}
+
 #' Build a gating hierarchy from a GatingSet
 #' @param gs a GatingSet
 #' @return a named list representing the gating hierarchy. 
@@ -603,12 +616,15 @@ get_all_ancestors <- function(named_list, names){
 #' @importFrom flowWorkspace gs_get_pop_paths gh_pop_get_gate gs_pop_get_parent
 get_gates_from_gs <- function(gs){
   
-  nodes <- flowWorkspace::gs_get_pop_paths(gs)
+  nodes <- gh_get_gate_names(gs[[1]])
+  
+  nodes <- gh_get_gate_names(gs[[1]])
+  
   gates <- list()
   
   for(node in setdiff(nodes, "root")){
-    g <- flowWorkspace::gh_pop_get_gate(gs[[1]], node)
-    parent <- flowWorkspace::gs_pop_get_parent(gs[[1]], node)
+    g <- flowWorkspace::gs_pop_get_gate(gs, node)
+    parent <- flowWorkspace::gs_pop_get_parent(gs, node)
     gates[[node]] <- list(gate = g, parent = parent)
   } 
   
@@ -623,7 +639,17 @@ get_gates_from_gs <- function(gs){
 #' @importFrom flowWorkspace gs_get_pop_paths gs_pop_add recompute colnames
 add_gates_flowCore <- function(gs, gates){
   
-  new_gates_name <- setdiff(names(gates), flowWorkspace::gs_get_pop_paths(gs))
+  #gates are expected to share the same hierarchy and dimensions across samples
+  # so focus only on the first sample
+  new_gates_name <- setdiff(names(gates), gh_get_gate_names(gs[[1]]))
+  if(length(new_gates_name)==0){
+    warning("All gates already exist in GatingSet. No gates added")
+    return(gs)
+  }
+  if(!setequal(new_gates_name, names(gates))){
+    warning(paste("Some of the gates already exist in GatingSet. Adding only ", 
+                  paste(new_gates_name, collapse = ", ")))
+  }
   gates <- gates[new_gates_name]
   
   ngates <- length(gates)
@@ -639,22 +665,35 @@ add_gates_flowCore <- function(gs, gates){
       
       for(i in 1:length(idx)){
         
+        
         g <- gates[[idx[i]]]
         
-        if(g$parent %in% union(flowWorkspace::gs_get_pop_paths(gs), "root") ){
-          
-          if( !is.null(names(g$gate@parameters)) & 
-              length( setdiff( names(g$gate@parameters), flowWorkspace::colnames(gs)) ) == 0 ){
-            
-            flowWorkspace::gs_pop_add(gs,
-                               g$gate,
-                               parent = g$parent,
-                               name = g$gate@filterId)
-                
-            
+        if(g$parent %in% union(gh_get_gate_names(gs[[1]]), "root") ){
+          if(class(g$gate) == "list"){
+            first_gate <- g$gate[[1]]
           }else{
-            warning("Could not find gate parameters in flowData")
+            first_gate <- g$gate
           }
+          gate_class <- class(first_gate)
+          pass_check <- FALSE
+          if(gate_class != "booleanFilter"){
+            if( !is.null(names(first_gate@parameters)) & 
+                length( setdiff( names(first_gate@parameters), flowWorkspace::colnames(gs@data)) ) == 0 ){
+                pass_check <- TRUE
+            }else{
+              warning("Could not find gate parameters in flowData")
+            }
+          }else{
+            pass_check <- TRUE
+          }
+          
+          if(pass_check){
+            flowWorkspace::gs_pop_add(gs = gs,
+                                      gate = g$gate,
+                                      parent = g$parent,
+                                      name = first_gate@filterId)
+          }
+          
           i_added <- c(i_added, i)
         }
       }
@@ -674,7 +713,7 @@ add_gates_flowCore <- function(gs, gates){
 
 #' Transform gates coordinates and modify names of parameters.
 #' @param gates a named list representing the gating hierarchy.
-#' @param transformation A list of trans objects. 
+#' @param transformation A list of trans objects.
 #' Each element must be named after a parameter and contain the transfomation 
 #' to apply for this parameter.
 #' @param pattern pattern to be replaced in the names of gate coordinates
@@ -894,7 +933,7 @@ get_parameters_gs <- function(gs){
   
   return( 
     list(sample = flowWorkspace::sampleNames(gs),
-         subset = flowWorkspace::gs_get_pop_paths(gs),
+         subset = gh_get_gate_names(gs[[1]]),
          plot_var = plot_var,
          labels = labels,
          axis_limits = axis_limits,
@@ -946,7 +985,7 @@ getPopStatsPlus <- function(gs, spill = NULL, filter = NULL){
 #' @param sample Names of samples from the GatingSet 
 #' (as returned by \code{pData(gs)$name})
 #' @param subset Names of subsets from the GatingSet 
-#' (as returned by \code{flowWorkspace::gs_get_pop_paths(gs)})
+#' (as returned by \code{gh_get_gate_names(gs[[1]])})
 #' @param Ncells number of cells to sample from the GatingSet
 #' @param spill spillover matrix. If NULL, uncompensated data is used for gating. 
 #' Uncompensated data is returned if parameter 'return_comp_data' is TRUE.
@@ -965,7 +1004,7 @@ get_data_gs <- function(gs,
 ){
   
   if(is.null(sample)){sample <- flowWorkspace::sampleNames(gs)}
-  if(is.null(subset)){subset <- flowWorkspace::gs_get_pop_paths(gs)}
+  if(is.null(subset)){subset <- gh_get_gate_names(gs[[1]])}
   
   idx <- which(sample %in% flowWorkspace::sampleNames(gs))
 
@@ -1284,13 +1323,13 @@ get_plot_data <- function(gs,
 #' as the plot type with the preffix 'plot_' (for instance 'plot_hexagonal()')
 #' @param plot_args list of arguments passed to the plot function
 #' @return a plot (plot class depends on the plot function)
-call_plot_function <- function(df,
+call_plot_function <- function(data,
                          plot_type,
                          plot_args = list()
                          ){
   
   p <- do.call(paste("plot", plot_type, sep="_"), 
-               list(args = c(list(df=df), plot_args)))
+               list(args = c(list(data=data), plot_args)))
 
   return(p)
 }
@@ -1306,6 +1345,7 @@ call_plot_function <- function(df,
 #' 'use_log10_count' : logical, transform bin counts using log10
 #' 'option' : name of the viridis palette
 #' @import ggplot2
+#' @import ggcyto
 #' @importFrom viridis scale_fill_viridis
 plot_hexagonal <- function(args = list()){
   
@@ -1322,10 +1362,17 @@ plot_hexagonal <- function(args = list()){
     assign(var, args[[var]])
   }
   
-  p <- ggplot(df,
-              aes_(x = as.name( xvar ), 
-                   y = as.name( yvar ) ) ) +
-    geom_hex(bins = bins)
+  if(class(data) %in% c("ncdfFlowSet", "flowSet")){
+    p <- ggcyto::ggcyto(data,
+                        aes_(x = as.name( xvar ), 
+                             y = as.name( yvar ) ) ) 
+  }else{
+    p <- ggplot(data,
+                        aes_(x = as.name( xvar ), 
+                             y = as.name( yvar ) ) )
+  }
+  
+  p <- p + geom_hex(bins = bins)
   
   if(use_log10_count){
     p <- p + scale_fill_viridis(trans = log10_trans(), option = option)
@@ -1350,6 +1397,7 @@ plot_hexagonal <- function(args = list()){
 #' (If 'smooth' is TRUE, the inverse of 'bins' is used as the value for the bandwidth parameter 'bw')
 #' 'alpha' : transparency (between 0 and 1)
 #' @import ggplot2
+#' @import ggcyto
 #' @importFrom ggridges geom_density_ridges
 plot_histogram <- function(args = list()){
   
@@ -1362,7 +1410,7 @@ plot_histogram <- function(args = list()){
   yridges_var <- "name"
   norm_density <- TRUE
   bins <- 100
-  alpha <- 0.1
+  alpha <- 0.25
   
   if(is.null(args["xvar"])){
     warning("Incorrect dimensions")
@@ -1373,8 +1421,17 @@ plot_histogram <- function(args = list()){
     assign(var, args[[var]])
   }
   
-  p <- ggplot(df,
-              aes_(x = as.name( xvar )))
+
+  if(class(data) %in% c("ncdfFlowSet", "flowSet")){
+    p <- ggcyto::ggcyto(data,
+                        aes_(x = as.name( xvar )))
+    df <- data.frame(exprs(data[[1]]), check.names = FALSE)
+  }else{
+    p <- ggplot(data, aes_(x = as.name( xvar )))
+    df <- data
+  }
+  
+  
   
   if(typeof(df[[xvar]])!= "double"){
     warning("Cannot plot histogram : x variable is not continuous.")
@@ -1464,11 +1521,12 @@ plot_histogram <- function(args = list()){
 #' 'id.vars' : variable defining groups for which a label should be displayed 
 #' (superseded by 'color_var' and 'group_var')
 #' @import ggplot2
+#' @import ggcyto
 #' @importFrom ggrepel geom_label_repel
 plot_dots <-function(args = list()){
   
   plot_type <- "dots"
-  id.vars <- "subset"
+  id.vars <- NULL
   show_label <- FALSE
   color_var <- NULL
   group_var <- NULL
@@ -1482,6 +1540,12 @@ plot_dots <-function(args = list()){
   
   for(var in names(args)){
     assign(var, args[[var]])
+  }
+  
+  if(class(data) %in% c("ncdfFlowSet", "flowSet")){
+    df <- data.frame(exprs(data[[1]]), check.names = FALSE)
+  }else{
+    df <- data
   }
   
   if(!is.null(color_var)){
@@ -1515,26 +1579,38 @@ plot_dots <-function(args = list()){
       group_var <- as.name(group_var)
     }
   }
-  p <- ggplot(df,
-              aes_string(x = as.name( xvar ), 
-                         y = as.name( yvar ),
-                         colour = color_var,
-                         group = group_var)) + 
-    geom_point(alpha = alpha, 
-               size = size)
-  if(show_label){
-    df_stat <- compute_stats(df = df,
-                             stat_function = "median",
-                             yvar = c(xvar, yvar),
-                             id.vars = id.vars)
-    
-    p <- p + geom_label_repel(mapping = aes_string(x = as.name( xvar ), 
-                                                  y = as.name( yvar ),
-                                                  color = id.vars,
-                                                  label = id.vars), 
-                             data = df_stat,
-                             fill = "white")
+  
+  if(class(data) %in% c("ncdfFlowSet", "flowSet")){
+    p <- ggcyto::ggcyto(data,
+                        aes_string(x = as.name( xvar ),
+                                   y = as.name( yvar ),
+                                   colour = color_var,
+                                   group = group_var))
+  }else{
+    p <- ggplot(data,
+                        aes_string(x = as.name( xvar ), 
+                                   y = as.name( yvar ),
+                                   colour = color_var,
+                                   group = group_var)) 
   }
+  
+  p <- p +   geom_point(alpha = alpha, 
+               size = size)
+  
+  # if(show_label){
+  #   df_stat <- compute_stats(df = df,
+  #                            stat_function = "median",
+  #                            yvar = c(xvar, yvar),
+  #                            id.vars = id.vars)
+  #   
+  #   p <- p + geom_label_repel(mapping = aes_string(x = as.name( xvar ), 
+  #                                                 y = as.name( yvar ),
+  #                                                 color = id.vars,
+  #                                                 label = id.vars), 
+  #                            data = df_stat,
+  #                            fill = "white")
+  # }
+  
   return(p)
   
 }
@@ -1572,6 +1648,12 @@ plot_contour <-function(args = list()){
     assign(var, args[[var]])
   }
   
+  if(class(data) %in% c("ncdfFlowSet", "flowSet")){
+    df <- data.frame(exprs(data[[1]]), check.names = FALSE)
+  }else{
+    df <- data
+  }
+  
   if(!is.null(color_var)){
     if(color_var == "none" ){
       color_var <- NULL
@@ -1596,14 +1678,19 @@ plot_contour <-function(args = list()){
     }
   }
   
-  
-  p <- ggplot(df,
-              aes_string(x = as.name( xvar ),
-                         y = as.name( yvar ),
-                         colour = color_var,
-                         group = group_var))
-
-
+  if(class(data) %in% c("ncdfFlowSet", "flowSet")){
+    p <- ggcyto::ggcyto(data,
+                aes_string(x = as.name( xvar ),
+                           y = as.name( yvar ),
+                           colour = color_var,
+                           group = group_var))
+  }else{
+    p <- ggplot(data,
+                aes_string(x = as.name( xvar ),
+                           y = as.name( yvar ),
+                           colour = color_var,
+                           group = group_var))
+  }
   
   if(show_outliers){
     p <- p + geom_point(size = size, alpha = alpha)
@@ -1947,7 +2034,8 @@ add_polygon_layer <- function(p,
                              polygon = NULL,
                              label = NULL){
   
-  if(p$plot_env$plot_type != "histogram" & setequal(names(polygon), c("x", "y"))){
+  #if(p$plot_env$plot_type != "histogram" & setequal(names(polygon), c("x", "y"))){
+  if(setequal(names(polygon), c("x", "y"))){
     if(!is.null(polygon$x)){
       if(length(polygon$x)>1){
         polygon <- data.frame(x = polygon$x, y = polygon$y)
@@ -2116,6 +2204,93 @@ add_gate <- function(p, gate){
   
 }
 
+#' Add a gate layer to plot
+#' @param p a plot
+#' @param gate a gate object
+#' @importFrom sp point.in.polygon
+#' @importFrom rlang quo_get_expr
+add_gate_to_plot <- function(p, gate){
+  
+  if(is.null(gate)){
+    return(p)
+  }
+  if(class(gate[[1]]) == "booleanFilter"){
+    warning("Gates of class booleanFilter cannot be displayed")
+    return(p)
+  }
+    
+  polygon <- get_gate_coordinates(gate[[1]])
+  
+  
+  xvar <- NULL
+  yvar <- NULL
+  color_var <- NULL
+  
+  if("x" %in% names(p$mapping)){
+    if("quosure" %in% class(p$mapping$x)){
+      xvar <- as.character(rlang::quo_get_expr(p$mapping$x))
+    }
+  }
+  
+  if("y" %in% names(p$mapping)){
+    if("quosure" %in% class(p$mapping$x)){
+      yvar <- as.character(rlang::quo_get_expr(p$mapping$y))
+    }
+  }
+  
+  # if("colour" %in% names(p$mapping)){
+  #   if("quosure" %in% class(p$mapping$colour)){
+  #     color_var <- as.character(rlang::quo_get_expr(p$mapping$colour))
+  #   }
+  # }
+  
+  if(all(names(polygon) %in% c(xvar, yvar))){ 
+    print("OK gate")
+    p <- p + geom_gate(gate) + geom_stats(gate = gate, nudge_y = 0.5,
+                                              type = c("gate_name", "percent"), label.padding = unit(0.5, "lines"),
+                                              fill = grDevices::rgb(1,1,1,0.75))
+    # if(dim(polygon)[2] >1){
+    #   in_poly <- sp::point.in.polygon(p$data[[xvar]], 
+    #                                   p$data[[yvar]], 
+    #                                   polygon[[xvar]],
+    #                                   polygon[[yvar]], 
+    #                                   mode.checked=FALSE)
+    #   
+    #   perc_in_poly <- sprintf("%.1f", sum(in_poly)/length(in_poly)*100)
+    #   
+    #   idx_match <- match(c(xvar, yvar), names(polygon))
+    #   names(polygon)[idx_match] <- c("x", "y")
+    #   
+    #   label <- paste(gate@filterId, " (", perc_in_poly, "%)", sep="")
+    #   p <- add_polygon_layer(p, polygon = polygon, label = label)
+    # }else{
+    #   p <- p + geom_area(data = data.frame(x = polygon[[xvar]], y = c(1,1)), 
+    #                      mapping = aes(x=x, y = y), 
+    #                      alpha = 0.2, 
+    #                      color = "red", fill = "red")
+    #   perc_in_poly <- sum(p$data[[xvar]] <= max(polygon[[xvar]]) & 
+    #                         p$data[[xvar]] >= min(polygon[[xvar]]))/ 
+    #     le_intngth(p$data[[xvar]])*100
+    #   perc_in_poly <- sprintf("%.1f", perc_in_poly)
+    #   label <- paste(gate@filterId, " (", perc_in_poly, "%)", sep="")
+    #   df_label <- data.frame(x=mean(polygon[[xvar]]), y= 0.5)
+    #   p <- p +  geom_label_repel(data = df_label, force = 4, inherit.aes = FALSE,
+    #                              mapping = aes(x=x, y=y),
+    #                              label = label,
+    #                              fill = grDevices::rgb(1,1,1,0.85),
+    #                              color = "red",
+    #                              nudge_y = 0,
+    #                              nudge_x =0,
+    #                              point.padding = 0)
+    #   
+    # }
+    
+  }
+  
+  return(p)
+  
+}
+
 #' Get data ranges from a plot
 #' @param p a plot
 #' @importFrom sp point.in.polygon
@@ -2143,14 +2318,25 @@ get_plot_data_range <- function(p){
   }
   
   if(!is.null(xvar)){
-    xlim <- range(p$data[[xvar]])
+    if(class(p$data) %in% c("ncdfFlowSet", "flowset")){
+      xvalues <- exprs(p$data[[1]])[,xvar]
+    }else{
+      xvalues <- p$data[[xvar]]
+    }
+    xlim <- range(xvalues)
     data_range[[xvar]] <- scales::expand_range(xlim, add = 1)
   }
+  
   if(!is.null(yvar)){
-    ylim <- range(p$data[[yvar]])
+    if(class(p$data) %in% c("ncdfFlowSet", "flowset")){
+      yvalues <- exprs(p$data[[1]])[,yvar]
+    }else{
+      yvalues <- p$data[[yvar]]
+    }
+    ylim <- range(yvalues)
     data_range[[yvar]] <- scales::expand_range(ylim, add=1)
   }
-
+  
   return(data_range)
 }
 
@@ -2217,6 +2403,235 @@ format_plot <- function(p,
   
   xvar <- NULL
   yvar <- NULL
+  title <- NULL
+  
+  if("x" %in% names(p$mapping)){
+    if("quosure" %in% class(p$mapping$x)){
+      xvar <- as.character(rlang::quo_get_expr(p$mapping$x))
+    }
+  }
+  
+  if("y" %in% names(p$mapping)){
+    if("quosure" %in% class(p$mapping$x)){
+      yvar <- as.character(rlang::quo_get_expr(p$mapping$y))
+    }
+  }
+  
+  xlim <- NULL
+  ylim <- NULL
+  
+  transformation <- list()
+  axis_labels <- list()
+  axis_limits <- list()
+  
+  color_var <- as.character(p$plot_env$color_var)
+
+  facet_yvar <- NULL
+  if(!is.null(p$plot_env$plot_type)){
+    if(p$plot_env$plot_type == "bar"){
+      facet_yvar <- "variable"
+    }
+  }
+  
+  
+  #### default parameters ###
+  
+  var_options <- c("xlim", "ylim", "transformation", "default_trans",
+                   "axis_labels", "axis_limits", "color_var_name", "facet_var", "facet_yvar",
+                   "scales", "option", "theme", "legend.position", "title")
+  
+  for(var in intersect(names(options), var_options)){
+    assign(var, options[[var]])
+  }
+
+  #facet scales
+  if(is.null(options$scales)){
+    scales <- "fixed"
+  }
+  
+  #default viridis palette
+  if(is.null(options$option)){
+    option <- "viridis"
+  }
+
+  #default transformation
+  if(is.null(options$default_trans)){
+    default_trans <- scales::identity_trans()
+  }
+  
+  ### transformations ###
+  
+  
+  
+  if(!is.null(xvar)){
+    if(length(xvar) == 1){
+      
+      if(class(p$data) %in% c("ncdfFlowSet", "flowset")){
+        xvalues <- exprs(p$data[[1]])[,xvar]
+      }else{
+        xvalues <- p$data[[xvar]]
+      }
+      
+      labx <- ifelse(xvar %in% names(axis_labels), axis_labels[[xvar]], xvar)
+      trans_x <- default_trans
+      if(xvar %in% names(transformation)){
+        trans_x <- transformation[[xvar]]
+      }
+      xlim <- axis_limits[[xvar]]
+      
+      if(is.double(xvalues)){
+        p <- p + scale_x_continuous(name = labx, trans = trans_x, limits = xlim ) 
+      }else if(is.integer(xvalues)){
+        limits <- NULL
+        if(!is.null(xlim)){limits <- seq(xlim[1], xlim[2])}
+        p <- p + scale_x_discrete(name = labx,  limits = limits) 
+      }else{
+        p <- p + scale_x_discrete(name = labx) 
+      }
+     
+    }
+  }
+  
+  if(!is.null(yvar)){
+    if(length(yvar) == 1){
+      if(class(p$data) %in% c("ncdfFlowSet", "flowset")){
+        yvalues <- exprs(p$data[[1]])[,yvar]
+      }else{
+        yvalues <- p$data[[yvar]]
+      }
+      laby <- ifelse(yvar %in% names(options$axis_labels), options$axis_labels[[yvar]], yvar)
+      trans_y <- default_trans
+      if(yvar %in% names(transformation)){
+        trans_y <- transformation[[yvar]]
+      }
+      ylim <- axis_limits[[yvar]]
+
+      if(is.double(yvalues)){
+        p <- p + scale_y_continuous(name = laby, trans = trans_y, limits = ylim) 
+      }else if(is.integer(yvalues)){
+        limits <- NULL
+        if(!is.null(ylim)){limits <- seq(ylim[1], ylim[2])}
+        p <- p + scale_y_discrete(name = laby,  limits = limits) 
+      }else{
+        p <- p + scale_y_discrete(name = laby) 
+      }
+        
+    }
+  }
+  
+  if(!is.null(p$plot_env$plot_type)){
+    if(p$plot_env$plot_type == "dots"){
+      
+      if(!is.null(color_var)){
+        if(length(color_var) == 1){
+
+          label_color <- ifelse(color_var %in% names(options$axis_labels), options$axis_labels[[color_var]], color_var)
+          trans_col <- default_trans
+          if(color_var %in% names(transformation)){
+            trans_col <- transformation[[color_var]]
+          }
+          
+          is_cont <- FALSE
+          if(class(p$data) %in% c("ncdfFlowSet", "flowset")){
+            if(color_var %in% colnames(exprs(p$data[[1]]))){
+              is_cont <- is.double(exprs(p$data[[1]])[,color_var])
+            }
+          }else{
+            if(color_var %in% names(p$data)){
+              is_cont <- is.double(p$data[[color_var]])
+            }
+          }
+          #is_cont <- ifelse(color_var %in% names(p$data), is.double(p$data[[color_var]]), FALSE)
+          
+          if(is_cont){
+            p <- p + viridis::scale_colour_viridis(trans = trans_col,
+                                                   name = label_color,
+                                                   option = option)
+          }
+        }
+      }
+    }
+  }
+
+  ### facet ###
+  if(!is.null(options$facet_var) | !is.null(facet_yvar)){
+    
+    left_formula <- paste(facet_yvar, collapse = " + ")
+    right_formula <- "."
+    if(!is.null(options$facet_var)){
+      if(options$facet_var != ""){
+        right_formula <- paste(options$facet_var, collapse = " + ")
+      }
+    }
+    
+    #print(paste(left_formula, "~", right_formula))
+    formula_facet <- stats::as.formula(paste(left_formula, "~", right_formula))
+    
+    p <- p + facet_grid(formula_facet,
+                        labeller = label_both,
+                        #scales = scale_y,
+                        scales = scales)
+  }else{
+    p <- p + facet_wrap(NULL)
+  }
+  
+  ### theme ###
+  if(!is.null(title)){
+    p <- p + ggtitle(title)
+  }
+  
+  if("theme" %in% names(options)){
+    if(!is.null(options$theme)){
+      if(options$theme != ""){
+        theme_name = paste("theme_", options$theme, sep = "")
+        theme_function <- function(...){
+          do.call(theme_name, list(...))
+        }
+        p <- p + theme_function()
+      }
+    }
+    
+  }
+  
+  
+  if(!is.null(options$legend.position)){
+    p <- p + theme(legend.position = options$legend.position)
+  }
+  
+  p <- p + theme(plot.title = element_text(face = "bold"))
+
+  return(p)
+  
+}
+
+#' Format a ggplot object
+#' @param p a ggplot object
+#' @param options  list of plot format options. Names of options include:
+#' xlim : x-axis range
+#' ylim : y-axis range
+#' transformation : named list of trans objects 
+#' default_trans : default trans object (set to 'identity_trans()' by default). 
+#' Used only if 'transformation' is not an element of 'options'.
+#' axis_labels : named list with axis labels (each element should be named after a plot variable)
+#' color_var_name : name to display for color variable
+#' facet_var : names of the variables used for facetting plots along the x-axis
+#' facet_yvar : names of the variables used for facetting plots along the y-axis
+#' scales : control scaling across facets (passed to 'facet_grid()'), Set to "fixed" by default
+#' option : name of the viridis palette
+#' theme : name of the ggplot theme ("gray" by default)
+#' legend.position : legend position
+#' @import ggplot2
+#' @import viridis
+#' @importFrom flowWorkspace logicle_trans
+#' @importFrom stats as.formula
+#' @importFrom rlang quo_get_expr
+#' @importFrom scales identity_trans
+#' @return a ggplot object
+format_ggcyto_plot <- function(p,
+                        options = list()){
+  
+  xvar <- NULL
+  yvar <- NULL
   
   if("x" %in% names(p$mapping)){
     if("quosure" %in% class(p$mapping$x)){
@@ -2256,7 +2671,7 @@ format_plot <- function(p,
   for(var in intersect(names(options), var_options)){
     assign(var, options[[var]])
   }
-
+  
   #facet scales
   if(is.null(options$scales)){
     scales <- "fixed"
@@ -2266,7 +2681,7 @@ format_plot <- function(p,
   if(is.null(options$option)){
     option <- "viridis"
   }
-
+  
   #default transformation
   if(is.null(options$default_trans)){
     default_trans <- scales::identity_trans()
@@ -2293,7 +2708,7 @@ format_plot <- function(p,
       }else{
         p <- p + scale_x_discrete(name = labx) 
       }
-     
+      
     }
   }
   
@@ -2306,7 +2721,7 @@ format_plot <- function(p,
         trans_y <- transformation[[yvar]]
       }
       ylim <- axis_limits[[yvar]]
-
+      
       if(is.double(p$data[[yvar]])){
         p <- p + scale_y_continuous(name = laby, trans = trans_y, limits = ylim) 
       }else if(is.integer(p$data[[yvar]])){
@@ -2316,7 +2731,7 @@ format_plot <- function(p,
       }else{
         p <- p + scale_y_discrete(name = laby) 
       }
-        
+      
     }
   }
   
@@ -2325,7 +2740,7 @@ format_plot <- function(p,
       
       if(!is.null(color_var)){
         if(length(color_var) == 1){
-
+          
           label_color <- ifelse(color_var %in% names(options$axis_labels), options$axis_labels[[color_var]], color_var)
           trans_col <- default_trans
           if(color_var %in% names(transformation)){
@@ -2342,7 +2757,7 @@ format_plot <- function(p,
       }
     }
   }
-
+  
   ### facet ###
   if(!is.null(options$facet_var) | !is.null(facet_yvar)){
     
@@ -2364,9 +2779,9 @@ format_plot <- function(p,
   }
   
   ### theme ###
-  if(length(unique(p$data$subset))==1){
-    p <- p + ggtitle(unique(p$data$subset))
-  }
+  # if(length(unique(p$data$subset))==1){
+  #   p <- p + ggtitle(unique(p$data$subset))
+  # }
   
   if("theme" %in% names(options)){
     if(!is.null(options$theme)){
@@ -2387,11 +2802,10 @@ format_plot <- function(p,
   }
   
   p <- p + theme(plot.title = element_text(face = "bold"))
-
+  
   return(p)
   
 }
-
 ### Main plot functions #######################################################################
 
 
@@ -2420,30 +2834,94 @@ plot_gs <- function(gs,
                     subset = NULL,
                     spill = NULL,
                     metadata = NULL,
+                    gate_name = NULL,
                     plot_type = "hexagonal",
                     plot_args = list(),
-                    options = list(),
-                    gate_name = NULL){
+                    options = list()){
   
   
   if(! "xvar" %in% names(plot_args)){
-    plot_args[["xvar"]] <- colnames(gs)[1]
+    plot_args[["xvar"]] <- colnames(gs@data)[1]
   }
   if(! "yvar" %in% names(plot_args)){
-    plot_args[["yvar"]] <- colnames(gs)[2]
+    plot_args[["yvar"]] <- colnames(gs@data)[2]
   }
   
   if(is.null(sample)) sample <-  flowWorkspace::sampleNames(gs)[1]
-  if(is.null(subset)) subset <- flowWorkspace::gs_get_pop_paths(gs)[1]
+  if(is.null(subset)) subset <- gh_get_gate_names(gs[[1]])[1]
 
+  
   df <- get_plot_data(df = df,
-                      gs = gs, 
+                      gs = gs,
                       sample = sample,
                       subset = subset,
                       spill = spill, 
                       metadata = metadata)
   
-  p <- call_plot_function(df = df,
+  p <- call_plot_function(data = df,
+                          plot_type = plot_type,
+                          plot_args = plot_args)
+  
+  p <- format_plot(p, options = options)
+  
+  # if(!is.null(gate_name)){
+  #   for(gateName in setdiff(gate_name, "root")){
+  #     g <- flowWorkspace::gs_pop_get_gate(gs, gateName)
+  #     p <- add_gate(p, g[[sample[1]]])
+  #   }
+  # }
+  
+  return(p)
+}
+
+#' Plot a GatingSet
+#' @param df a data.frame with plot data resulting from a call of \code{get_plot_data}. 
+#' Supersedes parameters 'gs', 'sample', 'spill', 'metadata'
+#' @param gs a GatingSet
+#' @param sample Names of samples from the GatingSet 
+#' (as returned by \code{pData(gs)$name})
+#' @param subset Names of subsets from the GatingSet 
+#' (as returned by \code{gs_get_pop_paths(gs)})
+#' @param spill spillover matrix. If NULL, uncompensated data is used for gating and plotting.
+#' @param metadata a data.frame containing metadata associated to samples.
+#' Must have a column \code{name} used for mapping.
+#' @param plot_type name of the plot type
+#' @param plot_args  list of plot parameters passed to the plot function. 
+#' Plot parameters depend on the plot type selected.
+#' @param options  list of plot format options passed to \code{format_plot()}
+#' @param gate_name Names of the gates to add to the plot (if it is compatible with plot parameters).
+#' Ignored if NULL.
+#' @importFrom flowWorkspace gs_get_pop_paths gh_pop_get_gate sampleNames
+#' @return a plot
+plot_gs_ggcyto <- function(gs,
+                    sample = NULL,
+                    subset = NULL,
+                    spill = NULL,
+                    metadata = NULL,
+                    gate_name = NULL,
+                    plot_type = "hexagonal",
+                    plot_args = list(),
+                    options = list()){
+  
+  
+  if(! "xvar" %in% names(plot_args)){
+    plot_args[["xvar"]] <- colnames(gs@data)[1]
+  }
+  if(! "yvar" %in% names(plot_args)){
+    plot_args[["yvar"]] <- colnames(gs@data)[2]
+  }
+  
+  if(is.null(sample)) sample <-  flowWorkspace::sampleNames(gs)[1]
+  if(is.null(subset)) subset <- gh_get_gate_names(gs[[1]])[1]
+  
+  fs <- gs_pop_get_data(gs[sample], subset)
+  options[["title"]] <- subset
+  
+  if(!is.null(spill)){
+    fs <- flowCore::compensate(fs, gs@compensation)
+  }
+  
+  p <- call_plot_function(data = fs,
                           plot_type = plot_type,
                           plot_args = plot_args)
   
@@ -2451,10 +2929,13 @@ plot_gs <- function(gs,
   
   if(!is.null(gate_name)){
     for(gateName in setdiff(gate_name, "root")){
-      g <- flowWorkspace::gh_pop_get_gate(gs[[1]], gateName)
-      p <- add_gate(p, g)
+      g <- flowWorkspace::gs_pop_get_gate(gs, gateName)
+      p <- add_gate_to_plot(p, g)
     }
   }
+  
+  p <- as.ggplot(p)
+  
   return(p)
 }
 
@@ -2506,7 +2987,7 @@ plot_stat <- function(df = NULL,
   
   
   if(is.null(sample)) sample <- flowWorkspace::sampleNames(gs)[1]
-  if(is.null(subset)) subset <- flowWorkspace::gs_get_pop_paths(gs)[1]
+  if(is.null(subset)) subset <- gh_get_gate_names(gs[[1]])[1]
   
   if(is.null(df)){
     df <- get_plot_data(df = df,
@@ -2586,24 +3067,24 @@ plot_gh <- function( gs,
   idx <- match(sample, flowWorkspace::sampleNames(gs))
   
   if(is.null(selected_subsets)){
-    selected_subsets <- setdiff(flowWorkspace::gs_get_pop_paths(gs), "root")
-    subset <- flowWorkspace::gs_get_pop_paths(gs)
+    selected_subsets <- setdiff(gh_get_gate_names(gs[[1]]), "root")
+    subset <- gh_get_gate_names(gs[[1]])
   }else{
-    subset <- selected_subsets[selected_subsets %in% flowWorkspace::gs_get_pop_paths(gs)]
+    subset <- selected_subsets[selected_subsets %in% gh_get_gate_names(gs[[1]])]
     parent_subsets <- sapply(subset, function(x){flowWorkspace::gs_pop_get_parent(gs[[idx[1]]], x)})
     subset <- union(subset, parent_subsets)
   }
   
 
-  if(is.null(df)){
-    
-    df <- get_data_gs(gs = gs,
-                      sample = sample,
-                      subset = subset,
-                      spill = spill,
-                      Ncells = Ncells)
-    
-  }
+  # if(is.null(df)){
+  #   
+  #   df <- get_data_gs(gs = gs,
+  #                     sample = sample,
+  #                     subset = subset,
+  #                     spill = spill,
+  #                     Ncells = Ncells)
+  #   
+  # }
   
   child_nodes <- flowWorkspace::gs_pop_get_children(gs[[idx[1]]], "root")
   child_nodes <- child_nodes[child_nodes %in% selected_subsets]
@@ -2657,11 +3138,10 @@ plot_gh <- function( gs,
           plot_type_gate <- "histogram"
         }
         
-        
-        plist[[count]] <- plot_gs(df = df,
-                                   gs=gs, 
+        plist[[count]] <- plot_gs_ggcyto(gs=gs, 
                                    sample=sample,
                                    subset = parent, 
+                                   spill = spill,
                                    gate_name = nodes_to_plot_parent[same_par], 
                                    plot_type = plot_type_gate,
                                    plot_args = plot_args,
@@ -2696,23 +3176,23 @@ plot_gh <- function( gs,
 #' @param plot_args  list of plot parameters passed to \code{plot_gs()}
 #' @param options  list of plot format options passed to \code{format_plot()}
 #' @importFrom flowWorkspace gh_pop_get_gate sampleNames
+#' @importFrom flowCore compensate
 plot_gate <- function(gate_name,
                      df = NULL,
                      gs,
                      sample = NULL,
                      spill = NULL,
                      metadata = NULL,
-                     plot_type = "contour",
+                     plot_type = "hexagonal",
                      plot_args = list(),
                      options = list()){
   
-  gate <- flowWorkspace::gh_pop_get_gate(gs[[1]], gate_name)
-  
-  polygon <- get_gate_coordinates(gate)
+  gate <- flowWorkspace::gs_pop_get_gate(gs, gate_name)
+  polygon <- get_gate_coordinates(gate[[1]])
   
   subset <- flowWorkspace::gs_pop_get_parent(gs,  gate_name)
   plot_args[["xvar"]] <- names(polygon)[1]
-  
+
   if(length(names(polygon))>1){
     plot_args$yvar <- names(polygon)[2]
   }else{
@@ -2721,20 +3201,26 @@ plot_gate <- function(gate_name,
   
   if(is.null(sample)) sample <-  flowWorkspace::sampleNames(gs)[1]
 
-  df <- get_plot_data(df = df,
-                      gs = gs, 
-                      sample = sample,
-                      subset = subset,
-                      spill = spill, 
-                      metadata = metadata)
+  # df <- get_plot_data(df = df,
+  #                     gs = gs,
+  #                     sample = sample,
+  #                     subset = parent,
+  #                     spill = spill,
+  #                     metadata = metadata)
   
-  p <- call_plot_function(df = df,
+  fs <- gs_pop_get_data(gs[sample], subset)
+  
+  if(!is.null(spill)){
+    fs <- flowCore::compensate(fs, gs@compensation)
+  }
+  
+  p <- call_plot_function(data = fs,
                     plot_type = plot_type,
                     plot_args = plot_args)
   
   p <- format_plot(p, options = options)
   
-  p <- add_gate(p, gate)
+  p <- add_gate_to_plot(p, gate)
   
   return(p)
 }
