@@ -265,6 +265,7 @@ Transform <- function(input, output, session, rval) {
     
     
     if(length(new_par)>0){
+
       for(i in 1:length(new_par)){
         
         transformation[[new_par[i]]] <- switch(rval_mod$parameters$display[idx_new[i]],
@@ -307,6 +308,7 @@ Transform <- function(input, output, session, rval) {
     idx <- match(input$selected_params, rval_mod$parameters$name)
     
     # update parameters slot in GatingSet
+
     if(nchar(input$param_desc) >0){
       for(i in 1:length(rval$gating_set)){
         old_desc <- rval$gating_set@data[[i]]@parameters[["desc"]][idx[1]]
@@ -315,8 +317,7 @@ Transform <- function(input, output, session, rval) {
         }
       }
     }
-         
-   
+
     # update description slot in GatingSet
     if(!is.null(input$param_vartype)){
       for(i in 1:length(rval$gating_set)){

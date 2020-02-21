@@ -10,6 +10,7 @@
 #' @importFrom flowCore fsApply each_col
 #' @importFrom flowWorkspace gs_get_pop_paths
 #' @importFrom shinydashboard renderValueBox
+#' @importFrom pryr object_size
 #' @export
 flowR_server <- function(session, input, output, modules = NULL) {
   
@@ -162,7 +163,7 @@ flowR_server <- function(session, input, output, modules = NULL) {
     }
 
   })
-  
+
   ### Get parameters from GatingSet ################################################################
   
   choices <- reactive({
