@@ -53,8 +53,8 @@ get_gates_from_ws_diva <- function(ws_path, template = NULL){
       parent <- gates[[i]]$parent_long
       name <- gates[[i]]$name_long
       
-      parent <- gsub(" ", "_", parent)
-      name <- gsub(" ", "_", name)
+      #parent <- gsub(" ", "_", parent)
+      #name <- gsub(" ", "_", name)
       
       if(gates[[i]]$type == "RectangleGate"){
         boundaries <- gates[[i]]$boundaries
@@ -97,6 +97,20 @@ parseGateDiva <- function(gateNode){
   
   name <- xml_text(xml_find_all(gate, ".//name"))
   parent <- xml_text(xml_find_all(gate, ".//parent"))
+  is_x_parameter_log <- xml_text(xml_find_all(gate, ".//is_x_parameter_log"))
+  is_x_parameter_scaled <- xml_text(xml_find_all(gate, ".//is_x_parameter_scaled"))
+  x_parameter_scale_value <- xml_text(xml_find_all(gate, ".//x_parameter_scale_value"))
+  is_y_parameter_log <- xml_text(xml_find_all(gate, ".//is_y_parameter_log"))
+  is_y_parameter_scaled <- xml_text(xml_find_all(gate, ".//is_y_parameter_scaled"))
+  y_parameter_scale_value <- xml_text(xml_find_all(gate, ".//y_parameter_scale_value"))
+  
+   # print(name)
+   # print(is_x_parameter_log)
+   # print(is_x_parameter_scaled)
+   # print(x_parameter_scale_value)
+   # print(is_y_parameter_log)
+   # print(is_y_parameter_scaled)
+   # print(y_parameter_scale_value)
   
   parent <- gsub(fixed = FALSE, pattern = "\\\\", replacement = "/", x= parent)
   if(parent == "All Events"){
@@ -126,7 +140,9 @@ parseGateDiva <- function(gateNode){
   
   m <- do.call(rbind, lapply(vertexes, function(v){
     x <- as.numeric(xml_attr(v, "x"))
+    if(is_x_parameter_log == "true" & is_x_parameter_scaled == "false"){x <- 10^x}
     y <- as.numeric(xml_attr(v, "y"))
+    if(is_y_parameter_log == "true" & is_y_parameter_scaled == "false"){y <- 10^y}
     return(data.frame(x = x,
                       y = y))
   }))
@@ -196,7 +212,7 @@ parseSpilloverMatrixDiva <- function(settingsNode){
   })
   
   df_spillover <- do.call(rbind, df_spillover_list)
-  compMat <- reshape2::acast(df_spillover, parameter ~ input)
+  compMat <- reshape2::acast(df_spillover, input ~ parameter)
   return(compMat)
 }
 
@@ -327,8 +343,8 @@ get_gates_from_ws <- function(ws_path, group = NULL){
     parent <- gates[[i]]$parent_long
     name <- gates[[i]]$name_long
     
-    parent <- gsub(" ", "_", parent)
-    name <- gsub(" ", "_", name)
+    #parent <- gsub(" ", "_", parent)
+    #name <- gsub(" ", "_", name)
     
     if(gates[[i]]$type == "RectangleGate"){
       boundaries <- gates[[i]]$boundaries
@@ -426,7 +442,7 @@ parseSpilloverMatrix <- function(x){
   spilloverNodes <- xml_find_all(x, ".//transforms:spillover")
   df_spillover_list <- lapply(spilloverNodes, parseSpillover)
   df_spillover <- do.call(rbind, df_spillover_list)
-  compMat <- reshape2::acast(df_spillover, parameter ~ input)
+  compMat <- reshape2::acast(df_spillover, input ~ parameter)
   return(compMat)
 }
 
@@ -493,10 +509,12 @@ get_gate_coordinates <- function(gate){
       polygon <- as.data.frame(gate@boundaries)
     }
   }else if(class(gate) == "rectangleGate"){
-    
-    polygon <- data.frame(x = c(gate@min[1], gate@max[1], gate@max[1], gate@min[1]),
-                          y = c(gate@min[2], gate@min[2], gate@max[2], gate@max[2]))
-    
+    if(length(gate@min)>1){
+      polygon <- data.frame(x = c(gate@min[1], gate@max[1], gate@max[1], gate@min[1]),
+                            y = c(gate@min[2], gate@min[2], gate@max[2], gate@max[2]))
+    }else{
+      polygon <- data.frame(x = c(gate@min[1], gate@max[1]))
+    }
     colnames(polygon) <- names(gate@min)
     
   }else if(class(gate) == "ellipsoidGate"){
@@ -590,7 +608,6 @@ get_gates_from_gs <- function(gs){
   
   for(node in setdiff(nodes, "root")){
     g <- flowWorkspace::gh_pop_get_gate(gs[[1]], node)
-    #print(names(g@parameters))
     parent <- flowWorkspace::gs_pop_get_parent(gs[[1]], node)
     gates[[node]] <- list(gate = g, parent = parent)
   } 
@@ -682,7 +699,6 @@ transform_gates <- function(gates,
       
       g <- gates[[i]]
       
-      
       if(class(g$gate) == "polygonGate"){
         
         polygon <- g$gate@boundaries
@@ -692,16 +708,23 @@ transform_gates <- function(gates,
                                     colnames(polygon))
         }
         
-        for(j in 1:length(colnames(polygon))){
-          if(colnames(polygon)[j] %in% names(transformation)){
-            polygon[,j] <- transformation[[colnames(polygon)[j]]]$transform(polygon[,j])
-          }
-          if(colnames(polygon)[j] == "Time"){
-            if(!is.null(time_step)){
+        if(!is.null(time_step)){
+          idx_time <- grep("^Time", colnames(polygon))
+          if(length(idx_time)>0){
+            for(j in idx_time){
               polygon[,j] <- polygon[,j]/time_step
             }
           }
         }
+        
+        if(!is.null(transformation)){
+          for(j in 1:length(colnames(polygon))){
+            if(colnames(polygon)[j] %in% names(transformation)){
+              polygon[,j] <- transformation[[colnames(polygon)[j]]]$transform(polygon[,j])
+            }
+          }
+        }
+
         
         trans_gate <- flowCore::polygonGate(.gate = polygon, filterId=g$gate@filterId)
       }
@@ -709,19 +732,28 @@ transform_gates <- function(gates,
       if(class(g$gate) == "rectangleGate"){
         
         polygon <- rbind(g$gate@min, g$gate@max)
+        if(dim(polygon)[2]==1){
+          colnames(polygon) <- names(g$gate@parameters)
+        }
         if(!is.null(pattern)){
-          colnames(polygon) <- gsub(pattern = pattern, 
-                                    replacement = replacement, 
+          colnames(polygon) <- gsub(pattern = pattern,
+                                    replacement = replacement,
                                     colnames(polygon))
         }
 
+        if(!is.null(time_step)){
+          idx_time <- grep("^Time", colnames(polygon))
+          if(length(idx_time)>0){
+            for(j in idx_time){
+              polygon[,j] <- polygon[,j]/time_step
+            }
+          }
+        }
         
         if(!is.null(transformation)){
           for(j in 1:length(colnames(polygon))){
-            polygon[,j] <- transformation[[colnames(polygon)[j]]]$transform(polygon[,j])
-            
-            if(colnames(polygon)[j] == "Time"){
-              polygon[,j] <- polygon[,j]/time_step
+            if(colnames(polygon)[j] %in% names(transformation)){
+              polygon[,j] <- transformation[[colnames(polygon)[j]]]$transform(polygon[,j])
             }
           }
         }
@@ -741,13 +773,19 @@ transform_gates <- function(gates,
                                     colnames(polygon))
         }
 
+        if(!is.null(time_step)){
+          idx_time <- grep("^Time", colnames(polygon))
+          if(length(idx_time)>0){
+            for(j in idx_time){
+              polygon[,j] <- polygon[,j]/time_step
+            }
+          }
+        }
         
         if(!is.null(transformation)){
           for(j in 1:length(colnames(polygon))){
-            polygon[,j] <- transformation[[colnames(polygon)[j]]]$transform(polygon[,j])
-            
-            if(colnames(polygon)[j] == "Time"){
-              polygon[,j] <- polygon[,j]/time_step
+            if(colnames(polygon)[j] %in% names(transformation)){
+              polygon[,j] <- transformation[[colnames(polygon)[j]]]$transform(polygon[,j])
             }
           }
         }
@@ -807,7 +845,7 @@ copy_gate <- function(gs, name, parent, copy_children_gates = TRUE){
 #' Get parameters from a GatingSet
 #' @param gs a GatingSet
 #' @return a list
-#' @importFrom flowWorkspace pData gs_get_pop_paths
+#' @importFrom flowWorkspace pData gs_get_pop_paths sampleNames
 #' @importFrom flowCore parameters
 #' @export
 get_parameters_gs <- function(gs){
@@ -833,7 +871,7 @@ get_parameters_gs <- function(gs){
     kw <- paste(x, "VARTYPE", sep = "")
     vartype <- ff@description[[kw]]
     if(is.null(vartype)){
-      vartype <- "double"
+      vartype <- "numeric"
     }
     return(vartype)
   }))
@@ -855,8 +893,8 @@ get_parameters_gs <- function(gs){
   names(axis_limits) <- params$name
   
   return( 
-    list(sample = pdata$name,
-         subset = gs_get_pop_paths(gs),
+    list(sample = flowWorkspace::sampleNames(gs),
+         subset = flowWorkspace::gs_get_pop_paths(gs),
          plot_var = plot_var,
          labels = labels,
          axis_limits = axis_limits,
@@ -875,7 +913,7 @@ get_parameters_gs <- function(gs){
 #' @param spill spillover matrix. If NULL, uncompensated data is used for gating
 #' @param filter a filter object applied before computing statistics. Ignored if NULL.
 #' @importFrom flowCore Subset
-#' @importFrom flowWorkspace pData GatingSet gs_pop_get_count_fast
+#' @importFrom flowWorkspace GatingSet gs_pop_get_count_fast sampleNames
 getPopStatsPlus <- function(gs, spill = NULL, filter = NULL){
   
   fs <- gs@data
@@ -893,8 +931,7 @@ getPopStatsPlus <- function(gs, spill = NULL, filter = NULL){
   df <- flowWorkspace::gs_pop_get_count_fast(gs_comp)
   
   df$name <- sapply(df$name, function(x){strsplit(x, split = "_[0-9]+$")[[1]][1]})
-  df_root <- data.frame(name = flowWorkspace::pData(fs)$name)
-  #df_root$name <- flowWorkspace::pData(fs)$name
+  df_root <- data.frame(name = flowWorkspace::sampleNames(fs))
   df_root$Population <- "root"
   df_root$Count <- sapply(1:length(fs), function(x){dim(fs[[x]]@exprs)[1]})
   df_root$Parent <- NA
@@ -916,7 +953,7 @@ getPopStatsPlus <- function(gs, spill = NULL, filter = NULL){
 #' @param return_comp_data logical. Should compensated data be returned ?
 #' @param updateProgress function used in shiny to update a progress bar
 #' @return a data.frame
-#' @importFrom flowWorkspace pData gs_get_pop_paths colnames GatingSet gh_pop_get_indices pData
+#' @importFrom flowWorkspace sampleNames gs_get_pop_paths colnames GatingSet gh_pop_get_indices pData
 #' @importFrom flowCore compensate
 get_data_gs <- function(gs,
                         sample = NULL,
@@ -927,14 +964,13 @@ get_data_gs <- function(gs,
                         updateProgress = NULL
 ){
   
-  if(is.null(sample)){ sample <- flowWorkspace::pData(gs)$name}
+  if(is.null(sample)){sample <- flowWorkspace::sampleNames(gs)}
   if(is.null(subset)){subset <- flowWorkspace::gs_get_pop_paths(gs)}
   
-  idx <- match(sample, flowWorkspace::pData(gs)$name)
-  idx <- idx[!is.na(idx)]
-  
-  if(length(idx) != length(sample)){
-    stop("sample not found in gating set")
+  idx <- which(sample %in% flowWorkspace::sampleNames(gs))
+
+  if(length(idx) == 0){
+    return(NULL)
   }
   
   gs_comp <- gs
@@ -942,7 +978,7 @@ get_data_gs <- function(gs,
   
   if(!is.null(spill)){
     
-    if( setequal(names(spill),  flowWorkspace::pData(gs)$name) ){
+    if( setequal(names(spill),  flowWorkspace::sampleNames(gs)) ){
       gates <- get_gates_from_gs(gs)
       fs <- gs@data[idx]
       fs <- flowCore::compensate(fs, spill[idx])
@@ -961,7 +997,8 @@ get_data_gs <- function(gs,
       
       idx_subset <- NULL
       if(!is.null(spill)){
-        idx_comp <- match(pData(gs)$name[idx[i]], pData(gs_comp)$name)
+        idx_comp <- match(flowWorkspace::sampleNames(gs)[idx[i]], 
+                          flowWorkspace::sampleNames(gs_comp))
       }
       
       if(subset[k] != "root"){
@@ -988,7 +1025,7 @@ get_data_gs <- function(gs,
       
       if(dim(df_int)[1]>0){
         
-        df_int[["name"]] <- pData(gs)$name[idx[i]]
+        df_int[["name"]] <- flowWorkspace::sampleNames(gs)[idx[i]]
         df_int[["subset"]] <- subset[k]
         #df <- rbind(df, df_int)
         
@@ -1015,7 +1052,7 @@ get_data_gs <- function(gs,
   
   df_tot <- do.call(rbind, df)
   df_tot[["subset"]] <- factor(df_tot[["subset"]], levels = subset)
-  df_tot[["name"]] <- factor(df_tot[["name"]], levels = pData(gs)$name[idx])
+  df_tot[["name"]] <- factor(df_tot[["name"]], levels = flowWorkspace::sampleNames(gs)[idx])
   
   if(length(df_tot[["name"]]) > 0){
     return(df_tot)
@@ -1188,6 +1225,7 @@ compute_stats <- function(df = NULL,
 #' @param vartype named character vector specifying variable type conversion.
 #' (either "factor", "integer" or "character")
 #' Must have a column \code{name} used for mapping.
+#' @importFrom flowWorkspace pData
 #' @return a data.frame
 get_plot_data <- function(gs,
                           df=NULL, 
@@ -1210,7 +1248,7 @@ get_plot_data <- function(gs,
   }
   
   if(is.null(metadata) & !is.null(gs)){
-    metadata <- pData(gs)
+    metadata <- flowWorkspace::pData(gs)
   }
   
   if(!is.null(metadata)){
@@ -1730,8 +1768,6 @@ plot_bar <-function(args = list()){
   id.vars <- names(df)[which(!sapply(df, is.numeric))]
   df_melt <- reshape2::melt(df, id.vars = id.vars)
   
-  #print(df_melt)
-  
   if(is.null(stat_var)){
     stat_var <- names(df)[which(sapply(df, is.numeric))]
   }
@@ -1797,8 +1833,6 @@ plot_tile <-function(args = list()){
   
   id.vars <- names(df)[which(!sapply(df, is.numeric))]
   df_melt <- reshape2::melt(df, id.vars = id.vars)
-  
-  #print(df_melt)
   
   if(is.null(stat_var)){
     stat_var <- names(df)[which(sapply(df, is.numeric))]
@@ -1942,6 +1976,7 @@ add_polygon_layer <- function(p,
         }
         
         if(update_range_x){
+          
           p <- p + scale_x_continuous(name = layer_info$x$name, 
                                       trans = layer_info$x$trans, 
                                       limits = xrange)
@@ -1950,8 +1985,8 @@ add_polygon_layer <- function(p,
         
         update_range_y <- FALSE
         
-        if(!is.null(layer_info$x$limits) & 
-           "RangeContinuous" %in% class(layer_info$x$range) ){
+        if(!is.null(layer_info$y$limits) & 
+           "RangeContinuous" %in% class(layer_info$y$range) ){
           
           yrange <- layer_info$y$trans$inverse(layer_info$y$limits)
           if(!is.null(yrange)){
@@ -1965,7 +2000,8 @@ add_polygon_layer <- function(p,
             }
           }
         }
-        if(update_range_y){
+        if(update_range_y ){
+          
           p <- p + scale_y_continuous(name = layer_info$y$name, 
                                       trans = layer_info$y$trans, 
                                       limits = yrange)
@@ -1978,7 +2014,8 @@ add_polygon_layer <- function(p,
           geom_polygon(data=polygon, mapping = aes(x=x, y=y), 
                        inherit.aes = FALSE,
                        fill="red",
-                       alpha=0.05)
+                       alpha=0.05) +
+          geom_point(data = polygon, mapping = aes(x=x, y=y), color = "red", inherit.aes = FALSE, alpha = 0.5, size = 2)
         if(!is.null(label)){
           df_label <- data.frame(x=mean(polygon$x), y= mean(polygon$y))
           p <- p +  geom_label_repel(data = df_label, force = 4, inherit.aes = FALSE,
@@ -2000,15 +2037,19 @@ add_polygon_layer <- function(p,
   
 }
 
+#' Add a gate layer to plot
+#' @param p a plot
+#' @param gate a gate object
 #' @importFrom sp point.in.polygon
 #' @importFrom rlang quo_get_expr
 add_gate <- function(p, gate){
   
-  if(is.null(gate) | p$plot_env$plot_type == "histogram"){
+  if(is.null(gate)){
     return(p)
   }
   
   polygon <- get_gate_coordinates(gate)
+  
   
   xvar <- NULL
   yvar <- NULL
@@ -2033,26 +2074,118 @@ add_gate <- function(p, gate){
   }
   
   if(setequal(c(xvar, yvar), names(polygon))){ 
+    if(dim(polygon)[2] >1){
+      in_poly <- sp::point.in.polygon(p$data[[xvar]], 
+                                      p$data[[yvar]], 
+                                      polygon[[xvar]],
+                                      polygon[[yvar]], 
+                                      mode.checked=FALSE)
+      
+      perc_in_poly <- sprintf("%.1f", sum(in_poly)/length(in_poly)*100)
+      
+      idx_match <- match(c(xvar, yvar), names(polygon))
+      names(polygon)[idx_match] <- c("x", "y")
+      
+      label <- paste(gate@filterId, " (", perc_in_poly, "%)", sep="")
+      p <- add_polygon_layer(p, polygon = polygon, label = label)
+    }else{
+      p <- p + geom_area(data = data.frame(x = polygon[[xvar]], y = c(1,1)), 
+                         mapping = aes(x=x, y = y), 
+                         alpha = 0.2, 
+                         color = "red", fill = "red")
+      perc_in_poly <- sum(p$data[[xvar]] <= max(polygon[[xvar]]) & 
+                            p$data[[xvar]] >= min(polygon[[xvar]]))/ 
+        length(p$data[[xvar]])*100
+      perc_in_poly <- sprintf("%.1f", perc_in_poly)
+      label <- paste(gate@filterId, " (", perc_in_poly, "%)", sep="")
+      df_label <- data.frame(x=mean(polygon[[xvar]]), y= 0.5)
+      p <- p +  geom_label_repel(data = df_label, force = 4, inherit.aes = FALSE,
+                                 mapping = aes(x=x, y=y),
+                                 label = label,
+                                 fill = grDevices::rgb(1,1,1,0.85),
+                                 color = "red",
+                                 nudge_y = 0,
+                                 nudge_x =0,
+                                 point.padding = 0)
+      
+    }
     
-    in_poly <- sp::point.in.polygon(p$data[[xvar]], 
-                                p$data[[yvar]], 
-                                polygon[[xvar]],
-                                polygon[[yvar]], 
-                                mode.checked=FALSE)
-    
-    perc_in_poly <- sprintf("%.1f", sum(in_poly)/length(in_poly)*100)
-    
-    idx_match <- match(c(xvar, yvar), names(polygon))
-    names(polygon)[idx_match] <- c("x", "y")
-    
-    label <- paste(gate@filterId, " (", perc_in_poly, "%)", sep="")
-    p <- add_polygon_layer(p, polygon = polygon, label = label)
   }
   
   return(p)
   
 }
 
+#' Get data ranges from a plot
+#' @param p a plot
+#' @importFrom sp point.in.polygon
+#' @importFrom rlang quo_get_expr
+#' @importFrom scales expand_range
+get_plot_data_range <- function(p){
+
+  xlim <- NULL
+  ylim <- NULL
+  xvar <- NULL
+  yvar <- NULL
+  
+  data_range <- list()
+  
+  if("x" %in% names(p$mapping)){
+    if("quosure" %in% class(p$mapping$x)){
+      xvar <- as.character(rlang::quo_get_expr(p$mapping$x))
+    }
+  }
+  
+  if("y" %in% names(p$mapping)){
+    if("quosure" %in% class(p$mapping$x)){
+      yvar <- as.character(rlang::quo_get_expr(p$mapping$y))
+    }
+  }
+  
+  if(!is.null(xvar)){
+    xlim <- range(p$data[[xvar]])
+    data_range[[xvar]] <- scales::expand_range(xlim, add = 1)
+  }
+  if(!is.null(yvar)){
+    ylim <- range(p$data[[yvar]])
+    data_range[[yvar]] <- scales::expand_range(ylim, add=1)
+  }
+
+  return(data_range)
+}
+
+#' Build a tree graph from a named list
+#' @param gates a named list. Each list element should contain a item 'parent' with 
+#' the name of its parent list element
+#' @importFrom graph addEdge nodes
+#' @importFrom Rgraphviz renderGraph layoutGraph
+#' @importFrom methods new
+plot_tree <- function(gates, fontsize = 40, rankdir = "LR", shape = "ellipse", fixedsize = FALSE){
+  gR = methods::new("graphNEL", nodes = union("root", names(gates)), edgemode = "directed")
+  
+  for(i in 1:length(gates)){
+    if(!is.null(gates[[i]]$parent)){
+      gR = graph::addEdge(gates[[i]]$parent,  names(gates)[i], gR)
+    }
+  }
+  
+  nAttrs <- list()
+  nodeNames <- basename(graph::nodes(gR))
+  names(nodeNames) <- graph::nodes(gR)
+  nAttrs$label <- nodeNames
+  
+  p <- Rgraphviz::renderGraph(Rgraphviz::layoutGraph(gR,
+                                                     nodeAttrs=nAttrs,
+                                                     attrs=list(graph=list(rankdir=rankdir),
+                                                                node=list(fixedsize = fixedsize,
+                                                                          fillcolor = "gray",
+                                                                          fontsize = fontsize,
+                                                                          shape = shape)
+                                                     )
+    )
+  )
+  return(p)
+}
 
 ### Format plot (legend, scale, labels ...) #####################################################
 
@@ -2085,8 +2218,6 @@ format_plot <- function(p,
   xvar <- NULL
   yvar <- NULL
   
-  #print(names(p$mapping))
-
   if("x" %in% names(p$mapping)){
     if("quosure" %in% class(p$mapping$x)){
       xvar <- as.character(rlang::quo_get_expr(p$mapping$x))
@@ -2281,7 +2412,7 @@ format_plot <- function(p,
 #' @param options  list of plot format options passed to \code{format_plot()}
 #' @param gate_name Names of the gates to add to the plot (if it is compatible with plot parameters).
 #' Ignored if NULL.
-#' @importFrom flowWorkspace gs_get_pop_paths pData gh_pop_get_gate
+#' @importFrom flowWorkspace gs_get_pop_paths gh_pop_get_gate sampleNames
 #' @return a plot
 plot_gs <- function(gs,
                     df = NULL,
@@ -2302,7 +2433,7 @@ plot_gs <- function(gs,
     plot_args[["yvar"]] <- colnames(gs)[2]
   }
   
-  if(is.null(sample)) sample <-  flowWorkspace::pData(gs)$name[1]
+  if(is.null(sample)) sample <-  flowWorkspace::sampleNames(gs)[1]
   if(is.null(subset)) subset <- flowWorkspace::gs_get_pop_paths(gs)[1]
 
   df <- get_plot_data(df = df,
@@ -2352,7 +2483,7 @@ plot_gs <- function(gs,
 #' @param plot_args  list of plot parameters passed to the plot function. 
 #' Plot parameters depend on the plot type selected.
 #' @param options  list of plot format options passed to \code{format_plot()}
-#' @importFrom flowWorkspace gs_get_pop_paths pData
+#' @importFrom flowWorkspace gs_get_pop_paths sampleNames
 #' @importFrom scales identity_trans
 #' @return a list with a plot and the corresponding plot data
 plot_stat <- function(df = NULL,
@@ -2374,7 +2505,7 @@ plot_stat <- function(df = NULL,
                         
   
   
-  if(is.null(sample)) sample <- flowWorkspace::pData(gs)$name[1]
+  if(is.null(sample)) sample <- flowWorkspace::sampleNames(gs)[1]
   if(is.null(subset)) subset <- flowWorkspace::gs_get_pop_paths(gs)[1]
   
   if(is.null(df)){
@@ -2439,7 +2570,7 @@ plot_stat <- function(df = NULL,
 #' @param plot_args  list of plot parameters passed to \code{plot_gs()}
 #' @param options  list of plot format options passed to \code{format_plot()}
 #' @return a list of ggplot objects
-#' @importFrom flowWorkspace gs_get_pop_paths gs_pop_get_parent gs_pop_get_children
+#' @importFrom flowWorkspace gs_get_pop_paths gs_pop_get_parent gs_pop_get_children sampleNames
 plot_gh <- function( gs, 
                       df = NULL,
                       sample = NULL,
@@ -2450,9 +2581,9 @@ plot_gh <- function( gs,
                       plot_args = list(), 
                       options = list()){
   
-  if(is.null(sample)){sample = pData(gs)$name[1]}
+  if(is.null(sample)){sample = flowWorkspace::sampleNames(gs)[1]}
   
-  idx <- match(sample, pData(gs)$name)
+  idx <- match(sample, flowWorkspace::sampleNames(gs))
   
   if(is.null(selected_subsets)){
     selected_subsets <- setdiff(flowWorkspace::gs_get_pop_paths(gs), "root")
@@ -2463,6 +2594,7 @@ plot_gh <- function( gs,
     subset <- union(subset, parent_subsets)
   }
   
+
   if(is.null(df)){
     
     df <- get_data_gs(gs = gs,
@@ -2475,6 +2607,7 @@ plot_gh <- function( gs,
   
   child_nodes <- flowWorkspace::gs_pop_get_children(gs[[idx[1]]], "root")
   child_nodes <- child_nodes[child_nodes %in% selected_subsets]
+  
   
   plist <- list()
   count <- 0
@@ -2517,14 +2650,20 @@ plot_gh <- function( gs,
         count <- count + 1
 
         plot_args$xvar <- par_nodes[[1]][1]
-        plot_args$yvar <- par_nodes[[1]][2]
+        plot_type_gate <- plot_type
+        if(length(par_nodes[[1]]) > 1){
+          plot_args$yvar <- par_nodes[[1]][2]
+        }else{
+          plot_type_gate <- "histogram"
+        }
         
-        plist[[count]] <- plot_gs(df = df, 
+        
+        plist[[count]] <- plot_gs(df = df,
                                    gs=gs, 
-                                   sample=sample, 
+                                   sample=sample,
                                    subset = parent, 
                                    gate_name = nodes_to_plot_parent[same_par], 
-                                   plot_type = plot_type,
+                                   plot_type = plot_type_gate,
                                    plot_args = plot_args,
                                    options = options)
         
@@ -2556,7 +2695,7 @@ plot_gh <- function( gs,
 #' @param plot_type name of the plot type
 #' @param plot_args  list of plot parameters passed to \code{plot_gs()}
 #' @param options  list of plot format options passed to \code{format_plot()}
-#' @importFrom flowWorkspace gh_pop_get_gate
+#' @importFrom flowWorkspace gh_pop_get_gate sampleNames
 plot_gate <- function(gate_name,
                      df = NULL,
                      gs,
@@ -2570,12 +2709,17 @@ plot_gate <- function(gate_name,
   gate <- flowWorkspace::gh_pop_get_gate(gs[[1]], gate_name)
   
   polygon <- get_gate_coordinates(gate)
+  
   subset <- flowWorkspace::gs_pop_get_parent(gs,  gate_name)
   plot_args[["xvar"]] <- names(polygon)[1]
   
-  if(length(names(polygon))>1){plot_args$yvar <- names(polygon)[2]}
+  if(length(names(polygon))>1){
+    plot_args$yvar <- names(polygon)[2]
+  }else{
+    plot_type = "histogram"
+  }
   
-  if(is.null(sample)) sample <-  pData(gs)$name[1]
+  if(is.null(sample)) sample <-  flowWorkspace::sampleNames(gs)[1]
 
   df <- get_plot_data(df = df,
                       gs = gs, 
@@ -2801,14 +2945,14 @@ dim_reduction <- function(df,
     tSNE <- Rtsne(df_trans[ idx_cells , yvar], perplexity = perplexity, dims = dims, check_duplicates = check_duplicates)
     df_tSNE <- tSNE$Y
     colnames(df_tSNE) <- c("tSNE1","tSNE2")
-    return(list( df = cbind(df_filter[idx_cells, ], df_tSNE), keep = idx_cells_kept, vars = c("tSNE1","tSNE2")))
+    return(list( df = cbind(df_filter[idx_cells, ], df_tSNE), keep = idx_cells_kept, var_names = c("tSNE1","tSNE2")))
   }
   
   if(method == "umap"){
     df_umap <- umap(df_trans[ idx_cells , yvar])
     df_umap <- df_umap$layout
     colnames(df_umap) <- c("UMAP1","UMAP2")
-    return(list( df = cbind(df_filter[idx_cells, ], df_umap), keep = idx_cells_kept, vars = c("UMAP1","UMAP2")))
+    return(list( df = cbind(df_filter[idx_cells, ], df_umap), keep = idx_cells_kept, var_names = c("UMAP1","UMAP2")))
   }
   
   return(NULL)
@@ -2897,10 +3041,10 @@ get_cluster <- function(df,
                                           "metaClustering_consensus", max=k_meta)
     
     metaClustering_perCell <- fSOM$metaClustering[fSOM$map$mapping[,1]]
-    df_filter$cluster_fsom <- as.integer(fSOM$map$mapping[,1])
-    df_filter$cluster <- as.integer(metaClustering_perCell)
-    
-    return(list(df = df_filter, keep = idx_cells_kept, fSOM = fSOM))
+    df_filter$cluster_fsom <- as.factor(fSOM$map$mapping[,1])
+    df_filter$cluster <- as.factor(metaClustering_perCell)
+    var_names <- c("cluster", "cluster_fsom")
+    return(list(df = df_filter, keep = idx_cells_kept,  var_names = var_names, fSOM = fSOM))
   }else{
     stop("Clustering method not supported")
   }
@@ -2925,7 +3069,7 @@ get_cluster <- function(df,
 #' \dontrun{
 #' utils::data("GvHD", package = "flowCore")
 #' gs <- GatingSet(GvHD)
-#' df <- get_data_gs(gs = gs, sample = pData(gs)$name[1:3], subset = "root", Ncells = 1000)
+#' df <- get_data_gs(gs = gs, sample = flowWorkspace::sampleNames(gs)[1:3], subset = "root", Ncells = 1000)
 #' fs <- build_flowset_from_df(df = df, origin = gs@data)
 #' pData(fs)}
 build_flowset_from_df <- function(df,
@@ -2941,16 +3085,17 @@ build_flowset_from_df <- function(df,
     idx_cells <- which(df[[sample_col]] == sample)
     ncells <- length(idx_cells)
     if(ncells >0){
-      df_sample <- df[ idx_cells , chanel_col]
+      df_sample <- df[idx_cells , chanel_col]
       
-      M <- as.matrix(df_sample)
+      df_exprs <- data.frame(lapply(df_sample, as.numeric), check.names = FALSE)
+      M <- as.matrix(df_exprs)
       
       par <- NULL
       desc <- NULL
       
       if(!is.null(origin)){
         
-        idx <- match(sample,flowWorkspace::pData(origin)$name)
+        idx <- match(sample, flowWorkspace::sampleNames(origin))
         
         if(!is.na(idx)){
           
@@ -2967,11 +3112,13 @@ build_flowset_from_df <- function(df,
           
           for(i in 1:length(par@data$name)){
             param <- par@data$name[i]
-            desc[[paste("$P",i,"VARTYPE",sep="")]] <- typeof(df_sample[[param]])
+            if(! paste("$P",i,"VARTYPE",sep="") %in% names(desc)){
+              desc[[paste("$P",i,"VARTYPE",sep="")]] <- class(df_sample[[param]])
+            }
           }
           
           for(param in new_par){
-            npar <- npar +1
+            npar <- npar + 1
             rg <- c(NA, NA)
             
             if(is.numeric(df_sample[[param]])){
@@ -2981,7 +3128,8 @@ build_flowset_from_df <- function(df,
             par@data <- rbind(par@data, c(param, NA, diff(rg), rg[1], rg[2]))
             rownames(par@data)[npar] <- paste("$P",npar, sep = "")
             desc[[paste("$P",npar,"DISPLAY",sep="")]] <- NA
-            desc[[paste("$P",npar,"VARTYPE",sep="")]] <- typeof(df_sample[[param]])
+            desc[[paste("$P",npar,"VARTYPE",sep="")]] <- class(df_sample[[param]])
+            print(class(df_sample[[param]]))
           }
           
           # par@data$vartype <- sapply(par@data$name, function(x){typeof(df_sample[[x]])})
@@ -2996,7 +3144,7 @@ build_flowset_from_df <- function(df,
       
       if(!is.null(par) & !is.null(desc)){
         ff_list[[sample]] <- flowFrame(exprs = M,
-                                       parameters = par, 
+                                       parameters = par,
                                        description = desc)
       }else{
         ff_list[[sample]] <- flowFrame(exprs = M)
@@ -3010,11 +3158,11 @@ build_flowset_from_df <- function(df,
     fs_new <- flowSet(ff_list)
     if("flowSet" %in% class(origin) ){
       pdata <- data.frame(flowWorkspace::pData(origin))
-      idx_match <- match(samples, pdata$name)
+      idx_match <- match(samples, flowWorkspace::pData(origin))
       if(length(colnames(pdata))>1){
         flowWorkspace::pData(fs_new) <- pdata[idx_match, ]
       }else{
-        flowWorkspace::pData(fs_new)$name <- pdata[idx_match, ]
+        flowWorkspace::pData(fs_new)$name <- pdata[idx_match, "name"]
       }
     }
   }else{
@@ -3025,3 +3173,16 @@ build_flowset_from_df <- function(df,
   
 }
 
+#' @importFrom flowWorkspace GatingSet
+build_gatingset_from_df <- function(df, gs_origin = NULL){
+  fs <- build_flowset_from_df(df = df, origin = gs_origin@data)
+  gs <- GatingSet(fs)
+  choices <- get_parameters_gs(gs)
+  gates <- get_gates_from_gs(gs_origin)
+  add_gates_flowCore(gs, gates)
+  sample <- choices$sample[choices$sample %in% names(gs_origin@compensation)]
+  gs@compensation <- gs_origin@compensation[sample]
+  params <- choices$params$name[choices$params$name %in% names(gs_origin@transformation)]
+  gs@transformation <- gs_origin@transformation[params]
+  return(gs)
+}

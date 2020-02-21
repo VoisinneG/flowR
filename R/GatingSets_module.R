@@ -85,7 +85,7 @@ GatingSetsUI <- function(id) {
 #'   \item{gating_set_selected}{Name of the selected GatingSet}
 #' }
 #' @import shiny
-#' @importFrom flowWorkspace GatingSet pData gs_get_pop_paths
+#' @importFrom flowWorkspace GatingSet pData gs_get_pop_paths sampleNames
 #' @importFrom graph addEdge
 #' @importFrom Rgraphviz renderGraph layoutGraph
 #' @importFrom methods new
@@ -105,8 +105,9 @@ GatingSets <- function(input, output, session, rval) {
   
   observeEvent(input$delete, {
     validate(need(input$gating_set, "no GatingSet selected"))
-    idx <- which(names(rval$gating_set_list) == input$gating_set | 
-                   sapply(rval$gating_set_list, function(x){x$parent}) ==  input$gating_set)
+    children <- union(input$gating_set,
+                      get_all_descendants(named_list = rval$gating_set_list, names = input$gating_set))
+    idx <- which(names(rval$gating_set_list) %in%  children)
     rval$gating_set_list <- rval$gating_set_list[-idx]
   })
   
@@ -156,7 +157,7 @@ GatingSets <- function(input, output, session, rval) {
       
       gs <- rval$gating_set_list[[input$gating_set]]$gating_set
       df <- get_data_gs(gs = gs,
-                        sample = pData(gs)$name, 
+                        sample = flowWorkspace::sampleNames(gs), 
                         subset = "root",
                         spill = NULL,
                         return_comp_data = FALSE)
@@ -190,7 +191,7 @@ GatingSets <- function(input, output, session, rval) {
       for(i in 1:length(rval$gating_set_list)){
         gs <- rval$gating_set_list[[i]]$gating_set
         df <- get_data_gs(gs = gs,
-                          sample = pData(gs)$name, 
+                          sample = flowWorkspace::sampleNames(gs), 
                           subset = "root",
                           spill = NULL,
                           return_comp_data = FALSE)

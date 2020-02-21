@@ -7,6 +7,6 @@ devtools::load_all('.') # charge le package
 #run_flowR("zenith") # lance l'application
 #runApp("./")
 #run before deploying app
-options(repos = BiocManager::repositories(), shiny.maxRequestSize = 100*1024^2)
-getOption("repos")
+#options(repos = BiocManager::repositories(), shiny.maxRequestSize = 100*1024^2)
+#getOption("repos")
 run_flowR()

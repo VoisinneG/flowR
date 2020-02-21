@@ -49,7 +49,8 @@ ImportUI <- function(id) {
            ),
            box(title = "Example dataset",
              width = NULL, height = NULL,
-             actionButton(ns("import_gvhd"), "import dataset (GvHD)")
+             selectInput(ns("example_selected"), "Select dataset", choices=c("GvHD", "Bcells"), selected = "GvHD"),
+             actionButton(ns("import_example"), "Load dataset")
            )
     ),
     column(width = 6,
@@ -62,7 +63,7 @@ ImportUI <- function(id) {
                #                selected = NULL,
                #                multiple = FALSE),
                textInput(ns("gs_name"), "GatingSet name", "import"),
-               actionButton(ns("load"), label = "Load selected files")
+               actionButton(ns("load"), label = "Create GatingSet")
            )
     )
   )
@@ -85,13 +86,13 @@ ImportUI <- function(id) {
 #'   \item{gating_set_selected}{Name of the selected GatingSet}
 #' }
 #' @import shiny
-#' @importFrom flowWorkspace pData
+#' @importFrom flowWorkspace pData GatingSet
 #' @importFrom flowCore fsApply
-#' @importFrom CytoML open_flowjo_xml open_diva_xml flowjo_to_gatingset fj_ws_get_sample_groups diva_get_sample_groups
 #' @importFrom ncdfFlow read.ncdfFlowSet
 #' @importFrom DT renderDT
 #' @importFrom tools file_ext
 #' @importFrom utils read.table data
+#' @import flowAI
 #' @export
 #' @rdname ImportUI
 Import <- function(input, output, session, rval) {
@@ -143,7 +144,7 @@ Import <- function(input, output, session, rval) {
 
         for(name in names(res)){
           fs <- build_flowset_from_df(df = res[[name]]$data, origin = res[[name]]$flow_set)
-          gs <- GatingSet(fs)
+          gs <- flowWorkspace::GatingSet(fs)
           add_gates_flowCore(gs = gs, gates = res[[name]]$gates)
           gs@compensation <- res[[name]]$compensation
           gs@transformation <- res[[name]]$transformation
@@ -173,7 +174,7 @@ Import <- function(input, output, session, rval) {
         df$name <- basename(rval_mod$df_files$datapath[input$files_table_rows_selected[1]])
         df$subset <- "root"
         fs <- build_flowset_from_df(df)
-        gs <- GatingSet(fs)
+        gs <- flowWorkspace::GatingSet(fs)
         rval$gating_set_list[[input$gs_name]] <- list(gating_set = gs,
                                                       parent = NULL)
         rval$gating_set_selected <- input$gs_name
@@ -188,7 +189,7 @@ Import <- function(input, output, session, rval) {
                                             truncate_max_range = TRUE )
           
           flowWorkspace::pData(fs)$name <- basename(files[idx_fcs])
-          gs <- GatingSet(fs)
+          gs <- flowWorkspace::GatingSet(fs)
           rval$gating_set_list[[input$gs_name]] <- list(gating_set = gs,
                                                         parent = NULL)
           rval$gating_set_selected <- input$gs_name
@@ -198,15 +199,24 @@ Import <- function(input, output, session, rval) {
 
   })
 
-  #### Import GvHD dataset ####
+  #### Import example dataset ####
   
-  observeEvent(input$import_gvhd, {
+  observeEvent(input$import_example, {
     
-    utils::data("GvHD", package = "flowCore")
-    gs <- GatingSet(GvHD)
-    rval$gating_set_list[["GvHD"]] <- list(gating_set = gs,
-                                                  parent = NULL)
-    rval$gating_set_selected <- "GvHD"
+    if(input$example_selected == "GvHD"){
+      utils::data("GvHD", package = "flowCore")
+      gs <- flowWorkspace::GatingSet(GvHD)
+      rval$gating_set_list[["GvHD"]] <- list(gating_set = gs,
+                                             parent = NULL)
+      rval$gating_set_selected <- "GvHD"
+    }else if(input$example_selected == "Bcells"){
+      utils::data("Bcells", package = "flowAI")
+      gs <- flowWorkspace::GatingSet(Bcells)
+      rval$gating_set_list[["Bcells"]] <- list(gating_set = gs,
+                                             parent = NULL)
+      rval$gating_set_selected <- "Bcells"
+    }
+    
   
   })
   

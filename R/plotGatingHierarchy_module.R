@@ -73,13 +73,17 @@ plotGatingHierarchy <- function(input, output, session,
                                  rval,
                                  plot_params = reactiveValues() ){
   
-  rval_plot <- reactiveValues()
+  rval_plot <- reactiveValues(init = TRUE)
   
   ### Set plot parameters ########################################################################
   
   observe({
-    rval_plot$sample <- choices()$sample[1]
-    rval_plot$plot_type <- "hexagonal"
+    if(rval_plot$init){
+      rval_plot$sample <- choices()$sample[1]
+      rval_plot$plot_type <- "hexagonal"
+      rval_plot$init <- FALSE
+    }
+    
   })
   
   observe({
@@ -110,7 +114,10 @@ plotGatingHierarchy <- function(input, output, session,
   plot_all_gates <- reactive({
     rval$update_gs
     validate(need(class(rval$gating_set) == "GatingSet", "Input is not a GatingSet"))
-    validate(need(setdiff(gs_get_pop_paths(rval$gating_set), "root"), "No gates to display"))
+    validate(need(setdiff(choices()$subset, "root"), "No gates to display"))
+    validate(need(rval_plot$sample, "Please select samples"))
+    validate(need(all(rval_plot$sample %in% choices()$sample), 
+                  "All samples not found in GatingSet")) 
     
     axis_labels <- choices()$labels
     
@@ -146,18 +153,16 @@ plotGatingHierarchy <- function(input, output, session,
     options$transformation <- transformation
     options$axis_labels <- axis_labels
     options$axis_limits <- axis_limits
-    
 
     p <- plot_gh( gs = rval$gating_set,
                   df = NULL,
                   sample = rval_plot$sample,
-                  selected_subsets = rval_plot$selected_subsets,
+                  #selected_subsets = rval_plot$selected_subsets,
                   spill = spill,
                   Ncells =  Ncells,
                   plot_type = rval_plot$plot_type,
                   plot_args = reactiveValuesToList(rval_plot),
                   options = options)
-
     p
     
   })

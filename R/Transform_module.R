@@ -51,8 +51,8 @@ TransformUI <- function(id) {
                            selectizeInput(ns("selected_params"), "Select parameters", 
                                           choices = NULL, selected = NULL, multiple = TRUE),
                            selectInput(ns("param_vartype"), "Type of variable", 
-                                       choices = c("double", 
-                                                   "integer", 
+                                       choices = c("numeric", 
+                                                   #"integer", 
                                                    "factor"), 
                                        selected = NULL),
                            textInput(ns("param_desc"), label = "Description (first parameter only)", value = ""),
@@ -311,18 +311,32 @@ Transform <- function(input, output, session, rval) {
 
     if(nchar(input$param_desc) >0){
       for(i in 1:length(rval$gating_set)){
-        rval$gating_set@data[[i]]@parameters[["desc"]][idx[1]] <- input$param_desc
+        old_desc <- rval$gating_set@data[[i]]@parameters[["desc"]][idx[1]]
+        if(old_desc != input$param_desc){
+          rval$gating_set@data[[i]]@parameters[["desc"]][idx[1]] <- input$param_desc
+        }
       }
     }
 
     # update description slot in GatingSet
-    for(i in 1:length(rval$gating_set)){
-      for(j in 1:length(idx)){
-        desc_field <- paste("$P", idx[j], "VARTYPE", sep="")
-        rval$gating_set@data[[i]]@description[[desc_field]] <- input$param_vartype
+    if(!is.null(input$param_vartype)){
+      for(i in 1:length(rval$gating_set)){
+        for(j in 1:length(idx)){
+          desc_field <- paste("$P", idx[j], "VARTYPE", sep="")
+          old_vartype <- rval$gating_set@data[[i]]@description[[desc_field]]
+          if(!is.null(old_vartype)){
+            if(old_vartype != input$param_vartype){
+              rval$gating_set@data[[i]]@description[[desc_field]] <- input$param_vartype
+            }
+          }else{
+            if(input$param_vartype!="numeric"){
+              rval$gating_set@data[[i]]@description[[desc_field]] <- input$param_vartype
+            }
+          }
+        }
       }
     }
-
+    
     transformation <- choices()$transformation
     trans_parameters <- rval$trans_parameters
     
@@ -348,8 +362,6 @@ Transform <- function(input, output, session, rval) {
                                                 t = input$t,
                                                 a = input$a))
       
-      
-      #print("update transformation")
       for(i in 1:length(var_name)){
         transformation[[var_name[i]]] <- trans
         trans_parameters[[var_name[i]]] <- trans_params

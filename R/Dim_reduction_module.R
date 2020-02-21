@@ -113,7 +113,7 @@ Dim_reductionUI <- function(id) {
 #' @param rval A reactive values object
 #' @return The updated reactiveValues object \code{rval}
 #' @import shiny
-#' @importFrom flowWorkspace pData gs_get_pop_paths
+#' @importFrom flowWorkspace gs_get_pop_paths sampleNames
 #' @importFrom shinydashboard renderValueBox
 #' @importFrom DT renderDT datatable
 #' @importFrom scales identity_trans log10_trans
@@ -284,9 +284,6 @@ Dim_reduction <- function(input, output, session, rval) {
 
 
     progress$set(message = paste("Performing", input$dim_red_method, "..."), value = 0)
-
-    print(parameters_table()$name[input$variables_table_rows_selected])
-    print(transformation)
     
     res <- try(dim_reduction(df = rval_mod$df_dim_red,
                          yvar = parameters_table()$name[input$variables_table_rows_selected],
@@ -309,24 +306,38 @@ Dim_reduction <- function(input, output, session, rval) {
     }else{
       rval_mod$df_dim_red <- res$df
       
-      df <- cbind( df_raw[res$keep, ], rval_mod$df_dim_red[ , setdiff(names(rval_mod$df_dim_red), names(df_raw))])
-      
+      df <- df_raw[res$keep, ]
+      for(var in res$var_names){
+        df[[var]] <- res$df[[var]]
+      }
+
       rval$dim_red_var <- res$vars
       
       if(!is.null(rval_mod$df_dim_red)){
 
-        fs <- build_flowset_from_df(rval_mod$df_dim_red, 
-                                    origin = rval$gating_set@data)
+        df <- cbind(df_raw[res$keep, setdiff(names(df_raw), names(res$df))], res$df)
         
-        rval_mod$gs <- GatingSet(fs)
-        gates <- get_gates_from_gs(rval$gating_set)
-        add_gates_flowCore(gs = rval_mod$gs, gates = gates)
-        rval_mod$gs@compensation <- choices()$compensation
-        rval_mod$gs@transformation <- choices()$transformation
+        rval_mod$gs <- build_gatingset_from_df(df = df, gs_origin = rval$gating_set)
+        params <- colnames(rval_mod$gs)[colnames(rval_mod$gs) %in% names(rval$trans_parameters)]
         
         rval$gating_set_list[[input$gs_name]] <- list(gating_set = rval_mod$gs,
-                                                      parent = rval$gating_set_selected)
+                                                      parent = rval$gating_set_selected,
+                                                      trans_parameters = rval$trans_parameters[params]
+                                                      )
         rval$gating_set_selected <- input$gs_name
+        
+        # fs <- build_flowset_from_df(rval_mod$df_dim_red, 
+        #                             origin = rval$gating_set@data)
+        # 
+        # rval_mod$gs <- GatingSet(fs)
+        # gates <- get_gates_from_gs(rval$gating_set)
+        # add_gates_flowCore(gs = rval_mod$gs, gates = gates)
+        # rval_mod$gs@compensation <- choices()$compensation
+        # rval_mod$gs@transformation <- choices()$transformation
+        # 
+        # rval$gating_set_list[[input$gs_name]] <- list(gating_set = rval_mod$gs,
+        #                                               parent = rval$gating_set_selected)
+        # rval$gating_set_selected <- input$gs_name
         
         rval$gating_set <- rval_mod$gs
         rval$update_gs <- rval$update_gs + 1
@@ -381,7 +392,7 @@ Dim_reduction <- function(input, output, session, rval) {
   output$progressBox <- renderValueBox({
     Nsamples <- 0
     if(!is.null(rval_mod$gs)){
-      Nsamples <- length(flowWorkspace::pData(rval_mod$gs)$name)
+      Nsamples <- length(flowWorkspace::sampleNames(rval_mod$gs))
     }
     
     valueBox(
