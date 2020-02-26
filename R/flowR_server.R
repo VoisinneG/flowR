@@ -29,7 +29,8 @@ flowR_server <- function(session, input, output, modules = NULL) {
   ### Build UI based on selected modules #######################################################
   
   observe({
-    default_modules <- c("Import", "Transform", "Gating", "Plotting", "Subsample")
+    default_modules <- c("Import", "Metadata", "Transform", "Compensation", "Gating", "Subsample", 
+                         "Clustering", "Dim_reduction", "Plotting", "GatingSets")
     if(is.null(modules)){
       rval$modules <- default_modules
     }else{
@@ -40,6 +41,7 @@ flowR_server <- function(session, input, output, modules = NULL) {
   observe({
     rval$modules <- union(rval$modules, "Modules")
   })
+  
   
   output$body <- renderUI({
     if(all(rval$modules %in% names(rval$tab_elements))){
@@ -58,6 +60,14 @@ flowR_server <- function(session, input, output, modules = NULL) {
       tagList(list())
     }
     
+  })
+  
+  # select first module loaded
+  observe({
+    validate(need(rval$modules, "No tab elements available"))
+    tab_selected <- rval$modules[1]
+    tab_selected <- paste(tab_selected, "tab", sep="_")
+    updateTabItems(inputId = "sidebar_tabs", selected = tab_selected, session = session)
   })
   
   output$menu <- renderMenu({
@@ -90,7 +100,7 @@ flowR_server <- function(session, input, output, modules = NULL) {
 
         mod_name_ui <- paste(mod_name, "UI", sep="")
         
-        module_server_function <-function(...){do.call(mod_name, list(...) )}
+        module_server_function <- function(...){do.call(mod_name, list(...) )}
         module_id <- paste(mod_name, "module", sep="_")
         module_tab_name <- paste(mod_name, "tab", sep="_")
         
@@ -103,6 +113,7 @@ flowR_server <- function(session, input, output, modules = NULL) {
                                                          list(id = module_id)))
         
         rval$menu_elements[[mod_name]] <- menuItem(mod_name,
+                                                   selected = TRUE,
                                                    tabName = module_tab_name, 
                                                    startExpanded = FALSE,
                                                    icon = icon("check-circle"))
@@ -126,12 +137,12 @@ flowR_server <- function(session, input, output, modules = NULL) {
     updateSelectInput(session, "gating_set", 
                       choices = names(rval$gating_set_list), 
                       selected = rval$gating_set_selected)
-    rval$update_gs <- rval$update_gs + 1
+    #rval$update_gs <- rval$update_gs + 1
   })
   
   observeEvent(input$gating_set, {
     rval$gating_set_selected <- input$gating_set
-    rval$update_gs <- rval$update_gs + 1
+    #rval$update_gs <- rval$update_gs + 1
   })
   
   observeEvent(rval$gating_set_selected, {
@@ -148,33 +159,48 @@ flowR_server <- function(session, input, output, modules = NULL) {
   })
   
   ### Update GatingSet transformation ##########################################################
-  observeEvent(rval$gating_set, {
-    validate(need(class(rval$gating_set) == "GatingSet", "No GatingSet available"))
-    validate(need(rval$gating_set_list, "No list of GatingSets available"))
-    validate(need(rval$gating_set_selected, "No GatingSet selected"))
-    
-    items_to_update <- union(rval$gating_set_selected,
-                             union(get_all_descendants(rval$gating_set_list, 
-                                                       rval$gating_set_selected),
-                                   get_all_ancestors(rval$gating_set_list, 
-                                                     rval$gating_set_selected)))
-    items_to_update <- intersect(items_to_update, names(rval$gating_set_list))
-    print("update GatingSet list")
-    print(items_to_update)
-    for(i in 1:length(items_to_update)){
-      rval$gating_set_list[[items_to_update[i]]]$gating_set@transformation <- rval$gating_set@transformation
-      rval$gating_set_list[[items_to_update[i]]]$trans_parameters <- rval$trans_parameters
-    }
+  
+  # observeEvent(rval$gating_set, {
+  #   validate(need(class(rval$gating_set) == "GatingSet", "No GatingSet available"))
+  #   validate(need(rval$gating_set_list, "No list of GatingSets available"))
+  #   validate(need(rval$gating_set_selected, "No GatingSet selected"))
+  #   
+  #   items_to_update <- union(rval$gating_set_selected,
+  #                            union(get_all_descendants(rval$gating_set_list, 
+  #                                                      rval$gating_set_selected),
+  #                                  get_all_ancestors(rval$gating_set_list, 
+  #                                                    rval$gating_set_selected)))
+  #   items_to_update <- intersect(items_to_update, names(rval$gating_set_list))
+  #   print("update GatingSet list")
+  #   print(items_to_update)
+  #   for(i in 1:length(items_to_update)){
+  #     rval$gating_set_list[[items_to_update[i]]]$gating_set@transformation <- rval$gating_set@transformation
+  #     rval$gating_set_list[[items_to_update[i]]]$trans_parameters <- rval$trans_parameters
+  #   }
+  # })
+  
+  
+  ### Get parameters from GatingSet ################################################################
+  
+  choices <- reactive({
+    rval$update_gs
+    validate(need(class(rval$gating_set) == "GatingSet", "input is not a GatingSet"))
+    get_parameters_gs(rval$gating_set)
   })
   
   ### Main Value boxes #########################################################################
   
   output$progressBox <- renderValueBox({
+    
     Nsamples <- 0
-    rval$update_gs
-    if(!is.null(rval$gating_set)){
-      Nsamples <- length(pData(rval$gating_set)$name)
+    if(class(rval$gating_set) == "GatingSet"){
+      Nsamples <- length(choices()$sample)
     }
+    
+    # rval$update_gs
+    # if(!is.null(rval$gating_set)){
+    #   Nsamples <- length(pData(rval$gating_set)$name)
+    # }
     valueBox(
       Nsamples, "samples",icon = icon("list"),
       color = "purple"

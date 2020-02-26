@@ -58,17 +58,12 @@ simpleDisplayUI <- function(id){
 
   tagList(
     fluidRow(
-      column(width = 12,
-             uiOutput(ns("ui_plot")),
-             br(),
-             br()
-             )
+      box(title = "Plot", width = 12, collapsible = TRUE, collapsed = FALSE,
+          uiOutput(ns("ui_plot"))
+      )  
     ),
     fluidRow(
-      column(12,
-             uiOutput(ns("ui_options"))
-             )
-
+      uiOutput(ns("ui_options"))
     )
     
   )
@@ -109,11 +104,12 @@ simpleDisplay <- function(input, output, session,
                           plot_list, 
                           params = reactiveValues(),
                           nrow = 1, 
-                          size = 300) {
+                          size = 300,
+                          max_height = 500) {
   
   rval_plot <- reactiveValues(nrow = 1,
-                              ncol = 1, 
-                              ncol_facet = 1, 
+                              ncol = 1,
+                              ncol_facet = 1,
                               nrow_facet = 1,
                               use_plotly = FALSE,
                               top = "")
@@ -130,6 +126,9 @@ simpleDisplay <- function(input, output, session,
     
   })
     
+  observe({
+    print(rval_plot$top)
+  })
   ### Layout plots ##########################################################################
   
   plot_display <- reactive({
@@ -209,58 +208,99 @@ simpleDisplay <- function(input, output, session,
      
    })
   
+  plot_to_render <- reactive({
+    validate(need(plot_display(), "No plot to render"))
+
+    if("graphNEL" %in% class(plot_display())){
+      Rgraphviz::renderGraph(plot_display())
+    }else{
+      plot_display()
+    }
+  })
+  
   output$plot_display  <- renderPlot({
-    ns <- session$ns
-    session$resetBrush(ns("plot_brush"))
-    plot_display()
+    plot_to_render()
   })
 
   output$plot_display_ly  <- renderPlotly({
-    plot_display()
+    plot_to_render()
   })
   
   ### Build UI for plot options #############################################################
   
-  output$ui_options <- renderUI({
+  ui_options_elements <- reactive({
     ns <- session$ns
-    
+    x <- list()
+    display_items <- list()
+    save_items <- list()
     if(!rval_plot$use_plotly){
-      tagList(
-        box(title = "Display", width = 6, collapsible = TRUE, collapsed = TRUE,
-            numericInput(ns("nrow_split"), label = "Number of rows", value = nrow),
-            numericInput(ns("row_size"), label = "plot height (px)", value = size),
-            numericInput(ns("col_size"), label = "plot width (px)", value = size),
-            checkboxInput(ns("show_title"), label = "show title", value = TRUE)
-        ),
-        box(title = "Save", width = 6, collapsible = TRUE, collapsed = TRUE,
-            downloadButton(ns("download_plot"), "Save plot")
-        )
+      display_items[[1]] <- numericInput(ns("nrow_split"), 
+                                         label = "Number of rows", value = nrow)
+      display_items[[2]] <- sliderInput(ns("zoom"), 
+                                        label = "Zoom", min = 0, max = 200, step = 1, value = 100)
+      display_items[[3]] <- numericInput(ns("row_size"), 
+                                         label = "plot height (px)", value = size)
+      display_items[[4]] <- numericInput(ns("col_size"), 
+                                         label = "plot width (px)", value = size)
+      display_items[[5]] <- numericInput(ns("max_height"), 
+                                         label = "max height (px)", value = max_height)
+      if("top" %in% names(params) ){
+        display_items[[6]] <- checkboxInput(ns("show_title"), 
+                                            label = "show title", value = TRUE)
+      }
+  
+      save_items[[1]] <-  downloadButton(ns("download_plot"), "Save plot")
+      
+      x[[1]]<-box(title = "Display options", width = 6, collapsible = TRUE, collapsed = TRUE,
+                  tagList(display_items))
+      
+      x[[2]] <- box(title = "Save", width = 6, collapsible = TRUE, collapsed = TRUE,
+                    tagList(save_items)
       )
     }
+    return(x)
+  })
+  
+  output$ui_options <- renderUI({
+    tagList(ui_options_elements())
   })
   
   ### Display plot ##########################################################################
   
-  output$ui_plot <- renderUI({
+  ui_plot_elements <- reactive({
     
-    validate(need(plot_display(), "No plot to display"))
     validate(need(input$row_size, "No input selected"))
-    
+    x <- list()
     ns <- session$ns
     
     if(rval_plot$use_plotly){
-           plotlyOutput(ns("plot_display_ly"), height = size)
+      x <- plotlyOutput(ns("plot_display_ly"), height = size)
     }else{
-      div( style = 'overflow-x: scroll',
-           plotOutput(ns("plot_display"), 
-                      height = rval_plot$nrow * rval_plot$nrow_facet * input$row_size, 
-                      width = rval_plot$ncol * rval_plot$ncol_facet * input$col_size,
-                      brush = ns("plot_brush"),
-                      click = ns("plot_click"),
-                      dblclick = ns("plot_dblclick")
-           )
+      height <- rval_plot$nrow * rval_plot$nrow_facet * input$row_size * input$zoom/100
+      width <- rval_plot$ncol * rval_plot$ncol_facet * input$col_size * input$zoom/100
+      width <- max(width, 150)
+      height <- max(height, 150)
+      print(height)
+      print(width)
+      x <- div(
+        style = paste("overflow-y: scroll; overflow-x: scroll; height:", 
+                      min(height, input$max_height) + 20, 'px',sep=""),
+        plotOutput(ns("plot_display"),
+                   height = height, 
+                   width = width,
+                   brush = ns("plot_brush"),
+                   click = ns("plot_click"),
+                   dblclick = ns("plot_dblclick")
+        )
       )
     }
+    print(x)
+    return(x)
+  })
+  
+  output$ui_plot <- renderUI({
+    
+    tagList(ui_plot_elements())
     
 
   })
@@ -270,17 +310,22 @@ simpleDisplay <- function(input, output, session,
   output$download_plot <- downloadHandler(
     filename = "plot.pdf",
     content = function(file) {
-      pdf(file, 
-          width = rval_plot$ncol * rval_plot$ncol_facet * input$col_size * 5/400, 
-          height = rval_plot$nrow * rval_plot$nrow_facet * input$row_size * 5/400)
+      height <- rval_plot$nrow * rval_plot$nrow_facet * input$row_size * input$zoom/100
+      width <- rval_plot$ncol * rval_plot$ncol_facet * input$col_size * input$zoom/100
+      width <- max(width, 150)
+      height <- max(height, 150)
       
-      print(plot_display())
-
+      pdf(file, width = width * 5/400, height = height * 5/400)
+      if("graphNEL" %in% class(plot_to_render())){
+        Rgraphviz::renderGraph(plot_to_render())
+      }else{
+        print(plot_to_render())
+      }
       dev.off()
     }
   )
 
-  return( list( plot = plot_display, params = input ) )
+  return( list( plot = plot_display, params = input) )
 }
 
 
@@ -310,21 +355,27 @@ simpleDisplay <- function(input, output, session,
 # 
 #     plot_list <- reactive({
 # 
-#       plist <- list()
 # 
+#         # gates <- get_gates_from_ws(
+#         #      "~/2019-Exp-Tumor-042 (Lung Carcinoma)/Classical analysis 06012020.wsp")
+#         # p <- plot_tree(gates, fontsize = 40, rankdir = NULL, shape = "ellipse", fixedsize = TRUE)
+#         # p
+# 
+# 
+#       plist <- list()
 #       plist[[1]] <- ggplot(iris, aes(x=Sepal.Length, y = Sepal.Width, color = Species)) +
-#         geom_point(alpha = 0.5) +
-#         facet_wrap(~Species)
+#         geom_point(alpha = 0.5)
+#         #facet_wrap(~Species)
 # 
 #        plist[[2]] <- ggplot(iris, aes(x=Species, y = Sepal.Length, fill = Species)) +
 #          geom_col(alpha = 0.5)
 # 
-#       return(plist)
+#       return(plist[1])
 # 
 #     })
 # 
-#     callModule(simpleDisplay, "simple_display_module", 
-#                plot_list = plot_list, 
+#     callModule(simpleDisplay, "simple_display_module",
+#                plot_list = plot_list,
 #                params = params,
 #                size = 500)
 # 

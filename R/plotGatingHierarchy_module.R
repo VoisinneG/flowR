@@ -110,7 +110,7 @@ plotGatingHierarchy <- function(input, output, session,
   plot_all_gates <- reactive({
     rval$update_gs
     validate(need(class(rval$gating_set) == "GatingSet", "Input is not a GatingSet"))
-    validate(need(setdiff(gs_get_pop_paths(rval$gating_set), "root"), "No gates to display"))
+    validate(need(setdiff(choices()$subset, "root"), "No gates to display"))
     
     axis_labels <- choices()$labels
     

@@ -17,9 +17,10 @@ ComputeSpillUI <- function(id) {
     actionButton(ns("compute_spillover_matrix"), "Compute spillover matrix"),
     br(),
     br(),
-    box(title = "Heatmap",
-        width = NULL, collapsible = TRUE,
-        plotlyOutput(ns("heatmap_spill"))
+    box(title = "Preview",
+        width = NULL, collapsible = TRUE, collapsed = TRUE,
+        DT::DTOutput(ns("spill_table"))
+        #plotlyOutput(ns("heatmap_spill"))
         )
   )
   
@@ -100,7 +101,7 @@ ComputeSpill <- function(input, output, session, rval) {
     names(pos_values) <- spill_vars
     rval_mod$pos_values[[input$fluo]] <- pos_values
 
-    print(rval_mod$pos_values)
+    #print(rval_mod$pos_values)
 
     df_neg <- get_data_gs(gs = rval$gating_set,
                           sample = input$sample_neg,
@@ -113,7 +114,7 @@ ComputeSpill <- function(input, output, session, rval) {
     names(neg_values) <- spill_vars
     rval_mod$neg_values[[input$fluo]] <- neg_values
 
-    print(rval_mod$neg_values)
+    #print(rval_mod$neg_values)
 
   })
 
@@ -133,13 +134,13 @@ ComputeSpill <- function(input, output, session, rval) {
                              check.names = FALSE)
     row.names(df_pos_tot) <- input$spill_params
     df_pos_tot <- df_pos_tot[input$spill_params]
-    print(df_pos_tot)
+    #print(df_pos_tot)
     
     df_neg_tot <- data.frame(do.call(rbind, rval_mod$neg_values[input$spill_params]),
                              check.names = FALSE)
     row.names(df_neg_tot) <- input$spill_params
     df_neg_tot <- df_neg_tot[input$spill_params]
-    print(df_neg_tot)
+    #print(df_neg_tot)
 
     df_spill <- df_pos_tot
     for(var in input$spill_params){
@@ -150,44 +151,34 @@ ComputeSpill <- function(input, output, session, rval) {
       
     }
     
-    print(df_spill)
-    rval_mod$spill[[input$spill_name]] <- df_spill
+    #print(df_spill)
+    rval_mod$spill_computed<- df_spill
 
   })
   
-  spill_matrix <- reactive({
-    rval_mod$spill
+  spill_matrix_list <- reactive({
+    x <- list()
+    if(!is.null(rval_mod$spill_computed)){
+      x[[input$spill_name]] <- rval_mod$spill_computed
+    }
+    return(x)
   })
   
-  output$heatmap_spill <- plotly::renderPlotly({
-    
-    validate(need(length(spill_matrix())>0, "No matrix computed"))
-    df <- as.data.frame(100*spill_matrix()[[1]])
-    df[df == 0] <- NA
-    df_log <- log10(df)
-    
-    p <- heatmaply::heatmaply(df_log,
-                              colors= viridis,
-                              plot_method="plotly",
-                              Rowv = NULL,
-                              Colv = NULL,
-                              column_text_angle = 90,
-                              xlab = "detection channel",
-                              ylab = "emitting fluorophore",
-                              fontsize_row = 10,
-                              fontsize_col = 10,
-                              cellnote_size = 6,
-                              hide_colorbar = TRUE,
-                              main = "spillover (%)",
-                              custom_hovertext = df,
-                              margins = c(50, 50, 50, 0)
-    )
-    
-    p
-    
+  ### Render compensation matrix #####################################################################
+  
+  output$spill_table <- DT::renderDT({
+    validate(need(length(spill_matrix_list())>0, "No matrix computed"))
+    df <- format_style_comp_matrix(spill_matrix_list()[[1]], editable = 'none')
+    return(df)
   })
   
-  return(spill_matrix)
+  # output$heatmap_spill <- plotly::renderPlotly({
+  #   validate(need(length(spill_matrix_list())>0, "No matrix computed"))
+  #   p <- plot_comp_as_heatmap(spill_matrix_list()[[1]])
+  #   p
+  # })
+  
+  return(spill_matrix_list)
   
 }
 
@@ -213,9 +204,15 @@ ComputeSpill <- function(input, output, session, rval) {
 #     observe({
 #       #utils::data("GvHD", package = "flowCore")
 #       #rval$gating_set <- GatingSet(GvHD)
-#       load("../flowR_utils/demo-data/OC17BMGV/comp.rda")
-#       gs <- GatingSet(res$comp$flow_set)
-#       rval$gating_set <- gs
+#       fs <- read.ncdfFlowSet(files = c("../flowR_utils/demo-data/OC17BMGV/comp-APC-004.fcs",
+#                                        "../flowR_utils/demo-data/OC17BMGV/comp-BV605-005.fcs",
+#                                        "../flowR_utils/demo-data/OC17BMGV/comp-FITC-001.fcs",
+#                                        "../flowR_utils/demo-data/OC17BMGV/comp-PE-002.fcs",
+#                                        "../flowR_utils/demo-data/OC17BMGV/comp-PECy7-003.fcs"))
+#       rval$gating_set <- GatingSet(fs)
+#       #load("../flowR_utils/demo-data/OC17BMGV/comp.rda")
+#       #gs <- GatingSet(res$comp$flow_set)
+#       #rval$gating_set <- gs
 #     })
 # 
 #     res <- callModule(ComputeSpill, "module", rval = rval)

@@ -2,13 +2,13 @@
 % Please edit documentation in R/flowR.R
 \name{parseGate}
 \alias{parseGate}
-\title{Return relevant info from a Gate section}
+\title{Return relevant info from a Gate xml_node}
 \usage{
 parseGate(x)
 }
 \arguments{
-\item{x}{a xml document}
+\item{x}{a Gate xml_node from a FlowJO wsp}
 }
 \description{
-Return relevant info from a Gate section
+Return relevant info from a Gate xml_node
 }

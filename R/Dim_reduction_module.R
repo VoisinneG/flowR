@@ -262,7 +262,7 @@ Dim_reduction <- function(input, output, session, rval) {
                       "log10" = scales::log10_trans(),
                       "asinh" = asinh_trans(),
                       "identity" = scales::identity_trans(),
-                      NULL)
+                      scales::identity_trans())
 
     progress$set(message = "Getting data...", value = 0)
 
@@ -301,7 +301,7 @@ Dim_reduction <- function(input, output, session, rval) {
     
     if(class(res) == "try-error"){
       showModal(modalDialog(
-        title = "Eroor",
+        title = "Error",
         print(res),
         easyClose = TRUE,
         footer = NULL
