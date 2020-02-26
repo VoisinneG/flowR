@@ -268,6 +268,7 @@ simpleDisplay <- function(input, output, session,
   })
 
   output$plot_render_ly  <- renderPlotly({
+    rval_plot$height
     plot_display()
   })
   
@@ -294,8 +295,15 @@ simpleDisplay <- function(input, output, session,
         display_items[["show_title"]] <- checkboxInput(ns("show_title"), 
                                                        label = "show title", value = rval_plot$show_title)
       }
-
+    }else{
+      display_items[["height"]] <- numericInput(ns("height"), 
+                                                label = "plot height (px)", value = rval_plot$height)
+      display_items[["width"]] <- numericInput(ns("width"), 
+                                               label = "plot width (px)", value = rval_plot$width)
+      display_items[["max_height"]] <- numericInput(ns("max_height"), 
+                                                    label = "max height (px)", value = rval_plot$max_height)
     }
+    
     return( tagList( display_items) )
   })
   
@@ -330,7 +338,11 @@ simpleDisplay <- function(input, output, session,
     ns <- session$ns
     
     if(rval_plot$use_plotly){
-      x[[1]] <- plotlyOutput(ns("plot_render_ly"), height = rval_plot$height)
+      x[[1]] <- div(
+        style = paste("overflow-y: scroll; overflow-x: scroll; height:", 
+                      min(rval_plot$height, rval_plot$max_height) + 20, 'px', sep=""),
+        plotlyOutput(ns("plot_render_ly"), width = rval_plot$width, height = rval_plot$height)
+      )
     }else{
       
       width <- rval_plot$width * rval_plot$zoom/100
@@ -400,67 +412,69 @@ simpleDisplay <- function(input, output, session,
 # library(ggplot2)
 # library(plotly)
 # 
-if (interactive()){
-
-  ui <- dashboardPage(
-    dashboardHeader(title = "simpleDisplay"),
-    sidebar = dashboardSidebar(disable = TRUE),
-    body = dashboardBody(
-      fluidRow(
-        column(6, box(width = NULL, simpleDisplayUI("simple_display_module"))),
-        column(6, box(width = NULL, plotOutput("plot")))
-      )
-    )
-  )
-
-  server <- function(input, output, session) {
-
-    params <- reactiveValues(use_plotly = FALSE, width = 500, height = 500, nrow = 2, title = "samples")
-
-    plot_list <- reactive({
-
-      load("../flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
-      fs <- build_flowset_from_df(df = res$cluster$data)
-      gs <- GatingSet(fs)
-      #add_gates_flowCore(gs, res$cluster$gates)
-      #plot_gh(gs)
-      
-        # gates <- get_gates_from_ws(
-        #      "../flowR_utils/demo-data/2019-Exp-Tumor-042 (Lung Carcinoma)/Classical analysis 06012020.wsp")
-        # p <- plot_tree(gates, fontsize = 40, rankdir = NULL, shape = "ellipse", fixedsize = TRUE)
-        # p
-
-
-      # plist <- list()
-      # plist[[1]] <- ggplot(iris, aes(x=Sepal.Length, y = Sepal.Width, color = Species)) +
-      #   geom_point(alpha = 0.5)+
-      #   facet_wrap(~Species)
-      # 
-      #  plist[[2]] <- ggplot(iris, aes(x=Species, y = Sepal.Length, fill = Species)) +
-      #    geom_col(alpha = 0.5)
-      # 
-      # return(plist)
-
-      df <- get_data_gs(gs)
-      df_cluster <- get_cluster(df, yvar = names(df)[4:7], y_trans = logicle_trans() )
-      fSOM <- df_cluster$fSOM
-      graphics::plot.new()
-      PlotPies(fSOM, cellTypes=as.factor(df$name))
-
-    })
-
-    # output$plot <- renderPlot({
-    #   #plot_list()
-    #   res$plot()
-    # })
-    
-    res <- callModule(simpleDisplay, "simple_display_module",
-               plot_list = plot_list,
-               params = params,
-               save = FALSE)
-
-  }
-
-  shinyApp(ui, server)
-
-}
+# if (interactive()){
+# 
+#   ui <- dashboardPage(
+#     dashboardHeader(title = "simpleDisplay"),
+#     sidebar = dashboardSidebar(disable = TRUE),
+#     body = dashboardBody(
+#       fluidRow(
+#         column(6, box(width = NULL, simpleDisplayUI("simple_display_module"))),
+#         column(6, box(width = NULL, plotOutput("plot")))
+#       )
+#     )
+#   )
+# 
+#   server <- function(input, output, session) {
+# 
+#     params <- reactiveValues(use_plotly = TRUE, width = 500, height = 500, max_height = 500, nrow = 2, title = "samples")
+# 
+#     plot_list <- reactive({
+# 
+#       #load("../flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
+#       #fs <- build_flowset_from_df(df = res$cluster$data)
+#       #gs <- GatingSet(fs)
+#       #add_gates_flowCore(gs, res$cluster$gates)
+#       #plot_gh(gs)
+# 
+#         # gates <- get_gates_from_ws(
+#         #      "../flowR_utils/demo-data/2019-Exp-Tumor-042 (Lung Carcinoma)/Classical analysis 06012020.wsp")
+#         # p <- plot_tree(gates, fontsize = 40, rankdir = NULL, shape = "ellipse", fixedsize = TRUE)
+#         # p
+# 
+# 
+#       # plist <- list()
+#       # plist[[1]] <- ggplot(iris, aes(x=Sepal.Length, y = Sepal.Width, color = Species)) +
+#       #   geom_point(alpha = 0.5)+
+#       #   facet_wrap(~Species)
+#       #
+#       #  plist[[2]] <- ggplot(iris, aes(x=Species, y = Sepal.Length, fill = Species)) +
+#       #    geom_col(alpha = 0.5)
+#       #
+#       # return(plist)
+# 
+#       # df <- get_data_gs(gs)
+#       # df_cluster <- get_cluster(df, yvar = names(df)[4:7], y_trans = logicle_trans() )
+#       # fSOM <- df_cluster$fSOM
+#       # graphics::plot.new()
+#       # PlotPies(fSOM, cellTypes=as.factor(df$name))
+# 
+#       heatmaply(matrix(runif(100), 50, 2))
+# 
+#     })
+# 
+#     # output$plot <- renderPlot({
+#     #   #plot_list()
+#     #   res$plot()
+#     # })
+# 
+#     res <- callModule(simpleDisplay, "simple_display_module",
+#                plot_list = plot_list,
+#                params = params,
+#                save = FALSE)
+# 
+#   }
+# 
+#   shinyApp(ui, server)
+# 
+# }
