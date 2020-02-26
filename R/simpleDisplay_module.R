@@ -308,10 +308,12 @@ simpleDisplay <- function(input, output, session,
     ns <- session$ns
     x <- list()
     
-    x[[1]] <- box(title = "Display options", width = ifelse(save, 6, 12), 
-                  collapsible = TRUE, collapsed = TRUE,
-        uiOutput(ns("ui_options"))
-    )
+    if(!rval_plot$use_plotly){
+      x[[1]] <- box(title = "Display options", width = ifelse(save, 6, 12), 
+                    collapsible = TRUE, collapsed = TRUE,
+                    uiOutput(ns("ui_options"))
+      )
+    }
     if(save){
       x[[2]] <- box(title = "Save", width = 6, collapsible = TRUE, collapsed = TRUE,
                     uiOutput(ns("ui_save"))
@@ -400,67 +402,67 @@ simpleDisplay <- function(input, output, session,
 # library(ggplot2)
 # library(plotly)
 # 
-if (interactive()){
-
-  ui <- dashboardPage(
-    dashboardHeader(title = "simpleDisplay"),
-    sidebar = dashboardSidebar(disable = TRUE),
-    body = dashboardBody(
-      fluidRow(
-        column(6, box(width = NULL, simpleDisplayUI("simple_display_module"))),
-        column(6, box(width = NULL, plotOutput("plot")))
-      )
-    )
-  )
-
-  server <- function(input, output, session) {
-
-    params <- reactiveValues(use_plotly = FALSE, width = 500, height = 500, nrow = 2, title = "samples")
-
-    plot_list <- reactive({
-
-      load("../flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
-      fs <- build_flowset_from_df(df = res$cluster$data)
-      gs <- GatingSet(fs)
-      #add_gates_flowCore(gs, res$cluster$gates)
-      #plot_gh(gs)
-      
-        # gates <- get_gates_from_ws(
-        #      "../flowR_utils/demo-data/2019-Exp-Tumor-042 (Lung Carcinoma)/Classical analysis 06012020.wsp")
-        # p <- plot_tree(gates, fontsize = 40, rankdir = NULL, shape = "ellipse", fixedsize = TRUE)
-        # p
-
-
-      # plist <- list()
-      # plist[[1]] <- ggplot(iris, aes(x=Sepal.Length, y = Sepal.Width, color = Species)) +
-      #   geom_point(alpha = 0.5)+
-      #   facet_wrap(~Species)
-      # 
-      #  plist[[2]] <- ggplot(iris, aes(x=Species, y = Sepal.Length, fill = Species)) +
-      #    geom_col(alpha = 0.5)
-      # 
-      # return(plist)
-
-      df <- get_data_gs(gs)
-      df_cluster <- get_cluster(df, yvar = names(df)[4:7], y_trans = logicle_trans() )
-      fSOM <- df_cluster$fSOM
-      graphics::plot.new()
-      PlotPies(fSOM, cellTypes=as.factor(df$name))
-
-    })
-
-    # output$plot <- renderPlot({
-    #   #plot_list()
-    #   res$plot()
-    # })
-    
-    res <- callModule(simpleDisplay, "simple_display_module",
-               plot_list = plot_list,
-               params = params,
-               save = FALSE)
-
-  }
-
-  shinyApp(ui, server)
-
-}
+# if (interactive()){
+# 
+#   ui <- dashboardPage(
+#     dashboardHeader(title = "simpleDisplay"),
+#     sidebar = dashboardSidebar(disable = TRUE),
+#     body = dashboardBody(
+#       fluidRow(
+#         column(6, box(width = NULL, simpleDisplayUI("simple_display_module"))),
+#         column(6, box(width = NULL, plotOutput("plot")))
+#       )
+#     )
+#   )
+# 
+#   server <- function(input, output, session) {
+# 
+#     params <- reactiveValues(use_plotly = FALSE, width = 500, height = 500, nrow = 2, title = "samples")
+# 
+#     plot_list <- reactive({
+# 
+#       load("../flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
+#       fs <- build_flowset_from_df(df = res$cluster$data)
+#       gs <- GatingSet(fs)
+#       #add_gates_flowCore(gs, res$cluster$gates)
+#       #plot_gh(gs)
+#       
+#         # gates <- get_gates_from_ws(
+#         #      "../flowR_utils/demo-data/2019-Exp-Tumor-042 (Lung Carcinoma)/Classical analysis 06012020.wsp")
+#         # p <- plot_tree(gates, fontsize = 40, rankdir = NULL, shape = "ellipse", fixedsize = TRUE)
+#         # p
+# 
+# 
+#       # plist <- list()
+#       # plist[[1]] <- ggplot(iris, aes(x=Sepal.Length, y = Sepal.Width, color = Species)) +
+#       #   geom_point(alpha = 0.5)+
+#       #   facet_wrap(~Species)
+#       # 
+#       #  plist[[2]] <- ggplot(iris, aes(x=Species, y = Sepal.Length, fill = Species)) +
+#       #    geom_col(alpha = 0.5)
+#       # 
+#       # return(plist)
+# 
+#       df <- get_data_gs(gs)
+#       df_cluster <- get_cluster(df, yvar = names(df)[4:7], y_trans = logicle_trans() )
+#       fSOM <- df_cluster$fSOM
+#       graphics::plot.new()
+#       PlotPies(fSOM, cellTypes=as.factor(df$name))
+# 
+#     })
+# 
+#     # output$plot <- renderPlot({10
+#     #   #plot_list()
+#     #   res$plot()
+#     # })
+#     
+#     res <- callModule(simpleDisplay, "simple_display_module",
+#                plot_list = plot_list,
+#                params = params,
+#                save = FALSE)
+# 
+#   }
+# 
+#   shinyApp(ui, server)
+# 
+# }
