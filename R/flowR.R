@@ -947,6 +947,27 @@ get_parameters_gs <- function(gs){
   )
 }  
 
+#' Return a flowSet from a given subset in a GatingSet
+#' @param gs a GatingSet
+#' @param spill spillover matrix. If NULL, uncompensated data is used for gating
+#' @param subset Name of the subset
+#' @importFrom flowWorkspace GatingSet gs_pop_get_data
+#' @importFrom flowCore compensate
+gs_get_fs_subset <- function(gs, spill = NULL, subset){
+  
+  fs <- gs@data
+  gates <- get_gates_from_gs(gs) 
+  
+  if(!is.null(spill)){
+    fs <- flowCore::compensate(fs, spill)
+  }
+  
+  gs_comp <- flowWorkspace::GatingSet(fs)
+  gs_comp <- add_gates_flowCore(gs_comp, gates)
+  fs_comp <- flowWorkspace::gs_pop_get_data(gs_comp, subset)
+  return(fs_comp)
+}
+
 #' Return statistics for all subsets ans samples in a GatingSet
 #' @param gs a GatingSet
 #' @param spill spillover matrix. If NULL, uncompensated data is used for gating
@@ -2397,6 +2418,7 @@ plot_tree <- function(gates, fontsize = 40, rankdir = "LR", shape = "ellipse", f
 #' @importFrom stats as.formula
 #' @importFrom rlang quo_get_expr
 #' @importFrom scales identity_trans
+#' @importFrom flowCore exprs
 #' @return a ggplot object
 format_plot <- function(p,
                         options = list()){
@@ -2467,12 +2489,14 @@ format_plot <- function(p,
     if(length(xvar) == 1){
       
       if(class(p$data) %in% c("ncdfFlowSet", "flowset")){
-        xvalues <- exprs(p$data[[1]])[,xvar]
+        xvalues <- flowCore::exprs(p$data[[1]])[,xvar]
       }else{
         xvalues <- p$data[[xvar]]
       }
       
-      labx <- ifelse(xvar %in% names(axis_labels), axis_labels[[xvar]], xvar)
+      labx <- ifelse(xvar %in% names(axis_labels), 
+                     axis_labels[[xvar]], 
+                     xvar)
       trans_x <- default_trans
       if(xvar %in% names(transformation)){
         trans_x <- transformation[[xvar]]
@@ -2480,7 +2504,8 @@ format_plot <- function(p,
       xlim <- axis_limits[[xvar]]
       
       if(is.double(xvalues)){
-        p <- p + scale_x_continuous(name = labx, trans = trans_x, limits = xlim ) 
+        p <- p + scale_x_continuous(name = labx, 
+                                    trans = trans_x, limits = xlim ) 
       }else if(is.integer(xvalues)){
         limits <- NULL
         if(!is.null(xlim)){limits <- seq(xlim[1], xlim[2])}
@@ -2495,11 +2520,13 @@ format_plot <- function(p,
   if(!is.null(yvar)){
     if(length(yvar) == 1){
       if(class(p$data) %in% c("ncdfFlowSet", "flowset")){
-        yvalues <- exprs(p$data[[1]])[,yvar]
+        yvalues <- flowCore::exprs(p$data[[1]])[,yvar]
       }else{
         yvalues <- p$data[[yvar]]
       }
-      laby <- ifelse(yvar %in% names(options$axis_labels), options$axis_labels[[yvar]], yvar)
+      laby <- ifelse(yvar %in% names(options$axis_labels), 
+                     options$axis_labels[[yvar]], 
+                     yvar)
       trans_y <- default_trans
       if(yvar %in% names(transformation)){
         trans_y <- transformation[[yvar]]
@@ -2507,7 +2534,8 @@ format_plot <- function(p,
       ylim <- axis_limits[[yvar]]
 
       if(is.double(yvalues)){
-        p <- p + scale_y_continuous(name = laby, trans = trans_y, limits = ylim) 
+        p <- p + scale_y_continuous(name = laby, 
+                                    trans = trans_y, limits = ylim) 
       }else if(is.integer(yvalues)){
         limits <- NULL
         if(!is.null(ylim)){limits <- seq(ylim[1], ylim[2])}
@@ -2525,7 +2553,10 @@ format_plot <- function(p,
       if(!is.null(color_var)){
         if(length(color_var) == 1){
 
-          label_color <- ifelse(color_var %in% names(options$axis_labels), options$axis_labels[[color_var]], color_var)
+          label_color <- ifelse(color_var %in% 
+                                  names(options$axis_labels), 
+                                options$axis_labels[[color_var]], 
+                                color_var)
           trans_col <- default_trans
           if(color_var %in% names(transformation)){
             trans_col <- transformation[[color_var]]
@@ -2533,8 +2564,8 @@ format_plot <- function(p,
           
           is_cont <- FALSE
           if(class(p$data) %in% c("ncdfFlowSet", "flowset")){
-            if(color_var %in% colnames(exprs(p$data[[1]]))){
-              is_cont <- is.double(exprs(p$data[[1]])[,color_var])
+            if(color_var %in% colnames(flowCore::exprs(p$data[[1]]))){
+              is_cont <- is.double(flowCore::exprs(p$data[[1]])[,color_var])
             }
           }else{
             if(color_var %in% names(p$data)){
@@ -2891,7 +2922,7 @@ plot_gs <- function(gs,
 #' @param options  list of plot format options passed to \code{format_plot()}
 #' @param gate_name Names of the gates to add to the plot (if it is compatible with plot parameters).
 #' Ignored if NULL.
-#' @importFrom flowWorkspace gs_get_pop_paths gh_pop_get_gate sampleNames
+#' @importFrom flowWorkspace gs_get_pop_paths gs_pop_get_gate sampleNames
 #' @return a plot
 plot_gs_ggcyto <- function(gs,
                     sample = NULL,
@@ -2914,12 +2945,12 @@ plot_gs_ggcyto <- function(gs,
   if(is.null(sample)) sample <-  flowWorkspace::sampleNames(gs)[1]
   if(is.null(subset)) subset <- gh_get_gate_names(gs[[1]])[1]
   
-  fs <- gs_pop_get_data(gs[sample], subset)
+  fs <- gs_get_fs_subset(gs[sample], spill = spill, subset = subset)
   options[["title"]] <- subset
   
-  if(!is.null(spill)){
-    fs <- flowCore::compensate(fs, gs@compensation)
-  }
+  # if(!is.null(spill)){
+  #   fs <- flowCore::compensate(fs, gs@compensation)
+  # }
   
   p <- call_plot_function(data = fs,
                           plot_type = plot_type,

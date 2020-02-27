@@ -67,8 +67,8 @@ plotCytoUI <- function(id) {
 #'   \item{plot}{a plot or a list of plots}
 #'   \item{params}{plot parameters}
 #' }
-#' @importFrom flowWorkspace gs_pop_get_children gs_pop_get_data
-#' @importFrom flowCore parameters
+#' @importFrom flowWorkspace gs_pop_get_children gs_pop_get_data sampleNames
+#' @importFrom flowCore parameters compensate
 #' @import shiny
 #' @import ggcyto
 #' @export
@@ -647,9 +647,8 @@ plotCyto <- function(input, output, session,
             validate(need(rval_input$yvar %in% choices()$plot_var, "Please select y variable"))
           }
         }
-
-    fs <- flowWorkspace::gs_pop_get_data(rval$gating_set[rval_input$sample], rval_input$subset)
     
+
     spill <- choices()$compensation
     print(spill)
     if(!is.null(rval$apply_comp)){
@@ -658,13 +657,9 @@ plotCyto <- function(input, output, session,
       }
     }
       
-    if(!is.null(spill)){
-      if(all(sampleNames(fs) %in% names(spill))){
-        fs <- compensate(fs, spill)
-      }else{
-        message("Could not compensate data")
-      }
-    }
+    fs <- gs_get_fs_subset(gs = rval$gating_set[rval_input$sample], 
+                           spill =spill,
+                           subset = rval_input$subset)
     
     plot_args <- reactiveValuesToList(rval_input)
     
