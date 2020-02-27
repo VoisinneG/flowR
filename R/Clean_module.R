@@ -122,7 +122,10 @@ CleanUI<-function(id){
                                     #plotOutput(ns("signal_acquisition_plot_output"))
                            )
                            
-               )
+               ), 
+               textInput(ns("GatingSet_tagged_name"), label = "Create GatingSet"),
+               actionButton(ns("action_create_gatingset"), label = "Create GatingSet")
+               
            ),
            box(title = "Results",
                width = NULL, collapsed = F, collapsible = T,
@@ -345,6 +348,82 @@ Clean <- function(input, output, session, rval) {
         dynamic_range = dynamic_range
       )
     )
+    
+  })
+  
+  ### setup the gatingSet tagged (badCells) ##############################################################
+  
+  setup_tag_gs <- reactive({
+    
+    df_temp <- NULL
+    
+    dt <- NULL
+    fs_temp <- list()
+    
+    df_temp2 <- list()
+    gs <- list()
+    
+    # Search value not in list
+    `%!in%` = Negate(`%in%`)
+    
+    validate(need(input$choice_sample_input, "No sample selected"))
+    validate(need(all(input$choice_sample_input %in% choices()$sample),
+                  "Please select samples"))
+    
+    samples <- choices()$sample
+    # withProgress("Create old GatingSet tagged", {
+      
+      for(i in 1:length(samples)){
+        sample <- samples[i]
+
+        # get a data frame to add sample names
+        df_temp[[i]] <- as.data.frame(exprs(rval$gating_set@data[[sample]]))
+        df_temp[[i]]$name <- paste0(sample)
+  
+        # build a new flowset from the dataframe with the sample names
+        fs <- build_flowset_from_df(df_temp[[i]])
+        fs_temp[[sample]] <- fs
+
+        # # get the data from the flowset and add badCells tag
+        df_temp2[[sample]] <- get_data_gs(GatingSet(fs))
+        df_temp2[[sample]]$badCells <- 0
+        
+        # print(df_temp2)
+
+        # search bad cells
+        if(df_temp2[[sample]][, "badCells"] %!in% df_temp2[[sample]][res()$dynamic_range[[sample]]$goodCellIDs, "badCells"]){
+          pos <- which(df_temp2[[sample]][,"badCells"]  %!in% df_temp2[[sample]][res()$dynamic_range[[sample]]$goodCellIDs, "badCells"])
+          df_temp2[[sample]][pos, "badCells"] <- 1
+          
+          
+        } else if(df_temp2[[sample]][,"badCells"] %!in% df_temp2[[sample]][res()$flowRateQCList[[sample]]$goodCellIDs,"badCells"]) {
+          pos <- which(df_temp2[[sample]][,"badCells"] %!in% df_temp2[[sample]][res()$flowRateQCList[[sample]]$goodCellIDs, "badCells"])
+          df_temp2[[sample]][pos, "badCells"] <- 1
+          
+          
+        } else if(df_temp2[[sample]][,"badCells"] %!in% df_temp2[[sample]][res()$FlowSignalQCList[[sample]]$goodCellIDs,"badCells"]){
+          pos <- which(df_temp2[[sample]][,"badCells"] %!in% df_temp2[[sample]][res()$FlowSignalQCList[[sample]]$goodCellIDs, "badCells"])
+          df_temp2[[sample]][pos, "badCells"] <- 1
+          
+          
+        }
+        else{
+          df_temp2[[sample]][res()$dynamic_range[[sample]]$bad_lowerIDs, "badCells"] <- 1
+          
+          df_temp2[[sample]][res()$dynamic_range[[sample]]$bad_upperIDs, "badCells"] <- 1
+          
+          df_temp2[[sample]][res()$flowRateQCList[[sample]]$badCellIDs, "badCells"] <- 1
+          
+        }
+        # print(df_temp2)
+        
+        # create list of gatingSet from the dataframe tagged
+        gs[[sample]] <- GatingSet(build_flowset_from_df(df_temp2[[sample]]))
+      }
+    
+    gating_set_with_bad_cell <- flowWorkspace::GatingSetList(gs)
+    print(gating_set_with_bad_cell)
+    return(gating_set_with_bad_cell)
     
   })
   
