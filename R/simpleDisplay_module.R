@@ -104,78 +104,54 @@ simpleDisplay <- function(input, output, session,
                           multirow = FALSE) {
   
   rval_plot <- reactiveValues(nrow = 1,
-                              nrow_display = 1,
-                              ncol = 1,
-                              ncol_facet = 1,
-                              nrow_facet = 1,
                               use_plotly = FALSE,
                               title = "",
                               zoom = 100,
                               width = 300,
                               height = 300,
                               max_height = 1000,
+                              min_size = 150,
                               init = TRUE,
                               show_title = TRUE)
   
-  observeEvent(input$zoom, {
-    rval_plot$zoom <- input$zoom
-  })
+  rval_mod <- reactiveValues(update_render = FALSE,
+                             nrow_display = 1,
+                             ncol = 1,
+                             ncol_facet = 1,
+                             nrow_facet = 1)
   
-  observeEvent(input$show_title, {
-    rval_plot$show_title <- input$show_title
-  })
+  rval_input <- reactiveValues()
   
+  ### Set plot parameters using plot_params ##########################################################
   
-  observeEvent(input$width, {
-    rval_plot$width <- input$width
-  })
-  
-  observeEvent(input$height, {
-    rval_plot$height <- input$height
-  })
-  
-  observeEvent(input$max_height, {
-    rval_plot$max_height <- input$max_height
-  })
-  
-  observeEvent(input$nrow, {
-    rval_plot$nrow <- input$nrow
-  })
-  
-  # observe({
-  #   if(class(plot_list())[1] == "list"){
-  #     n <- max(1, length(plot_list()))
-  #     if(!is.null(input$nrow)){
-  #       rval_plot$nrow <- min(n, input$nrow)
-  #     }else{
-  #       rval_plot$nrow <- min(n, rval_plot$nrow)
-  #     }
-  #   }else{
-  #     rval_plot$nrow <- 1
-  #   }
-  # })
-
-  observe({
-      for(var in intersect(names(params), names(rval_plot))){
-        rval_plot[[var]] <- params[[var]]
-      }
-  })
-  
-  observe({
-    if(rval_plot$show_title){
-      rval_plot$top <- rval_plot$title
-    }else{
-      rval_plot$top <- ""
+  observeEvent(reactiveValuesToList(params), {
+    for(var in intersect(names(params), names(rval_plot))){
+      rval_plot[[var]] <- params[[var]]
     }
   })
-
-  ### Layout plots ##########################################################################
+  
+  ### store plot parameters in rval_input #############################################################
+  
+  observeEvent(reactiveValuesToList(rval_plot), {
+    for(var in names(rval_plot)){
+      rval_input[[var]] <- rval_plot[[var]]
+    }
+  })
+  
+  observe({
+    for(var in names(input)){
+      rval_input[[var]] <- input[[var]]
+    }
+  })
+  
+  ### Layout plots #################################################################################
   
   plot_display <- reactive({
     
-      rval_plot$ncol_facet <- 1
-      rval_plot$nrow_facet <- 1
-      rval_plot$ncol <- 1
+    
+      rval_mod$ncol_facet <- 1
+      rval_mod$nrow_facet <- 1
+      rval_mod$ncol <- 1
       rval_plot$nrow_display <- 1
       
      if(class(plot_list())[1] == "list"){
@@ -189,8 +165,8 @@ simpleDisplay <- function(input, output, session,
                 facet_layout <- p$facet$compute_layout(p, p$facet$params)
                 
                 if(!is.null(facet_layout)){
-                  rval_plot$ncol_facet <- max(facet_layout$COL)
-                  rval_plot$nrow_facet <- max(facet_layout$ROW)
+                  rval_mod$ncol_facet <- max(facet_layout$COL)
+                  rval_mod$nrow_facet <- max(facet_layout$ROW)
                 }
               }
             }
@@ -199,13 +175,20 @@ simpleDisplay <- function(input, output, session,
               
               rval_plot$use_plotly <- FALSE
 
-              rval_plot$nrow_display <- min(n, rval_plot$nrow)
-              rval_plot$ncol <- ceiling(n/rval_plot$nrow)
+              rval_mod$nrow_display <- min(n, rval_input$nrow)
+              rval_mod$ncol <- ceiling(n/rval_input$nrow)
+              
+              top <- ""
+              if(!is.null(rval_input$show_title)){
+                if(rval_input$show_title){
+                  top <- rval_plot$title
+                }
+              }
 
               g <- try(gridExtra::marrangeGrob(plot_list(), 
-                                           nrow = rval_plot$nrow_display, 
-                                           ncol = rval_plot$ncol, 
-                                           top = rval_plot$top),
+                                           nrow = rval_mod$nrow_display, 
+                                           ncol = rval_mod$ncol, 
+                                           top = top),
                        silent = TRUE)
 
               if("try-error" %in% class(g)){
@@ -238,8 +221,8 @@ simpleDisplay <- function(input, output, session,
          facet_layout <- p$facet$compute_layout(p, p$facet$params)
          
          if(!is.null(facet_layout)){
-           rval_plot$ncol_facet <- max(facet_layout$COL)
-           rval_plot$nrow_facet <- max(facet_layout$ROW)
+           rval_mod$ncol_facet <- max(facet_layout$COL)
+           rval_mod$nrow_facet <- max(facet_layout$ROW)
          }
        }
        
@@ -248,15 +231,17 @@ simpleDisplay <- function(input, output, session,
      
    })
   
-  # plot_to_render <- reactive({
-  #   validate(need(plot_display(), "No plot to display"))
-  # 
-  #   if("graphNEL" %in% class(plot_display())){
-  #     Rgraphviz::renderGraph(plot_display())
-  #   }else{
-  #     plot_display()
-  #   }
-  # })
+  ### Control plot rendering (when use_plotly == TRUE) #######################################
+  
+  observeEvent(rval_input$max_height, {
+    rval_mod$update_render <- TRUE
+  })
+  
+  observeEvent(c(rval_input$height), {
+    rval_mod$update_render <- FALSE
+  })
+  
+  ### Render plot ###########################################################################
   
   output$plot_render  <- renderPlot({
     validate(need(plot_display(), "No plot to display"))
@@ -268,6 +253,10 @@ simpleDisplay <- function(input, output, session,
   })
 
   output$plot_render_ly  <- renderPlotly({
+    rval_mod$update_render <- TRUE
+    rval_input$height
+    rval_input$width
+    rval_input$zoom
     plot_display()
   })
   
@@ -277,7 +266,6 @@ simpleDisplay <- function(input, output, session,
     ns <- session$ns
     display_items <- list()
     
-    if(!rval_plot$use_plotly){
       if(multirow){
         display_items[["nrow"]] <- numericInput(ns("nrow"),
                                                       label = "Number of rows", value = rval_plot$nrow)
@@ -294,8 +282,7 @@ simpleDisplay <- function(input, output, session,
         display_items[["show_title"]] <- checkboxInput(ns("show_title"), 
                                                        label = "show title", value = rval_plot$show_title)
       }
-
-    }
+    
     return( tagList( display_items) )
   })
   
@@ -321,61 +308,70 @@ simpleDisplay <- function(input, output, session,
     tagList(x)
   })
   
-  ### Display plot ##########################################################################
+  ### Build UI for plot display ##########################################################################
+
   
-  #output$ui_plot_elements <- reactive({
   output$ui_plot <- renderUI({
 
     x <- list()
     ns <- session$ns
     
     if(rval_plot$use_plotly){
-      x[[1]] <- plotlyOutput(ns("plot_render_ly"), height = rval_plot$height)
+      if(rval_mod$update_render){
+        
+        width <- rval_input$width * rval_input$zoom/100
+        height <- rval_input$height * rval_input$zoom/100
+        width <- max(width, min_size = rval_plot$min_size)
+        height <- max(height, min_size = rval_plot$min_size)
+        
+        x[[1]] <- div(
+          style = paste("overflow-y: scroll; overflow-x: scroll; height:", 
+                        min(height, rval_input$max_height) + 20, 'px', sep=""),
+          plotlyOutput(ns("plot_render_ly"), width = width, height = height)
+        )
+        
+      }else{
+        x[[1]] <- plotlyOutput(ns("plot_render_ly"))
+      }
+      
     }else{
       
-      width <- rval_plot$width * rval_plot$zoom/100
-      height <- rval_plot$height * rval_plot$zoom/100
-      width <- max(width, 150)
-      height <- max(height, 150)
-      height <- rval_plot$nrow_display * rval_plot$nrow_facet * height
-      width <- rval_plot$ncol * rval_plot$ncol_facet * width
+      width <- rval_input$width * rval_input$zoom/100
+      height <- rval_input$height * rval_input$zoom/100
+      width <- max(width, min_size = rval_plot$min_size)
+      height <- max(height, min_size = rval_plot$min_size)
+      height <- rval_mod$nrow_display * rval_mod$nrow_facet * height
+      width <- rval_mod$ncol * rval_mod$ncol_facet * width
 
-      x[[1]] <- #box(title = "Plot", width = NULL, collapsible = TRUE, collapsed = FALSE,
-                div(
-                  style = paste("overflow-y: scroll; overflow-x: scroll; height:", 
-                                min(height, rval_plot$max_height) + 20, 'px',sep=""),
-                  plotOutput(ns("plot_render"),
-                             height = height,
-                             width = width,
-                             brush = ns("plot_brush"),
-                             click = ns("plot_click"),
-                             dblclick = ns("plot_dblclick")
-                  )
-                #)
+      x[[1]] <- div(
+        style = paste("overflow-y: scroll; overflow-x: scroll; height:", 
+                      min(height, rval_input$max_height) + 20, 'px',sep=""),
+        plotOutput(ns("plot_render"),
+                   height = height,
+                   width = width,
+                   brush = ns("plot_brush"),
+                   click = ns("plot_click"),
+                   dblclick = ns("plot_dblclick")
+        )
+        
       )
        
     }
     return(tagList(x))
   })
-  
-  # output$ui_plot <- renderUI({
-  #   
-  #   tagList(ui_plot_elements())
-  #   
-  # 
-  # })
+
 
   ### Save plot ############################################################################
   
   output$download_plot <- downloadHandler(
     filename = "plot.pdf",
     content = function(file) {
-      width <- rval_plot$width * rval_plot$zoom/100
-      height <- rval_plot$height * rval_plot$zoom/100
-      width <- max(width, 150)
-      height <- max(height, 150)
-      height <- rval_plot$nrow_display * rval_plot$nrow_facet * height
-      width <- rval_plot$ncol * rval_plot$ncol_facet * width
+      width <- rval_input$width * rval_input$zoom/100
+      height <- rval_input$height * rval_input$zoom/100
+      width <- max(width, min_size = rval_plot$min_size)
+      height <- max(height, min_size = rval_plot$min_size)
+      height <- rval_mod$nrow_display * rval_mod$nrow_facet * height
+      width <- rval_mod$ncol * rval_mod$ncol_facet * width
 
 
       pdf(file, width = width * 5/400, height = height * 5/400)
@@ -400,67 +396,77 @@ simpleDisplay <- function(input, output, session,
 # library(ggplot2)
 # library(plotly)
 # 
-if (interactive()){
-
-  ui <- dashboardPage(
-    dashboardHeader(title = "simpleDisplay"),
-    sidebar = dashboardSidebar(disable = TRUE),
-    body = dashboardBody(
-      fluidRow(
-        column(6, box(width = NULL, simpleDisplayUI("simple_display_module"))),
-        column(6, box(width = NULL, plotOutput("plot")))
-      )
-    )
-  )
-
-  server <- function(input, output, session) {
-
-    params <- reactiveValues(use_plotly = FALSE, width = 500, height = 500, nrow = 2, title = "samples")
-
-    plot_list <- reactive({
-
-      load("../flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
-      fs <- build_flowset_from_df(df = res$cluster$data)
-      gs <- GatingSet(fs)
-      #add_gates_flowCore(gs, res$cluster$gates)
-      #plot_gh(gs)
-      
-        # gates <- get_gates_from_ws(
-        #      "../flowR_utils/demo-data/2019-Exp-Tumor-042 (Lung Carcinoma)/Classical analysis 06012020.wsp")
-        # p <- plot_tree(gates, fontsize = 40, rankdir = NULL, shape = "ellipse", fixedsize = TRUE)
-        # p
-
-
-      # plist <- list()
-      # plist[[1]] <- ggplot(iris, aes(x=Sepal.Length, y = Sepal.Width, color = Species)) +
-      #   geom_point(alpha = 0.5)+
-      #   facet_wrap(~Species)
-      # 
-      #  plist[[2]] <- ggplot(iris, aes(x=Species, y = Sepal.Length, fill = Species)) +
-      #    geom_col(alpha = 0.5)
-      # 
-      # return(plist)
-
-      df <- get_data_gs(gs)
-      df_cluster <- get_cluster(df, yvar = names(df)[4:7], y_trans = logicle_trans() )
-      fSOM <- df_cluster$fSOM
-      graphics::plot.new()
-      PlotPies(fSOM, cellTypes=as.factor(df$name))
-
-    })
-
-    # output$plot <- renderPlot({
-    #   #plot_list()
-    #   res$plot()
-    # })
-    
-    res <- callModule(simpleDisplay, "simple_display_module",
-               plot_list = plot_list,
-               params = params,
-               save = FALSE)
-
-  }
-
-  shinyApp(ui, server)
-
+# if (interactive()){
+# 
+#   ui <- dashboardPage(
+#     dashboardHeader(title = "simpleDisplay"),
+#     sidebar = dashboardSidebar(disable = TRUE),
+#     body = dashboardBody(
+#       fluidRow(
+#         column(6, box(width = NULL, simpleDisplayUI("simple_display_module"))),
+#         column(6, box(width = NULL, plotOutput("plot")))
+#       )
+#     )
+#   )
+# 
+#   server <- function(input, output, session) {
+# 
+#     params <- reactiveValues(use_plotly = FALSE, 
+#                              width = 300, 
+#                              height = 300, 
+#                              max_height = 500, 
+#                              min_size = 200,
+#                              nrow = 2,
+#                              title = "samples")
+# 
+#     plot_list <- reactive({
+# 
+#       load("../flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
+#       fs <- build_flowset_from_df(df = res$cluster$data)
+#       gs <- GatingSet(fs)
+#       #add_gates_flowCore(gs, res$cluster$gates)
+#       #plot_gh(gs)
+# 
+#         # gates <- get_gates_from_ws(
+#         #      "../flowR_utils/demo-data/2019-Exp-Tumor-042 (Lung Carcinoma)/Classical analysis 06012020.wsp")
+#         # p <- plot_tree(gates, fontsize = 40, rankdir = NULL, shape = "ellipse", fixedsize = TRUE)
+#         # p
+# 
+# 
+#       # plist <- list()
+#       # plist[[1]] <- ggplot(iris, aes(x=Sepal.Length, y = Sepal.Width, color = Species)) +
+#       #   geom_point(alpha = 0.5)+
+#       #   facet_wrap(~Species)
+#       # 
+#       #  plist[[2]] <- ggplot(iris, aes(x=Species, y = Sepal.Length, fill = Species)) +
+#       #    geom_col(alpha = 0.5)
+#       # 
+#       # return(plist)
+# 
+#       df <- get_data_gs(gs)
+#       df_cluster <- get_cluster(df, yvar = names(df)[4:7], y_trans = logicle_trans() )
+#       fSOM <- df_cluster$fSOM
+#       graphics::plot.new()
+#       print("plot")
+#       PlotPies(fSOM, cellTypes=as.factor(df$name))
+# 
+#       #heatmaply(matrix(runif(100), 50, 2))
+# 
+#     })
+# 
+#     # output$plot <- renderPlot({
+#     #   #plot_list()
+#     #   res$plot()
+#     # })
+# 
+#     res <- callModule(simpleDisplay, "simple_display_module",
+#                plot_list = plot_list,
+#                params = params,
+#                save = FALSE,
+#                multirow = FALSE)
+# 
+#   }
+# 
+#   shinyApp(ui, server)
+# 
 }
