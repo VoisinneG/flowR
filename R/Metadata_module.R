@@ -95,7 +95,7 @@ MetadataUI <- function(id) {
 #' @param rval A reactive values object
 #' @return The updated reactiveValues object \code{rval}
 #' @import shiny
-#' @importFrom flowWorkspace pData
+#' @importFrom flowWorkspace pData sampleNames
 #' @importFrom tools file_ext
 #' @importFrom readxl read_excel
 #' @importFrom utils read.csv write.table
@@ -195,6 +195,7 @@ Metadata <- function(input, output, session, rval) {
       df <- data.frame(df)
       colnames(df) <- keys
       df$name <- flowWorkspace::pData(rval$gating_set)$name
+      #df$name <- flowWorkspace::sampleNames(rval$gating_set)
       
     }
     
@@ -240,7 +241,8 @@ Metadata <- function(input, output, session, rval) {
       
       validate(need(! input$gs_name %in% names(rval$gating_set_list), "Name already exists" ))
       
-      idx_match <- match(samples, flowWorkspace::pData(rval$gating_set)$name)
+      #idx_match <- match(samples, flowWorkspace::pData(rval$gating_set)$name)
+      idx_match <- match(samples, flowWorkspace::sampleNames(rval$gating_set))
       gs_filter <- GatingSet(rval$gating_set@data[idx_match])
       gates <- get_gates_from_gs(gs = rval$gating_set)
       add_gates_flowCore(gs = gs_filter, gates = gates)
@@ -254,8 +256,10 @@ Metadata <- function(input, output, session, rval) {
         }
       }
       
+      params <- colnames( gs_filter)[colnames(gs_filter) %in% names(rval$trans_parameters)]
       rval$gating_set_list[[input$gs_name]] <- list(gating_set = gs_filter,
-                                                    parent = rval$gating_set_selected)
+                                                    parent = rval$gating_set_selected,
+                                                    trans_parameters = rval$trans_parameters[params])
       rval$gating_set_selected <- input$gs_name
       rval$gating_set <- gs_filter
       rval$update_gs <- rval$update_gs + 1
@@ -337,7 +341,7 @@ Metadata <- function(input, output, session, rval) {
   
   #### edit metadata information ####
   output$pData <- DT::renderDT({validate(need(rval_mod$pdata, "No metadata")); rval_mod$pdata},
-                            rownames = FALSE,
+                            rownames = TRUE,
                             selection = 'none',
                             editable = 'cell',
                             server = TRUE )
@@ -361,7 +365,7 @@ Metadata <- function(input, output, session, rval) {
   output$download_meta <- downloadHandler(
     filename = "metadata.txt",
     content = function(file) {
-      utils::write.table(rval_mod$pdata, file = file, row.names = FALSE, quote = FALSE, sep = "\t")
+      utils::write.table(rval_mod$pdata, file = file, row.names = TRUE, quote = FALSE, sep = "\t")
     }
   )
   

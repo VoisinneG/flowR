@@ -11,7 +11,7 @@ plot_gate(
   sample = NULL,
   spill = NULL,
   metadata = NULL,
-  plot_type = "contour",
+  plot_type = "hexagonal",
   plot_args = list(),
   options = list()
 )
