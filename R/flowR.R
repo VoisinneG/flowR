@@ -2266,7 +2266,7 @@ add_gate_to_plot <- function(p, gate){
   # }
   
   if(all(names(polygon) %in% c(xvar, yvar))){ 
-    print("OK gate")
+    #print("OK gate")
     p <- p + geom_gate(gate) + geom_stats(gate = gate, nudge_y = 0.5,
                                               type = c("gate_name", "percent"), label.padding = unit(0.5, "lines"),
                                               fill = grDevices::rgb(1,1,1,0.75))
@@ -3646,7 +3646,7 @@ build_flowset_from_df <- function(df,
             rownames(par@data)[npar] <- paste("$P",npar, sep = "")
             desc[[paste("$P",npar,"DISPLAY",sep="")]] <- NA
             desc[[paste("$P",npar,"VARTYPE",sep="")]] <- class(df_sample[[param]])
-            print(class(df_sample[[param]]))
+            #print(class(df_sample[[param]]))
           }
           
           # par@data$vartype <- sapply(par@data$name, function(x){typeof(df_sample[[x]])})

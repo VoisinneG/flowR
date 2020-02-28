@@ -110,7 +110,9 @@ plotCyto <- function(input, output, session,
                               show_outliers = FALSE,
                               option = "viridis")
   
-
+observe({
+  print(rval_plot$auto_focus)
+})
   ### Initialization of plot parameters ############################################################
   observe({
     rval_plot$xvar <- choices()$plot_var[1]
@@ -581,7 +583,7 @@ plotCyto <- function(input, output, session,
     if(use_ggcyto){
       return(list())
     }
-    print("raw")
+    #print("raw")
     
     df <- data_plot_focus()
     plot_list <- list()
@@ -650,7 +652,7 @@ plotCyto <- function(input, output, session,
     
 
     spill <- choices()$compensation
-    print(spill)
+    #print(spill)
     if(!is.null(rval$apply_comp)){
       if(!rval$apply_comp){
         spill <- NULL
@@ -693,7 +695,7 @@ plotCyto <- function(input, output, session,
                                   plot_raw(), 
                                   plot_raw_ggcyto()), {
     
-    #print("format")
+    print("format")
     
     axis_labels <- choices()$labels
     
@@ -713,8 +715,7 @@ plotCyto <- function(input, output, session,
     }
     
     if(use_ggcyto){
-      
-      print("use_ggcyto")
+      #print("use_ggcyto")
       plist <- plot_raw_ggcyto()
     }else{
       plist <- plot_raw()
@@ -752,7 +753,8 @@ plotCyto <- function(input, output, session,
     validate(need(rval_input$subset, "Please select subsets"))
     validate(need(all(rval_input$subset %in% choices()$subset), 
                   "All subsets not found in GatingSet"))
-    #print("gate")
+    
+    print("gate")
     
     gate <- NULL
 
@@ -775,7 +777,7 @@ plotCyto <- function(input, output, session,
                            gate_int <- flowWorkspace::gs_pop_get_gate(rval$gating_set,
                                                                       gate_name)
                            #p <- add_gate(p = p, gate = gate_int)
-                           print(gate_int)
+                           #print(gate_int)
                            #print(get_gate_coordinates(gate_int))
                            p <- add_gate_to_plot(p, gate_int)
                          }
@@ -792,7 +794,7 @@ plotCyto <- function(input, output, session,
     
     
     
-    #print("poly")
+    print("poly")
 
     # gate <- NULL
     # if(!is.null(rval_input$show_gates)){
@@ -804,15 +806,15 @@ plotCyto <- function(input, output, session,
     polygon <- data.frame(x = polygon_gate$x,
                           y = polygon_gate$y)
     
-    print(polygon)
+    #print(polygon)
     
     plist <- lapply( draw_gates(),
                      function(p){
                        
                        
                        
-                       print("OK")
-                       print(polygon$x)
+                       #print("OK")
+                       #print(polygon$x)
                        if(use_ggcyto){
                          p <- as.ggplot(p)
                          if(!is.null(polygon$x)){
@@ -825,7 +827,7 @@ plotCyto <- function(input, output, session,
                        #     p <- add_gate(p, g)
                        #   }
                        # }
-                       print("OK")
+                       #print("OK")
                        if(rval_input$zoom_on_data_points){
                          data_range <- get_plot_data_range(p)
                          xlim <- NULL
@@ -836,7 +838,7 @@ plotCyto <- function(input, output, session,
                          }
                          p <- p + coord_cartesian(xlim = xlim, ylim = ylim, expand = TRUE)
                        }
-                       print("OK")
+                       #print("OK")
                        return(p)
                      })
     

@@ -123,7 +123,8 @@ GatingUI <- function(id) {
                   width = NULL, height = NULL,
                   tabPanel("Tree",
                            simpleDisplayUI(ns("simple_display_module_tree")),
-                           box(title = "Plot Options", width = NULL, collapsible = TRUE, collapsed = TRUE,
+                           box(title = "Plot Options", width = NULL, 
+                               collapsible = TRUE, collapsed = TRUE,
                                uiOutput(ns("tree_ui_options"))
                            )
                   ),
@@ -140,7 +141,8 @@ GatingUI <- function(id) {
                   ),
                   tabPanel(title = "Export",
                            br(),
-                           downloadButton(ns("export_gh"), label = "Export Gating Hierarchy"),
+                           downloadButton(ns("export_gh"), 
+                                          label = "Export Gating Hierarchy"),
                            br(),
                            br()
                   ),
@@ -150,13 +152,19 @@ GatingUI <- function(id) {
                                      multiple = FALSE
                            ),
                            uiOutput(ns("import_options")),
-                           box(title = "Transform", width = NULL, collapsible = TRUE, collapsed = TRUE,
-                               textInput(ns("pattern"), label = "Pattern", value  = "Comp-"),
-                               textInput(ns("replacement"), label = "Replacement", value  = ""),
-                               numericInput(ns("time_step"), label = "Time step", value = 1),
-                               actionButton(ns("transform_gates"), label = "Apply transformation")
+                           box(title = "Transform", width = NULL, 
+                               collapsible = TRUE, collapsed = TRUE,
+                               textInput(ns("pattern"), label = "Pattern", 
+                                         value  = "Comp-"),
+                               textInput(ns("replacement"), label = "Replacement", 
+                                         value  = ""),
+                               numericInput(ns("time_step"), label = "Time step", 
+                                            value = 1),
+                               actionButton(ns("transform_gates"), 
+                                            label = "Apply transformation")
                            ),
-                           box(title = "Preview", width = NULL, collapsible = TRUE, collapsed = TRUE,
+                           box(title = "Preview", 
+                               width = NULL, collapsible = TRUE, collapsed = TRUE,
                                verbatimTextOutput(ns("import_gh_summary"))
                            ),
                            actionButton(ns("apply_gh"), label = "Import gates")
@@ -202,7 +210,7 @@ Gating <- function(input, output, session, rval) {
     rval$update_gs <- 0
   })
   
-  ### Call modules ###############################################################################
+  ### Call modules #########################################################################
   res <- callModule(plotCyto, "plot_module", 
                     rval=rval,
                     plot_params = plot_params,
@@ -227,7 +235,7 @@ Gating <- function(input, output, session, rval) {
              plot_list = graph,
              params = reactiveValues(width = 500, height = 500))
   
-  ### Get parameters from GatingSet ################################################################
+  ### Get parameters from GatingSet ########################################################
   
   choices <- reactive({
     rval$update_gs
@@ -235,7 +243,7 @@ Gating <- function(input, output, session, rval) {
     get_parameters_gs(rval$gating_set)
   })
 
-  ### Passing plot parameters to the gating hierarchy plot #######################################
+  ### Passing plot parameters to the gating hierarchy plot ###############################
   observe({
       for(var in intersect(names(res$params), c("sample",
                                               "plot_type",
@@ -263,7 +271,7 @@ Gating <- function(input, output, session, rval) {
     updateSelectInput(session, "gate_selection", choices = gates)
   })
   
-  ### Observe environments for gating ############################################################
+  ### Observe environments for gating ###################################################
 
   observeEvent(input$gate_selection, {
     #update plot_params
@@ -277,22 +285,31 @@ Gating <- function(input, output, session, rval) {
     updateSelectInput(session, "gate_selection", selected = res$params$subset)
   })
   
-  ### update polygon coordinates upon mouse click on main plot ####################################
+  ### Manage simple click events on main plot ##########################################
+  
   observeEvent(res_display$params$plot_click, {
     if(is.null(res_display$params$plot_brush)) {
+      
+      #get x and y coordinates
       xvar <- res$params$xvar
       yvar <- res$params$yvar
       
-      x_coord <- res_display$params$plot_click$x
+      x_coord_raw <- res_display$params$plot_click$x
       if(xvar %in% names(rval$gating_set@transformation)){
-        x_coord <- rval$gating_set@transformation[[xvar]]$inverse(x_coord)
+        x_coord <- rval$gating_set@transformation[[xvar]]$inverse(x_coord_raw)
       }
-      gate$x <- c(gate$x, x_coord)
       
-      y_coord <- res_display$params$plot_click$y
+      y_coord_raw <- res_display$params$plot_click$y
       if(yvar %in% names(rval$gating_set@transformation)){
-        y_coord <- rval$gating_set@transformation[[yvar]]$inverse(y_coord)
+        y_coord <- rval$gating_set@transformation[[yvar]]$inverse(y_coord_raw)
       }
+      
+      #compute distance with existing vertexes
+      d <- sqrt(((gate$x - x_coord)/gate$x)^2 + ((gate$y - y_coord)/gate$y)^2)
+      min_d <- min(d)
+      print(min_d)
+      
+      gate$x <- c(gate$x, x_coord)
       gate$y <- c(gate$y, y_coord)
   
       #idx <- grDevices::chull(gate$x, gate$y)
@@ -301,7 +318,8 @@ Gating <- function(input, output, session, rval) {
     }
   })
   
-  ### update polygon coordinates upon mouse brush on main plot ####################################
+  ### Manage brush events on main plot ###################################################
+  
   observeEvent(res_display$params$plot_brush, {
     brush <- res_display$params$plot_brush
     
@@ -331,32 +349,33 @@ Gating <- function(input, output, session, rval) {
     gate$y <- brush_coords$y
   })
   
-  ### reset polygon upon mouse double click on main plot ##########################################
+  ### Manage double click events on main plot #############################################
+  
   observeEvent(res_display$params$plot_dblclick, {
     gate$x <- NULL
     gate$y <- NULL
   })
   
-  ### reset polygon using action button ###########################################################
+  ### reset polygon using action button ###################################################
   observeEvent(input$reset_gate, {
     gate$x <- NULL
     gate$y <- NULL
     rval$gate <- NULL
   })
   
-  ### reset polygon when plot x axis is modified ##################################################
+  ### reset polygon when plot x axis is modified #########################################
   observeEvent(res$params$xvar, {
     gate$x <- NULL
     gate$y <- NULL
   })
   
-  ### reset polygon when plot y axis is modified ##################################################
+  ### reset polygon when plot y axis is modified #########################################
   observeEvent(res$params$yvar, {
     gate$x <- NULL
     gate$y <- NULL
   })
   
-  ### Create gate from polygon, update rval$gating_set ############################################
+  ### Create gate from polygon, update rval$gating_set ###################################
 
   observeEvent(input$create_gate, {
     
@@ -378,11 +397,14 @@ Gating <- function(input, output, session, rval) {
         var_names <- c(res$params$xvar, res$params$yvar)
         names(var_names) <- NULL
         colnames(polygon) <- var_names
-        print(polygon)
-        poly_gate <- flowCore::polygonGate(.gate = polygon, filterId=input$gate_name)
+
+        poly_gate <- flowCore::polygonGate(.gate = polygon, 
+                                           filterId=input$gate_name)
         rval$gate <- poly_gate
           
-        flowWorkspace::gs_pop_add(rval$gating_set, poly_gate, parent = res$params$subset)
+        flowWorkspace::gs_pop_add(rval$gating_set, 
+                                  poly_gate, 
+                                  parent = res$params$subset)
         flowWorkspace::recompute(rval$gating_set)
         rval$update_gs <- rval$update_gs + 1
         
@@ -404,11 +426,12 @@ Gating <- function(input, output, session, rval) {
     
   })
   
-  ### Delete selected gate, update rval$gating_set ################################################
+  ### Delete selected gate, update rval$gating_set #######################################
   observeEvent(input$delete_gate, {
     if(input$gate_to_delete != "root"){
       
-      idx_gh <- which( flowWorkspace::gs_get_pop_paths(rval$gating_set) == input$gate_to_delete )
+      idx_gh <- which( flowWorkspace::gs_get_pop_paths(rval$gating_set) == 
+                         input$gate_to_delete )
       target_gate <- flowWorkspace::gs_get_pop_paths(rval$gating_set)[idx_gh]
 
       flowWorkspace::gs_pop_remove(gs = rval$gating_set, node = target_gate)
@@ -425,12 +448,13 @@ Gating <- function(input, output, session, rval) {
   })
   
   
-  ### Rename selected gate, update rval$gating_set ################################################
+  ### Rename selected gate, update rval$gating_set #######################################
   observeEvent(input$rename_gate, {
     
     if(input$gate_to_rename != "root"){
       
-      idx_gh <- which( flowWorkspace::gs_get_pop_paths(rval$gating_set) == input$gate_to_rename )
+      idx_gh <- which( flowWorkspace::gs_get_pop_paths(rval$gating_set) == 
+                         input$gate_to_rename )
       target_gate <- flowWorkspace::gs_get_pop_paths(rval$gating_set)[idx_gh]
 
       flowWorkspace::setNode(rval$gating_set, target_gate, input$new_name)
@@ -440,7 +464,7 @@ Gating <- function(input, output, session, rval) {
     
   })
 
-  ### Copy selected gate, update rval$gating_set ################################################
+  ### Copy selected gate, update rval$gating_set #########################################
   observeEvent(input$copy_gate, {
     
     
@@ -466,7 +490,7 @@ Gating <- function(input, output, session, rval) {
 
   })
   
-  ### Update plot parameters to show defining gate ################################################
+  ### Update plot parameters to show defining gate ########################################
   observeEvent(input$show_gate, {
     
     if(res$params$subset != "root"){
@@ -500,13 +524,13 @@ Gating <- function(input, output, session, rval) {
   })
   
   
-  ### Output messages #############################################################################
+  ### Output messages ####################################################################
   
   output$message_gate <- renderPrint({
     print(gate$x)
   })
   
-  ### Plot gating tree ############################################################################
+  ### Plot gating tree ###################################################################
   
   gate_list <- reactive({
     rval$update_gs
@@ -557,16 +581,18 @@ Gating <- function(input, output, session, rval) {
       ns <- session$ns
       x <- list()
       x[["fontsize"]] <- numericInput(ns("fontsize"), "fontsize", value = 10)
-      x[["horizontal_tree"]] <- checkboxInput(ns("horizontal_tree"), label = "horizontal layout", TRUE)
+      x[["horizontal_tree"]] <- checkboxInput(ns("horizontal_tree"), 
+                                              label = "horizontal layout", TRUE)
       x[["shape"]] <- selectInput(ns("shape"), "node shape", 
-                                  choices = c("ellipse", "circle", "rectangle"), selected = "ellipse")
+                                  choices = c("ellipse", "circle", "rectangle"), 
+                                  selected = "ellipse")
       x[["fixedsize"]] <- checkboxInput(ns("fixedsize"), label = "fixed node size", FALSE)
 
       tagList(x)
 
   })
   
-  ### Population statistics ######################################################################
+  ### Population statistics ##############################################################
   
   pop_stats <- reactive({
     validate(need(class(rval$gating_set)=="GatingSet", "No GatingSet available"))
@@ -594,12 +620,13 @@ Gating <- function(input, output, session, rval) {
   output$download_data <- downloadHandler(
     filename = "pop_stats.txt",
     content = function(file) {
-      utils::write.table(pop_stats(), file = file, row.names = FALSE, quote = FALSE, sep = "\t")
+      utils::write.table(pop_stats(), 
+                         file = file, row.names = FALSE, quote = FALSE, sep = "\t")
     }
   )
   
 
-  ### Import/Export Gating Hierarchy ##############################################################
+  ### Import/Export Gating Hierarchy ####################################################
   
   output$import_options <- renderUI({
     ns <- session$ns
@@ -608,10 +635,12 @@ Gating <- function(input, output, session, rval) {
     if(!is.null(file_path)){
       if(file_ext(file_path) %in% c("xml")){
         choices <- get_templates_from_ws_diva(file_path)
-        x[[1]] <- selectInput(ns("template"), "Template", choices = choices, selected = choices[1])
+        x[[1]] <- selectInput(ns("template"), "Template", 
+                              choices = choices, selected = choices[1])
       }else if(file_ext(file_path) %in% c("wsp")){
         choices <- get_groups_from_ws(file_path)
-        x[[1]] <- selectInput(ns("group"), "Group", choices = choices, selected = choices[1])
+        x[[1]] <- selectInput(ns("group"), "Group", 
+                              choices = choices, selected = choices[1])
       }
     }
     tagList(x)
@@ -700,7 +729,7 @@ Gating <- function(input, output, session, rval) {
 }
 
 
-### Tests #########################################################################################
+### Tests ############################################################################
 # 
 # library(shiny)
 # library(shinydashboard)
@@ -713,56 +742,56 @@ Gating <- function(input, output, session, rval) {
 # library(plotly)
 # library(ggridges)
 # 
-# if (interactive()){
-# 
-#   ui <- dashboardPage(
-#     dashboardHeader(title = "Gating"),
-#     sidebar = dashboardSidebar(disable = TRUE),
-#     body = dashboardBody(
-#       GatingUI("module")
-#     )
-#   )
-# 
-#   server <- function(input, output, session) {
-# 
-#     rval <- reactiveValues()
-# 
-#     observe({
-#       #dataDir <- system.file("extdata",package="flowWorkspaceData")
-#       #gs <- load_gs(list.files(dataDir, pattern = "gs_bcell_auto",full = TRUE))
-#        fs <- read.ncdfFlowSet(files = "../flowR_utils/demo-data/JL04BMVLG-Valentin/Tumor_T_001_012.fcs")
-#        #gates <- gates <- get_gates_from_ws_diva("../flowR_utils/demo-data/JL04BMVLG-Valentin/JL04BMVLG.xml", template = "Gating")
-#        gates <- get_gates_from_ws("../flowR_utils/demo-data/JL04BMVLG-Valentin/Tumor-testFlowR.wsp", group = "Tumor")
-#        gates <- transform_gates(gates, pattern = "Comp-", replacement = "")
-#        gs <- flowWorkspace::GatingSet(fs)
-#        
-#        add_gates_flowCore(gs, gates = gates)
-#       transfo <- lapply(colnames(gs), logicle_trans)
-#       names(transfo) <- colnames(gs)
-#       gs@transformation <- transfo
-#       spill <- gs@data[[1]]@description[["SPILL"]]
-#       comp <- lapply(pData(gs)$name, function(x){spill})
-#       names(comp) <- pData(gs)$name
-#       gs@compensation <- comp
-#       rval$gating_set <- gs
-#       #load("../flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
-#       #fs <- build_flowset_from_df(df = res$cluster$data, origin = res$cluster$flow_set)
-#       #gs <- flowWorkspace::GatingSet(fs)
-#       #gs@transformation <-  res$cluster$transformation
-#       #add_gates_flowCore(gs, res$cluster$gates)
-#       #rval$gating_set <- gs
-#       #plot_params$sample <- pData(gs)$name[1]
-#       #utils::data("GvHD", package = "flowCore")
-#       #rval$gating_set <- GatingSet(GvHD)
-#       #gs <- load_gs("./inst/ext/gs")
-#       #rval$gating_set <- gs
-#     })
-# 
-#     res <- callModule(Gating, "module", rval = rval)
-# 
-#   }
-# 
-#   shinyApp(ui, server)
-# 
-# }
+if (interactive()){
+
+  ui <- dashboardPage(
+    dashboardHeader(title = "Gating"),
+    sidebar = dashboardSidebar(disable = TRUE),
+    body = dashboardBody(
+      GatingUI("module")
+    )
+  )
+
+  server <- function(input, output, session) {
+
+    rval <- reactiveValues()
+
+    observe({
+      #dataDir <- system.file("extdata",package="flowWorkspaceData")
+      #gs <- load_gs(list.files(dataDir, pattern = "gs_bcell_auto",full = TRUE))
+       fs <- read.ncdfFlowSet(files = "../flowR_utils/demo-data/JL04BMVLG-Valentin/Tumor_T_001_012.fcs")
+       #gates <- gates <- get_gates_from_ws_diva("../flowR_utils/demo-data/JL04BMVLG-Valentin/JL04BMVLG.xml", template = "Gating")
+       gates <- get_gates_from_ws("../flowR_utils/demo-data/JL04BMVLG-Valentin/Tumor-testFlowR.wsp", group = "Tumor")
+       gates <- transform_gates(gates, pattern = "Comp-", replacement = "")
+       gs <- flowWorkspace::GatingSet(fs)
+
+       add_gates_flowCore(gs, gates = gates)
+      transfo <- lapply(colnames(gs), logicle_trans)
+      names(transfo) <- colnames(gs)
+      gs@transformation <- transfo
+      spill <- gs@data[[1]]@description[["SPILL"]]
+      comp <- lapply(pData(gs)$name, function(x){spill})
+      names(comp) <- pData(gs)$name
+      gs@compensation <- comp
+      rval$gating_set <- gs
+      #load("../flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
+      #fs <- build_flowset_from_df(df = res$cluster$data, origin = res$cluster$flow_set)
+      #gs <- flowWorkspace::GatingSet(fs)
+      #gs@transformation <-  res$cluster$transformation
+      #add_gates_flowCore(gs, res$cluster$gates)
+      #rval$gating_set <- gs
+      #plot_params$sample <- pData(gs)$name[1]
+      #utils::data("GvHD", package = "flowCore")
+      #rval$gating_set <- GatingSet(GvHD)
+      #gs <- load_gs("./inst/ext/gs")
+      #rval$gating_set <- gs
+    })
+
+    res <- callModule(Gating, "module", rval = rval)
+
+  }
+
+  shinyApp(ui, server)
+
+}
 
