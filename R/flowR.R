@@ -665,9 +665,8 @@ add_gates_flowCore <- function(gs, gates){
       
       for(i in 1:length(idx)){
         
-        
         g <- gates[[idx[i]]]
-        
+
         if(g$parent %in% union(gh_get_gate_names(gs[[1]]), "root") ){
           if(class(g$gate) == "list"){
             first_gate <- g$gate[[1]]
@@ -955,11 +954,15 @@ get_parameters_gs <- function(gs){
 #' @importFrom flowCore compensate
 gs_get_fs_subset <- function(gs, spill = NULL, subset){
   
-  fs <- gs@data
+  fs <- gs@data[sampleNames(gs)]
   gates <- get_gates_from_gs(gs) 
   
   if(!is.null(spill)){
-    fs <- flowCore::compensate(fs, spill)
+      if(all(sampleNames(fs) %in% names(spill))){
+        fs <- flowCore::compensate(fs, spill)
+      }else{
+        message("Could not compensate data")
+      }
   }
   
   gs_comp <- flowWorkspace::GatingSet(fs)
@@ -3146,6 +3149,8 @@ plot_gh <- function( gs,
         par_nodes <- lapply(nodes_to_plot_parent, function(x){
           
           g <- flowWorkspace::gh_pop_get_gate(gs[[idx[1]]], x)
+          
+          
           
           if(class(g) %in% c("polygonGate")){
             try(colnames(g@boundaries), silent = TRUE)
