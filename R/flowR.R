@@ -3550,7 +3550,7 @@ get_cluster <- function(df,
 #' @param sample_col Name of df's column containing sample names
 #' @return a flowSet
 #' @importFrom flowCore description parameters flowFrame flowSet
-#' @importFrom flowWorkspace pData
+#' @importFrom flowWorkspace pData sampleNames
 #' @examples
 #' \dontrun{
 #' utils::data("GvHD", package = "flowCore")
@@ -3644,7 +3644,7 @@ build_flowset_from_df <- function(df,
     fs_new <- flowSet(ff_list)
     if("flowSet" %in% class(origin) ){
       pdata <- data.frame(flowWorkspace::pData(origin))
-      idx_match <- match(samples, flowWorkspace::pData(origin))
+      idx_match <- match(samples, flowWorkspace::sampleNames(origin))
       if(length(colnames(pdata))>1){
         flowWorkspace::pData(fs_new) <- pdata[idx_match, ]
       }else{

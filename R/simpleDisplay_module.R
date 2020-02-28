@@ -469,4 +469,4 @@ simpleDisplay <- function(input, output, session,
 # 
 #   shinyApp(ui, server)
 # 
-}
+#}
