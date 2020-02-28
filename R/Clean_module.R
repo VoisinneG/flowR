@@ -352,16 +352,18 @@ Clean <- function(input, output, session, rval) {
   })
   
   ### setup the gatingSet tagged (badCells) ##############################################################
-  
-  setup_tag_gs <- reactive({
+  #'@ImportFrom flowWorkspace gslist_to_gs GatingSetList
+  create_futur_gs <- reactive({
     
     df_temp <- NULL
     
-    dt <- NULL
     fs_temp <- list()
     
     df_temp2 <- list()
     gs <- list()
+    
+    subset_df_clean <- list() 
+    gs_clean <- list()
     
     # Search value not in list
     `%!in%` = Negate(`%in%`)
@@ -388,8 +390,6 @@ Clean <- function(input, output, session, rval) {
         df_temp2[[sample]] <- get_data_gs(GatingSet(fs))
         df_temp2[[sample]]$badCells <- 0
         
-        # print(df_temp2)
-
         # search bad cells
         if(df_temp2[[sample]][, "badCells"] %!in% df_temp2[[sample]][res()$dynamic_range[[sample]]$goodCellIDs, "badCells"]){
           pos <- which(df_temp2[[sample]][,"badCells"]  %!in% df_temp2[[sample]][res()$dynamic_range[[sample]]$goodCellIDs, "badCells"])
@@ -415,16 +415,45 @@ Clean <- function(input, output, session, rval) {
           df_temp2[[sample]][res()$flowRateQCList[[sample]]$badCellIDs, "badCells"] <- 1
           
         }
-        # print(df_temp2)
-        
+
         # create list of gatingSet from the dataframe tagged
         gs[[sample]] <- GatingSet(build_flowset_from_df(df_temp2[[sample]]))
+        
+        # get cleaning gating set
+        subset_df_clean[[sample]] <- subset(df_temp2[[sample]], df_temp2[[sample]][,"badCells"] == 0)
+        
+        gs_clean[[sample]] <- GatingSet(build_flowset_from_df(subset_df_clean[[sample]]))
       }
-    
+
     gating_set_with_bad_cell <- flowWorkspace::GatingSetList(gs)
-    print(gating_set_with_bad_cell)
-    return(gating_set_with_bad_cell)
+    gating_set_with_only_good_cell <- flowWorkspace::GatingSetList(gs_clean)
     
+    gs_old_tagged <- flowWorkspace::gslist_to_gs(gating_set_with_bad_cell)
+    gs_good_cells <- flowWorkspace::gslist_to_gs(gating_set_with_only_good_cell)
+    return(
+      list(
+        gs_old_tagged,
+        gs_good_cells
+      )
+    )
+  })
+  
+  ### Build the new gating_set & old gating_set tagged #################################################
+  
+  observeEvent(input$action_create_gatingset,{
+    rval$gs <- create_futur_gs()[[2]]
+    
+    print(rval$gs)
+    params <- colnames(rval$gs)[colnames(rval$gs) %in% names(rval$trans_parameters)]
+
+    rval$gating_set_list[[paste0(input$GatingSet_tagged_name,"_clean")]] <- list(gating_set = rval$gs,
+                                                  parent = rval$gating_set_selected,
+                                                  trans_parameters = rval$trans_parameters[params]
+                                                  )
+    rval$gating_set_selected <- paste0(input$GatingSet_tagged_name,"_clean")
+
+    rval$gating_set <- rval$gs
+    rval$update_gs <- rval$update_gs + 1
   })
   
   ### Build result table ###############################################################################
