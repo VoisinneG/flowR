@@ -28,7 +28,7 @@ CleanUI<-function(id){
                             label = "Number of events per bin [signal acquisition only]",
                             value = 500),
                actionButton(ns("clean_selected_sample_input"),
-                            label = "Analyze selected sample(s)"),
+                            label = "Analyze selected sample(s)")
                
            ),
            box(width = NULL,
@@ -118,10 +118,14 @@ CleanUI<-function(id){
                                     textOutput(ns("signal_message")),
                                     br(),
                                     br(),
-                                    plotOutput(ns("signal_acquisition_plot_output"))
+                                    simpleDisplayUI(ns("simple_display_module2"))
+                                    #plotOutput(ns("signal_acquisition_plot_output"))
                            )
                            
-               )
+               ), 
+               textInput(ns("GatingSet_tagged_name"), label = "Create GatingSet"),
+               actionButton(ns("action_create_gatingset"), label = "Create GatingSet")
+               
            ),
            box(title = "Results",
                width = NULL, collapsed = F, collapsible = T,
@@ -129,7 +133,25 @@ CleanUI<-function(id){
                            tabPanel("Heatmap",
                                     br(),
                                     br(),
-                                    simpleDisplayUI(ns("simple_display_module"))
+                                    simpleDisplayUI(ns("simple_display_module")),
+                                    box(title = "Display options",
+                                        width = 12,
+                                        collapsible = T,
+                                        collapsed = T,
+                                        
+                                        selectInput(ns("colorpalette_select"), label = "Color option", choices = list("Default (fill Green to Red)" = "Default",
+                                                                                                                      "Viridis" = "D",
+                                                                                                                      "Magma" = "A",
+                                                                                                                      "Inferno" = "B",
+                                                                                                                      "Plasma" = "C")),
+                                        sliderInput(inputId = ns("change_height"), 
+                                                    label = "Change height heatmap representation", 
+                                                    min = 400, 
+                                                    max = 2000, 
+                                                    value = 600, 
+                                                    step = 50)
+                                       
+                                    )
                                     #plotlyOutput(ns("heatmap"), height = "auto")
                            ),
                            tabPanel("Table",
@@ -158,8 +180,12 @@ Clean <- function(input, output, session, rval) {
   
   callModule(simpleDisplay, "simple_display_module", 
              plot_list = heatmap_plot, 
-             params = reactiveValues(use_plotly = TRUE, width = 500, height = 500),
+             params = reactiveValues(use_plotly = TRUE, width = 500, height = "auto"),
              save = FALSE)
+  
+  callModule(simpleDisplay, "simple_display_module2", 
+             plot_list = signal_plot, 
+             params = reactiveValues(width = 500, height = 50, max_height=500))
   
   ### get parameters from GatingSet ##################################################
   
@@ -194,12 +220,12 @@ Clean <- function(input, output, session, rval) {
     updateSelectInput(session = session, inputId = "options_chExclude2", 
                       choices = chNames,
                       select = excludeCh)
-    
+
   })
   
-  ## Set time channel ###############################################################
+  ### Set time channel ###############################################################
   observe({
-    chNames <- choices()$params$name
+    chNames <- choices()$plot_var
     print(chNames)
     pattern <- "^Time|^time"
     timeCh<- grep(pattern, chNames, value = TRUE)
@@ -243,6 +269,7 @@ Clean <- function(input, output, session, rval) {
     validate(need(input$choice_sample_input, "No sample selected"))
     validate(need(all(input$choice_sample_input %in% choices()$sample),
                   "Please select samples"))
+    
     samples <- input$choice_sample_input
     
     timeCh <- input$choice_channel_input
@@ -324,6 +351,111 @@ Clean <- function(input, output, session, rval) {
     
   })
   
+  ### setup the gatingSet tagged (badCells) ##############################################################
+  #'@ImportFrom flowWorkspace gslist_to_gs GatingSetList
+  create_futur_gs <- reactive({
+    
+    df_temp <- NULL
+    
+    fs_temp <- list()
+    
+    df_temp2 <- list()
+    gs <- list()
+    
+    subset_df_clean <- list() 
+    gs_clean <- list()
+    
+    # Search value not in list
+    `%!in%` = Negate(`%in%`)
+    
+    validate(need(input$choice_sample_input, "No sample selected"))
+    validate(need(all(input$choice_sample_input %in% choices()$sample),
+                  "Please select samples"))
+    
+    samples <- choices()$sample
+    # withProgress("Create old GatingSet tagged", {
+      
+      for(i in 1:length(samples)){
+        sample <- samples[i]
+
+        # get a data frame to add sample names
+        df_temp[[i]] <- as.data.frame(exprs(rval$gating_set@data[[sample]]))
+        df_temp[[i]]$name <- paste0(sample)
+  
+        # build a new flowset from the dataframe with the sample names
+        fs <- build_flowset_from_df(df_temp[[i]])
+        fs_temp[[sample]] <- fs
+
+        # # get the data from the flowset and add badCells tag
+        df_temp2[[sample]] <- get_data_gs(GatingSet(fs))
+        df_temp2[[sample]]$badCells <- 0
+        
+        # search bad cells
+        if(df_temp2[[sample]][, "badCells"] %!in% df_temp2[[sample]][res()$dynamic_range[[sample]]$goodCellIDs, "badCells"]){
+          pos <- which(df_temp2[[sample]][,"badCells"]  %!in% df_temp2[[sample]][res()$dynamic_range[[sample]]$goodCellIDs, "badCells"])
+          df_temp2[[sample]][pos, "badCells"] <- 1
+          
+          
+        } else if(df_temp2[[sample]][,"badCells"] %!in% df_temp2[[sample]][res()$flowRateQCList[[sample]]$goodCellIDs,"badCells"]) {
+          pos <- which(df_temp2[[sample]][,"badCells"] %!in% df_temp2[[sample]][res()$flowRateQCList[[sample]]$goodCellIDs, "badCells"])
+          df_temp2[[sample]][pos, "badCells"] <- 1
+          
+          
+        } else if(df_temp2[[sample]][,"badCells"] %!in% df_temp2[[sample]][res()$FlowSignalQCList[[sample]]$goodCellIDs,"badCells"]){
+          pos <- which(df_temp2[[sample]][,"badCells"] %!in% df_temp2[[sample]][res()$FlowSignalQCList[[sample]]$goodCellIDs, "badCells"])
+          df_temp2[[sample]][pos, "badCells"] <- 1
+          
+          
+        }
+        else{
+          df_temp2[[sample]][res()$dynamic_range[[sample]]$bad_lowerIDs, "badCells"] <- 1
+          
+          df_temp2[[sample]][res()$dynamic_range[[sample]]$bad_upperIDs, "badCells"] <- 1
+          
+          df_temp2[[sample]][res()$flowRateQCList[[sample]]$badCellIDs, "badCells"] <- 1
+          
+        }
+
+        # create list of gatingSet from the dataframe tagged
+        gs[[sample]] <- GatingSet(build_flowset_from_df(df_temp2[[sample]]))
+        
+        # get cleaning gating set
+        subset_df_clean[[sample]] <- subset(df_temp2[[sample]], df_temp2[[sample]][,"badCells"] == 0)
+        
+        gs_clean[[sample]] <- GatingSet(build_flowset_from_df(subset_df_clean[[sample]]))
+      }
+
+    gating_set_with_bad_cell <- flowWorkspace::GatingSetList(gs)
+    gating_set_with_only_good_cell <- flowWorkspace::GatingSetList(gs_clean)
+    
+    gs_old_tagged <- flowWorkspace::gslist_to_gs(gating_set_with_bad_cell)
+    gs_good_cells <- flowWorkspace::gslist_to_gs(gating_set_with_only_good_cell)
+    return(
+      list(
+        gs_old_tagged,
+        gs_good_cells
+      )
+    )
+  })
+  
+  ### Build the new gating_set & old gating_set tagged #################################################
+  
+  observeEvent(input$action_create_gatingset,{
+    rval$gs <- create_futur_gs()[[2]]
+    
+    print(rval$gs)
+    params <- colnames(rval$gs)[colnames(rval$gs) %in% names(rval$trans_parameters)]
+
+    rval$gating_set_list[[paste0(input$GatingSet_tagged_name,"_clean")]] <- list(gating_set = rval$gs,
+                                                  parent = rval$gating_set_selected,
+                                                  trans_parameters = rval$trans_parameters[params]
+                                                  )
+    rval$gating_set_selected <- paste0(input$GatingSet_tagged_name,"_clean")
+
+    rval$gating_set <- rval$gs
+    rval$update_gs <- rval$update_gs + 1
+  })
+  
   ### Build result table ###############################################################################
   
   res_table <- eventReactive(res(), {
@@ -335,20 +467,73 @@ Clean <- function(input, output, session, rval) {
       Signal_acquisition <- res()$FlowSignalQCList[[sample]]$Perc_bad_cells$badPerc_cp*100
       Flow_rate <- res()$flowRateQCList[[sample]]$res_fr_QC$badPerc*100
       Dynamic_range <- res()$dynamic_range[[sample]]$badPerc*100
+      
+      Number_flowRate_good_cells <- length(res()$Flow_rate[[sample]]$goodCellIDs)
+      Number_sig_acq_good_cells <- length(res()$FlowSignalQCList[[sample]]$goodCellIDs)
+      
+      Number_margin_good_cells <- length(res()$dynamic_range[[sample]]$goodCellIDs)
+      tot_bad_cells_margin <- length(res()$dynamic_range[[sample]]$bad_lowerIDs) + length(res()$dynamic_range[[sample]]$bad_upperIDs)
+      Number_margin_bad_cells <- tot_bad_cells_margin
+      
       df <- rbind(df, data.frame(Flow_rate, 
                                  Dynamic_range,
-                                 Signal_acquisition )) 
+                                 Signal_acquisition,
+                                 Number_flowRate_good_cells,
+                                 Number_sig_acq_good_cells,
+                                 Number_margin_good_cells,
+                                 Number_margin_bad_cells))
+      
+
       
     }
+    
+    
+    colnames(df)[which(names(df) == "Sample")] <- "Samples names"
+    colnames(df)[which(names(df) == "Signal_acquisition")] <- "Signal acquisition bad cells(%)"
+    colnames(df)[which(names(df) == "Flow_rate")] <- "Flow rate bad cells(%)"
+    colnames(df)[which(names(df) == "Dynamic_range")] <- "Dynamic range bad cells(%)"
+    colnames(df)[which(names(df) == "Number_flowRate_good_cells")] <- "Goods cells flowRate"
+    colnames(df)[which(names(df) == "Number_sig_acq_good_cells")] <- "Signal Acquisition goods cells"
+    colnames(df)[which(names(df) == "Number_margin_good_cells")] <- "Dynamic range goods cells"
+    colnames(df)[which(names(df) == "Number_margin_bad_cells")] <- "Dynamic range bad cells"
+    
     rownames(df) <- input$choice_sample_input
     return(df)
   })
+  ### Display option for heatmap ##########################################################################
+  
+  color_selection <- reactive({
+    if(input$colorpalette_select == "Default"){
+      pal_fill<- scale_fill_gradient(low = "#77ff00", high = "red")
+      return(pal_fill)
+    } 
+    else if(input$colorpalette_select == "A"){
+      pal_fill <- scale_fill_viridis_c(option = "A")
+    }
+    else if(input$colorpalette_select == "B"){
+      scale_fill_viridis_c(option = "B")
+    }
+    else if(input$colorpalette_select == "C"){
+      scale_fill_viridis_c(option = "C")
+    }
+    else{
+      scale_fill_viridis_c(option = "D")
+    }
+  })
+  
+  height_dynamic <- reactive({
+    val <- input$change_height
+    print(val)
+    return(val)
+  })
   
   ### Build heatmap #######################################################################################
-  
+
   heatmap_plot <- reactive({
-    heatmaply(res_table(),colors = viridis::magma(10), limits = c(0,100),
-              Rowv = FALSE, Colv = FALSE)
+    # heatmaply(res_table()[,1:3],colors = viridis::magma(10), limits = c(0,100),
+    #           Rowv = FALSE, Colv = FALSE)
+    heatmaply(res_table()[,1:3],scale_fill_gradient_fun = color_selection(), limits = c(0,100),
+              Rowv = FALSE, Colv = FALSE) %>% layout(height = height_dynamic())
   })
   
   # output$heatmap <- renderPlotly({
@@ -383,14 +568,18 @@ Clean <- function(input, output, session, rval) {
     flow_margin_plot(res()$dynamic_range[[input$select_one_sample]], binSize = input$binSize)
   })
   
-  output$signal_acquisition_plot_output <- renderPlot({
-    # print(FlowSignalQCList$sample[[1]])
+  
+  signal_plot <- reactive({
     flow_signal_plot_auto(res()$FlowSignalQCList[[input$select_one_sample]])
-    
   })
   
+  # output$signal_acquisition_plot_output <- renderPlot({
+  #   # print(FlowSignalQCList$sample[[1]])
+  #   flow_signal_plot_auto(res()$FlowSignalQCList[[input$select_one_sample]])
+  # })
+  
   output$result_output <- DT::renderDataTable({
-    res_table()
+    datatable(res_table(), options = list(scrollX = T, scrollCollapse=TRUE, lengthMenu = c(100,50,20,10)))
   })
   
   return(rval)
