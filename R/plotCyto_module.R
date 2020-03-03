@@ -882,10 +882,12 @@ observe({
 #     plot_params <- reactiveValues()
 # 
 #     observe({
-#       dataDir <- system.file("extdata",package="flowWorkspaceData")
-#       gs <- load_gs(list.files(dataDir, pattern = "gs_bcell_auto",full = TRUE))
+#       #dataDir <- system.file("extdata",package="flowWorkspaceData")
+#       #gs <- load_gs(list.files(dataDir, pattern = "gs_bcell_auto",full = TRUE))
 #        #utils::data("GvHD", package = "flowCore")
 #        #gs <- GatingSet(GvHD)
+#       data("Bcells")
+#       gs <- GatingSet(Bcells)
 #        rval$gating_set <- gs
 #       #plot_params$plot_type <- "histogram"
 #       #plot_params$xvar <- "cluster"

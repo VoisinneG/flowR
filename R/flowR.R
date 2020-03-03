@@ -1389,13 +1389,15 @@ plot_hexagonal <- function(args = list()){
   if(class(data) %in% c("ncdfFlowSet", "flowSet")){
     p <- ggcyto::ggcyto(data,
                         aes_(x = as.name( xvar ), 
-                             y = as.name( yvar ) ) ) 
+                             y = as.name( yvar ) ) )
   }else{
     p <- ggplot(data,
                         aes_(x = as.name( xvar ), 
                              y = as.name( yvar ) ) )
+     
   }
   
+  #p <- p + coord_cartesian()
   p <- p + geom_hex(bins = bins)
   
   if(use_log10_count){
@@ -2342,7 +2344,7 @@ get_plot_data_range <- function(p){
   }
   
   if(!is.null(xvar)){
-    if(class(p$data) %in% c("ncdfFlowSet", "flowset")){
+    if(class(p$data) %in% c("ncdfFlowSet", "flowSet")){
       xvalues <- exprs(p$data[[1]])[,xvar]
     }else{
       xvalues <- p$data[[xvar]]
@@ -2352,7 +2354,7 @@ get_plot_data_range <- function(p){
   }
   
   if(!is.null(yvar)){
-    if(class(p$data) %in% c("ncdfFlowSet", "flowset")){
+    if(class(p$data) %in% c("ncdfFlowSet", "flowSet")){
       yvalues <- exprs(p$data[[1]])[,yvar]
     }else{
       yvalues <- p$data[[yvar]]
@@ -2491,7 +2493,7 @@ format_plot <- function(p,
   if(!is.null(xvar)){
     if(length(xvar) == 1){
       
-      if(class(p$data) %in% c("ncdfFlowSet", "flowset")){
+      if(class(p$data) %in% c("ncdfFlowSet", "flowSet")){
         xvalues <- flowCore::exprs(p$data[[1]])[,xvar]
       }else{
         xvalues <- p$data[[xvar]]
@@ -2522,7 +2524,7 @@ format_plot <- function(p,
   
   if(!is.null(yvar)){
     if(length(yvar) == 1){
-      if(class(p$data) %in% c("ncdfFlowSet", "flowset")){
+      if(class(p$data) %in% c("ncdfFlowSet", "flowSet")){
         yvalues <- flowCore::exprs(p$data[[1]])[,yvar]
       }else{
         yvalues <- p$data[[yvar]]
@@ -2566,7 +2568,7 @@ format_plot <- function(p,
           }
           
           is_cont <- FALSE
-          if(class(p$data) %in% c("ncdfFlowSet", "flowset")){
+          if(class(p$data) %in% c("ncdfFlowSet", "flowSet")){
             if(color_var %in% colnames(flowCore::exprs(p$data[[1]]))){
               is_cont <- is.double(flowCore::exprs(p$data[[1]])[,color_var])
             }

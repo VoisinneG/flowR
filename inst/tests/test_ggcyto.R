@@ -1,5 +1,17 @@
 library(ggcyto)
 library(flowWorkspaceData)
+library("flowAI")
+
+data("Bcells")
+gs <- GatingSet(Bcells)
+
+p <- plot_gs_ggcyto(gs, options=list(axis_limits=list("FSC-A" = c(0,100000))))
+
+p <- plot_gs_ggcyto(gs, plot_args = list(xvar = "FSC-A", yvar = "SSC-A"), 
+                    options = list(axis_limits = list()))
+
+p <- p + scale_x_continuous(limits = c(0,100000)) #+ geom_hex()
+p + coord_cartesian(xlim = c(0,10000), ylim = NULL, default = FALSE)
 
 dataDir <- system.file("extdata",package="flowWorkspaceData")
 gs <- load_gs(list.files(dataDir, pattern = "gs_bcell_auto",full = TRUE))
