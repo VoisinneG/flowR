@@ -77,6 +77,8 @@ patternSelection <- function(input, output, session, choices = reactiveValues())
   
   rval_mod <- reactiveValues()
   
+  ### Render UI ###########################################################################
+  
   output$options <- renderUI({
     ns <- session$ns
     if(input$var_name == 'subset'){
@@ -85,6 +87,8 @@ patternSelection <- function(input, output, session, choices = reactiveValues())
         )
     }
   })
+  
+  ### Default values ######################################################################
   
   observe({
     if(length(names(choices))>0){

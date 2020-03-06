@@ -126,7 +126,9 @@ Clustering <- function(input, output, session, rval) {
   ### Call modules #########################################################################
   
   selected <- callModule(selection, "selection_module", rval)
-  callModule(simpleDisplay, "simple_display_module", plot_list = plot_fSOM, size = 500)
+  callModule(simpleDisplay, "simple_display_module", 
+             plot_list = plot_fSOM, 
+             params = reactiveValues(width = 500, height = 500))
   
   ### Build UI with options ##################################################################
   
@@ -290,9 +292,6 @@ Clustering <- function(input, output, session, rval) {
     
     progress$set(message = "Clustering...", value = 50)
     
-    print("OK1")
-    print(transformation)
-    
     res <- try(get_cluster(df=df_cluster, 
                        yvar = parameters_table()$name[input$variables_table_rows_selected],
                        y_trans = y_trans,
@@ -317,21 +316,19 @@ Clustering <- function(input, output, session, rval) {
         rval_mod$fSOM <- res$fSOM
       }
       
+      df <- df_raw[res$keep, ]
+      for(var in res$var_names){
+        df[[var]] <- res$df[[var]]
+      }
       
-      df <- cbind(df_raw[res$keep, setdiff(names(df_raw), names(res$df))], res$df)
+      rval_mod$gs <- build_gatingset_from_df(df = df, gs_origin = rval$gating_set)
       
-      
-      fs <- build_flowset_from_df(df = df, 
-                                  origin = rval$gating_set@data)
-      
-      rval_mod$gs <- GatingSet(fs)
-      gates <- get_gates_from_gs(rval$gating_set)
-      add_gates_flowCore(gs = rval_mod$gs, gates = gates)
-      rval_mod$gs@compensation <- choices()$compensation
-      rval_mod$gs@transformation <- choices()$transformation
+      print(rval_mod$gs@transformation)
+      params <- colnames(rval_mod$gs)[colnames(rval_mod$gs) %in% names(rval$trans_parameters)]
       
       rval$gating_set_list[[input$gs_name]] <- list(gating_set = rval_mod$gs,
                                                     parent = rval$gating_set_selected,
+                                                    trans_parameters = rval$trans_parameters[params],
                                                     fSOM = res$fSOM)
       rval$gating_set_selected <- input$gs_name
       
@@ -351,6 +348,7 @@ Clustering <- function(input, output, session, rval) {
     
     validate(need(input$clustering_method == "FlowSOM", "No plot to display"))
     validate(need(rval_mod$fSOM, "No plot to display"))
+    validate(need("scale_node_size" %in% names(input), "UI not rendered"))
     
     fSOM <- rval_mod$fSOM
     

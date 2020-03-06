@@ -13,8 +13,8 @@ simpleDisplay(
   session,
   plot_list,
   params = reactiveValues(),
-  nrow = 1,
-  size = 300
+  save = TRUE,
+  multirow = FALSE
 )
 }
 \arguments{
