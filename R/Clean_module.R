@@ -820,27 +820,27 @@ Clean <- function(input, output, session, rval) {
 # library(plotly)
 # library(heatmaply)
 
-if (interactive()){
-
-  ui <- dashboardPage(
-    dashboardHeader(title = "flowAI"),
-    sidebar = dashboardSidebar(disable = TRUE),
-    body = dashboardBody(
-      CleanUI("module")
-    )
-  )
-
-  server <- function(input, output, session) {
-    rval <- reactiveValues()
-    observe({
-      # utils::data("GvHD", package = "flowCore")
-      # rval$gating_set <- GatingSet(GvHD)
-      utils::data("Bcells", package = "flowAI")
-      rval$gating_set <- flowWorkspace::GatingSet(Bcells)
-    })
-    res <- callModule(Clean, "module", rval = rval)
-  }
-
-  shinyApp(ui, server)
-
-}
+# if (interactive()){
+# 
+#   ui <- dashboardPage(
+#     dashboardHeader(title = "flowAI"),
+#     sidebar = dashboardSidebar(disable = TRUE),
+#     body = dashboardBody(
+#       CleanUI("module")
+#     )
+#   )
+# 
+#   server <- function(input, output, session) {
+#     rval <- reactiveValues()
+#     observe({
+#       # utils::data("GvHD", package = "flowCore")
+#       # rval$gating_set <- GatingSet(GvHD)
+#       utils::data("Bcells", package = "flowAI")
+#       rval$gating_set <- flowWorkspace::GatingSet(Bcells)
+#     })
+#     res <- callModule(Clean, "module", rval = rval)
+#   }
+# 
+#   shinyApp(ui, server)
+# 
+# }
