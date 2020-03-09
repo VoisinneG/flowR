@@ -2,7 +2,6 @@
 #' @import shiny
 #' @import DT
 #' @import plotly
-#' @import shinyalert
 #' @import shinyjs
 
 CleanUI<-function(id){
@@ -12,7 +11,6 @@ CleanUI<-function(id){
   fluidRow(
     br(),
     shinyjs::useShinyjs(),
-    shinyalert::useShinyalert(),
     column(4,
            box(title = "Cleaning selection", width = NULL,
                checkboxGroupInput(ns("groupButton"), label = "Choose type of cleaning",
@@ -198,7 +196,7 @@ Clean <- function(input, output, session, rval) {
       need(input$alpha != "", "choose an ESD between 0-1"),
       need(is.numeric(input$alpha), "Numeric value only")
              )
-    print(is.na(input$alpha))
+    # print(is.na(input$alpha))
     if(!is.null(input$alpha) && input$alpha>=0 && input$alpha<=1 && is.numeric(input$alpha)){
       input$alpha
       shinyjs::enable(id = "clean_selected_sample_input")
@@ -634,7 +632,7 @@ Clean <- function(input, output, session, rval) {
       # show modal
     } else {
       old_gs <- gs_list[[1]]
-      print(rval$gating_set_selected)
+      # print(rval$gating_set_selected)
       params <- colnames(old_gs)[colnames(old_gs) %in% names(rval$trans_parameters)]
 
 
@@ -670,23 +668,9 @@ Clean <- function(input, output, session, rval) {
     
     samples <- input$choice_sample_input
     
-    # Signal_acquisition <- lapply(1:length(samples), function(sample){res()$FlowSignalQCList[[sample]]$Perc_bad_cells$badPerc_cp*100})
-    # Flow_rate <- lapply(1:length(samples), function(sample){res()$flowRateQCList[[sample]]$res_fr_QC$badPerc*100})
-    # 
-    # 
-    # Number_flowRate_good_cells <- lapply(1:length(samples), function(sample){length(res()$Flow_rate[[sample]]$goodCellIDs)})
-    # Number_sig_acq_good_cells <- lapply(1:length(samples), function(sample){length(res()$FlowSignalQCList[[sample]]$goodCellIDs)})
-    # 
-    # Dynamic_range <- lapply(1:length(samples), function(sample){res()$dynamic_range[[sample]]$badPerc*100})
-    # Number_margin_good_cells <- lapply(1:length(samples), function(sample){length(res()$dynamic_range[[sample]]$goodCellIDs)})
-    # tot_bad_cells_margin <-  lapply(1:length(samples), function(sample){length(res()$dynamic_range[[sample]]$bad_lowerIDs) + length(res()$dynamic_range[[sample]]$bad_upperIDs)})
-    # Number_margin_bad_cells <- tot_bad_cells_margin
-    
-    # print(input$groupButton)
-    
     for(i in  1:length(samples)){
       sample <- samples[i]
-      print(res()$FlowSignalQCList[[sample]]$Perc_bad_cells)
+      # print(res()$FlowSignalQCList[[sample]]$Perc_bad_cells)
       Signal_acquisition <- res()$FlowSignalQCList[[sample]]$Perc_bad_cells$badPerc_cp*100
       Number_sig_acq_good_cells <- length(res()$FlowSignalQCList[[sample]]$goodCellIDs)
       
@@ -832,10 +816,10 @@ Clean <- function(input, output, session, rval) {
 #   server <- function(input, output, session) {
 #     rval <- reactiveValues()
 #     observe({
-#       # utils::data("GvHD", package = "flowCore")
-#       # rval$gating_set <- GatingSet(GvHD)
-#       utils::data("Bcells", package = "flowAI")
-#       rval$gating_set <- flowWorkspace::GatingSet(Bcells)
+#       utils::data("GvHD", package = "flowCore")
+#       rval$gating_set <- GatingSet(GvHD)
+#       # utils::data("Bcells", package = "flowAI")
+#       # rval$gating_set <- flowWorkspace::GatingSet(Bcells)
 #     })
 #     res <- callModule(Clean, "module", rval = rval)
 #   }
