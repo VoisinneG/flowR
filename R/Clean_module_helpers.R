@@ -104,8 +104,7 @@ flow_rate_check <- function(flowRateData, lowerRateThres, upperRateThres,
 }
 
 
-#' @import plyr ddply .
-#' @import flowAI
+#' @importFrom plyr ddply .
 # A flowFrame object is splitted in bins with equal number of events
 # and for each bin the median is calculated.
 #
@@ -353,6 +352,7 @@ flow_margin_plot <- function(FlowMarginData, binSize = 500) {
 
 
 ## create new flowFrame with the parameter indicating good and bad cells
+#' @importFrom flowCore description
 addQC <- function(QCvector, sub_exprs, params, keyval){
   
   rs <- attr(sub_exprs, "ranges")
@@ -549,6 +549,7 @@ flow_rate_check_auto <- function(x, FlowRateData, ...) {
 
 # # Plot frequency values for a list y, containing the outputs from
 # # the function flow_rate_check_auto
+#' @import ggplot2
 flow_rate_plot_auto <- function(FlowRateQC) {
   
   second_fraction <- FlowRateQC$res_fr_QC$second_fraction
@@ -575,7 +576,7 @@ flow_rate_plot_auto <- function(FlowRateQC) {
 
 # # Retrieves the number of events for each FCS file and creates
 # # a bar plot.
-# #
+#'@importFrom flowCore fsApply
 flow_set_qc <- function(set){
   if (!is(set, "flowSet"))
     stop("'set' needs to be of class 'flowSet'")
@@ -598,9 +599,10 @@ flow_set_plot <- function(N_cell_set, area){
     )
 }
 
-#' @importFrom changepoint cpt.meanvar
 # Detection of shifts in the median intensity signal detected
 # by the laser of the flow cytometry over time
+#' @importFrom flowCore parameters keyword exprs flowFrame
+#' @importFrom changepoint cpt.meanvar
 flow_signal_check_auto <- function(x, FlowSignalData, ChannelExclude = NULL,
                               pen_valueFS = pen_valueFS, maxSegmentFS = maxSegmentFS, outlier_remove = FALSE) {
   
@@ -710,11 +712,11 @@ flow_signal_check_auto <- function(x, FlowSignalData, ChannelExclude = NULL,
   
   badPerc_tot <- round(1 - length(goodCellIDs)/nrow(fs_cellBinID),4)
   
-  params <- parameters(x)
-  keyval <- keyword(x)
-  sub_exprs <- exprs(x)
+  params <- flowCore::parameters(x)
+  keyval <- flowCore::keyword(x)
+  sub_exprs <- flowCore::exprs(x)
   sub_exprs <- sub_exprs[goodCellIDs, ]  ## check if the Id Correspond!
-  newx <- flowFrame(exprs = sub_exprs, parameters = params, description = keyval)
+  newx <- flowCore::flowFrame(exprs = sub_exprs, parameters = params, description = keyval)
   
   return(list(FSnewFCS = newx, exprsBin = FlowSignalData$exprsBin, Perc_bad_cells = data.frame(badPerc_tot,badPerc_cp, badPerc_out),
               goodCellIDs = goodCellIDs, tab_cpt = tab_cpt, ch_no_cpt =ch_no_cpt,
@@ -723,12 +725,6 @@ flow_signal_check_auto <- function(x, FlowSignalData, ChannelExclude = NULL,
 
 
 
-# Plot the flourescence intensity for each channel of a flowFrame
-# over time, highlighting the wider segment that do not show shifts
-# of the median intensity
-#' @param exprsBin give the exprsBin object from FlowSignalData
-#' @param segm give the segm object from FlowSignalQC
-#' @param FS_out give the FS_out object from FlowSignalQC
 #' @import ggplot2
 flow_signal_plot_auto <- function(FlowSignalQC) {
   

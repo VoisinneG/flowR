@@ -595,6 +595,7 @@ get_all_ancestors <- function(named_list, names){
   
 }
 
+#' Get all gate names from a GatingHierarchy
 #' @param gh a GatingHierarchy
 #' @importFrom flowWorkspace gs_pop_get_children
 gh_get_gate_names <- function(gh){

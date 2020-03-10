@@ -1,9 +1,8 @@
 #' Identify and remove anomalies
 #' @param id shiny id
 #' @import shiny
-#' @import DT
-#' @import plotly
-#' @import shinyjs
+#' @importFrom DT dataTableOutput
+#' @importFrom shinyjs useShinyjs
 #' @export
 #' @examples 
 #' \dontrun{
@@ -183,7 +182,7 @@ CleanUI<-function(id){
                            tabPanel("Table",
                                     br(),
                                     br(),
-                                    DT::dataTableOutput(ns("result_output"))
+                                    DT::DTOutput(ns("result_output"))
                            )
                )
            )
@@ -199,7 +198,7 @@ CleanUI<-function(id){
 #' @importFrom data.table setDT
 #' @importFrom plotly renderPlotly
 #' @importFrom heatmaply heatmaply
-#' @import flowAI
+#' @importFrom shinyjs enable disable
 #' @export
 Clean <- function(input, output, session, rval) {
   
