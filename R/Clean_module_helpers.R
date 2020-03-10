@@ -104,7 +104,7 @@ flow_rate_check <- function(flowRateData, lowerRateThres, upperRateThres,
 }
 
 
-#' @importFrom plyr ddply .
+#' @importFrom plyr ddply colwise .
 # A flowFrame object is splitted in bins with equal number of events
 # and for each bin the median is calculated.
 #
@@ -144,7 +144,7 @@ flow_signal_bin <- function(x, channels = NULL, binSize = 500,
   stopifnot(length(cf) == lenSec)
   tmpx <- split(seconds, cf)
   xx2 <- sapply(tmpx, mean)  # mean of each time bin  (x axis)
-  yy2 <- as.matrix(plyr::ddply(as.data.frame(yy), plyr::.(cf), colwise(median)))[, -1]
+  yy2 <- as.matrix(plyr::ddply(as.data.frame(yy), plyr::.(cf), plyr::colwise(median)))[, -1]
   
   return(list(exprsBin = cbind(timeSec = xx2, yy2), cellBinID = data.frame(cellID = idx, binID = cf),
               bins = length(unique(cf)), binSize = binSize))
@@ -177,7 +177,7 @@ flow_signal_plot <- function(flowSignalData, lowerBinThres, upperBinThres) {
   return(FS_graph)
 }
 
-
+#' @importFrom flowCore parameters keyword exprs flowFrame
 flow_signal_check <- function(flowSignalData, lowerBinThres, upperBinThres) {
   
   exprsBin <- flowSignalData$exprsBin
@@ -289,11 +289,11 @@ flow_margin_check <- function(x,  ChannelExclude = NULL,
   
   cat(paste0(100 * badPerc, "% of anomalous cells detected in the dynamic range check. \n"))
   
-  params <- parameters(x)
-  keyval <- keyword(x)
-  sub_exprs <- exprs(x)
+  params <- flowCore::parameters(x)
+  keyval <- flowCore::keyword(x)
+  sub_exprs <- flowCore::exprs(x)
   sub_exprs <- sub_exprs[goodCellIDs, ]
-  newx <- flowFrame(exprs = sub_exprs, parameters = params,
+  newx <- flowCore::flowFrame(exprs = sub_exprs, parameters = params,
                     description = keyval)
   
   return(list(FMnewFCS = newx, goodCellIDs = goodCellIDs,
@@ -601,6 +601,7 @@ flow_set_plot <- function(N_cell_set, area){
 
 # Detection of shifts in the median intensity signal detected
 # by the laser of the flow cytometry over time
+#' @importFrom plyr ldply
 #' @importFrom flowCore parameters keyword exprs flowFrame
 #' @importFrom changepoint cpt.meanvar
 flow_signal_check_auto <- function(x, FlowSignalData, ChannelExclude = NULL,
@@ -691,7 +692,7 @@ flow_signal_check_auto <- function(x, FlowSignalData, ChannelExclude = NULL,
     ch_no_cpt <- nam_cpt[zero_cpt]
     
     max_n_cpt <- max(sapply(ch_cpt, length))
-    tab_cpt <- ldply(ch_cpt, function(x) c(x, rep(NA, max_n_cpt - length(x))),
+    tab_cpt <- plyr::ldply(ch_cpt, function(x) c(x, rep(NA, max_n_cpt - length(x))),
                      .id = NULL)
     rownames(tab_cpt) <- nam_cpt[nozero_cpt]
     tab_cpt <- as.matrix(tab_cpt)

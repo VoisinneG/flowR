@@ -841,10 +841,10 @@ Clean <- function(input, output, session, rval) {
 #   server <- function(input, output, session) {
 #     rval <- reactiveValues()
 #     observe({
-#       utils::data("GvHD", package = "flowCore")
-#       rval$gating_set <- GatingSet(GvHD)
-#       # utils::data("Bcells", package = "flowAI")
-#       # rval$gating_set <- flowWorkspace::GatingSet(Bcells)
+#       #utils::data("GvHD", package = "flowCore")
+#       #rval$gating_set <- GatingSet(GvHD)
+#        utils::data("Bcells", package = "flowAI")
+#        rval$gating_set <- flowWorkspace::GatingSet(Bcells)
 #     })
 #     res <- callModule(Clean, "module", rval = rval)
 #   }

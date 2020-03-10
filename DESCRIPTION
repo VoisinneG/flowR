@@ -46,6 +46,7 @@ Imports:
   htmlwidgets,
   FlowSOM,
   mFilter,
+  plyr,
   changepoint,
   pryr
 LazyData: TRUE
