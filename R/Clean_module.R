@@ -1,9 +1,34 @@
+#' Identify and remove anomalies
 #' @param id shiny id
 #' @import shiny
 #' @import DT
 #' @import plotly
 #' @import shinyjs
-
+#' @export
+#' @examples 
+#' \dontrun{
+#' if (interactive()){
+#' 
+#'   ui <- dashboardPage(
+#'     dashboardHeader(title = "flowAI"),
+#'     sidebar = dashboardSidebar(disable = TRUE),
+#'     body = dashboardBody(
+#'       CleanUI("module")
+#'     )
+#'   )
+#' 
+#'   server <- function(input, output, session) {
+#'     rval <- reactiveValues()
+#'     observe({
+#'       utils::data("Bcells", package = "flowAI")
+#'       rval$gating_set <- flowWorkspace::GatingSet(Bcells)
+#'     })
+#'     res <- callModule(Clean, "module", rval = rval)
+#'   }
+#'   
+#'   shinyApp(ui, server)
+#' 
+#' }}
 CleanUI<-function(id){
   
   ns <- NS(id)
@@ -175,6 +200,7 @@ CleanUI<-function(id){
 #' @importFrom plotly renderPlotly
 #' @importFrom heatmaply heatmaply
 #' @import flowAI
+#' @export
 Clean <- function(input, output, session, rval) {
   
   ### Call modules ###################################################################
@@ -802,7 +828,7 @@ Clean <- function(input, output, session, rval) {
 # library(flowCore)
 # library(plotly)
 # library(heatmaply)
-
+#
 # if (interactive()){
 # 
 #   ui <- dashboardPage(
