@@ -833,33 +833,43 @@ Clean <- function(input, output, session, rval) {
   heatmap_plot <- reactive({
       options(warn = -1) 
     validate(need(!is.null(res()), "Please clean your data with the correct parameters"))
-    
-    heatmaply(res_table()[,1:3],scale_fill_gradient_fun = color_selection(), limits = c(0,100), dendrogram = F,
-              Rowv = FALSE, Colv = FALSE)
+    print(res_table()[,1])
+    # print(length(input$groupButton))
+    if(length(input$groupButton) > 1){
+      heatmaply(res_table()[,1:length(input$groupButton)],scale_fill_gradient_fun = color_selection(), limits = c(0,100), dendrogram = F,
+                Rowv = FALSE, Colv = FALSE)
+    } else {
+      
+      heatmaply(res_table()[1],scale_fill_gradient_fun = color_selection(), limits = c(0,100), dendrogram = F,
+                Rowv = FALSE, Colv = FALSE)
+    }
   })
 
   ### Display messages on top of QC plots ##################################################################
   
   output$fr_message <- renderText({
-    validate(need(
-      !is.null(res()), ""
-    ))
+    validate(
+      need(!is.null(res()), ""),
+      need(length(res()$flowRateQCList) != 0, "")
+      )
     perc <- res()$flowRateQCList[[input$select_one_sample]]$res_fr_QC$badPerc*100
     paste(perc,"% of anomalous cells detected in the flow rate check")
   })
   
   output$dynamic_message <- renderText({
-    validate(need(
-      !is.null(res()), ""
-    ))
+    validate(
+      need(!is.null(res()), ""),
+      need(length(res()$dynamic_range) != 0, "")
+      )
     perc <- res()$dynamic_range[[input$select_one_sample]]$badPerc*100
     paste(perc,"% of anomalous cells detected in the dynamic range check")
   })
   
   output$signal_message <- renderText({
-    validate(need(
-      !is.null(res()), ""
-    ))
+    validate(
+      need(!is.null(res()), ""),
+      need(length(res()$FlowSignalQCList) != 0, "")
+      )
     perc <- res()$FlowSignalQCList[[input$select_one_sample]]$Perc_bad_cells$badPerc_cp*100
     paste(perc,"% of anomalous cells detected in signal acquisition check")
   })
@@ -867,23 +877,27 @@ Clean <- function(input, output, session, rval) {
   ### Build QC plots #######################################################################################
   
   output$flow_rate_plot_output <- renderPlot({
-    validate(need(
-      !is.null(res()), "Need to clean the data with the correct option"
-    ))
+    validate(
+      need(!is.null(res()), "Need to clean the data with the correct option"),
+      need(length(res()$flowRateQCList) != 0, "Need to select flow rate cleaning to visualize plot")
+      )
       flow_rate_plot_auto(res()$flowRateQCList[[input$select_one_sample]])
   })
 
   output$dynamic_plot_output <-renderPlot({
-    validate(need(
-      !is.null(res()), "Need to clean the data with the correct option"
-    ))
+    validate(
+      need(!is.null(res()), "Need to clean the data with the correct option"),
+      need(length(res()$dynamic_range) != 0, "Need to select dynamic range cleaning to visualize plot")
+      )
+      
     flow_margin_plot(res()$dynamic_range[[input$select_one_sample]], binSize = input$binSize)
   })
   
   signal_plot <- reactive({
-    validate(need(
-      !is.null(res()), "Need to clean the data with the correct option"
-    ))
+    validate(
+      need(!is.null(res()), "Need to clean the data with the correct option"),
+      need(length(res()$FlowSignalQCList) != 0, "Need to select signal acquisition cleanin to visualize plot")
+      )
     flow_signal_plot_auto(res()$FlowSignalQCList[[input$select_one_sample]])
   })
 
@@ -909,27 +923,27 @@ Clean <- function(input, output, session, rval) {
 # library(plotly)
 # library(heatmaply)
 #
-# if (interactive()){
-# 
-#   ui <- dashboardPage(
-#     dashboardHeader(title = "flowAI"),
-#     sidebar = dashboardSidebar(disable = TRUE),
-#     body = dashboardBody(
-#       CleanUI("module")
-#     )
-#   )
-# 
-#   server <- function(input, output, session) {
-#     rval <- reactiveValues()
-#     observe({
-#       # utils::data("GvHD", package = "flowCore")
-#       # rval$gating_set <- GatingSet(GvHD)
-#       utils::data("Bcells", package = "flowAI")
-#       rval$gating_set <- flowWorkspace::GatingSet(Bcells)
-#     })
-#     res <- callModule(Clean, "module", rval = rval)
-#   }
-# 
-#   shinyApp(ui, server)
-# 
-# }
+if (interactive()){
+
+  ui <- dashboardPage(
+    dashboardHeader(title = "flowAI"),
+    sidebar = dashboardSidebar(disable = TRUE),
+    body = dashboardBody(
+      CleanUI("module")
+    )
+  )
+
+  server <- function(input, output, session) {
+    rval <- reactiveValues()
+    observe({
+      # utils::data("GvHD", package = "flowCore")
+      # rval$gating_set <- GatingSet(GvHD)
+      utils::data("Bcells", package = "flowAI")
+      rval$gating_set <- flowWorkspace::GatingSet(Bcells)
+    })
+    res <- callModule(Clean, "module", rval = rval)
+  }
+
+  shinyApp(ui, server)
+
+}
