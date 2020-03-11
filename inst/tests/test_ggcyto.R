@@ -4,8 +4,60 @@ library("flowAI")
 
 data("Bcells")
 gs <- GatingSet(Bcells)
+pdata_gs <- pData(gs)
+pdata_gs$name <- row.names(pdata_gs)
+pData(gs) <- pdata_gs
+fs <- gs@data
+
+data("GvHD")
+gs <- GatingSet(GvHD)
+
+# pb with scaling of ggcyto plots
+p <- ggcyto::ggcyto(data = gs@data[1:3], aes(x=`FSC-H`, y=`SSC-A`)) + geom_hexagonal()
+
+p <- ggcyto::ggcyto(data = gs@data[1:10], aes(x=`FSC-H`, y=`SSC-H`, color = `FSC-A`)) + geom_point()
+#p <- format_plot(p=p, options = list(axis_limits=list("FSC-A" = c(0,100000))) )
+#p + scale_x_logicle(limits=c(0,100000))
+#p + scale_x_continuous(limits=c(0,100000))
+
+p <- ggcyto::ggcyto(data = gs@data[1:3], aes(x=`FSC-A`, y=`SSC-A`))
+p <- p + geom_hex()
+
+p <- call_plot_function(data = gs@data[1:3], plot_type = "hexagonal", plot_args = list(xvar = "FSC-A", yvar = "SSC-A"))
+p <- as.ggplot(p)
+p <- p + facet_wrap(NULL)
+p <- format_plot(p=p, options = list(axis_limits=list("FSC-A" = c(0,100000)),
+                                     transformation = list("FSC-A" = logicle_trans())) )
+p
+
+p <- p + facet_wrap(~Patient)
+
+samp <- read.FCS(system.file("extdata","0877408774.B08", package="flowCore"))
+rectGate <- rectangleGate(filterId="nonDebris", list("FSC-H"=c(200,Inf), "SSC-H"=NULL) )
+fr <- filter(samp,rectGate)
+class(fr)
+summary(fr)
+
+data(GvHD)
+foo <- GvHD[1:3]
+fr2 <- filter(foo, rectGate)
+class(fr2)
+summary(fr2)
+
+fs <- Subset(foo, rectGate)
+
+p$coordinates$limits$x <- c("min"=0, "max" = 100000)
+
+p <- p + scale_x_continuous(trans = logicle_trans())
+p <- p + scale_y_continuous(trans = logicle_trans(), limits = c(0, 100000))
+
+p + coord_trans(limx = c(0,100000), x = "logicle")
+
+
 
 p <- plot_gs_ggcyto(gs, options=list(axis_limits=list("FSC-A" = c(0,100000))))
+
+p <- plot_gs_ggcyto(gs, plot_args = list(xvar = "FSC-A", yvar = "SSC-A"))
 
 p <- plot_gs_ggcyto(gs, plot_args = list(xvar = "FSC-A", yvar = "SSC-A"), 
                     options = list(axis_limits = list()))

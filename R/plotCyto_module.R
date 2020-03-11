@@ -68,7 +68,7 @@ plotCytoUI <- function(id) {
 #'   \item{params}{plot parameters}
 #' }
 #' @importFrom flowWorkspace gs_pop_get_children gs_pop_get_data sampleNames
-#' @importFrom flowCore parameters compensate
+#' @importFrom flowCore parameters compensate rectangleGate Subset
 #' @import shiny
 #' @import ggcyto
 #' @export
@@ -98,7 +98,7 @@ plotCyto <- function(input, output, session,
                               norm_density = TRUE,
                               smooth = FALSE,
                               ridges = FALSE,
-                              yridges_var = "subset",
+                              yridges_var = "name",
                               bins = 50,
                               alpha = 0.3,
                               size = 0.3,
@@ -211,7 +211,7 @@ observe({
     
     x[["ridges"]] <- checkboxInput(ns("ridges"), "ridges", value = rval_plot[["ridges"]])
     
-    x[["yridges_var"]] <- selectizeInput(ns("yridges_var"), 
+    x[["yridges_var"]] <- selectizeInput(ns("yridges_var"),
                                          multiple =FALSE,
                                          label = "y ridges variable", 
                                          choices = c("subset", choices()$meta_var), 
@@ -280,12 +280,18 @@ observe({
       rval_plot$auto_focus <- TRUE
     }
     
+                  
     color_var_choices <- switch(rval_input$plot_type,
                                 "dots" = c("none", "subset", choices()$meta_var, 
                                            choices()$plot_var),
                                 c("none", "subset", 
                                   choices()$meta_var, 
                                   choices()$plot_var[choices()$params$vartype != "numeric"]))
+    
+    if(use_ggcyto){
+      color_var_choices <-  c("none",  choices()$meta_var)
+    }
+    
     
     if(is.null(rval_plot[["color_var"]])){
       rval_plot[["color_var"]] <- color_var_choices[1]
@@ -318,30 +324,42 @@ observe({
                    choices = choices()$plot_var,
                    selected = rval_plot[["yvar"]])
     
-    rval_mod$plot_variables[["group_var"]] <- selectizeInput(ns("group_var"), 
-                                       multiple = !simple_plot,
-                                       label = "group variable",
-                                       choices = c("none", "subset", 
-                                                   choices()$meta_var,
-                                                   choices()$plot_var[choices()$params$vartype != "numeric"]),
-                                       selected = rval_plot[["group_var"]])
-    
-    rval_mod$plot_variables[["facet_var"]] <- selectizeInput(ns("facet_var"),
-                                       multiple =TRUE,
-                                       label = "facet variables",
-                                       choices = c("subset", 
-                                                   choices()$meta_var, 
-                                                   choices()$plot_var[choices()$params$vartype != "numeric"]),
-                                       selected = rval_plot[["facet_var"]]
-    )
+    if(use_ggcyto){
+      rval_mod$plot_variables[["group_var"]] <- selectizeInput(ns("group_var"),
+                                                               multiple = !simple_plot,
+                                                               label = "group variable",
+                                                               choices = c("none",  choices()$meta_var),
+                                                               selected = rval_plot[["group_var"]])
+
+      rval_mod$plot_variables[["facet_var"]] <- selectizeInput(ns("facet_var"),
+                                                               multiple =TRUE,
+                                                               label = "facet variables",
+                                                               choices = c(choices()$meta_var),
+                                                               selected = rval_plot[["facet_var"]])
+    }else{
+      rval_mod$plot_variables[["group_var"]] <- selectizeInput(ns("group_var"), 
+                                                               multiple = !simple_plot,
+                                                               label = "group variable",
+                                                               choices = c("none", "subset", 
+                                                                           choices()$meta_var,
+                                                                           choices()$plot_var[choices()$params$vartype != "numeric"]),
+                                                               selected = rval_plot[["group_var"]])
+      
+      rval_mod$plot_variables[["facet_var"]] <- selectizeInput(ns("facet_var"),
+                                                               multiple =TRUE,
+                                                               label = "facet variables",
+                                                               choices = c("subset", 
+                                                                           choices()$meta_var, 
+                                                                           choices()$plot_var[choices()$params$vartype != "numeric"]),
+                                                               selected = rval_plot[["facet_var"]])
+    }
     
     split_choices <- c("xvar", "yvar", "color_var")
     names(split_choices) <- c("x variable", "y variable", "color variable")
     rval_mod$plot_variables[["split_var"]] <- selectInput(ns("split_var"),
                                          label = "select variable used to split plots",
                                          choices = split_choices,
-                                         selected = rval_plot[["split_var"]]
-    )
+                                         selected = rval_plot[["split_var"]])
     
   })
   
@@ -647,6 +665,7 @@ observe({
         if(!is.null(rval_input$plot_type)){
           if(rval_input$plot_type != "histogram"){
             validate(need(rval_input$yvar %in% choices()$plot_var, "Please select y variable"))
+            validate(need(all(!rval_input$yvar %in% rval_input$xvar), "Please select different x and y variables"))
           }
         }
     
@@ -662,6 +681,41 @@ observe({
     fs <- gs_get_fs_subset(gs = rval$gating_set[rval_input$sample], 
                            spill =spill,
                            subset = rval_input$subset)
+    
+    
+    
+    # gate data based on plot limits
+    if(!rval_input$auto_focus){
+      
+      gate_var <- NULL
+      if(!is.null(choices()$axis_limits[[rval_input$xvar]])){
+        gate_var <- rval_input$xvar
+      }
+      
+      if(!is.null(rval_input$yvar)){
+        if(!is.null(choices()$axis_limits[[rval_input$yvar]])){
+          gate_var <- c(gate_var, rval_input$yvar)
+        }
+      }
+      
+      if(length(gate_var) > 0 ){
+        rectGate <- flowCore::rectangleGate(filterId="focus", choices()$axis_limits[gate_var])
+        fs <- flowCore::Subset(fs, rectGate)
+      }
+      # xlim <- choices()$axis_limits[[rval_input$xvar]]
+      # boundray_list[[]]
+      # boundaries <- matrix(xlim, nrow = 1)
+      # rownames(boundaries) <- rval_input$xvar
+      # colnames(boundaries) <- c("min", "max")
+      # if(!is.null(rval_input$yvar)){
+      #   ylim <- choices()$axis_limits[[rval_input$yvar]]
+      #   boundaries <- matrix(c(xlim, ylim), nrow = 2)
+      #   rownames(boundaries) <- c(rval_input$xvar, input$yvar)
+      #   colnames(boundaries) <- c("min", "max")
+      # }
+      # gate_focus <- flowCore::rectangleGate(.gate = boundaries)
+      
+    }
     
     plot_args <- reactiveValuesToList(rval_input)
     
@@ -692,11 +746,12 @@ observe({
   ### Format plot ##################################################################################
 
   plot_format <- eventReactive( c(params_update_plot_format(), 
-                                  plot_raw(), 
-                                  plot_raw_ggcyto()), {
+                                  draw_gates()), {
     
     print("format")
     
+    plist <- draw_gates()
+      
     axis_labels <- choices()$labels
     
     transformation <- choices()$transformation
@@ -715,15 +770,17 @@ observe({
     }
     
     if(use_ggcyto){
-      #print("use_ggcyto")
-      plist <- plot_raw_ggcyto()
-    }else{
-      plist <- plot_raw()
+      plist <- lapply( plist, function(p){
+        print(class(p))
+        p <- as.ggplot(p)
+        print(class(p))
+        return(p)} )
     }
    
     
     plist <- lapply( plist,
                      function(p){
+                       
                        if(length(rval_input$subset)==1){
                          options$title <- rval_input$subset
                        }
@@ -736,18 +793,26 @@ observe({
                          data_range <- get_plot_data_range(p)
                          options$axis_limits[names(data_range)] <- data_range
                        }
-                       format_plot(p,
+                       
+                       #print(options$axis_limits)
+                       print("OK1")
+                       p <- format_plot(p,
                                    options = options)
+                       print("OK2")
+                       p
                      })
    return(plist)
   })
   
   ### Add gates corresponding to plot coordinates ##################################################
   
-  draw_gates <- eventReactive(plot_format(), {
+  draw_gates <- eventReactive(c(plot_raw(), 
+                              plot_raw_ggcyto()), {
     
     if(!use_ggcyto){
-      return(plot_format())
+      return(plot_raw())
+    }else{
+      plist <- plot_raw_ggcyto()
     }
     
     validate(need(rval_input$subset, "Please select subsets"))
@@ -770,7 +835,7 @@ observe({
       }
     }
     
-    plist <- lapply( plot_format(),
+    plist <- lapply( plist,
                      function(p){
                        if(!is.null(gate)){
                          for(gate_name in setdiff(gate, "root")){
@@ -791,9 +856,7 @@ observe({
   ### Add polygon layer ############################################################################
 
   draw_polygon <- reactive({
-    
-    
-    
+
     print("poly")
 
     # gate <- NULL
@@ -808,26 +871,26 @@ observe({
     
     #print(polygon)
     
-    plist <- lapply( draw_gates(),
+    plist <- lapply( plot_format(),
                      function(p){
                        
                        
                        
-                       #print("OK")
+                       print("OK")
                        #print(polygon$x)
-                       if(use_ggcyto){
-                         p <- as.ggplot(p)
+                       #if(use_ggcyto){
+                        # p <- as.ggplot(p)
                          if(!is.null(polygon$x)){
                            p <- add_polygon_layer(p, polygon = polygon)
                          }
-                       }
+                       #}
                        # if(!is.null(gate)){
                        #   for(gate_name in setdiff(gate, "root")){
                        #     g <- choices()$gates[[gate_name]]$gate
                        #     p <- add_gate(p, g)
                        #   }
                        # }
-                       #print("OK")
+                       print("OK")
                        if(rval_input$zoom_on_data_points){
                          data_range <- get_plot_data_range(p)
                          xlim <- NULL
@@ -838,14 +901,14 @@ observe({
                          }
                          p <- p + coord_cartesian(xlim = xlim, ylim = ylim, expand = TRUE)
                        }
-                       #print("OK")
+                       print("OK")
                        return(p)
                      })
     
     
   })
   
-  return( list(plot = draw_polygon, params = rval_input) )
+  return( list(plot =  draw_polygon, params = rval_input) )
   
 }
 

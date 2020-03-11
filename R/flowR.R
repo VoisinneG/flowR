@@ -1346,11 +1346,19 @@ get_plot_data <- function(gs,
 #' The plot function corresponding to a given plot type must have the same name 
 #' as the plot type with the preffix 'plot_' (for instance 'plot_hexagonal()')
 #' @param plot_args list of arguments passed to the plot function
+#' @importFrom flowWorkspace pData
 #' @return a plot (plot class depends on the plot function)
 call_plot_function <- function(data,
                          plot_type,
                          plot_args = list()
                          ){
+  # Make sure metadata column 'name' has the correct values 
+  #(not the case in the flowAI::Bcells dataset)
+  if(class(data) %in% c("ncdfFlowSet", "flowSet")){
+    pdata <- flowWorkspace::pData(data)
+    pdata$name <- row.names(pdata)
+    flowWorkspace::pData(data) <- pdata
+  }
   
   p <- do.call(paste("plot", plot_type, sep="_"), 
                list(args = c(list(data=data), plot_args)))
@@ -2428,8 +2436,13 @@ plot_tree <- function(gates, fontsize = 40, rankdir = "LR", shape = "ellipse", f
 format_plot <- function(p,
                         options = list()){
   
+  if(! "ggplot" %in% class(p) ){
+    stop("p is not an object of class 'ggplot' ")
+  }
+  
   xvar <- NULL
   yvar <- NULL
+  color_var <- NULL
   title <- NULL
   
   if("x" %in% names(p$mapping)){
@@ -2451,7 +2464,12 @@ format_plot <- function(p,
   axis_labels <- list()
   axis_limits <- list()
   
-  color_var <- as.character(p$plot_env$color_var)
+  if("colour" %in% names(p$mapping)){
+    if("quosure" %in% class(p$mapping$colour)){
+      color_var <- as.character(rlang::quo_get_expr(p$mapping$colour))
+      print(color_var)
+    }
+  }
 
   facet_yvar <- NULL
   if(!is.null(p$plot_env$plot_type)){
@@ -2488,17 +2506,10 @@ format_plot <- function(p,
   
   ### transformations ###
   
-  
-  
   if(!is.null(xvar)){
     if(length(xvar) == 1){
-      
-      if(class(p$data) %in% c("ncdfFlowSet", "flowSet")){
-        xvalues <- flowCore::exprs(p$data[[1]])[,xvar]
-      }else{
-        xvalues <- p$data[[xvar]]
-      }
-      
+
+      xvalues <- p$data[[xvar]]
       labx <- ifelse(xvar %in% names(axis_labels), 
                      axis_labels[[xvar]], 
                      xvar)
@@ -2509,8 +2520,15 @@ format_plot <- function(p,
       xlim <- axis_limits[[xvar]]
       
       if(is.double(xvalues)){
+        
+        if(!is.null(xlim)){
+          names(xlim) <- c("min", "max")
+        }
+        p$coordinates$limits$x <- xlim
+        
         p <- p + scale_x_continuous(name = labx, 
                                     trans = trans_x, limits = xlim ) 
+        
       }else if(is.integer(xvalues)){
         limits <- NULL
         if(!is.null(xlim)){limits <- seq(xlim[1], xlim[2])}
@@ -2524,11 +2542,8 @@ format_plot <- function(p,
   
   if(!is.null(yvar)){
     if(length(yvar) == 1){
-      if(class(p$data) %in% c("ncdfFlowSet", "flowSet")){
-        yvalues <- flowCore::exprs(p$data[[1]])[,yvar]
-      }else{
-        yvalues <- p$data[[yvar]]
-      }
+      
+      yvalues <- p$data[[yvar]]
       laby <- ifelse(yvar %in% names(options$axis_labels), 
                      options$axis_labels[[yvar]], 
                      yvar)
@@ -2537,8 +2552,14 @@ format_plot <- function(p,
         trans_y <- transformation[[yvar]]
       }
       ylim <- axis_limits[[yvar]]
-
+      
       if(is.double(yvalues)){
+        
+        if(!is.null(ylim)){
+          names(ylim) <- c("min", "max")
+        }
+        p$coordinates$limits$y <- ylim
+        
         p <- p + scale_y_continuous(name = laby, 
                                     trans = trans_y, limits = ylim) 
       }else if(is.integer(yvalues)){
@@ -2552,41 +2573,45 @@ format_plot <- function(p,
     }
   }
   
-  if(!is.null(p$plot_env$plot_type)){
-    if(p$plot_env$plot_type == "dots"){
+  if("GeomPoint" %in% class(p$layers[[1]]$geom)){
+  #if(!is.null(p$plot_env$plot_type)){
+    #if(p$plot_env$plot_type == "dots"){
       
       if(!is.null(color_var)){
         if(length(color_var) == 1){
 
+          print("OK color")
           label_color <- ifelse(color_var %in% 
                                   names(options$axis_labels), 
                                 options$axis_labels[[color_var]], 
                                 color_var)
           trans_col <- default_trans
+          
           if(color_var %in% names(transformation)){
             trans_col <- transformation[[color_var]]
           }
           
+          colorlim <- axis_limits[[color_var]]
+          
           is_cont <- FALSE
-          if(class(p$data) %in% c("ncdfFlowSet", "flowSet")){
-            if(color_var %in% colnames(flowCore::exprs(p$data[[1]]))){
-              is_cont <- is.double(flowCore::exprs(p$data[[1]])[,color_var])
-            }
-          }else{
-            if(color_var %in% names(p$data)){
-              is_cont <- is.double(p$data[[color_var]])
-            }
+          
+          if(color_var %in% names(p$data)){
+            is_cont <- is.double(p$data[[color_var]])
           }
+          print("OK color")
           #is_cont <- ifelse(color_var %in% names(p$data), is.double(p$data[[color_var]]), FALSE)
           
           if(is_cont){
+            print(trans_col)
+            print(color_lim)
             p <- p + viridis::scale_colour_viridis(trans = trans_col,
                                                    name = label_color,
-                                                   option = option)
+                                                   option = option, 
+                                                   limits = colorlim)
           }
         }
       }
-    }
+    
   }
 
   ### facet ###
@@ -2961,14 +2986,14 @@ plot_gs_ggcyto <- function(gs,
                           plot_type = plot_type,
                           plot_args = plot_args)
   
-  p <- format_plot(p, options = options)
-  
   if(!is.null(gate_name)){
     for(gateName in setdiff(gate_name, "root")){
       g <- flowWorkspace::gs_pop_get_gate(gs, gateName)
       p <- add_gate_to_plot(p, g)
     }
   }
+  
+  p <- format_plot(p, options = options)
   
   p <- as.ggplot(p)
   
