@@ -4,6 +4,7 @@
 #' @import DT
 #' @import plotly
 #' @import shinyjs
+#' @import flowAI
 #' @export
 #' @examples 
 #' \dontrun{
@@ -32,7 +33,7 @@
 CleanUI<-function(id){
   
   ns <- NS(id)
-
+  
   fluidRow(
     br(),
     shinyjs::useShinyjs(),
@@ -43,9 +44,9 @@ CleanUI<-function(id){
                                               "Dynamic range" = 2,
                                               "Signal acquisition" = 3),
                                   selected = c(1, 2, 3)
-                                  )
+               )
                
-               ),
+           ),
            
            box(title = "Parameters", width = NULL,
                selectInput(inputId = ns("choice_sample_input"),
@@ -87,7 +88,7 @@ CleanUI<-function(id){
                                                "lower-tail only (negative going anomalies)" = "neg",
                                                "upper-tail only (positive going anomalies)" = "pos"),
                                 selected = "both"
-                                ),
+                   ),
                    checkboxInput(ns("use_decomp"), 
                                  label = "Without usage of flow rate cytometry", 
                                  value = FALSE)
@@ -112,7 +113,7 @@ CleanUI<-function(id){
                    width = NULL,
                    collapsed = T,
                    collapsible = T,
-
+                   
                    selectInput(ns("options_chExclude2"), 
                                label = "Channel to exclude", 
                                multiple = T, choices = NULL),
@@ -120,9 +121,9 @@ CleanUI<-function(id){
                                  label = "Remove outlier",
                                  value = F)
                )
-          )
+           )
     ),
-  
+    
     column(8,
            box(title = "Quality check plots",
                width = NULL, collapsed = FALSE, collapsible = T,
@@ -176,8 +177,8 @@ CleanUI<-function(id){
                                                                                                                       "Magma" = "A",
                                                                                                                       "Inferno" = "B",
                                                                                                                       "Plasma" = "C"))
-                                       
-                                       
+                                        
+                                        
                                     )
                            ),
                            tabPanel("Table",
@@ -190,7 +191,7 @@ CleanUI<-function(id){
     )
     
   )
-
+  
 }
 
 #' @importFrom flowCore exprs keyword
@@ -218,27 +219,27 @@ Clean <- function(input, output, session, rval) {
   
   # check if nothing have been selected in checkbox (clean type)
   observe({
+    
     if(is.null(input$groupButton)){
       showModal(
         modalDialog(title = "Warning cleaning type selection",
                     "Need a minimum of one type of cleaning to continue and make the cleaning",
                     footer = modalButton("Dismiss")
         )
-        )
+      )
       shinyjs::disable(id = "clean_selected_sample_input")
     } else{
       shinyjs::enable(id = "clean_selected_sample_input")
     }
   })
   
-  
   #ESD parameter error
   observe({ 
     validate(
       need(input$alpha != "", "choose an ESD between 0-1"),
       need(is.numeric(input$alpha), "Numeric value only")
-             )
-    # print(is.na(input$alpha))
+    )
+
     if(!is.null(input$alpha) && input$alpha>=0 && input$alpha<=1 && is.numeric(input$alpha)){
       input$alpha
       shinyjs::enable(id = "clean_selected_sample_input")
@@ -260,6 +261,7 @@ Clean <- function(input, output, session, rval) {
       need(input$second_fraction != "", "choose timestep smoothness between 0-1"),
       need(is.numeric(input$second_fraction), "Numeric values only")
     )
+    
     if(input$second_fraction>=0 && input$second_fraction<=1){
       input$second_fraction
       shinyjs::enable(id = "clean_selected_sample_input")
@@ -316,11 +318,11 @@ Clean <- function(input, output, session, rval) {
     # get the min cells lengths samples (to apply the verification on it)  
     val <- min(unlist(sample_all_length))
     bin <- round(val/3)
-    bin_max <- round(bin - 2 )
+    bin_max <- round(bin - 2)
     
     # disable and show modal dialog or button is usable
     if(input$binSize<= 0 || input$binSize > bin_max){
-    
+      
       showModal(
         modalDialog(
           title = "Bin verification to provide possible error in cleaning",
@@ -355,8 +357,8 @@ Clean <- function(input, output, session, rval) {
   ### Update UI #####################################################################
   
   ### Set default excluded channels #################################################
+  
   observe({
-    
     chNames <- choices()$plot_var
     pattern <- "^FSC|^SSC"
     excludeCh<- grep(pattern, chNames, value = TRUE)
@@ -368,7 +370,6 @@ Clean <- function(input, output, session, rval) {
     updateSelectInput(session = session, inputId = "options_chExclude2", 
                       choices = chNames,
                       select = excludeCh)
-
   })
   
   ### Set time channel ###############################################################
@@ -405,7 +406,7 @@ Clean <- function(input, output, session, rval) {
   observe({
     if("$TIMESTEP" %in% names(description(set()[[1]]))){
       updateNumericInput(session, "timestep",
-                        value = as.numeric(description(set()[[1]])[["$TIMESTEP"]])
+                         value = as.numeric(description(set()[[1]])[["$TIMESTEP"]])
       )
     }
   })
@@ -429,15 +430,12 @@ Clean <- function(input, output, session, rval) {
     binSize <- input$binSize
     pen_valueFS <- 500
     
-    
     alpha <- input$alpha
 
-    
     outlier_remove <- input$remove_outlier
     
     
     ## set Flow rate parameter (Quality content) & bin arg
-    
     FR_QC_arg <- list(alpha = alpha, 
                       use_decomp = TRUE,
                       direction= direction)
@@ -447,7 +445,6 @@ Clean <- function(input, output, session, rval) {
                        timestep = timestep)
     
     ## set signal acquisition parameters 
-    
     FS_bin_arg <- list(channels = NULL,
                        binSize = binSize, 
                        timeCh = timeCh, 
@@ -460,21 +457,20 @@ Clean <- function(input, output, session, rval) {
                       outlier_remove = outlier_remove)
     
     ## get the cleaning for dynamic range / flow rate / signal acquisition in list
-    
     flowRateQCList <- list()
     FlowSignalQCList <- list()
     dynamic_range <- list()
-    
     
     withProgress(message = 'The data cleaning is running..', value = 0,{
       for(i in  1:length(samples)){
         sample <- samples[i]
         
-        ordFCS <- ord_fcs_time(set()[[sample]], timeCh = timeCh)
+        ordFCS <- flowAI:::ord_fcs_time(set()[[sample]], timeCh = timeCh)
+        
         ### modification ici #### 
         if(2 %in% input$groupButton){
           dynamic_range[[sample]] <-   tryCatch(expr = {
-            flow_margin_check(x = ordFCS,
+            flowAI:::flow_margin_check(x = ordFCS,
                               ChannelExclude = ChannelExclude,
                               side = side,
                               neg_values = 1)
@@ -483,21 +479,23 @@ Clean <- function(input, output, session, rval) {
             return(NA)
           })
         }
-        
+
         if(1 %in% input$groupButton){
           # provide a possible error
           flowRateQCList[[sample]] <- tryCatch({
-            flowRateData <- do.call(flow_rate_bin, c(list(ordFCS), 
-                                                     FR_bin_arg))
-            do.call(flow_rate_check_auto,
-                    c(list(ordFCS, flowRateData),
-                      FR_QC_arg))
+            flowRateData <- flowAI:::flow_rate_bin(x = ordFCS, timeCh = timeCh, second_fraction = second_fraction, timestep = timestep)
+            flowAI:::flow_rate_check(x= ordFCS, FlowRateData = flowRateData, alpha = alpha, use_decomp = T)
+            # flowRateData <- do.call(flowAI:::flow_rate_bin, c(list(ordFCS),
+            #                                          FR_bin_arg))
+            # do.call(flowAI:::flow_rate_check,
+            #         c(list(ordFCS, flowRateData),
+            #           FR_QC_arg))
           } ,
           error = function(e) {
             message("Selected channel is not appropriate here, please select choose other channel.")
             return(NA)
           })
-          
+
         }
         
         if(is.na(flowRateQCList[[sample]]) && !is.null(flowRateQCList[[sample]])){break} # break loop if we have an error
@@ -505,9 +503,9 @@ Clean <- function(input, output, session, rval) {
         
         if(3 %in% input$groupButton){
           FlowSignalQCList[[sample]] <-   tryCatch(expr = {
-            FlowSignalData <- do.call(flow_signal_bin, c(list(ordFCS), 
+            FlowSignalData <- do.call(flowAI:::flow_signal_bin, c(list(ordFCS), 
                                                          FS_bin_arg))
-            do.call(flow_signal_check_auto, 
+            do.call(flowAI:::flow_signal_check, 
                     c(list(x = ordFCS, FlowSignalData = FlowSignalData), 
                       FS_QC_arg))
           }, 
@@ -540,7 +538,6 @@ Clean <- function(input, output, session, rval) {
         )
       )
     }
-    # print(names(flowRateQCList))
     
     return(
       list(
@@ -562,11 +559,11 @@ Clean <- function(input, output, session, rval) {
     
     df_temp <- NULL
     df_ending <- NULL
-
+    
     df_temp2 <- list()
-
+    
     subset_df_clean <- NULL 
-
+    
     # Search value not in list
     `%!in%` = Negate(`%in%`)
     
@@ -584,101 +581,98 @@ Clean <- function(input, output, session, rval) {
                       spill = parameter$compensation,
                       return_comp_data = TRUE,
                       Ncells = NULL
-                      )
-
+    )
+    
     df$badCells <- 0
     
-      for(i in 1:length(samples)){
-        sample <- samples[i]
-        # print(res()$dynamic_range[[sample]])
-        df_temp2[[sample]] <- df[df$name == sample,]
-        
-        # search bad cells
-        
-        ## Dynamic range search badCells 
-        if(input$groupButton == 2){
-          
-          if(df_temp2[[sample]][, "badCells"] %!in% df_temp2[[sample]][res()$dynamic_range[[sample]]$goodCellIDs, "badCells"]){
-            pos <- which(df_temp2[[sample]][,"badCells"]  %!in% df_temp2[[sample]][res()$dynamic_range[[sample]]$goodCellIDs, "badCells"])
-            df_temp2[[sample]][pos, "badCells"] <- 1
-            
-          } 
-          
-          # search badCells if id is found in bad lower_ids or upper_ids
-          if(is.null(res()$dynamic_range[[sample]]$bad_lowerIDs)) {
-            message("NULL VALUE PRESENT HERE")
-          } else {
-            if(is.na(res()$dynamic_range[[sample]]$bad_lowerIDs) || length(res()$dynamic_range[[sample]]$bad_lowerIDs) == 0){
-              message("bad lower ids not found in dynamic range")
-            } else {
-              df_temp2[[sample]][res()$dynamic_range[[sample]]$bad_lowerIDs, "badCells"] <- 1
-            }
-          }
-          
-          if(is.null(res()$dynamic_range[sample]$bad_upperIDs)){
-            message("NULL VALUE PRESENT HERE ICI")
-          } else{
-            if(is.na(res$dynamic_range[[sample]]$bad_upperIDs) && length(res$dynamic_range[[sample]]$bad_upperIDs) == 0){
-              message("badupper ID cells is not present in dynamic range")
-              
-            } else {
-              df_temp2[[sample]][res()$dynamic_range[[sample]]$bad_upperIDs, "badCells"] <- 1
-            }
-          }
-        }
-        
-        ## FlowRate search badCells
-        if(input$groupButton == 1){
-          if(df_temp2[[sample]][,"badCells"] %!in% df_temp2[[sample]][res()$flowRateQCList[[sample]]$goodCellIDs,"badCells"]) {
-            pos <- which(df_temp2[[sample]][,"badCells"] %!in% df_temp2[[sample]][res()$flowRateQCList[[sample]]$goodCellIDs, "badCells"])
-            df_temp2[[sample]][pos, "badCells"] <- 1
-            
-          }
-          
-          if(is.null(res()$flowRateQCList[[sample]]$badCellIDs)){
-            message("NULL VALUE ICI")
-          } else {
-            if(is.na(res()$flowRateQCList[[sample]]$badCellIDs) && length(res()$flowRateQCList[[sample]]$badCellIDs) == 0){
-              message("badcells ID is not present in flowRate")
-            } else {
-              df_temp2[[sample]][res()$flowRateQCList[[sample]]$badCellIDs, "badCells"] <- 1
-            }
-            
-          }
-        }
-        
-        ## Signal acquisition search badCells
-        if(input$groupButton == 3){
-          
-        
-          if(df_temp2[[sample]][,"badCells"] %!in% df_temp2[[sample]][res()$FlowSignalQCList[[sample]]$goodCellIDs,"badCells"]){
-            pos <- which(df_temp2[[sample]][,"badCells"] %!in% df_temp2[[sample]][res()$FlowSignalQCList[[sample]]$goodCellIDs, "badCells"])
-            df_temp2[[sample]][pos, "badCells"] <- 1
-          }
-        }
-          
-
-        
-        # get cleaning gating set
-        df_ending <- rbind(df_ending, df_temp2[[sample]])
-
-        subset_df_clean <- subset(df_ending, df_ending[,"badCells"] == 0)
-       
-        progress$inc(1/i, detail = paste("Doing part", sample))
-        }
-   
-      subset_df_clean[,"badCells"] <- as.factor(subset_df_clean[,"badCells"])
-      df_ending[,"badCells"] <- as.factor(df_ending[,"badCells"]) 
+    for(i in 1:length(samples)){
+      sample <- samples[i]
       
-      gs_old_tagged <- build_gatingset_from_df(df = df_ending, gs_origin = rval$gating_set)
-      gs_good_cells <- build_gatingset_from_df(df = subset_df_clean, gs_origin = rval$gating_set)
+      df_temp2[[sample]] <- df[df$name == sample,]
       
-      return(
-        list(
-          gs_old_tagged,
-          gs_good_cells
-        )
+      # search bad cells
+      
+      ## Dynamic range search badCells 
+      if(input$groupButton == 2){
+        
+        if(df_temp2[[sample]][, "badCells"] %!in% df_temp2[[sample]][res()$dynamic_range[[sample]]$goodCellIDs, "badCells"]){
+          pos <- which(df_temp2[[sample]][,"badCells"]  %!in% df_temp2[[sample]][res()$dynamic_range[[sample]]$goodCellIDs, "badCells"])
+          df_temp2[[sample]][pos, "badCells"] <- 1
+          
+        } 
+        
+        # search badCells if id is found in bad lower_ids or upper_ids
+        if(is.null(res()$dynamic_range[[sample]]$bad_lowerIDs)) {
+          message("NULL VALUE PRESENT HERE")
+        } else {
+          if(is.na(res()$dynamic_range[[sample]]$bad_lowerIDs) || length(res()$dynamic_range[[sample]]$bad_lowerIDs) == 0){
+            message("bad lower ids not found in dynamic range")
+          } else {
+            df_temp2[[sample]][res()$dynamic_range[[sample]]$bad_lowerIDs, "badCells"] <- 1
+          }
+        }
+        
+        if(is.null(res()$dynamic_range[sample]$bad_upperIDs)){
+          message("NULL VALUE PRESENT HERE ICI")
+        } else{
+          if(is.na(res$dynamic_range[[sample]]$bad_upperIDs) && length(res$dynamic_range[[sample]]$bad_upperIDs) == 0){
+            message("badupper ID cells is not present in dynamic range")
+            
+          } else {
+            df_temp2[[sample]][res()$dynamic_range[[sample]]$bad_upperIDs, "badCells"] <- 1
+          }
+        }
+      }
+      
+      ## FlowRate search badCells
+      if(input$groupButton == 1){
+        if(df_temp2[[sample]][,"badCells"] %!in% df_temp2[[sample]][res()$flowRateQCList[[sample]]$goodCellIDs,"badCells"]) {
+          pos <- which(df_temp2[[sample]][,"badCells"] %!in% df_temp2[[sample]][res()$flowRateQCList[[sample]]$goodCellIDs, "badCells"])
+          df_temp2[[sample]][pos, "badCells"] <- 1
+          
+        }
+        
+        if(is.null(res()$flowRateQCList[[sample]]$badCellIDs)){
+          message("NULL VALUE ICI")
+        } else {
+          if(is.na(res()$flowRateQCList[[sample]]$badCellIDs) && length(res()$flowRateQCList[[sample]]$badCellIDs) == 0){
+            message("badcells ID is not present in flowRate")
+          } else {
+            df_temp2[[sample]][res()$flowRateQCList[[sample]]$badCellIDs, "badCells"] <- 1
+          }
+          
+        }
+      }
+      
+      ## Signal acquisition search badCells
+      if(input$groupButton == 3){
+        
+        if(df_temp2[[sample]][,"badCells"] %!in% df_temp2[[sample]][res()$FlowSignalQCList[[sample]]$goodCellIDs,"badCells"]){
+          pos <- which(df_temp2[[sample]][,"badCells"] %!in% df_temp2[[sample]][res()$FlowSignalQCList[[sample]]$goodCellIDs, "badCells"])
+          df_temp2[[sample]][pos, "badCells"] <- 1
+        }
+      }
+      
+      # get cleaning gating set
+      df_ending <- rbind(df_ending, df_temp2[[sample]])
+      
+      subset_df_clean <- subset(df_ending, df_ending[,"badCells"] == 0)
+      
+      progress$inc(1/i, detail = paste("Doing part", sample))
+    }
+    
+    subset_df_clean[,"badCells"] <- as.factor(subset_df_clean[,"badCells"])
+    df_ending[,"badCells"] <- as.factor(df_ending[,"badCells"]) 
+    
+    gs_old_tagged <- build_gatingset_from_df(df = df_ending, gs_origin = rval$gating_set)
+    gs_good_cells <- build_gatingset_from_df(df = subset_df_clean, gs_origin = rval$gating_set)
+    
+    return(
+      list(
+        gs_old_tagged,
+        gs_good_cells
       )
+    )
   })
   
   ### Build the new gating_set & old gating_set tagged #################################################
@@ -722,7 +716,6 @@ Clean <- function(input, output, session, rval) {
   ### Build result table ###############################################################################
   
   res_table <- eventReactive(res(), {
-    
     if(!is.null(res())){
 
     df <- NULL
@@ -782,18 +775,7 @@ Clean <- function(input, output, session, rval) {
                                          Number_margin_good_cells,
                                          Number_margin_bad_cells))
       }
-      
-      
-# 
-#       df <- rbind(df, data.frame(Flow_rate,
-#                                  Dynamic_range,
-#                                  Signal_acquisition,
-#                                  Number_flowRate_good_cells,
-#                                  Number_sig_acq_good_cells,
-#                                  Number_margin_good_cells,
-#                                  Number_margin_bad_cells))
     }
-    
     
     colnames(df)[which(names(df) == "Sample")] <- "Samples names"
     colnames(df)[which(names(df) == "Signal_acquisition")] <- "Signal acquisition bad cells(%)"
@@ -893,7 +875,7 @@ Clean <- function(input, output, session, rval) {
       need(length(res()$flowRateQCList) != 0, "Need to select flow rate cleaning to visualize plot"),
       need(name_gs_analysed() == rval$gating_set_selected, "")
     )
-    flow_rate_plot_auto(res()$flowRateQCList[[input$select_one_sample]])
+    flowAI:::flow_rate_plot(res()$flowRateQCList[[input$select_one_sample]])
   })
 
   output$dynamic_plot_output <-renderPlot({
@@ -903,7 +885,7 @@ Clean <- function(input, output, session, rval) {
       need(name_gs_analysed() == rval$gating_set_selected, "")
     )
     
-    flow_margin_plot(res()$dynamic_range[[input$select_one_sample]], binSize = input$binSize)
+    flowAI:::flow_margin_plot(res()$dynamic_range[[input$select_one_sample]], binSize = input$binSize)
   })
   
   signal_plot <- reactive({
@@ -912,7 +894,7 @@ Clean <- function(input, output, session, rval) {
       need(length(res()$FlowSignalQCList) != 0, "Need to select signal acquisition cleanin to visualize plot"),
       need(name_gs_analysed() == rval$gating_set_selected, "")
     )
-    flow_signal_plot_auto(res()$FlowSignalQCList[[input$select_one_sample]])
+    flowAI:::flow_signal_plot(res()$FlowSignalQCList[[input$select_one_sample]])
   })
   
   output$result_output <- DT::renderDataTable({
