@@ -48,7 +48,8 @@ Imports:
   mFilter,
   plyr,
   changepoint,
-  pryr
+  pryr,
+  flowAI
 LazyData: TRUE
 License: file LICENSE
 RoxygenNote: 7.0.2
