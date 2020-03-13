@@ -794,6 +794,15 @@ Clean <- function(input, output, session, rval) {
     value_name <- rval$gating_set_selected
     return(value_name)
   })
+  
+  # check condition 
+  
+  condition_reini <- reactive({
+    if(!is.null(rval$gating_set_selected)){
+      validate(need(name_gs_analysed() == rval$gating_set_selected, ""))
+    }
+  })
+  
   ### Display option for heatmap ##########################################################################
   
   color_selection <- reactive({
@@ -819,9 +828,10 @@ Clean <- function(input, output, session, rval) {
     validate(
       need(!is.null(res()), "Please clean your data with the correct parameters")
       )
-    if(!is.null(rval$gating_set_selected)){
-      validate(need(name_gs_analysed() == rval$gating_set_selected, ""))
-    }
+    # if(!is.null(rval$gating_set_selected)){
+    #   validate(need(name_gs_analysed() == rval$gating_set_selected, ""))
+    # }
+    condition_reini()
     if(length(input$groupButton) > 1){
       heatmaply(res_table()[,1:length(input$groupButton)],scale_fill_gradient_fun = color_selection(), limits = c(0,100), dendrogram = F,
                 Rowv = FALSE, Colv = FALSE)
@@ -836,12 +846,13 @@ Clean <- function(input, output, session, rval) {
   
   output$fr_message <- renderText({
     validate(
-      need(!is.null(res()), ""),
+      # need(!is.null(res()), ""),
       need(length(res()$flowRateQCList) != 0, "")
     )
-    if(!is.null(rval$gating_set_selected)){
-      validate(need(name_gs_analysed() == rval$gating_set_selected, ""))
-    }
+    # if(!is.null(rval$gating_set_selected)){
+    #   validate(need(name_gs_analysed() == rval$gating_set_selected, ""))
+    # }
+    condition_reini()
     perc <- res()$flowRateQCList[[input$select_one_sample]]$res_fr_QC$badPerc*100
     paste(perc,"% of anomalous cells detected in the flow rate check")
   })
@@ -851,9 +862,8 @@ Clean <- function(input, output, session, rval) {
       #need(!is.null(res()), ""),
       need(length(res()$dynamic_range) != 0, "")
     )
-    if(!is.null(rval$gating_set_selected)){
-      validate(need(name_gs_analysed() == rval$gating_set_selected, ""))
-    }
+    condition_reini()
+    
     perc <- res()$dynamic_range[[input$select_one_sample]]$badPerc*100
     paste(perc,"% of anomalous cells detected in the dynamic range check")
   })
@@ -863,9 +873,8 @@ Clean <- function(input, output, session, rval) {
       #need(!is.null(res()), ""),
       need(length(res()$FlowSignalQCList) != 0, "")
     )
-    if(!is.null(rval$gating_set_selected)){
-      validate(need(name_gs_analysed() == rval$gating_set_selected, ""))
-    }
+    condition_reini()
+    
     perc <- res()$FlowSignalQCList[[input$select_one_sample]]$Perc_bad_cells$badPerc_cp*100
     paste(perc,"% of anomalous cells detected in signal acquisition check")
   })
@@ -874,48 +883,40 @@ Clean <- function(input, output, session, rval) {
   
   output$flow_rate_plot_output <- renderPlot({
     validate(
-      need(!is.null(res()), "Need to clean the data with the correct option"),
+      # need(!is.null(res()), "Need to clean the data with the correct option"),
       need(length(res()$flowRateQCList) != 0, "Need to select flow rate cleaning to visualize plot")
     )
-    
-    if(!is.null(rval$gating_set_selected)){
-      validate(need(name_gs_analysed() == rval$gating_set_selected, ""))
-    }
+    condition_reini()
     
     flowAI:::flow_rate_plot(res()$flowRateQCList[[input$select_one_sample]])
   })
 
   output$dynamic_plot_output <-renderPlot({
     validate(
-      need(!is.null(res()), "Need to clean the data with the correct option"),
+      # need(!is.null(res()), "Need to clean the data with the correct option"),
       need(length(res()$dynamic_range) != 0, "Need to select dynamic range cleaning to visualize plot")
     )
-    
-    if(!is.null(rval$gating_set_selected)){
-      validate(need(name_gs_analysed() == rval$gating_set_selected, ""))
-    }
+    condition_reini()
     
     flowAI:::flow_margin_plot(res()$dynamic_range[[input$select_one_sample]], binSize = input$binSize)
   })
   
   signal_plot <- reactive({
     validate(
-      need(!is.null(res()), "Need to clean the data with the correct option"),
+      # need(!is.null(res()), "Need to clean the data with the correct option"),
       need(length(res()$FlowSignalQCList) != 0, "Need to select signal acquisition cleanin to visualize plot")
     )
-    if(!is.null(rval$gating_set_selected)){
-      validate(need(name_gs_analysed() == rval$gating_set_selected, ""))
-    }
+    condition_reini()
+
     flowAI:::flow_signal_plot(res()$FlowSignalQCList[[input$select_one_sample]])
   })
   
   output$result_output <- DT::renderDataTable({
-    validate(
-      need(!is.null(res()), "Need to clean the data with the correct option")
-      )
-    if(!is.null(rval$gating_set_selected)){
-      validate(need(name_gs_analysed() == rval$gating_set_selected, ""))
-    }
+    # validate(
+    #   need(!is.null(res()), "Need to clean the data with the correct option")
+    #   )
+    condition_reini()
+
     datatable(res_table(), options = list(scrollX = T, scrollCollapse=TRUE, lengthMenu = c(100,50,20,10)))
   })
   
