@@ -1,10 +1,15 @@
-library(flowWorkspaceData)
+# library(flowWorkspaceData)
+library(flowWorkspace)
 library(ncdfFlow)
 library(premessa)
 library(flowCore)
 
-fs <- read.ncdfFlowSet(files = c("../flowR_utils/norm/20120222_cells_found.fcs", 
-                                 "../flowR_utils/norm/20120229_cells_found.fcs"))
+# fs <- read.ncdfFlowSet(files = c("../flowR_utils/norm/20120222_cells_found.fcs", 
+#                                  "../flowR_utils/norm/20120229_cells_found.fcs"))
+
+fs <- read.ncdfFlowSet(files = c("/mnt/NAS7/Workspace/hammamiy/data_premasse/20120222_cells_found.fcs",
+                                 "/mnt/NAS7/Workspace/hammamiy/data_premasse/20120229_cells_found.fcs"))
+                                 
 gs <- GatingSet(fs)
 
 
@@ -30,6 +35,7 @@ plot_gs_ggcyto(gs,sample = sampleNames(gs), gate_name = "beads1",
                plot_type = "dots",
                plot_args = list(xvar = "Bead1(La139)Di", yvar = "(Ir193)Di" ),
                options = list(default_trans = asinh_trans())) + facet_wrap(~name)
+
 
 # compute baseline
 df <- get_data_gs(gs = gs, sample = sampleNames(gs), subset = "beads5")
@@ -77,6 +83,7 @@ fs_norm <- build_flowset_from_df(df = df, origin = fs)
 gs_norm <- build_gatingset_from_df(df = df, gs_origin = gs)
 gs_norm <- GatingSet(fs_norm)
 
+
 plot_gs(gs_norm,sample = sampleNames(gs_norm),
                plot_type = "dots",
                plot_args = list(xvar = "Bead1(La139)Di", yvar = "(Ir193)Di" ),
@@ -84,7 +91,8 @@ plot_gs(gs_norm,sample = sampleNames(gs_norm),
 
 #using only functions from premessa
 
-wd <- "../flowR_utils/norm"
+# wd <- "../flowR_utils/norm"
+wd <- "/mnt/NAS7/Workspace/hammamiy/data_premasse"
 beads.cols.names <- c("Bead1(La139)Di", "Bead2(Pr141)Di", "CD11c(Tb159)Di", "Bead3(Tm169)Di", "Bead4(Lu175)Di")
 beads.gate <- list()
 beads.gate[["20120222_cells_found.fcs"]] <- list("Bead1(La139)Di" = list(x=asinh(c(10, 200)/5), y=asinh(c(-50, 50)/5)), 
@@ -97,21 +105,29 @@ beads.gate[["20120229_cells_found.fcs"]] <-list("Bead1(La139)Di" = list(x=asinh(
                                                 "CD11c(Tb159)Di" = list(x=asinh(c(10, 200)/5), y=asinh(c(-50, 50)/5)), 
                                                 "Bead3(Tm169)Di" = list(x=asinh(c(10, 200)/5), y=asinh(c(-50, 50)/5)), 
                                                 "Bead4(Lu175)Di" = list(x=asinh(c(10, 200)/5), y=asinh(c(-50, 50)/5))) 
+# 
+# normalize_folder(wd  = wd, 
+#                  beads.gates = beads.gate, 
+#                  output.dir.name = "../flowR_utils/norm/normed/", 
+#                  beads.type = "Beta", 
+#                  baseline = NULL)
 
-normalize_folder(wd  = wd, 
+
+premessa::normalize_folder(wd  = wd, 
                  beads.gates = beads.gate, 
-                 output.dir.name = "../flowR_utils/norm/normed/", 
+                 output.dir.name = "/normed/", 
                  beads.type = "Beta", 
                  baseline = NULL)
 
-bdata <- calculate_baseline(wd, beads.type = "Beta", files.type = "data", beads.gates = beads.gate)
+bdata <- premessa:::calculate_baseline(wd, beads.type = "Beta", files.type = "data", beads.gates = beads.gate)
+
 
 sample <- sampleNames(fs)[1]
 m <- flowCore::exprs(fs[[sample]])
-beads.events <- identify_beads(m, beads.gate[[sample]], beads.cols.names, dna.col = "(Ir193)Di")
+beads.events <- premessa:::identify_beads(m, beads.gate[[sample]], beads.cols.names, dna.col = "(Ir193)Di")
 beads.data <- m[beads.events,]
 
-norm.res <- correct_data_channels(m, beads.data, baseline = bdata, beads.cols.names)
+norm.res <- premessa:::correct_data_channels(m, beads.data, baseline = bdata, beads.cols.names)
 
 m.normed <- norm.res$m.normed
 m.normed <- cbind(m.normed,
