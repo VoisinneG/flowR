@@ -183,7 +183,11 @@ CleanUI<-function(id){
                                     br(),
                                     br(),
                                     DT::DTOutput(ns("result_output"))
-                           )
+                           ),
+                           tabPanel("Preview badCells plot",
+                                    simpleDisplayUI(ns("simple_display_badcells_module")),
+                                    plotGatingSetInput(ns("plot_preview_badcells"))
+                                    )
                )
            )
     )
@@ -213,6 +217,26 @@ Clean <- function(input, output, session, rval) {
   callModule(simpleDisplay, "simple_display_module2", 
              plot_list = signal_plot, 
              params = reactiveValues(width = 500, height = 40, max_height=500, min_size = 20))
+  
+  plot_params <- reactiveValues()
+  
+  observe({
+    print("ok")
+    validate(need(flowCore::colnames(rval$gating_set) == "badCells", "need to make cleaning to see plot"))
+    plot_params$plot_type <- "dots"
+    plot_params$xvar <- "FSC-H"
+    plot_params$yvar <- "SSC-H"
+    plot_params$color_var <- "badCells"
+    
+    res_badcells_plot <- callModule(plotGatingSet, "plot_preview_badcells",
+                                    rval,
+                                    plot_params = plot_params,
+                                    show_gates = F)
+    
+    callModule(simpleDisplay, "simple_display_badcells_module", res_badcells_plot$plot)
+  })
+  
+
   
   ### Check parameter to provide an error ############################################
   
