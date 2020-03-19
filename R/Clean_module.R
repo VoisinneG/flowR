@@ -135,7 +135,24 @@ CleanUI<-function(id){
                                     textOutput(ns("fr_message")),
                                     br(),
                                     br(),
-                                    plotOutput(ns("flow_rate_plot_output"))
+                                    plotOutput(ns("flow_rate_plot_output")),
+                                    fluidRow(
+                                      column(4,
+                                             uiOutput(ns("sliderRate"))
+                                      ),
+                                      column(4,
+                                             uiOutput(ns("sliderTime"))
+                                      ),
+                                      column(4,
+                                             br(),
+                                             checkboxInput(inputId = ns("useCutInput"), 
+                                                           label = "Use interractive selection", 
+                                                           value = F
+                                                           )
+                                      )
+                                    ),
+                                    hr()
+                                    
                            ),
                            tabPanel("Dynamic range",
                                     br(),
@@ -221,7 +238,6 @@ Clean <- function(input, output, session, rval) {
   plot_params <- reactiveValues()
   
   observe({
-    print("ok")
     validate(need(flowCore::colnames(rval$gating_set) == "badCells", "need to make cleaning to see plot"))
     plot_params$plot_type <- "dots"
     plot_params$xvar <- "FSC-H"
@@ -236,7 +252,47 @@ Clean <- function(input, output, session, rval) {
     callModule(simpleDisplay, "simple_display_badcells_module", res_badcells_plot$plot)
   })
   
-
+  ### Setup sliderInput for flowRate #################################################
+  
+  sliders <- reactive({
+    return(
+      c(
+        min(res()$flowRateQCList[[input$select_one_sample]]$frequencies[,3]) - 0.1,
+        max(res()$flowRateQCList[[input$select_one_sample]]$frequencies[,3]) + 0.1,
+        min(res()$flowRateQCList[[input$select_one_sample]]$frequencies[,4]) - 10,
+        max(res()$flowRateQCList[[input$select_one_sample]]$frequencies[,4]) + 10
+      )
+    )
+  })
+  
+  output$sliderRate <- renderUI({
+    ns <- session$ns
+    sliderInput(inputId = ns("rateSliderInput"), 
+                label = "Rate",
+                min = sliders()[3], max = sliders()[4],
+                value = c(sliders()[3], sliders()[4]), step = 0.1)
+  })
+  
+  output$sliderTime <- renderUI({
+    ns <- session$ns
+    sliderInput(inputId = ns("timeSliderInput"),
+                label = "Time cut",
+                min = sliders()[1], max = sliders()[2],
+                value = c(sliders()[1], sliders()[2]), step = 0.1)
+  })
+  
+  rateSlider <- reactive({
+    return(
+      c(input$rateSliderInput[1], input$rateSliderInput[2])
+    )
+  })
+  
+  timeSlider <- reactive({
+    print(input$timeSliderInput)
+    return(
+      c(input$timeSliderInput[1], input$timeSliderInput[2])
+    )
+  })
   
   ### Check parameter to provide an error ############################################
   
@@ -479,6 +535,7 @@ Clean <- function(input, output, session, rval) {
     flowRateQCList <- list()
     FlowSignalQCList <- list()
     dynamic_range <- list()
+    flowRateData <- list()
     
     withProgress(message = 'The data cleaning is running..', value = 0,{
       for(i in  1:length(samples)){
@@ -502,8 +559,8 @@ Clean <- function(input, output, session, rval) {
         if(1 %in% input$groupButton){
           # provide a possible error
           flowRateQCList[[sample]] <- tryCatch({
-            flowRateData <- flowAI:::flow_rate_bin(x = ordFCS, timeCh = timeCh, second_fraction = second_fraction, timestep = timestep)
-            flowAI:::flow_rate_check(x= ordFCS, FlowRateData = flowRateData, alpha = alpha, use_decomp = T)
+            flowRateData[[sample]] <- flowAI:::flow_rate_bin(x = ordFCS, timeCh = timeCh, second_fraction = second_fraction, timestep = timestep)
+            flowAI:::flow_rate_check(x= ordFCS, FlowRateData = flowRateData[[sample]], alpha = alpha, use_decomp = T)
             # flowRateData <- do.call(flowAI:::flow_rate_bin, c(list(ordFCS),
             #                                          FR_bin_arg))
             # do.call(flowAI:::flow_rate_check,
@@ -562,14 +619,17 @@ Clean <- function(input, output, session, rval) {
       list(
         flowRateQCList = flowRateQCList,
         FlowSignalQCList = FlowSignalQCList,
-        dynamic_range = dynamic_range
+        dynamic_range = dynamic_range,
+        flowRateData = flowRateData
       )
     )
     
   })
   
   ### setup the gatingSet tagged (badCells) ##############################################################
-
+observe({
+  print(selection_Cells_interactive())
+})
   create_futur_gs <- reactive({
     progress <- shiny::Progress$new()
     
@@ -644,6 +704,9 @@ Clean <- function(input, output, session, rval) {
       }
       
       ## FlowRate search badCells
+      if(input$useCutInput == F){
+        
+      
       if(input$groupButton == 1){
         if(df_temp2[[sample]][,"badCells"] %!in% df_temp2[[sample]][res()$flowRateQCList[[sample]]$goodCellIDs,"badCells"]) {
           pos <- which(df_temp2[[sample]][,"badCells"] %!in% df_temp2[[sample]][res()$flowRateQCList[[sample]]$goodCellIDs, "badCells"])
@@ -662,7 +725,9 @@ Clean <- function(input, output, session, rval) {
           
         }
       }
-      
+      } else if(input$useCutInput == T){
+        # print("ok")
+      }
       ## Signal acquisition search badCells
       if(input$groupButton == 3){
         
@@ -904,6 +969,7 @@ Clean <- function(input, output, session, rval) {
   })
   
   ### Build QC plots #######################################################################################
+
   
   output$flow_rate_plot_output <- renderPlot({
     validate(
@@ -912,10 +978,32 @@ Clean <- function(input, output, session, rval) {
     )
     condition_reini()
     
-    flowAI:::flow_rate_plot(res()$flowRateQCList[[input$select_one_sample]])
+    plot_rate <- flowAI:::flow_rate_plot(res()$flowRateQCList[[input$select_one_sample]])
+    plot_rate <- plot_rate + ggplot2:::geom_hline(yintercept = c(rateSlider()[1], rateSlider()[2]), color="blue",
+                                                  linetype = "longdash", size = 1.2, show_guide = TRUE)
+    plot_rate <- plot_rate + ggplot2:::geom_vline(xintercept = c(timeSlider()[1], timeSlider()[2]), color="blue",
+                                                  linetype = "longdash", size = 1.2, show_guide = TRUE)
+    plot_rate
+  })
+  
+  # interractive selection for flow rate and kept it 
+  selection_Cells_interactive <- reactive({
+    frequencies <- as.data.frame(res()$flowRateQCList[[input$select_one_sample]]$frequencies)
+    
+    flowRateQC <- list()
+    
+    cellBinID <- res()$flowRateData[[input$select_one_sample]]$cellBinID
+    
+    goodcell_x <- which(frequencies$secbin < timeSlider()[2] & frequencies$secbin > timeSlider()[1])
+    goodcell_y <- which(frequencies$tbCounts < rateSlider()[2] & frequencies$tbCounts > rateSlider()[1])
+
+    flowRateQC[[input$select_one_sample]] <- cellBinID$cellID[ cellBinID$binID %in% intersect(goodcell_x, goodcell_y) ]
+    print(flowRateQC)
+    return(flowRateQC)
+
   })
 
-  output$dynamic_plot_output <-renderPlot({
+  output$dynamic_plot_output <- renderPlot({
     validate(
       # need(!is.null(res()), "Need to clean the data with the correct option"),
       need(length(res()$dynamic_range) != 0, "Need to select dynamic range cleaning to visualize plot")
@@ -964,27 +1052,27 @@ Clean <- function(input, output, session, rval) {
 # library(heatmaply)
 # library(flowAI) 
 # 
-# if (interactive()){
-# 
-#   ui <- dashboardPage(
-#     dashboardHeader(title = "flowAI"),
-#     sidebar = dashboardSidebar(disable = TRUE),
-#     body = dashboardBody(
-#       CleanUI("module")
-#     )
-#   )
-# 
-#   server <- function(input, output, session) {
-#     rval <- reactiveValues()
-#     observe({
-#       #utils::data("GvHD", package = "flowCore")
-#       #rval$gating_set <- GatingSet(GvHD)
-#        utils::data("Bcells", package = "flowAI")
-#        rval$gating_set <- flowWorkspace::GatingSet(Bcells)
-#     })
-#     res <- callModule(Clean, "module", rval = rval)
-#   }
-# 
-#   shinyApp(ui, server)
-# 
-# }
+if (interactive()){
+
+  ui <- dashboardPage(
+    dashboardHeader(title = "flowAI"),
+    sidebar = dashboardSidebar(disable = TRUE),
+    body = dashboardBody(
+      CleanUI("module")
+    )
+  )
+
+  server <- function(input, output, session) {
+    rval <- reactiveValues()
+    observe({
+      #utils::data("GvHD", package = "flowCore")
+      #rval$gating_set <- GatingSet(GvHD)
+       utils::data("Bcells", package = "flowAI")
+       rval$gating_set <- flowWorkspace::GatingSet(Bcells)
+    })
+    res <- callModule(Clean, "module", rval = rval)
+  }
+
+  shinyApp(ui, server)
+
+}
