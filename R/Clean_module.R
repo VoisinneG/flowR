@@ -148,11 +148,12 @@ CleanUI<-function(id){
                                              checkboxInput(inputId = ns("useCutInput"), 
                                                            label = "Use interractive selection", 
                                                            value = F
-                                                           )
-                                      )
+                                                           ),
+                                             uiOutput(ns("actionRenderUI"))
+                                                              
                                     ),
                                     hr()
-                                    
+                                    )
                            ),
                            tabPanel("Dynamic range",
                                     br(),
@@ -288,12 +289,23 @@ Clean <- function(input, output, session, rval) {
   })
   
   timeSlider <- reactive({
-    print(input$timeSliderInput)
+    # print(input$timeSliderInput)
     return(
       c(input$timeSliderInput[1], input$timeSliderInput[2])
     )
   })
   
+  ### renderUI actionButton ##########################################################
+  
+  output$actionRenderUI <- renderUI({
+    if(input$useCutInput == T){
+      ns <- session$ns
+      actionButton(inputId = ns("applyInput"),
+                   label = "Apply for the current sample")
+    }
+
+  
+  })
   ### Check parameter to provide an error ############################################
   
   #ESD parameter error
@@ -627,9 +639,7 @@ Clean <- function(input, output, session, rval) {
   })
   
   ### setup the gatingSet tagged (badCells) ##############################################################
-observe({
-  print(selection_Cells_interactive())
-})
+
   create_futur_gs <- reactive({
     progress <- shiny::Progress$new()
     
@@ -668,8 +678,36 @@ observe({
       sample <- samples[i]
       
       df_temp2[[sample]] <- df[df$name == sample,]
-      
+
       # search bad cells
+      
+      ## FlowRate search badCells
+      
+      if(input$groupButton == 1){
+        if(sample %in% names(ok_after_verify$flowRateSelected)){
+          # keep cell from flowRate
+          df_temp2[[sample]] <- df_temp2[[sample]][ok_after_verify$flowRateSelected[[sample]],]
+          
+        } else {
+          print(table(df_temp2[[sample]][,"badCells"]))
+          if(df_temp2[[sample]][,"badCells"] %!in% df_temp2[[sample]][res()$flowRateQCList[[sample]]$goodCellIDs,"badCells"]) {
+            pos <- which(df_temp2[[sample]][,"badCells"] %!in% df_temp2[[sample]][res()$flowRateQCList[[sample]]$goodCellIDs, "badCells"])
+            df_temp2[[sample]][pos, "badCells"] <- 1
+            
+          }
+          
+          if(is.null(res()$flowRateQCList[[sample]]$badCellIDs)){
+            message("NULL VALUE ICI")
+          } else {
+            if(is.na(res()$flowRateQCList[[sample]]$badCellIDs) && length(res()$flowRateQCList[[sample]]$badCellIDs) == 0){
+              message("badcells ID is not present in flowRate")
+            } else {
+              df_temp2[[sample]][res()$flowRateQCList[[sample]]$badCellIDs, "badCells"] <- 1
+            }
+            
+          }
+        }
+      }
       
       ## Dynamic range search badCells 
       if(input$groupButton == 2){
@@ -703,31 +741,8 @@ observe({
         }
       }
       
-      ## FlowRate search badCells
-      if(input$useCutInput == F){
-        
-      
-      if(input$groupButton == 1){
-        if(df_temp2[[sample]][,"badCells"] %!in% df_temp2[[sample]][res()$flowRateQCList[[sample]]$goodCellIDs,"badCells"]) {
-          pos <- which(df_temp2[[sample]][,"badCells"] %!in% df_temp2[[sample]][res()$flowRateQCList[[sample]]$goodCellIDs, "badCells"])
-          df_temp2[[sample]][pos, "badCells"] <- 1
-          
-        }
-        
-        if(is.null(res()$flowRateQCList[[sample]]$badCellIDs)){
-          message("NULL VALUE ICI")
-        } else {
-          if(is.na(res()$flowRateQCList[[sample]]$badCellIDs) && length(res()$flowRateQCList[[sample]]$badCellIDs) == 0){
-            message("badcells ID is not present in flowRate")
-          } else {
-            df_temp2[[sample]][res()$flowRateQCList[[sample]]$badCellIDs, "badCells"] <- 1
-          }
-          
-        }
-      }
-      } else if(input$useCutInput == T){
-        # print("ok")
-      }
+    
+
       ## Signal acquisition search badCells
       if(input$groupButton == 3){
         
@@ -770,6 +785,9 @@ observe({
     if(is.null(gs_list)){
       # show modal
     } else {
+      # reset of ok_after_verify 
+      ok_after_verify$flowRateSelected <- NULL
+      
       old_gs <- gs_list[[1]]
       # print(rval$gating_set_selected)
       params <- colnames(old_gs)[colnames(old_gs) %in% names(rval$trans_parameters)]
@@ -990,32 +1008,58 @@ observe({
   selection_Cells_interactive <- reactive({
     frequencies <- as.data.frame(res()$flowRateQCList[[input$select_one_sample]]$frequencies)
     
-    flowRateQC <- list()
-    
     cellBinID <- res()$flowRateData[[input$select_one_sample]]$cellBinID
-    
+
     goodcell_x <- which(frequencies$secbin < timeSlider()[2] & frequencies$secbin > timeSlider()[1])
     goodcell_y <- which(frequencies$tbCounts < rateSlider()[2] & frequencies$tbCounts > rateSlider()[1])
 
-    flowRateQC[[input$select_one_sample]] <- cellBinID$cellID[ cellBinID$binID %in% intersect(goodcell_x, goodcell_y) ]
-    print(flowRateQC)
+    flowRateQC <- cellBinID$cellID[cellBinID$binID %in% intersect(goodcell_x, goodcell_y)]
+
     return(flowRateQC)
 
   })
-
+  
+  ### Verify if the users use Ok button when apply the current selected sample ################
+  ok_after_verify <- reactiveValues(flowRateSelected = NULL)
+  
+  observeEvent(input$applyInput, {
+    verify_selection()
+  })
+  
+  # showmodal button (if ok is pressed then the user assume to get specific cell) or close and stop the process
+  verify_selection <- function(failed = FALSE) {
+    ns <- session$ns
+    showModal(
+      if (failed == F)
+        modalDialog(title = "Verify selection cutting",
+                    "Are you sure to apply selection of cells for the current sample",
+                    footer = tagList(
+                      actionButton(ns("ok"), "OK"),
+                      modalButton("Cancel")
+                      
+                    )
+        )
+    )
+  }
+  
+  # if ok is pressed then close the modal and add the current selected sample in list (reactive object)
+  observeEvent(input$ok, {
+    ok_after_verify$flowRateSelected <- list()
+    ok_after_verify$flowRateSelected[[input$select_one_sample]] <- selection_Cells_interactive()
+    removeModal()
+  })
+ 
   output$dynamic_plot_output <- renderPlot({
     validate(
-      # need(!is.null(res()), "Need to clean the data with the correct option"),
       need(length(res()$dynamic_range) != 0, "Need to select dynamic range cleaning to visualize plot")
     )
     condition_reini()
     
     flowAI:::flow_margin_plot(res()$dynamic_range[[input$select_one_sample]], binSize = input$binSize)
   })
-  
+
   signal_plot <- reactive({
     validate(
-      # need(!is.null(res()), "Need to clean the data with the correct option"),
       need(length(res()$FlowSignalQCList) != 0, "Need to select signal acquisition cleanin to visualize plot")
     )
     condition_reini()
@@ -1024,17 +1068,11 @@ observe({
   })
   
   output$result_output <- DT::renderDataTable({
-    # validate(
-    #   need(!is.null(res()), "Need to clean the data with the correct option")
-    #   )
     condition_reini()
 
     datatable(res_table(), options = list(scrollX = T, scrollCollapse=TRUE, lengthMenu = c(100,50,20,10)))
   })
   
-  # observe({
-  #   print(rval$gating_set_selected)
-  # })
   
   return(rval)
 }
@@ -1052,27 +1090,27 @@ observe({
 # library(heatmaply)
 # library(flowAI) 
 # 
-if (interactive()){
-
-  ui <- dashboardPage(
-    dashboardHeader(title = "flowAI"),
-    sidebar = dashboardSidebar(disable = TRUE),
-    body = dashboardBody(
-      CleanUI("module")
-    )
-  )
-
-  server <- function(input, output, session) {
-    rval <- reactiveValues()
-    observe({
-      #utils::data("GvHD", package = "flowCore")
-      #rval$gating_set <- GatingSet(GvHD)
-       utils::data("Bcells", package = "flowAI")
-       rval$gating_set <- flowWorkspace::GatingSet(Bcells)
-    })
-    res <- callModule(Clean, "module", rval = rval)
-  }
-
-  shinyApp(ui, server)
-
-}
+# if (interactive()){
+# 
+#   ui <- dashboardPage(
+#     dashboardHeader(title = "flowAI"),
+#     sidebar = dashboardSidebar(disable = TRUE),
+#     body = dashboardBody(
+#       CleanUI("module")
+#     )
+#   )
+# 
+#   server <- function(input, output, session) {
+#     rval <- reactiveValues()
+#     observe({
+#       #utils::data("GvHD", package = "flowCore")
+#       #rval$gating_set <- GatingSet(GvHD)
+#        utils::data("Bcells", package = "flowAI")
+#        rval$gating_set <- flowWorkspace::GatingSet(Bcells)
+#     })
+#     res <- callModule(Clean, "module", rval = rval)
+#   }
+# 
+#   shinyApp(ui, server)
+# 
+# }
