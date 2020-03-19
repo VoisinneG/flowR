@@ -138,22 +138,21 @@ CleanUI<-function(id){
                                     plotOutput(ns("flow_rate_plot_output")),
                                     fluidRow(
                                       column(4,
-                                             uiOutput(ns("sliderRate"))
-                                      ),
-                                      column(4,
-                                             uiOutput(ns("sliderTime"))
-                                      ),
-                                      column(4,
                                              br(),
                                              checkboxInput(inputId = ns("useCutInput"), 
                                                            label = "Use interractive selection", 
                                                            value = F
-                                                           ),
+                                             ),
                                              uiOutput(ns("actionRenderUI"))
-                                                              
+                                      ),
+                                      column(4,
+                                             uiOutput(ns("sliderRate"))
+                                      ),
+                                      column(4,
+                                             uiOutput(ns("sliderTime"))
+                                      )
                                     ),
                                     hr()
-                                    )
                            ),
                            tabPanel("Dynamic range",
                                     br(),
@@ -267,19 +266,23 @@ Clean <- function(input, output, session, rval) {
   })
   
   output$sliderRate <- renderUI({
-    ns <- session$ns
-    sliderInput(inputId = ns("rateSliderInput"), 
-                label = "Rate",
-                min = sliders()[3], max = sliders()[4],
-                value = c(sliders()[3], sliders()[4]), step = 0.1)
+    if(input$useCutInput == T){
+      ns <- session$ns
+      sliderInput(inputId = ns("rateSliderInput"), 
+                  label = "Rate",
+                  min = sliders()[3], max = sliders()[4],
+                  value = c(sliders()[3], sliders()[4]), step = 0.1)
+    }
   })
   
   output$sliderTime <- renderUI({
-    ns <- session$ns
-    sliderInput(inputId = ns("timeSliderInput"),
-                label = "Time cut",
-                min = sliders()[1], max = sliders()[2],
-                value = c(sliders()[1], sliders()[2]), step = 0.1)
+    if(input$useCutInput == T){
+      ns <- session$ns
+      sliderInput(inputId = ns("timeSliderInput"),
+                  label = "Time cut",
+                  min = sliders()[1], max = sliders()[2],
+                  value = c(sliders()[1], sliders()[2]), step = 0.1)
+    }
   })
   
   rateSlider <- reactive({
@@ -289,7 +292,6 @@ Clean <- function(input, output, session, rval) {
   })
   
   timeSlider <- reactive({
-    # print(input$timeSliderInput)
     return(
       c(input$timeSliderInput[1], input$timeSliderInput[2])
     )
@@ -689,7 +691,6 @@ Clean <- function(input, output, session, rval) {
           df_temp2[[sample]] <- df_temp2[[sample]][ok_after_verify$flowRateSelected[[sample]],]
           
         } else {
-          print(table(df_temp2[[sample]][,"badCells"]))
           if(df_temp2[[sample]][,"badCells"] %!in% df_temp2[[sample]][res()$flowRateQCList[[sample]]$goodCellIDs,"badCells"]) {
             pos <- which(df_temp2[[sample]][,"badCells"] %!in% df_temp2[[sample]][res()$flowRateQCList[[sample]]$goodCellIDs, "badCells"])
             df_temp2[[sample]][pos, "badCells"] <- 1
@@ -789,7 +790,6 @@ Clean <- function(input, output, session, rval) {
       ok_after_verify$flowRateSelected <- NULL
       
       old_gs <- gs_list[[1]]
-      # print(rval$gating_set_selected)
       params <- colnames(old_gs)[colnames(old_gs) %in% names(rval$trans_parameters)]
 
 
@@ -935,9 +935,6 @@ Clean <- function(input, output, session, rval) {
     validate(
       need(!is.null(res()), "Please clean your data with the correct parameters")
       )
-    # if(!is.null(rval$gating_set_selected)){
-    #   validate(need(name_gs_analysed() == rval$gating_set_selected, ""))
-    # }
     condition_reini()
     if(length(input$groupButton) > 1){
       heatmaply(res_table()[,1:length(input$groupButton)],scale_fill_gradient_fun = color_selection(), limits = c(0,100), dendrogram = F,
@@ -953,12 +950,8 @@ Clean <- function(input, output, session, rval) {
   
   output$fr_message <- renderText({
     validate(
-      # need(!is.null(res()), ""),
       need(length(res()$flowRateQCList) != 0, "")
     )
-    # if(!is.null(rval$gating_set_selected)){
-    #   validate(need(name_gs_analysed() == rval$gating_set_selected, ""))
-    # }
     condition_reini()
     perc <- res()$flowRateQCList[[input$select_one_sample]]$res_fr_QC$badPerc*100
     paste(perc,"% of anomalous cells detected in the flow rate check")
@@ -966,7 +959,6 @@ Clean <- function(input, output, session, rval) {
   
   output$dynamic_message <- renderText({
     validate(
-      #need(!is.null(res()), ""),
       need(length(res()$dynamic_range) != 0, "")
     )
     condition_reini()
@@ -977,7 +969,6 @@ Clean <- function(input, output, session, rval) {
   
   output$signal_message <- renderText({
     validate(
-      #need(!is.null(res()), ""),
       need(length(res()$FlowSignalQCList) != 0, "")
     )
     condition_reini()
