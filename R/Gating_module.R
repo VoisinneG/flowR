@@ -294,14 +294,14 @@ Gating <- function(input, output, session, rval) {
       xvar <- res$params$xvar
       yvar <- res$params$yvar
       
-      x_coord_raw <- res_display$params$plot_click$x
+      x_coord <- res_display$params$plot_click$x
       if(xvar %in% names(rval$gating_set@transformation)){
-        x_coord <- rval$gating_set@transformation[[xvar]]$inverse(x_coord_raw)
+        x_coord <- rval$gating_set@transformation[[xvar]]$inverse(x_coord)
       }
       
-      y_coord_raw <- res_display$params$plot_click$y
+      y_coord <- res_display$params$plot_click$y
       if(yvar %in% names(rval$gating_set@transformation)){
-        y_coord <- rval$gating_set@transformation[[yvar]]$inverse(y_coord_raw)
+        y_coord <- rval$gating_set@transformation[[yvar]]$inverse(y_coord)
       }
       
       #compute distance with existing vertexes
@@ -759,21 +759,22 @@ Gating <- function(input, output, session, rval) {
 #     observe({
 #       #dataDir <- system.file("extdata",package="flowWorkspaceData")
 #       #gs <- load_gs(list.files(dataDir, pattern = "gs_bcell_auto",full = TRUE))
-#        fs <- read.ncdfFlowSet(files = "../flowR_utils/demo-data/JL04BMVLG-Valentin/Tumor_T_001_012.fcs")
+#        #fs <- read.ncdfFlowSet(files = "../flowR_utils/demo-data/JL04BMVLG-Valentin/Tumor_T_001_012.fcs")
 #        #gates <- gates <- get_gates_from_ws_diva("../flowR_utils/demo-data/JL04BMVLG-Valentin/JL04BMVLG.xml", template = "Gating")
-#        gates <- get_gates_from_ws("../flowR_utils/demo-data/JL04BMVLG-Valentin/Tumor-testFlowR.wsp", group = "Tumor")
-#        gates <- transform_gates(gates, pattern = "Comp-", replacement = "")
-#        gs <- flowWorkspace::GatingSet(fs)
+#        # gates <- get_gates_from_ws("../flowR_utils/demo-data/JL04BMVLG-Valentin/Tumor-testFlowR.wsp", group = "Tumor")
+#        # gates <- transform_gates(gates, pattern = "Comp-", replacement = "")
+#        # gs <- flowWorkspace::GatingSet(fs)
 # 
-#        add_gates_flowCore(gs, gates = gates)
-#       transfo <- lapply(colnames(gs), logicle_trans)
-#       names(transfo) <- colnames(gs)
-#       gs@transformation <- transfo
-#       spill <- gs@data[[1]]@description[["SPILL"]]
-#       comp <- lapply(pData(gs)$name, function(x){spill})
-#       names(comp) <- pData(gs)$name
-#       gs@compensation <- comp
-#       rval$gating_set <- gs
+#       # add_gates_flowCore(gs, gates = gates)
+#       # transfo <- lapply(colnames(gs), logicle_trans)
+#       # names(transfo) <- colnames(gs)
+#       # gs@transformation <- transfo
+#       # spill <- gs@data[[1]]@description[["SPILL"]]
+#       # comp <- lapply(pData(gs)$name, function(x){spill})
+#       # names(comp) <- pData(gs)$name
+#       # gs@compensation <- comp
+#       # rval$gating_set <- gs
+# 
 #       #load("../flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
 #       #fs <- build_flowset_from_df(df = res$cluster$data, origin = res$cluster$flow_set)
 #       #gs <- flowWorkspace::GatingSet(fs)
@@ -785,6 +786,8 @@ Gating <- function(input, output, session, rval) {
 #       #rval$gating_set <- GatingSet(GvHD)
 #       #gs <- load_gs("./inst/ext/gs")
 #       #rval$gating_set <- gs
+#       utils::data("Bcells")
+#       rval$gating_set <-GatingSet(Bcells)
 #     })
 # 
 #     res <- callModule(Gating, "module", rval = rval)

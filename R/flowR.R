@@ -639,6 +639,8 @@ get_gates_from_gs <- function(gs){
 #' @importFrom flowWorkspace gs_get_pop_paths gs_pop_add recompute colnames
 add_gates_flowCore <- function(gs, gates){
   
+  print(sampleNames(gs))
+  
   #gates are expected to share the same hierarchy and dimensions across samples
   # so focus only on the first sample
   new_gates_name <- setdiff(names(gates), gh_get_gate_names(gs[[1]]))
@@ -667,8 +669,20 @@ add_gates_flowCore <- function(gs, gates){
         
         g <- gates[[idx[i]]]
 
+        print("gate check")
+        print(g)
+        
         if(g$parent %in% union(gh_get_gate_names(gs[[1]]), "root") ){
           if(class(g$gate) == "list"){
+            
+            # check that all samples have a gate defined
+            samples_to_gate <- intersect(names(g$gate), flowWorkspace::sampleNames(gs))
+            if(!setequal(samples_to_gate, flowWorkspace::sampleNames(gs))){
+              stop("Names of gates do not match sample names")
+            }else{
+              g$gate <- g$gate[samples_to_gate]
+            }
+            
             first_gate <- g$gate[[1]]
           }else{
             first_gate <- g$gate
@@ -3491,14 +3505,14 @@ dim_reduction <- function(df,
   }
 
   if(method == "tSNE"){
-    tSNE <- Rtsne(df_trans[ idx_cells , yvar], perplexity = perplexity, dims = dims, check_duplicates = check_duplicates)
+    tSNE <- Rtsne::Rtsne(df_trans[ idx_cells , yvar], perplexity = perplexity, dims = dims, check_duplicates = check_duplicates)
     df_tSNE <- tSNE$Y
     colnames(df_tSNE) <- c("tSNE1","tSNE2")
     return(list( df = cbind(df_filter[idx_cells, ], df_tSNE), keep = idx_cells_kept, var_names = c("tSNE1","tSNE2")))
   }
   
   if(method == "umap"){
-    df_umap <- umap(df_trans[ idx_cells , yvar])
+    df_umap <- umap::umap(df_trans[ idx_cells , yvar])
     df_umap <- df_umap$layout
     colnames(df_umap) <- c("UMAP1","UMAP2")
     return(list( df = cbind(df_filter[idx_cells, ], df_umap), keep = idx_cells_kept, var_names = c("UMAP1","UMAP2")))

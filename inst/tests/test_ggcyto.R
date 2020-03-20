@@ -1,5 +1,6 @@
 library(ggcyto)
 library(flowWorkspaceData)
+library(flowWorkspace)
 library("flowAI")
 
 data("Bcells")
@@ -65,11 +66,36 @@ p <- plot_gs_ggcyto(gs, plot_args = list(xvar = "FSC-A", yvar = "SSC-A"),
 p <- p + scale_x_continuous(limits = c(0,100000)) #+ geom_hex()
 p + coord_cartesian(xlim = c(0,10000), ylim = NULL, default = FALSE)
 
+### Bcells - test adding gates ############################################################
+library(flowAI)
+data("Bcells")
+gs <- GatingSet(Bcells)
+
+sampleNames(gs)
+colnames(gs)
+rg <- rectangleGate(list("FSC-A" = c(0, 100000)), filterId = "rg")
+
+gs_pop_add(gs, rg, parent = "root")
+gates <- get_gates_from_gs(gs)
+
+gs2 <- GatingSet(gs@data)
+
+add_gates_flowCore(gs2, gates)
+
+#### gs_bcell_auto - test scales in ggcyto
+
 dataDir <- system.file("extdata",package="flowWorkspaceData")
 gs <- load_gs(list.files(dataDir, pattern = "gs_bcell_auto",full = TRUE))
 
 gs_get_pop_paths(gs)
 gates <- get_gates_from_gs(gs)
+df <- get_plot_data(gs, sample = sampleNames(gs)[1], subset = "Live")
+
+fs <- gs@data
+gs2 <- GatingSet(fs)
+add_gates_flowCore(gs2, list("g1" = list(gate = gates$`/boundary`$gate$`12828_1_Bcell_C01.fcs`, parent = "root")))
+gates2 <- get_gates_from_gs(gs2)
+
 fs <- gs_pop_get_data(gs, "Live") # cannot get data from multiple susbsets
 
 
@@ -88,8 +114,9 @@ p <- call_plot_function(data = fs,
                         plot_args = list(xvar = 'Live', smooth = TRUE, ridges = TRUE,
                                          yridges_var = "name", yvar = 'FSC-A', bins = 30, alpha = 0.5)
                         )
-p <- ggplot(fs, aes(x=`FSC-A`, y=`SSC-A`)) + geom_point()
+#p <- ggplot(fs, aes(x=`FSC-A`, y=`SSC-A`)) + geom_point()
 
+p <- as.ggplot(p)
 
 p1 <- format_plot(p, options = list(transformation = transformation))
 
