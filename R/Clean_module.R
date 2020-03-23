@@ -575,11 +575,6 @@ Clean <- function(input, output, session, rval) {
           flowRateQCList[[sample]] <- tryCatch({
             flowRateData[[sample]] <- flowAI:::flow_rate_bin(x = ordFCS, timeCh = timeCh, second_fraction = second_fraction, timestep = timestep)
             flowAI:::flow_rate_check(x= ordFCS, FlowRateData = flowRateData[[sample]], alpha = alpha, use_decomp = T)
-            # flowRateData <- do.call(flowAI:::flow_rate_bin, c(list(ordFCS),
-            #                                          FR_bin_arg))
-            # do.call(flowAI:::flow_rate_check,
-            #         c(list(ordFCS, flowRateData),
-            #           FR_QC_arg))
           } ,
           error = function(e) {
             message("Selected channel is not appropriate here, please select choose other channel.")
@@ -1010,7 +1005,7 @@ Clean <- function(input, output, session, rval) {
 
   })
   
-  ### Verify if the users use Ok button when apply the current selected sample ################
+  ### Verify if the users use Ok button when apply the current selected sample ################################
   ok_after_verify <- reactiveValues(flowRateSelected = NULL)
   
   observeEvent(input$applyInput, {
