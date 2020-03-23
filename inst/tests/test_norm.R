@@ -3,7 +3,7 @@ library(flowWorkspace)
 library(ncdfFlow)
 library(premessa)
 library(flowCore)
-
+library(ggcyto)
 # fs <- read.ncdfFlowSet(files = c("../flowR_utils/norm/20120222_cells_found.fcs", 
 #                                  "../flowR_utils/norm/20120229_cells_found.fcs"))
 
@@ -41,7 +41,7 @@ plot_gs_ggcyto(gs,sample = sampleNames(gs), gate_name = "beads1",
 df <- get_data_gs(gs = gs, sample = sampleNames(gs), subset = "beads5")
 beads.cols.names <- c("Bead1(La139)Di", "Bead2(Pr141)Di", "CD11c(Tb159)Di", "Bead3(Tm169)Di", "Bead4(Lu175)Di")
 df$id <- 1
-df_stat <- compute_stats(df = df, 
+df_stat <- flowR:::compute_stats(df = df, 
                          y_trans = asinh_trans(scale = 5), 
                          apply_inverse = TRUE,
                          yvar = beads.cols.names, 
@@ -121,16 +121,27 @@ premessa::normalize_folder(wd  = wd,
 
 bdata <- premessa:::calculate_baseline(wd, beads.type = "Beta", files.type = "data", beads.gates = beads.gate)
 
-
+fs
 sample <- sampleNames(fs)[1]
 m <- flowCore::exprs(fs[[sample]])
 beads.events <- premessa:::identify_beads(m, beads.gate[[sample]], beads.cols.names, dna.col = "(Ir193)Di")
 beads.data <- m[beads.events,]
 
+fs
+beads.data
+table(beads.events)
+
 norm.res <- premessa:::correct_data_channels(m, beads.data, baseline = bdata, beads.cols.names)
+
 
 m.normed <- norm.res$m.normed
 m.normed <- cbind(m.normed,
-                  beadDist = premessa::get_mahalanobis_distance_from_beads(m.normed, 
+                  beadDist = premessa:::get_mahalanobis_distance_from_beads(m.normed, 
                                                                            beads.events, 
                                                                            beads.cols.names))
+
+premessa:::plot_distance_from_beads(m.normed, x.var = "(Ir193)Di", y.var = "(Ir191)Di")
+
+
+premessa:::plot_beads_over_time(beads.data = m, beads.normed = norm.res$beads.normed, beads.cols = beads.cols.names)
+
