@@ -756,8 +756,8 @@ Clean <- function(input, output, session, rval) {
       progress$inc(1/i, detail = paste("Doing part", sample))
     }
     
-    subset_df_clean[,"badCells"] <- as.factor(subset_df_clean[,"badCells"])
-    df_ending[,"badCells"] <- as.factor(df_ending[,"badCells"]) 
+    subset_df_clean[,"badCells"] <- as.integer(subset_df_clean[,"badCells"])
+    df_ending[,"badCells"] <- as.integer(df_ending[,"badCells"]) 
     
     gs_old_tagged <- build_gatingset_from_df(df = df_ending, gs_origin = rval$gating_set)
     gs_good_cells <- build_gatingset_from_df(df = subset_df_clean, gs_origin = rval$gating_set)
