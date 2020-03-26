@@ -305,9 +305,12 @@ Gating <- function(input, output, session, rval) {
       }
       
       #compute distance with existing vertexes
-      d <- sqrt(((gate$x - x_coord)/gate$x)^2 + ((gate$y - y_coord)/gate$y)^2)
-      min_d <- min(d)
-      print(min_d)
+      if(!is.null(gate$x)){
+        d <- sqrt(((gate$x - x_coord)/gate$x)^2 + ((gate$y - y_coord)/gate$y)^2)
+        min_d <- min(d)
+        print(min_d)
+      }
+      
       
       gate$x <- c(gate$x, x_coord)
       gate$y <- c(gate$y, y_coord)
@@ -765,15 +768,17 @@ Gating <- function(input, output, session, rval) {
   #        # gates <- transform_gates(gates, pattern = "Comp-", replacement = "")
   #        # gs <- flowWorkspace::GatingSet(fs)
   # 
-  #       # add_gates_flowCore(gs, gates = gates)
-  #        transfo <- lapply(colnames(gs), function(x){return(logicle_trans())})
-  #        names(transfo) <- colnames(gs)
-  #        gs@transformation <- transfo
-  #        # spill <- gs@data[[1]]@description[["SPILL"]]
-  #        # comp <- lapply(pData(gs)$name, function(x){spill})
-  #        # names(comp) <- pData(gs)$name
-  #        # gs@compensation <- comp
-  #        rval$gating_set <- gs
+  #        #add_gates_flowCore(gs, gates = gates)
+  #        #transfo <- lapply(colnames(gs), function(x){return(logicle_trans())})
+  #        #names(transfo) <- colnames(gs)
+  #        #gs@transformation <- transfo
+  #       
+  #         # spill <- gs@data[[1]]@description[["SPILL"]]
+  #         # comp <- lapply(pData(gs)$name, function(x){spill})
+  #         # names(comp) <- pData(gs)$name
+  #         # gs@compensation <- comp
+  #        
+  #         rval$gating_set <- gs
   # 
   #       #load("../flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
   #       #fs <- build_flowset_from_df(df = res$cluster$data, origin = res$cluster$flow_set)

@@ -139,7 +139,7 @@ transformation_parameters <- lapply(transformation, function(tr){
   as.list(environment(tr$transform))
 })
 
-rg <- rectangleGate(list("FL1-H" = c(500, 1000)), filterId = "rg")
+rg <- rectangleGate(list("FSC-A" = c(500, 1000)), filterId = "rg")
 gs_pop_add(gs, rg, parent= "root")
 
 p <- ggcyto(gs@data[[1]], aes_(x=as.name("FL1-H"), y=as.name("FL2-H"))) + 
@@ -156,14 +156,19 @@ p1 <- p + scale_x_continuous(trans=log10_trans(), limits = c(10,1000)) +
    scale_y_continuous(trans=log10_trans(), limits = c(10,1000))
 p1 + stat_binhex() + geom_gate(rg)
 
-plot_gs_ggcyto(gs, gate_name = "rg", sample = sampleNames(gs)[1:3], plot_type = "contour",
-               plot_args = list("xvar"= "FL1-H", "yvar" = "FL2-H",   "show_outliers" = TRUE,
-                                size = 1, alpha = 0.8, use_pointdensity = TRUE, max_nrow_to_plot = 10000),
+transformation[["SSC-A"]] <- identity_trans()
+transformation[["FSC-A"]] <- identity_trans()
+
+p <- plot_gs_ggcyto(gs, gate_name = "rg", sample = sampleNames(gs)[1:3], plot_type = "dots",
+               plot_args = list("xvar"= "FSC-A", "yvar" = "SSC-A", "show_outliers" = TRUE, transform_function = "log",
+                                size = 0.3, alpha = 0.2, use_pointdensity = TRUE, adjust = 1, max_nrow_to_plot = 10000),
                options = list(
-                 "facet_var" = "name",
+                 #"facet_var" = "name",
                  option = "viridis",
-  axis_limits=list("FL1-H"=c(5,100000)),
+  axis_limits=list("FSC-A"=c(1e4,3e5), "SSC-A" = c(1e3,3e5)),
   transformation = transformation))
+
+p
 
 p <- plot_gs(gs, plot_type = "dots", 
              Ncells = 1000,

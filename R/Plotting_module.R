@@ -54,7 +54,7 @@ Plotting <- function(input, output, session, rval){
 
   })
   
-  res <- callModule(plotGatingSet, "plot_module", rval, plot_params,
+  res <- callModule(plotCyto, "plot_module", rval, plot_params,
                     simple_plot = FALSE, 
                     auto_update = FALSE
                     )

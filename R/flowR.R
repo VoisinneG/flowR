@@ -1575,6 +1575,7 @@ plot_dots <-function(args = list()){
   
   plot_type <- "dots"
   
+  transform_function <- "identity"
   max_nrow_to_plot <- Inf
   adjust <- 1
   use_pointdensity <- FALSE
@@ -1652,9 +1653,10 @@ plot_dots <-function(args = list()){
   }
   
   if(use_pointdensity){
+    adjust_default <- sapply(max(df[[xvar]]), transform_function)/30
     p <- p + ggpointdensity::geom_pointdensity(alpha = alpha, 
                                                size = size,
-                                               adjust = adjust)
+                                               adjust = adjust_default * adjust)
       #scale_color_viridis()
   }else{
     p <- p +  geom_point(alpha = alpha,
@@ -1662,7 +1664,7 @@ plot_dots <-function(args = list()){
   }
   
 
-  if(show_label & class(data) %in% c("ncdfFlowSet", "flowSet")){
+  if(show_label & ! class(data) %in% c("ncdfFlowSet", "flowSet")){
     df_stat <- compute_stats(df = df,
                              stat_function = "median",
                              yvar = c(xvar, yvar),

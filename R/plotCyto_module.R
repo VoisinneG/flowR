@@ -644,6 +644,17 @@ observe({
       plot_args[[var]] <- rval_input[[var]][1]
     }
     
+    plot_args[["transform_function"]] <- "identity"
+    transformation <- choices()$transformation
+    if(!is.null(rval$apply_trans)){
+      if(rval$apply_trans){
+        if( ! "identity" %in% transformation[[rval_input$xvar]]$name |
+            ! "identity" %in% transformation[[rval_input$yvar]]$name){
+          plot_args[["transform_function"]] <- "log"
+        }
+      }
+    }
+    
     for(var in rval_input[[split_variable]]){
       
       plot_args[[split_variable]] <- var
@@ -751,7 +762,19 @@ observe({
         plot_args[["max_nrow_to_plot"]] <- Inf
       }
     }
-      
+    
+    plot_args[["transform_function"]] <- "identity"
+    transformation <- choices()$transformation
+    if(!is.null(rval$apply_trans)){
+      if(rval$apply_trans){
+        if( ! "identity" %in% transformation[[rval_input$xvar]]$name |
+            ! "identity" %in% transformation[[rval_input$yvar]]$name){
+          plot_args[["transform_function"]] <- "log"
+        }
+      }
+    }
+
+    
     for(var in rval_input[[split_variable]]){
       
       plot_args[[split_variable]] <- var
