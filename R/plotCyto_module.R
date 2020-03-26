@@ -88,7 +88,7 @@ plotCyto <- function(input, output, session,
   rval_mod <- reactiveValues(plot_list = list())
   
   ### Default plot parameters ######################################################################
-  rval_plot <- reactiveValues(plot_type = "hexagonal",
+  rval_plot <- reactiveValues(plot_type = "dots",
                               use_all_cells = FALSE,
                               auto_focus = FALSE,
                               zoom_on_data_points = FALSE,
@@ -102,6 +102,7 @@ plotCyto <- function(input, output, session,
                               bins = 50,
                               alpha = 0.3,
                               size = 0.3,
+                              adjust = 1,
                               color_var = "none",
                               group_var = "none",
                               facet_var = "name",
@@ -181,8 +182,13 @@ observe({
     ns <- session$ns
     x <- list()
     
+    if(use_ggcyto){
+      plot_types <- c("dots", "histogram", "contour")
+    }else{
+      plot_types <- c("dots", "histogram", "contour", "hexagonal")
+    }
     x[["plot_type"]] <- selectInput(ns("plot_type"), label = "plot type",
-                choices = c("hexagonal", "histogram", "dots", "contour"),
+                choices = plot_types,
                 selected = rval_plot[["plot_type"]])
     
     x[["use_all_cells"]] <- checkboxInput(ns("use_all_cells"), "Use all cells", rval_plot[["use_all_cells"]])
@@ -226,6 +232,9 @@ observe({
     x[["size"]] <- numericInput(ns("size"), label = "size", 
                                 value = rval_plot[["size"]])
     
+    x[["adjust"]] <- numericInput(ns("adjust"), label = "adjust", 
+                                value = rval_plot[["adjust"]])
+    
     x[["show_label"]] <- checkboxInput(ns("show_label"), "show labels", 
                                        value = rval_plot[["show_label"]])
     
@@ -252,6 +261,9 @@ observe({
       vars <- c("show_gates", "bins", "option")
     }else if (rval_input$plot_type == 'dots'){
       vars <- c("show_gates","alpha", "size", "show_label", "option")
+      if("density" %in% rval_input$color_var){
+        vars <- c(vars, "adjust")
+      }
     }else if (rval_input$plot_type == 'contour'){
       vars <- c("show_gates", "show_outliers",  "bins", "alpha", "size")
     }
@@ -282,14 +294,16 @@ observe({
     
                   
     color_var_choices <- switch(rval_input$plot_type,
-                                "dots" = c("none", "subset", choices()$meta_var, 
+                                "dots" = c("none", "density", "subset", choices()$meta_var, 
                                            choices()$plot_var),
                                 c("none", "subset", 
                                   choices()$meta_var, 
                                   choices()$plot_var[choices()$params$vartype != "numeric"]))
     
     if(use_ggcyto){
-      color_var_choices <-  c("none",  choices()$meta_var)
+      color_var_choices <- switch(rval_input$plot_type,
+                                  "dots" = c("none", "density", "subset", choices()$meta_var),
+                                  c("none", "subset", choices()$meta_var))
     }
     
     
@@ -499,6 +513,7 @@ observe({
                       "bins",
                       "size",
                       "alpha",
+                      "adjust",
                       "norm_density",
                       "smooth",
                       "ridges",
@@ -566,7 +581,7 @@ observe({
                   "All subsets not found in GatingSet"))
 
 
-    Ncells <- 30000
+    Ncells <- 5e4
     if(!is.null(rval_input$use_all_cells)){
       if(rval_input$use_all_cells){
         Ncells <- NULL
@@ -730,6 +745,13 @@ observe({
       plot_args[[var]] <- rval_input[[var]][1]
     }
     
+    plot_args[["max_nrow_to_plot"]] <- 3e4
+    if(!is.null(rval_input$use_all_cells)){
+      if(rval_input$use_all_cells){
+        plot_args[["max_nrow_to_plot"]] <- Inf
+      }
+    }
+      
     for(var in rval_input[[split_variable]]){
       
       plot_args[[split_variable]] <- var
@@ -947,10 +969,10 @@ observe({
 #     observe({
 #       #dataDir <- system.file("extdata",package="flowWorkspaceData")
 #       #gs <- load_gs(list.files(dataDir, pattern = "gs_bcell_auto",full = TRUE))
-#        #utils::data("GvHD", package = "flowCore")
-#        #gs <- GatingSet(GvHD)
-#       data("Bcells")
-#       gs <- GatingSet(Bcells)
+#       utils::data("GvHD", package = "flowCore")
+#       gs <- GatingSet(GvHD)
+#       #data("Bcells")
+#       #gs <- GatingSet(Bcells)
 #        rval$gating_set <- gs
 #       #plot_params$plot_type <- "histogram"
 #       #plot_params$xvar <- "cluster"
@@ -969,7 +991,7 @@ observe({
 #                       plot_params = plot_params,
 #                       simple_plot = FALSE,
 #                       show_gates = TRUE,
-#                       use_ggcyto = TRUE
+#                       use_ggcyto = FALSE
 #                       )
 # 
 #     callModule(simpleDisplay, "simple_display_module", res$plot)
@@ -979,3 +1001,4 @@ observe({
 #   shinyApp(ui, server)
 # 
 # }
+  

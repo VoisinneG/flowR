@@ -1409,14 +1409,11 @@ plot_hexagonal <- function(args = list()){
   }
   
   if(class(data) %in% c("ncdfFlowSet", "flowSet")){
-    p <- ggcyto::ggcyto(data,
-                        aes_(x = as.name( xvar ), 
-                             y = as.name( yvar ) ) )
+    stop("Plot type not supported for flowSet objects")
   }else{
     p <- ggplot(data,
                         aes_(x = as.name( xvar ), 
                              y = as.name( yvar ) ) )
-     
   }
   
   #p <- p + coord_cartesian()
@@ -1451,6 +1448,7 @@ plot_histogram <- function(args = list()){
   
   plot_type <- "histogram"
   
+  max_nrow_to_plot = Inf
   color_var <- NULL
   group_var <- NULL
   smooth <- FALSE
@@ -1472,7 +1470,8 @@ plot_histogram <- function(args = list()){
 
   if(class(data) %in% c("ncdfFlowSet", "flowSet")){
     p <- ggcyto::ggcyto(data,
-                        aes_(x = as.name( xvar )))
+                        aes_(x = as.name( xvar )),
+                        max_nrow_to_plot=max_nrow_to_plot)
     df <- data.frame(exprs(data[[1]]), check.names = FALSE)
   }else{
     p <- ggplot(data, aes_(x = as.name( xvar )))
@@ -1571,9 +1570,14 @@ plot_histogram <- function(args = list()){
 #' @import ggplot2
 #' @import ggcyto
 #' @importFrom ggrepel geom_label_repel
+#' @importFrom ggpointdensity geom_pointdensity
 plot_dots <-function(args = list()){
   
   plot_type <- "dots"
+  
+  max_nrow_to_plot <- Inf
+  adjust <- 1
+  use_pointdensity <- FALSE
   id.vars <- NULL
   show_label <- FALSE
   color_var <- NULL
@@ -1599,7 +1603,10 @@ plot_dots <-function(args = list()){
   if(!is.null(color_var)){
     if(color_var == "none"){
       color_var <- NULL
-    }else{
+    }else if(color_var == "density"){
+      use_pointdensity <- TRUE
+    }
+    else{
       if(color_var %in% names(df)){
         id.vars <- color_var
       }
@@ -1628,36 +1635,46 @@ plot_dots <-function(args = list()){
     }
   }
   
-  if(class(data) %in% c("ncdfFlowSet", "flowSet")){
-    p <- ggcyto::ggcyto(data,
-                        aes_string(x = as.name( xvar ),
-                                   y = as.name( yvar ),
-                                   colour = color_var,
-                                   group = group_var))
-  }else{
-    p <- ggplot(data,
-                        aes_string(x = as.name( xvar ), 
-                                   y = as.name( yvar ),
-                                   colour = color_var,
-                                   group = group_var)) 
+  mapping <- aes_string(x = as.name( xvar ),
+                  y = as.name( yvar ),
+                  colour = color_var,
+                  group = group_var)
+  
+  if(use_pointdensity){
+    mapping <- aes_string(x = as.name( xvar ),
+                          y = as.name( yvar ))
   }
   
-  p <- p +   geom_point(alpha = alpha, 
-               size = size)
+  if(class(data) %in% c("ncdfFlowSet", "flowSet")){
+    p <- ggcyto::ggcyto(data = data, mapping=mapping, max_nrow_to_plot=max_nrow_to_plot)
+  }else{
+    p <- ggplot(data, mapping) 
+  }
   
-  # if(show_label){
-  #   df_stat <- compute_stats(df = df,
-  #                            stat_function = "median",
-  #                            yvar = c(xvar, yvar),
-  #                            id.vars = id.vars)
-  #   
-  #   p <- p + geom_label_repel(mapping = aes_string(x = as.name( xvar ), 
-  #                                                 y = as.name( yvar ),
-  #                                                 color = id.vars,
-  #                                                 label = id.vars), 
-  #                            data = df_stat,
-  #                            fill = "white")
-  # }
+  if(use_pointdensity){
+    p <- p + ggpointdensity::geom_pointdensity(alpha = alpha, 
+                                               size = size,
+                                               adjust = adjust)
+      #scale_color_viridis()
+  }else{
+    p <- p +  geom_point(alpha = alpha,
+                          size = size)
+  }
+  
+
+  if(show_label & class(data) %in% c("ncdfFlowSet", "flowSet")){
+    df_stat <- compute_stats(df = df,
+                             stat_function = "median",
+                             yvar = c(xvar, yvar),
+                             id.vars = id.vars)
+
+    p <- p + geom_label_repel(mapping = aes_string(x = as.name( xvar ),
+                                                  y = as.name( yvar ),
+                                                  color = id.vars,
+                                                  label = id.vars),
+                             data = df_stat,
+                             fill = "white")
+  }
   
   return(p)
   
@@ -1679,6 +1696,7 @@ plot_contour <-function(args = list()){
   
   plot_type <- "contour"
 
+  max_nrow_to_plot = Inf
   color_var <- NULL
   group_var <- NULL
   
@@ -1731,7 +1749,8 @@ plot_contour <-function(args = list()){
                 aes_string(x = as.name( xvar ),
                            y = as.name( yvar ),
                            colour = color_var,
-                           group = group_var))
+                           group = group_var),
+                max_nrow_to_plot = max_nrow_to_plot)
   }else{
     p <- ggplot(data,
                 aes_string(x = as.name( xvar ),
@@ -2628,6 +2647,10 @@ format_plot <- function(p,
     
   }
 
+  if("StatPointdensity" %in% class(p$layers[[1]]$stat)){
+    p <- p + viridis::scale_colour_viridis(option = option)
+  }
+  
   ### facet ###
   if(!is.null(options$facet_var) | !is.null(facet_yvar)){
     
@@ -2910,6 +2933,7 @@ plot_gs <- function(gs,
                     spill = NULL,
                     metadata = NULL,
                     gate_name = NULL,
+                    Ncells = NULL,
                     plot_type = "hexagonal",
                     plot_args = list(),
                     options = list()){
@@ -2924,12 +2948,12 @@ plot_gs <- function(gs,
   
   if(is.null(sample)) sample <-  flowWorkspace::sampleNames(gs)[1]
   if(is.null(subset)) subset <- gh_get_gate_names(gs[[1]])[1]
-
   
   df <- get_plot_data(df = df,
                       gs = gs,
                       sample = sample,
                       subset = subset,
+                      Ncells = Ncells,
                       spill = spill, 
                       metadata = metadata)
   
@@ -2986,6 +3010,7 @@ plot_gs_ggcyto <- function(gs,
     plot_args[["yvar"]] <- colnames(gs@data)[2]
   }
   
+  
   if(is.null(sample)) sample <-  flowWorkspace::sampleNames(gs)[1]
   if(is.null(subset)) subset <- gh_get_gate_names(gs[[1]])[1]
   
@@ -3007,9 +3032,9 @@ plot_gs_ggcyto <- function(gs,
     }
   }
   
-  p <- format_plot(p, options = options)
-  
   p <- as.ggplot(p)
+  
+  p <- format_plot(p, options = options)
   
   return(p)
 }
@@ -3253,6 +3278,7 @@ plot_gh <- function( gs,
 #' @param plot_args  list of plot parameters passed to \code{plot_gs()}
 #' @param options  list of plot format options passed to \code{format_plot()}
 #' @importFrom flowWorkspace gh_pop_get_gate sampleNames
+#' @importFrom ggcyto as.ggplot
 #' @importFrom flowCore compensate
 plot_gate <- function(gate_name,
                      df = NULL,
@@ -3295,9 +3321,13 @@ plot_gate <- function(gate_name,
                     plot_type = plot_type,
                     plot_args = plot_args)
   
+  p <- add_gate_to_plot(p, gate)
+  
+  p <- ggcyto::as.ggplot(p)
+    
   p <- format_plot(p, options = options)
   
-  p <- add_gate_to_plot(p, gate)
+  
   
   return(p)
 }
