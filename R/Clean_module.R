@@ -69,6 +69,18 @@ CleanUI<-function(id){
                
            ),
            box(width = NULL,
+               title = "GatingSet",
+               collapsible = F,
+               collapsed = F,
+               actionButton(inputId = ns("update_preview_badCells"), label = "Update preview of badCells"),
+               checkboxInput(inputId = ns("gating_set_tag_or_not"), 
+                             label = "Actual gatingset with gatingset tag",
+                             value = T
+                            ),
+               textInput(ns("GatingSet_tagged_name"), label = "Create GatingSet"),
+               actionButton(ns("action_create_gatingset"), label = "Create GatingSet")
+               ),
+           box(width = NULL,
                title = "Advanced options",
                collapsible = T, collapsed = T,
                box(title = "Flow rate",
@@ -171,9 +183,8 @@ CleanUI<-function(id){
                                     simpleDisplayUI(ns("simple_display_module2"))
                            )
                            
-               ), 
-               textInput(ns("GatingSet_tagged_name"), label = "Create GatingSet"),
-               actionButton(ns("action_create_gatingset"), label = "Create GatingSet")
+               )
+               
                
            ),
            box(title = "Results",
@@ -225,6 +236,9 @@ CleanUI<-function(id){
 Clean <- function(input, output, session, rval) {
   
   ### Call modules ###################################################################
+  # temp_rval <- reactiveValues(test = NULL)
+  temp_gs <- reactiveValues(gating_set = NULL)
+  preview_val_but <- reactiveValues(input_prev = NULL)
   
   callModule(simpleDisplay, "simple_display_module", 
              plot_list = heatmap_plot, 
@@ -237,15 +251,27 @@ Clean <- function(input, output, session, rval) {
   
   plot_params <- reactiveValues()
   
+  ### setup preview badCells plottings via callModules ########################################################### 
+  observeEvent(input$update_preview_badCells, {
+    preview_val_but$input_prev <- 1
+    
+    #temp rval for preview of badcells
+    temp_gs$gating_set <- rval$gating_set 
+      gs <- create_futur_gs()[[1]]
+      temp_gs$gating_set <- gs
+  })
+  
   observe({
-    validate(need(flowCore::colnames(rval$gating_set) == "badCells", "need to make cleaning to see plot"))
+    validate(need(flowCore::colnames(temp_gs$gating_set) == "badCells", "need to make cleaning to see plot"))
+    
+    # set parameter of plots by defaults
     plot_params$plot_type <- "dots"
     plot_params$xvar <- "FSC-H"
     plot_params$yvar <- "SSC-H"
     plot_params$color_var <- "badCells"
-    
+
     res_badcells_plot <- callModule(plotGatingSet, "plot_preview_badcells",
-                                    rval,
+                                    temp_gs,
                                     plot_params = plot_params,
                                     show_gates = F)
     
@@ -492,7 +518,7 @@ Clean <- function(input, output, session, rval) {
   
   res <- eventReactive(input$clean_selected_sample_input, {
     show_error <- 0
-    
+    preview_val_but$input_prev <- 0
     
     if(is.null(input$groupButton)){
       showModal(
@@ -736,9 +762,7 @@ Clean <- function(input, output, session, rval) {
           }
         }
       }
-      
-    
-
+ 
       ## Signal acquisition search badCells
       if(input$groupButton == 3){
         
@@ -758,16 +782,17 @@ Clean <- function(input, output, session, rval) {
     
     subset_df_clean[,"badCells"] <- as.integer(subset_df_clean[,"badCells"])
     df_ending[,"badCells"] <- as.integer(df_ending[,"badCells"]) 
-    
+
     gs_old_tagged <- build_gatingset_from_df(df = df_ending, gs_origin = rval$gating_set)
     gs_good_cells <- build_gatingset_from_df(df = subset_df_clean, gs_origin = rval$gating_set)
-    
+
     return(
       list(
         gs_old_tagged,
         gs_good_cells
       )
     )
+
   })
   
   ### Build the new gating_set & old gating_set tagged #################################################
@@ -776,27 +801,35 @@ Clean <- function(input, output, session, rval) {
     updateTextInput(session, "GatingSet_tagged_name", value = paste0(rval$gating_set_selected, "_clean"))
   })
   
+
   observeEvent(input$action_create_gatingset,{
-    gs_list <- create_futur_gs()
+    preview_val_but$input_prev <- 0
+    gs_list <- create_futur_gs() # list of frame for futur gs
+    
     if(is.null(gs_list)){
       # show modal
     } else {
       # reset of ok_after_verify 
-      ok_after_verify$flowRateSelected <- NULL
+      if(input$gating_set_tag_or_not == T){
+        ok_after_verify$flowRateSelected <- NULL
+        
+        old_gs <- gs_list[[1]]
+
+        params <- colnames(old_gs)[colnames(old_gs) %in% names(rval$trans_parameters)]
+        
+        
+        rval$gating_set_list[[paste(rval$gating_set_selected, "_tag")]] <- list(gating_set = old_gs,
+                                                                                parent = rval$gating_set_selected,
+                                                                                trans_parameters = rval$trans_parameters[params]
+        )
+        
+        rval$gating_set <- old_gs
+        rval$update_gs <- rval$update_gs + 1
+      } 
       
-      old_gs <- gs_list[[1]]
-      params <- colnames(old_gs)[colnames(old_gs) %in% names(rval$trans_parameters)]
-
-
-      rval$gating_set_list[[paste(rval$gating_set_selected, "_tag")]] <- list(gating_set = old_gs,
-                                                                  parent = rval$gating_set_selected,
-                                                                  trans_parameters = rval$trans_parameters[params]
-      )
-
-      rval$gating_set <- old_gs
-      rval$update_gs <- rval$update_gs + 1
       
       gs <- gs_list[[2]]
+      
       params <- colnames(gs)[colnames(gs) %in% names(rval$trans_parameters)]
       rval$gating_set_list[[input$GatingSet_tagged_name]] <- list(gating_set = gs,
                                                                   parent = rval$gating_set_selected,
@@ -804,10 +837,11 @@ Clean <- function(input, output, session, rval) {
       )
       
       rval$gating_set_selected <- input$GatingSet_tagged_name
-
+      
       rval$gating_set <- gs
       rval$update_gs <- rval$update_gs + 1
     }
+    
     
   })
   
@@ -973,7 +1007,6 @@ Clean <- function(input, output, session, rval) {
   })
   
   ### Build QC plots #######################################################################################
-
   
   output$flow_rate_plot_output <- renderPlot({
     validate(
