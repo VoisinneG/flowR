@@ -239,33 +239,33 @@ callModule(simpleDisplay, "simple_display", gate_plot()$plot)
 # library(flowWorkspace)
 # library(flowCore)
 # 
-if (interactive()){
-
-  ui <- dashboardPage(
-    dashboardHeader(title = "flowAI"),
-    sidebar = dashboardSidebar(disable = TRUE),
-    body = dashboardBody(
-      NormalizationUI("module")
-    )
-  )
-
-  server <- function(input, output, session) {
-    rval <- reactiveValues()
-    observe({
-      #utils::data("GvHD", package = "flowCore")
-      #rval$gating_set <- GatingSet(GvHD)
-      # utils::data("Bcells", package = "flowAI")
-      # rval$gating_set <- flowWorkspace::GatingSet(Bcells)
-
-      fs <- read.ncdfFlowSet(files = c("/mnt/NAS7/Workspace/hammamiy/data_premasse/20120222_cells_found.fcs",
-                                       "/mnt/NAS7/Workspace/hammamiy/data_premasse/20120229_cells_found.fcs"))
-
-      gs <- GatingSet(fs)
-      rval$gating_set <- gs
-    })
-    res <- callModule(Normalization, "module", rval = rval)
-  }
-
-  shinyApp(ui, server)
-
-}
+# if (interactive()){
+# 
+#   ui <- dashboardPage(
+#     dashboardHeader(title = "flowAI"),
+#     sidebar = dashboardSidebar(disable = TRUE),
+#     body = dashboardBody(
+#       NormalizationUI("module")
+#     )
+#   )
+# 
+#   server <- function(input, output, session) {
+#     rval <- reactiveValues()
+#     observe({
+#       #utils::data("GvHD", package = "flowCore")
+#       #rval$gating_set <- GatingSet(GvHD)
+#       # utils::data("Bcells", package = "flowAI")
+#       # rval$gating_set <- flowWorkspace::GatingSet(Bcells)
+# 
+#       fs <- read.ncdfFlowSet(files = c("/mnt/NAS7/Workspace/hammamiy/data_premasse/20120222_cells_found.fcs",
+#                                        "/mnt/NAS7/Workspace/hammamiy/data_premasse/20120229_cells_found.fcs"))
+# 
+#       gs <- GatingSet(fs)
+#       rval$gating_set <- gs
+#     })
+#     res <- callModule(Normalization, "module", rval = rval)
+#   }
+# 
+#   shinyApp(ui, server)
+# 
+# }
