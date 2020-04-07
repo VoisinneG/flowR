@@ -1007,8 +1007,10 @@ get_data_gs <- function(gs,
   if(is.null(sample)){sample <- flowWorkspace::sampleNames(gs)}
   if(is.null(subset)){subset <- gh_get_gate_names(gs[[1]])}
   
-  idx <- which(sample %in% flowWorkspace::sampleNames(gs))
-
+  #idx <- which(sample %in% flowWorkspace::sampleNames(gs))
+  idx <- match(sample, flowWorkspace::sampleNames(gs))
+  idx <- idx[!is.na(idx)]
+  
   if(length(idx) == 0){
     return(NULL)
   }
