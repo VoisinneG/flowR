@@ -9,7 +9,7 @@ library(ggcyto)
 
 fs <- read.ncdfFlowSet(files = c("/mnt/NAS7/Workspace/hammamiy/data_premasse/20120222_cells_found.fcs",
                                  "/mnt/NAS7/Workspace/hammamiy/data_premasse/20120229_cells_found.fcs"))
-                                 
+
 gs <- GatingSet(fs)
 
 
@@ -42,11 +42,11 @@ df <- get_data_gs(gs = gs, sample = sampleNames(gs), subset = "beads5")
 beads.cols.names <- c("Bead1(La139)Di", "Bead2(Pr141)Di", "CD11c(Tb159)Di", "Bead3(Tm169)Di", "Bead4(Lu175)Di")
 df$id <- 1
 df_stat <- flowR:::compute_stats(df = df, 
-                         y_trans = asinh_trans(scale = 5), 
-                         apply_inverse = TRUE,
-                         yvar = beads.cols.names, 
-                         stat_function = "median", 
-                         id.vars = c("id"))
+                                 y_trans = asinh_trans(scale = 5), 
+                                 apply_inverse = TRUE,
+                                 yvar = beads.cols.names, 
+                                 stat_function = "median", 
+                                 id.vars = c("id"))
 baseline.data <- unlist(df_stat[, -1])
 
 #normalize data for each sample
@@ -57,10 +57,10 @@ for(sample in sampleNames(gs)){
   beads.data <- get_data_gs(gs, sample = sample, subset = "beads5")
   beads.data <- as.matrix(beads.data[-which(names(beads.data) %in% c("name", "subset"))])
   norm.res <- premessa:::correct_data_channels(m = m,
-                                    beads.data = beads.data,
-                                    baseline = baseline.data,
-                                    beads.col.names = beads.cols.names,
-                                    time.col.name = "Time")
+                                               beads.data = beads.data,
+                                               baseline = baseline.data,
+                                               beads.col.names = beads.cols.names,
+                                               time.col.name = "Time")
   m.normed <- norm.res$m.normed
   beads.events <- gh_pop_get_indices(gs[[sample]], "beads5")
   
@@ -85,9 +85,9 @@ gs_norm <- GatingSet(fs_norm)
 
 
 plot_gs(gs_norm,sample = sampleNames(gs_norm),
-               plot_type = "dots",
-               plot_args = list(xvar = "Bead1(La139)Di", yvar = "(Ir193)Di" ),
-               options = list(default_trans = asinh_trans())) + facet_wrap(~name)
+        plot_type = "dots",
+        plot_args = list(xvar = "Bead1(La139)Di", yvar = "(Ir193)Di" ),
+        options = list(default_trans = asinh_trans())) + facet_wrap(~name)
 
 #using only functions from premessa
 
@@ -114,10 +114,10 @@ beads.gate[["20120229_cells_found.fcs"]] <-list("Bead1(La139)Di" = list(x=asinh(
 
 
 premessa::normalize_folder(wd  = wd, 
-                 beads.gates = beads.gate, 
-                 output.dir.name = "/normed/", 
-                 beads.type = "Beta", 
-                 baseline = NULL)
+                           beads.gates = beads.gate, 
+                           output.dir.name = "/normed/", 
+                           beads.type = "Beta", 
+                           baseline = NULL)
 
 bdata <- premessa:::calculate_baseline(wd, beads.type = "Beta", files.type = "data", beads.gates = beads.gate)
 
@@ -137,11 +137,15 @@ norm.res <- premessa:::correct_data_channels(m, beads.data, baseline = bdata, be
 m.normed <- norm.res$m.normed
 m.normed <- cbind(m.normed,
                   beadDist = premessa:::get_mahalanobis_distance_from_beads(m.normed, 
-                                                                           beads.events, 
-                                                                           beads.cols.names))
+                                                                            beads.events, 
+                                                                            beads.cols.names))
 
 premessa:::plot_distance_from_beads(m.normed, x.var = "(Ir193)Di", y.var = "(Ir191)Di")
 
 
 premessa:::plot_beads_over_time(beads.data = m, beads.normed = norm.res$beads.normed, beads.cols = beads.cols.names)
 
+
+
+test <- get_gates_from_gs(gs)
+test$`/beads1/beads2/beads3/beads4/beads5`
