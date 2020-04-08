@@ -91,14 +91,16 @@ Normalization <- function(input, output, session, rval){
   gate_reference <- reactive({
     validate(
       need(!is.null(rval$gating_set), "")
-      )
-    gates <- get_gates_from_gs(rval$gating_set)
-    return(gates)
+    )
+    get_gates_from_gs(rval$gating_set)
   })
   
   ### Update selectInput #########################################################################
   
   observe({
+    # validate(
+    #   need(!is.null(rval$gating_set), "")
+    # )
     updateSelectInput(session = session, 
                       inputId = "gates_subset_select", 
                       label = "Choice the gates of references", 
@@ -213,13 +215,16 @@ Normalization <- function(input, output, session, rval){
       
       df <- do.call(rbind, df_list)
       
+      # print(df)
       fs_norm <- build_flowset_from_df(df = df)
-      
+      # print(fs_norm)
       # #build GatingSet
       
       # fs_norm <- build_flowset_from_df(df = df, origin = fs)
       gs_norm <- build_gatingset_from_df(df = df, gs_origin = rval$gating_set)
+      
       # gs_norm <- GatingSet(fs_norm)
+      print(colnames(gs_norm))
       
       return(gs_norm)
       # rval$gating_set <- gs_norm
@@ -234,12 +239,13 @@ Normalization <- function(input, output, session, rval){
     validate(need(length(input$beads_select_input) > 0, "Need to choice beads before to apply normalization"))
     
     gs_norm <- normalize_reactive()
-    
-    # params <- colnames(gs_norm)[colnames(gs_norm) %in% names(rval$trans_parameters)]
-    # rval$gating_set_list[[input$GatingSet_tagged_name]] <- list(gating_set = gs_norm,
-    #                                                             parent = rval$gating_set_selected,
-    #                                                             trans_parameters = rval$trans_parameters[params]
-    # )
+    # print(names(gs_norm))
+    # print("test")
+    params <- colnames(gs_norm)[colnames(gs_norm) %in% names(rval$trans_parameters)]
+    rval$gating_set_list[[input$gating_set_norm_text]] <- list(gating_set = gs_norm,
+                                                                parent = rval$gating_set_selected,
+                                                                trans_parameters = rval$trans_parameters[params]
+    )
     rval$gating_set_selected <- input$gating_set_norm_text
     
     rval$gating_set <- gs_norm
@@ -299,14 +305,10 @@ Normalization <- function(input, output, session, rval){
 #       # rg5 <- rectangleGate(filterId = "beads5", list("Bead4(Lu175)Di" = c(10, 200), "(Ir193)Di" = c(-50, 50)))
 # 
 #       rg <- flowCore::rectangleGate(filterId = "beads1", list("APC-Cy7-A" = c(10, 200), "Pacific Blue-A" = c(-50, 50)))
-#       # rg2 <- rectangleGate(filterId = "beads2", list("Bead2(Pr141)Di" = c(10, 200), "(Ir193)Di" = c(-50, 50)))
-#       # rg3 <- rectangleGate(filterId = "beads3", list("CD11c(Tb159)Di" = c(10, 200), "(Ir193)Di" = c(-50, 50)))
-#       
+# 
+# 
 #       flowWorkspace::gs_pop_add(rval$gating_set, rg)
-#       # flowWorkspace::gs_pop_add(gs, rg2, parent = "/beads1")
-#       # flowWorkspace::gs_pop_add(gs, rg3, parent = "/beads1/beads2")
-#       # flowWorkspace::gs_pop_add(gs, rg4, parent = "/beads1/beads2/beads3")
-#       # flowWorkspace::gs_pop_add(gs, rg5, parent = "/beads1/beads2/beads3/beads4")
+# 
 # 
 #       recompute(rval$gating_set)
 # 
