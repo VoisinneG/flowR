@@ -130,11 +130,31 @@ Normalization <- function(input, output, session, rval){
   })
   
   #update beads input chan
+  #### Update beads input from default or personalized choices #######################################################################
   observe({
-    updateSelectInput(session, "beads_select_input", 
-                      label = "Choices the channels beads", 
-                      choices = chan_names(), 
-                      selected = m_norm_tmp$beads.cols.names.used)
+    
+    # get the first pattern of chan names 
+    if(input$norm_default == 1){
+      vec_names <- chan_names()[which(grepl("[A-z]i+", chan_names()))]
+      vec <- lapply(vec_names, function(i){
+        c(i[[1]])
+      })
+      
+      first_occurency <- unlist(vec, use.names = F)
+      print(first_occurency)
+      selection_default <- chan_names()[which(chan_names() %in% first_occurency)]
+      
+      updateSelectInput(session, "beads_select_input", 
+                        label = "Choices the channels beads", 
+                        choices = chan_names(), 
+                        selected = selection_default)
+    } else {
+      updateSelectInput(session, "beads_select_input", 
+                        label = "Choices the channels beads", 
+                        choices = chan_names(), 
+                        selected = m_norm_tmp$beads.cols.names.used)
+    }
+
   })
   
   # update x & y selectinput for the plot dist
