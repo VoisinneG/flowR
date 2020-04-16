@@ -27,14 +27,17 @@ NormalizationUI <- function(id){
                
                selectInput(inputId = ns("gates_subset_select"), label = "Choice the gates of references", choices = NULL),
                hr(),
-               selectInput(inputId = ns("beads_select_input"), label = "Choices the channels beads", multiple = T, choices = NULL)
+               selectInput(inputId = ns("beads_select_input"), label = "Choices the channels beads", multiple = T, choices = NULL),
+               
+               hr(),
+               actionButton(inputId = ns("normalize_button"), label = "Apply normalization")
                
                
                
            ),
            box(width = 12, title = "Create GatingSet",
                textInput(inputId = ns("gating_set_norm_text"), label = "Entry the names of normalize GatingSet", value = NULL),
-               actionButton(inputId = ns("Add_gate"), label = "create gates by default")
+               actionButton(inputId = ns("create_gs"), label = "create gates by default")
            )
     ),
     
@@ -76,76 +79,44 @@ NormalizationUI <- function(id){
 #'@import premessa
 #'@export
 Normalization <- function(input, output, session, rval){
+  # Setup temporary gs reactiveValues
+  
+  gs_tmp <- reactiveValues(gs_norm = rval)
+  
   
   #### call module ######################################################################################
   
-  # callModule(plotGatingSet, "param_plot", rval, show_gates = T, simple_plot = F)
-  
-  plot_params <- reactiveValues(plot_type = "dots", subset = c("root" , "/beads1"), color_var = "subset")
+  plot_params <- reactiveValues(plot_type = "dots", subset = c("root", NULL), color_var = "subset")
   
 
-
+  
   
   res <- callModule(plotGatingSet, "plot_preview", 
-                    rval,
+                    gs_tmp$gs_norm,
                     plot_params = plot_params,
                     show_gates = F,
                     simple_plot = F)
   
-  # gate_plot <- reactive({
-  #   
-  #   plot_params$show_gates <- TRUE
-  #   
-  #   callModule(plotGatingSet, "plot_preview",
-  #              rval,
-  #              plot_params = plot_params,
-  #              show_gates = F,
-  #              simple_plot = F)
-  # 
-  # })
-  
-  # callModule(simpleDisplay, "simple_display", gate_plot()$plot)
+
   callModule(simpleDisplay, "simple_display", res$plot)
-  
-  # mydata <- reactiveValues(x_values = c(), y_values = c())
-  
-  # observe({
-  #   dist <- xy_range_str(plot_display$params$plot_brush)
-  #   print(dist)
-  # })
-  
-  # get the parameters from the mouse brush selection
-  # xy_range_str <- function(e) {
-  #  list <- list()
-  #  if(is.null(e)) return("NULL")
-  #  list$xmin <- round(e$xmin, 1)
-  #  list$xmax <- round(e$xmax, 1)
-  #  list$ymin <- round(e$ymin, 1)
-  #  list$ymax <- round(e$ymax, 1)
-  #  return(list)
-  # }
   
   ### Setup gates of references subset ######################################################################
   
   gate_reference <- reactive({
-    validate(
-      need(!is.null(rval$gating_set), "")
-    )
-    get_gates_from_gs(rval$gating_set)
-  })
-  
-  ### Update selectInput #########################################################################
-  
-  observe({
     # validate(
     #   need(!is.null(rval$gating_set), "")
     # )
-    updateSelectInput(session = session, 
-                      inputId = "gates_subset_select", 
-                      label = "Choice the gates of references", 
-                      choices = names(gate_reference()))
-    
+    if(!is.null(rval$gating_set)){
+      res <- get_gates_from_gs(rval$gating_set)
+      return(names(res))
+    } else {
+      return(NULL)
+    }
+
   })
+  
+  ### Update selectInput #########################################################################
+
   
   # update multiple select input from channel names
   chan_names <- reactive({
@@ -171,11 +142,13 @@ Normalization <- function(input, output, session, rval){
   
   find_chan_desc_beads <- reactive({
     validate(need(!is.null(rval$gating_set), "gs is null"))
+    
     # find the similary beads from different sample
     all_beads_description <- lapply(rval$gating_set@data@frames, function(x){
 
       pattern_result <- flowR::description(x)[which(grepl("[Bb]ead", flowR::description(x)))]
-      print(grepl("[Bb]ead", flowR::description(x)))
+      # print(grepl("[Bb]ead", flowR::description(x)))
+      
       names <- colnames(rval$gating_set)[which(colnames(rval$gating_set) %in% pattern_result)]
       intersect(colnames(rval$gating_set),names)
     })
@@ -188,39 +161,47 @@ Normalization <- function(input, output, session, rval){
     return(res)
   })
   
+  # Update the selectinput of subset correponding to gate and create default gate 
   observeEvent(input$apply_default_gates ,{
-    print(find_chan_desc_beads())
+    
+    arbritrary_value <- list(x = c(10, 200))
+    sapply(input$select_beads_gates_default, function(x){
+      
+      names(arbritrary_value) <- x # rename x to the corresponding channel selected
+      rg <- flowCore::rectangleGate(filterId = x, arbritrary_value)
+      flowWorkspace::gs_pop_add(rval$gating_set, rg)
+    })
+    
+    recompute(rval$gating_set)
+    rval$update_gs <- rval$update_gs + 1
+    
+    updateSelectInput(session = session,
+                      inputId = "gates_subset_select",
+                      label = "Choice the gates of references",
+                      choices = gate_reference()
+    )
+    
   })
-  #update beads input chan
+  
+  ## update subset params_plot
+  
+  observe({
+    validate(need(!is.null(input$gates_subset_select), ""))
+    plot_params$subset <- c("root", input$gates_subset_select)
+  })
+  
+
   #### Update beads input from default or personalized choices #######################################################################
   observe({
-    # validate(need(!is.null()))
-    # get the first pattern of chan names 
-    # if(input$norm_default == 1){
-    #   vec_names <- chan_names()[which(grepl("[A-z]i+", chan_names()))]
-    #   vec <- lapply(vec_names, function(i){
-    #     c(i[[1]])
-    #   })
-    #   
-    #   first_occurency <- unlist(vec, use.names = F)
-    #   print(first_occurency)
-    #   selection_default <- chan_names()[which(chan_names() %in% first_occurency)]
-    #   
-    #   updateSelectInput(session, "beads_select_input", 
-    #                     label = "Choices the channels beads", 
-    #                     choices = chan_names(), 
-    #                     selected = selection_default)
-    # } else {
+
       updateSelectInput(session, "beads_select_input",
                         label = "Choices the channels beads",
                         choices = chan_names(),
-                        selected = m_norm_tmp$beads.cols.names.used)
-    # }
-
+                        selected = input$select_beads_gates_default)
+    # selected = m_norm_tmp$beads.cols.names.used
   })
   
   # update x & y selectinput for the plot dist
-  
   observe({
     updateSelectInput(session, 
                          "x_dist_input",
@@ -242,9 +223,12 @@ Normalization <- function(input, output, session, rval){
     
   })
   
-  ## Normalization from subset & specific "beads selected" ####
+  ## Normalization from subset & specific "beads selected" #######################################################
+  
+  #setup reactiveVal
   m_normed <- reactiveValues(norm = NULL)
   m_norm_tmp <- reactiveValues(m = NULL, norm.res = NULL, beads.cols.names.used = NULL)
+ 
   
   # update beads for normalization
   beads.cols.names <- reactive({
@@ -252,7 +236,6 @@ Normalization <- function(input, output, session, rval){
   })
   
   normalize_reactive <- reactive({
-    if(input$norm_default == 1){
       
       m_norm_tmp$beads.cols.names.used <- input$beads_select_input
       sample_names <- sampleNames(rval$gating_set)
@@ -336,24 +319,27 @@ Normalization <- function(input, output, session, rval){
       # print(df)
       fs_norm <- build_flowset_from_df(df = df)
       # print(fs_norm)
+      
       # #build GatingSet
-      
-      # fs_norm <- build_flowset_from_df(df = df, origin = fs)
       gs_norm <- build_gatingset_from_df(df = df, gs_origin = rval$gating_set)
-      
-      # gs_norm <- GatingSet(fs_norm)
-      print(colnames(gs_norm))
       
       return(gs_norm)
       # rval$gating_set <- gs_norm
       
-    }
+    
   })
   
   ### make normalisation ##################################################################################################
   
+  # Apply temporary normalization preview 
+  
+  observeEvent(input$normalize_button, {
+    gs_tmp$gs_norm <- normalize_reactive()
+    print("Normalization finished")
+  })
+  
   # create the new gating set from the normalization
-  observeEvent(input$Add_gate, {
+  observeEvent(input$create_gs, {
     validate(need(length(input$beads_select_input) > 0, "Need to choice beads before to apply normalization"))
     
     gs_norm <- normalize_reactive()
@@ -374,20 +360,13 @@ Normalization <- function(input, output, session, rval){
   ### Make normalization plot #######################################################################################
   output$norm_plot <- renderPlot({
     validate(need(!is.null(m_normed$norm), "No current normalisation apply"))
-    # print(m_normed$norm)
-    # print(sampleNames(rval$gating_set))
-    # premessa:::plot_distance_from_beads(m_normed$norm, x.var = "Bead1(La139)Di", y.var = "(Ir191)Di")
+
     premessa:::plot_beads_over_time(beads.data = m_norm_tmp$m, beads.normed = m_norm_tmp$norm.res$beads.normed, beads.cols = m_norm_tmp$beads.cols.names.used)
   })
   
   output$norm_plot_dist <- renderPlot({
-    # validate(
-    #   need()
-    #   )
-    # premessa:::plot_distance_from_beads(gs_norm@data@frames$`20120222_cells_found.fcs`@exprs, x.var = "Bead1(La139)Di", y.var = "Bead2(Pr141)Di")
-    # print(rval$gating_set@data[[input$select_sample_input]])
+    # validate(need(rval$gating_set@[[]], "No current normalisation apply"))
     premessa:::plot_distance_from_beads(exprs(rval$gating_set@data[[input$select_sample_input]]), x.var = input$x_dist_input, y.var = input$y_dist_input)
-    
   })
   return(rval)
   
@@ -424,18 +403,20 @@ if (interactive()){
 
       gs <- GatingSet(fs)
 
-      rg <- flowCore::rectangleGate(filterId = "beads1", list("Bead1(La139)Di" = c(10, 200), "(Ir193)Di" = c(-50, 50)))
-      rg2 <- flowCore::rectangleGate(filterId = "beads2", list("Bead2(Pr141)Di" = c(10, 200), "(Ir193)Di" = c(-50, 50)))
-      rg3 <- flowCore::rectangleGate(filterId = "beads3", list("CD11c(Tb159)Di" = c(10, 200), "(Ir193)Di" = c(-50, 50)))
-      rg4 <- flowCore::rectangleGate(filterId = "beads4", list("Bead3(Tm169)Di" = c(10, 200), "(Ir193)Di" = c(-50, 50)))
-      rg5 <- flowCore::rectangleGate(filterId = "beads5", list("Bead4(Lu175)Di" = c(10, 200), "(Ir193)Di" = c(-50, 50)))
+      # rg <- flowCore::rectangleGate(filterId = "beads1", list("Bead1(La139)Di" = c(10, 200), "(Ir193)Di" = c(-50, 50)))
+      # rg2 <- flowCore::rectangleGate(filterId = "beads2", list("Bead2(Pr141)Di" = c(10, 200), "(Ir193)Di" = c(-50, 50)))
+      # rg3 <- flowCore::rectangleGate(filterId = "beads3", list("CD11c(Tb159)Di" = c(10, 200), "(Ir193)Di" = c(-50, 50)))
+      # rg4 <- flowCore::rectangleGate(filterId = "beads4", list("Bead3(Tm169)Di" = c(10, 200), "(Ir193)Di" = c(-50, 50)))
+      # rg5 <- flowCore::rectangleGate(filterId = "beads5", list("Bead4(Lu175)Di" = c(10, 200), "(Ir193)Di" = c(-50, 50)))
 
-      flowWorkspace::gs_pop_add(gs, rg)
-      flowWorkspace::gs_pop_add(gs, rg2, parent = "/beads1")
-      flowWorkspace::gs_pop_add(gs, rg3, parent = "/beads1/beads2")
-      flowWorkspace::gs_pop_add(gs, rg4, parent = "/beads1/beads2/beads3")
-      flowWorkspace::gs_pop_add(gs, rg5, parent = "/beads1/beads2/beads3/beads4")
-      recompute(gs)
+      # flowWorkspace::gs_pop_add(gs, rg)
+      # flowWorkspace::gs_pop_add(gs, rg2, parent = "/beads1")
+      # flowWorkspace::gs_pop_add(gs, rg3, parent = "/beads1/beads2")
+      # flowWorkspace::gs_pop_add(gs, rg4, parent = "/beads1/beads2/beads3")
+      # flowWorkspace::gs_pop_add(gs, rg5, parent = "/beads1/beads2/beads3/beads4")
+      # recompute(gs)
+
+
 
       rval$gating_set <- gs
 
