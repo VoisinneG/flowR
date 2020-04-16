@@ -118,20 +118,21 @@ gs <- GatingSet(GvHD)
 sampleNames(gs)
 colnames(gs)
 
-transformation <- lapply(colnames(gs), function(x){
-  el <- estimateLogicle(x = gs@data[[1]], x)
-  params <- as.list(environment(el@transforms[[x]]@f))
-  params <- params[c("w", "t", "m", "a")]
-  test_trans <- try(el@transforms[[x]]@f(1), silent = TRUE)
-  if(class(test_trans) == "try-error"){
-    #params_default <- list("w"=1, "t"=1e6, "m"=7, "a"=0)
-    #do.call(logicle_trans, params_default)
-    logicle_trans()
-  }else{
-    do.call(logicle_trans, params)
-  }
-})
-transformation <- lapply(colnames(gs), function(x){asinh_trans()})
+# transformation <- lapply(colnames(gs), function(x){
+#   el <- estimateLogicle(x = gs@data[[1]], x)
+#   params <- as.list(environment(el@transforms[[x]]@f))
+#   params <- params[c("w", "t", "m", "a")]
+#   test_trans <- try(el@transforms[[x]]@f(1), silent = TRUE)
+#   if(class(test_trans) == "try-error"){
+#     #params_default <- list("w"=1, "t"=1e6, "m"=7, "a"=0)
+#     #do.call(logicle_trans, params_default)
+#     logicle_trans()
+#   }else{
+#     do.call(logicle_trans, params)
+#   }
+# })
+
+transformation <- lapply(colnames(gs), function(x){flowWorkspace::flowjo_biexp_trans()})
 names(transformation) <- colnames(gs)
 
 
@@ -139,29 +140,30 @@ transformation_parameters <- lapply(transformation, function(tr){
   as.list(environment(tr$transform))
 })
 
-rg <- rectangleGate(list("FSC-A" = c(500, 1000)), filterId = "rg")
+rg <- rectangleGate(list("FSC-H" = c(500, 1000)), filterId = "rg")
 gs_pop_add(gs, rg, parent= "root")
 
-p <- ggcyto(gs@data[[1]], aes_(x=as.name("FL1-H"), y=as.name("FL2-H"))) + 
-  geom_point() +
-  geom_gate(rg)
-
-p <- as.ggplot(p)
-p <- p + scale_x_continuous(trans=asinh_trans())
-
-p2 <- as.ggplot(p + geom_hex() + geom_gate(rg))
-p2 + scale_x_continuous(trans=log10_trans(), limits = c(10,1000))
-
-p1 <- p + scale_x_continuous(trans=log10_trans(), limits = c(10,1000)) +
-   scale_y_continuous(trans=log10_trans(), limits = c(10,1000))
-p1 + stat_binhex() + geom_gate(rg)
-
-transformation[["SSC-A"]] <- identity_trans()
-transformation[["FSC-A"]] <- identity_trans()
+# p <- ggcyto(gs@data[[1]], aes_(x=as.name("FL1-H"), y=as.name("FL2-H"))) + 
+#   geom_point() +
+#   geom_gate(rg)
+# 
+# p <- as.ggplot(p)
+# p <- p + scale_x_continuous(trans=asinh_trans())
+# 
+# p2 <- as.ggplot(p + geom_hex() + geom_gate(rg))
+# p2 + scale_x_continuous(trans=log10_trans(), limits = c(10,1000))
+# 
+# p1 <- p + scale_x_continuous(trans=log10_trans(), limits = c(10,1000)) +
+#    scale_y_continuous(trans=log10_trans(), limits = c(10,1000))
+# p1 + stat_binhex() + geom_gate(rg)
+# 
+# transformation[["SSC-A"]] <- identity_trans()
+# transformation[["FSC-A"]] <- identity_trans()
 
 p <- plot_gs_ggcyto(gs, gate_name = "rg", sample = sampleNames(gs)[1:3], plot_type = "dots",
-               plot_args = list("xvar"= "FSC-A", "yvar" = "SSC-A", "show_outliers" = TRUE, transform_function = "log",
-                                size = 0.3, alpha = 0.2, use_pointdensity = TRUE, adjust = 1, max_nrow_to_plot = 10000),
+               plot_args = list("xvar"= "FSC-H", "yvar" = "SSC-H", 
+                                "show_outliers" = TRUE, transform_function = "log",
+                                size = 1, alpha = 0.2, use_pointdensity = TRUE, adjust = 10, max_nrow_to_plot = 10000),
                options = list(
                  #"facet_var" = "name",
                  option = "viridis",
@@ -171,8 +173,8 @@ p <- plot_gs_ggcyto(gs, gate_name = "rg", sample = sampleNames(gs)[1:3], plot_ty
 p
 
 p <- plot_gs(gs, plot_type = "dots", 
-             Ncells = 1000,
-               plot_args = list("xvar"= "FL1-H", "yvar" = "FL2-H", size = 1, alpha = 0.8, use_pointdensity = TRUE), 
+             Ncells = 100000,
+               plot_args = list("xvar"= "FSC-H", "yvar" = "SSC-H", size = 1, alpha = 0.8, use_pointdensity = TRUE), 
                options = list(
                  option = "magma",
                  axis_limits=list("FL1-H"=c(1,100000)),

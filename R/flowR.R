@@ -2462,7 +2462,6 @@ plot_tree <- function(gates, fontsize = 40, rankdir = "LR", shape = "ellipse", f
 #' legend.position : legend position
 #' @import ggplot2
 #' @import viridis
-#' @importFrom flowWorkspace logicle_trans
 #' @importFrom stats as.formula
 #' @importFrom rlang quo_get_expr
 #' @importFrom scales identity_trans
@@ -2722,7 +2721,6 @@ format_plot <- function(p,
 #' legend.position : legend position
 #' @import ggplot2
 #' @import viridis
-#' @importFrom flowWorkspace logicle_trans
 #' @importFrom stats as.formula
 #' @importFrom rlang quo_get_expr
 #' @importFrom scales identity_trans
