@@ -9,20 +9,26 @@ NormalizationUI <- function(id){
     
     column(4,
            box(width = 12, title = "Parameter",
+               selectInput(inputId = ns("select_beads_gates_default")
+                           , label = "Select beads channel to apply default gates"
+                           , choices = NULL,
+                          multiple = T),
+               actionButton(inputId = ns("apply_default_gates"), label = "Apply default gates"),
                
-               radioButtons(inputId = ns("norm_default"),
-                            label = "Choose gating normalization option",
-                            choices = c("Default" = 1,
-                                        "Personalized" = 2),
-                            selected = 1,
-                            inline = F),
+               hr(),
+               # radioButtons(inputId = ns("norm_default"),
+               #              label = "Choose gating normalization option",
+               #              choices = c("Default" = 1,
+               #                          "Personalized" = 2),
+               #              selected = 1,
+               #              inline = F),
                # h4(br("Apply modification")),
                
                
                selectInput(inputId = ns("gates_subset_select"), label = "Choice the gates of references", choices = NULL),
                hr(),
-               selectInput(inputId = ns("beads_select_input"), label = "Choices the channels beads", multiple = T, choices = NULL),
-               plotGatingSetInput(ns("plot_preview"))
+               selectInput(inputId = ns("beads_select_input"), label = "Choices the channels beads", multiple = T, choices = NULL)
+               
                
                
            ),
@@ -34,8 +40,18 @@ NormalizationUI <- function(id){
     
     column(8,
            box(width = 12, title = "Plot",
-               simpleDisplayUI(ns("simple_display"))
+               tabsetPanel(
+                 tabPanel("Plot visualization",
+                          simpleDisplayUI(ns("simple_display"))
+                 ),
+                 
+                 tabPanel("Plot options",
+                          plotGatingSetInput(ns("plot_preview"))
+                 )
+               )
+               
            ),
+           
            box(width = 12,title = "Normalization graphical representation",
                tabsetPanel(
                  tabPanel("Before/After normalization",
@@ -63,22 +79,33 @@ Normalization <- function(input, output, session, rval){
   
   #### call module ######################################################################################
   
-  callModule(plotGatingSet, "param_plot", rval, show_gates = T)
+  # callModule(plotGatingSet, "param_plot", rval, show_gates = T, simple_plot = F)
   
-  plot_params <- reactiveValues()
+  plot_params <- reactiveValues(plot_type = "dots", subset = c("root" , "/beads1"), color_var = "subset")
   
-  gate_plot <- reactive({
-    
-    plot_params$show_gates <- TRUE
-    
-    callModule(plotGatingSet, "plot_preview",
-               rval,
-               plot_params = plot_params,
-               show_gates = T)
 
-  })
+
   
-  callModule(simpleDisplay, "simple_display", gate_plot()$plot)
+  res <- callModule(plotGatingSet, "plot_preview", 
+                    rval,
+                    plot_params = plot_params,
+                    show_gates = F,
+                    simple_plot = F)
+  
+  # gate_plot <- reactive({
+  #   
+  #   plot_params$show_gates <- TRUE
+  #   
+  #   callModule(plotGatingSet, "plot_preview",
+  #              rval,
+  #              plot_params = plot_params,
+  #              show_gates = F,
+  #              simple_plot = F)
+  # 
+  # })
+  
+  # callModule(simpleDisplay, "simple_display", gate_plot()$plot)
+  callModule(simpleDisplay, "simple_display", res$plot)
   
   # mydata <- reactiveValues(x_values = c(), y_values = c())
   
@@ -129,31 +156,66 @@ Normalization <- function(input, output, session, rval){
     return(names)
   })
   
+  ### update select_beads_gates_default and apply default gates on these chan ########################################################
+  
+  # update selectinput beads gates 
+  observe({
+    updateSelectInput(session = session, 
+                      inputId = "select_beads_gates_default",
+                      choices = chan_names(),
+                      selected = find_chan_desc_beads()
+                      )
+  })
+  
+  # search in the current parameters the desc corresponding to "beads"
+  
+  find_chan_desc_beads <- reactive({
+    validate(need(!is.null(rval$gating_set), "gs is null"))
+    # find the similary beads from different sample
+    all_beads_description <- lapply(rval$gating_set@data@frames, function(x){
+
+      pattern_result <- flowR::description(x)[which(grepl("[Bb]ead", flowR::description(x)))]
+      print(grepl("[Bb]ead", flowR::description(x)))
+      names <- colnames(rval$gating_set)[which(colnames(rval$gating_set) %in% pattern_result)]
+      intersect(colnames(rval$gating_set),names)
+    })
+
+    #remove duplicated beads in vector
+    unlist_beads_sample <- unlist(all_beads_description)
+    removed_duplicated_beads <- Map(`[`, all_beads_description, relist(!duplicated(unlist_beads_sample), skeleton = all_beads_description))
+    res <- unlist(removed_duplicated_beads, use.names = F)
+
+    return(res)
+  })
+  
+  observeEvent(input$apply_default_gates ,{
+    print(find_chan_desc_beads())
+  })
   #update beads input chan
   #### Update beads input from default or personalized choices #######################################################################
   observe({
-    
+    # validate(need(!is.null()))
     # get the first pattern of chan names 
-    if(input$norm_default == 1){
-      vec_names <- chan_names()[which(grepl("[A-z]i+", chan_names()))]
-      vec <- lapply(vec_names, function(i){
-        c(i[[1]])
-      })
-      
-      first_occurency <- unlist(vec, use.names = F)
-      print(first_occurency)
-      selection_default <- chan_names()[which(chan_names() %in% first_occurency)]
-      
-      updateSelectInput(session, "beads_select_input", 
-                        label = "Choices the channels beads", 
-                        choices = chan_names(), 
-                        selected = selection_default)
-    } else {
-      updateSelectInput(session, "beads_select_input", 
-                        label = "Choices the channels beads", 
-                        choices = chan_names(), 
+    # if(input$norm_default == 1){
+    #   vec_names <- chan_names()[which(grepl("[A-z]i+", chan_names()))]
+    #   vec <- lapply(vec_names, function(i){
+    #     c(i[[1]])
+    #   })
+    #   
+    #   first_occurency <- unlist(vec, use.names = F)
+    #   print(first_occurency)
+    #   selection_default <- chan_names()[which(chan_names() %in% first_occurency)]
+    #   
+    #   updateSelectInput(session, "beads_select_input", 
+    #                     label = "Choices the channels beads", 
+    #                     choices = chan_names(), 
+    #                     selected = selection_default)
+    # } else {
+      updateSelectInput(session, "beads_select_input",
+                        label = "Choices the channels beads",
+                        choices = chan_names(),
                         selected = m_norm_tmp$beads.cols.names.used)
-    }
+    # }
 
   })
   
