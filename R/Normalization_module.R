@@ -86,7 +86,7 @@ Normalization <- function(input, output, session, rval){
   
   #### call module ######################################################################################
   
-  plot_params <- reactiveValues(plot_type = "dots", subset = c("root", NULL), color_var = "subset")
+  plot_params <- reactiveValues(plot_type = "dots", subset = c("root", NULL), color_var = "subset", xvar = NULL, yvar = NULL, split_var = "yvar")
   
 
   
@@ -103,9 +103,6 @@ Normalization <- function(input, output, session, rval){
   ### Setup gates of references subset ######################################################################
   
   gate_reference <- reactive({
-    # validate(
-    #   need(!is.null(rval$gating_set), "")
-    # )
     if(!is.null(rval$gating_set)){
       res <- get_gates_from_gs(rval$gating_set)
       return(names(res))
@@ -190,7 +187,27 @@ Normalization <- function(input, output, session, rval){
     plot_params$subset <- c("root", input$gates_subset_select)
   })
   
+  # update yvar ("beads selected") & xvar = "FSC" if fsc is not present in chan take the first parameter
+  
+  observe({
+    validate(
+      need(!is.null(input$gates_subset_select), ""),
+      need(!is.null(rval$gating_set), "")
+           )
+    
+    print(input$select_beads_gates_default)
+    plot_params$yvar <- input$select_beads_gates_default
+    
+    if(length(grep("FSC", colnames(rval$gating_set))) >= 1){
+      position_grep <- which(grepl("FSC", colnames(rval$gating_set)))
+      
+      plot_params$xvar <- colnames(rval$gating_set)[position_grep][1]
+    } else {
+      plot_params$xvar <- colnames(rval$gating_set)[1]
+    }
 
+  })
+  
   #### Update beads input from default or personalized choices #######################################################################
   observe({
 
@@ -393,15 +410,15 @@ if (interactive()){
   server <- function(input, output, session) {
     rval <- reactiveValues()
     observe({
-      #utils::data("GvHD", package = "flowCore")
-      #rval$gating_set <- GatingSet(GvHD)
-      # utils::data("Bcells", package = "flowAI")
-      # rval$gating_set <- flowWorkspace::GatingSet(Bcells)
+      # utils::data("GvHD", package = "flowCore")
+      # rval$gating_set <- GatingSet(GvHD)
+      utils::data("Bcells", package = "flowAI")
+      rval$gating_set <- flowWorkspace::GatingSet(Bcells)
 
-      fs <- read.ncdfFlowSet(files = c("/mnt/NAS7/Workspace/hammamiy/data_premasse/20120222_cells_found.fcs",
-                                       "/mnt/NAS7/Workspace/hammamiy/data_premasse/20120229_cells_found.fcs"))
-
-      gs <- GatingSet(fs)
+      # fs <- read.ncdfFlowSet(files = c("/mnt/NAS7/Workspace/hammamiy/data_premasse/20120222_cells_found.fcs",
+      #                                  "/mnt/NAS7/Workspace/hammamiy/data_premasse/20120229_cells_found.fcs"))
+      # 
+      # gs <- GatingSet(fs)
 
       # rg <- flowCore::rectangleGate(filterId = "beads1", list("Bead1(La139)Di" = c(10, 200), "(Ir193)Di" = c(-50, 50)))
       # rg2 <- flowCore::rectangleGate(filterId = "beads2", list("Bead2(Pr141)Di" = c(10, 200), "(Ir193)Di" = c(-50, 50)))
@@ -418,7 +435,7 @@ if (interactive()){
 
 
 
-      rval$gating_set <- gs
+      # rval$gating_set <- gs
 
       # rg <- flowCore::rectangleGate(filterId = "beads1", list("APC-Cy7-A" = c(10, 200), "Pacific Blue-A" = c(-50, 50)))
       # flowWorkspace::gs_pop_add(rval$gating_set, rg)
