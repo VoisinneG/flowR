@@ -259,36 +259,6 @@ Normalization <- function(input, output, session, rval){
       
       beads.gate <- list()
       
-      # l <- list(x = asinh(c(10, 200)/5), y= asinh(c(-50, 50)/5))
-      
-      # for(i in 1:length(sample_names)){
-      #   
-      #   for(j in 1:length(m_norm_tmp$beads.cols.names.used)){
-      #     name <- paste(m_norm_tmp$beads.cols.names.used[[j]])
-      #     
-      #     smp <- paste(sample_names[i])
-      #     tmp <- list(x = c(l$x), y = c(l$y))
-      #     
-      #     beads.gate[[smp]][[name]] <- tmp
-      #     
-      #   }
-      #   
-      # }
-      
-      
-      # print(beads.gate)
-      # beads.gate[["20120222_cells_found.fcs"]] <- list("Bead1(La139)Di" = list(x=asinh(c(10, 200)/5), y=asinh(c(-50, 50)/5)),
-      #                                                  "Bead2(Pr141)Di" = list(x=asinh(c(10, 200)/5), y=asinh(c(-50, 50)/5)),
-      #                                                  "CD11c(Tb159)Di" = list(x=asinh(c(10, 200)/5), y=asinh(c(-50, 50)/5)),
-      #                                                  "Bead3(Tm169)Di" = list(x=asinh(c(10, 200)/5), y=asinh(c(-50, 50)/5)),
-      #                                                  "Bead4(Lu175)Di" = list(x=asinh(c(10, 200)/5), y=asinh(c(-50, 50)/5)))
-      # beads.gate[["20120229_cells_found.fcs"]] <- list("Bead1(La139)Di" = list(x=asinh(c(10, 200)/5), y=asinh(c(-50, 50)/5)),
-      #                                                  "Bead2(Pr141)Di" = list(x=asinh(c(10, 200)/5), y=asinh(c(-50, 50)/5)),
-      #                                                  "CD11c(Tb159)Di" = list(x=asinh(c(10, 200)/5), y=asinh(c(-50, 50)/5)),
-      #                                                  "Bead3(Tm169)Di" = list(x=asinh(c(10, 200)/5), y=asinh(c(-50, 50)/5)),
-      #                                                  "Bead4(Lu175)Di" = list(x=asinh(c(10, 200)/5), y=asinh(c(-50, 50)/5)))
-      
-      
       # if users takes specific gates (from specific subset)
       df_list <- list()
       
@@ -333,9 +303,7 @@ Normalization <- function(input, output, session, rval){
       
       df <- do.call(rbind, df_list)
       
-      # print(df)
       fs_norm <- build_flowset_from_df(df = df)
-      # print(fs_norm)
       
       # #build GatingSet
       gs_norm <- build_gatingset_from_df(df = df, gs_origin = rval$gating_set)
@@ -374,17 +342,56 @@ Normalization <- function(input, output, session, rval){
     
   })
   
+
+  #### get df (compute stat) for making plot before/after norm ########################
+
+  get_stat_for_plot <- reactive({
+
+    # get name of parameter normalized
+    beads <- colnames(gs_tmp$gs_norm)[match(m_norm_tmp$beads.cols.names.used, colnames(gs_tmp$gs_norm))]
+    beads_norm <- colnames(gs_tmp$gs_norm)[match(paste0(m_norm_tmp$beads.cols.names.used, " norm"), colnames(gs_tmp$gs_norm))]
+    
+    # get one vector before/after norm
+    beads_before_after <- c(beads, beads_norm)
+    
+    df <- get_data_gs(gs = gs_tmp$gs_norm, sample = sampleNames(gs_tmp$gs_norm), subset = input$gates_subset_select)
+   
+     df_stat <- flowR:::compute_stats(df = df,
+                                     y_trans = asinh_trans(scale = 5),
+                                     apply_inverse = TRUE,
+                                     yvar = beads_before_after,
+                                     stat_function = "median"
+                                     )
+    
+    return(list
+           (df_stat,
+             beads,
+             beads_norm)
+           )
+  })
+  
   ### Make normalization plot #######################################################################################
   output$norm_plot <- renderPlot({
     validate(need(!is.null(m_normed$norm), "No current normalisation apply"))
+    
+    data <- melt(get_stat_for_plot()[[1]],value.name = "Signal median", variable.name = "Parameters")
+    
+    colnames(data)[colnames(data) == "name"] <- "Sample"
+    
+    data$norm_aspect <- "Before"
+    data$norm_aspect[which(grepl("norm" , data$Parameters))] <- "After"
 
-    premessa:::plot_beads_over_time(beads.data = m_norm_tmp$m, beads.normed = m_norm_tmp$norm.res$beads.normed, beads.cols = m_norm_tmp$beads.cols.names.used)
-  })
+    ggplot(data = data, mapping = aes(x = Sample, y = `Signal median`)) + geom_point(aes(colour = Parameters)) + facet_grid(norm_aspect ~ .)
   
-  output$norm_plot_dist <- renderPlot({
-    # validate(need(rval$gating_set@[[]], "No current normalisation apply"))
-    premessa:::plot_distance_from_beads(exprs(rval$gating_set@data[[input$select_sample_input]]), x.var = input$x_dist_input, y.var = input$y_dist_input)
+    # premessa:::plot_beads_over_time(beads.data = m_norm_tmp$m, beads.normed = m_norm_tmp$norm.res$beads.normed, beads.cols = m_norm_tmp$beads.cols.names.used)
   })
+  # 
+  # output$norm_plot_dist <- renderPlot({
+  #   # validate(need(rval$gating_set@[[]], "No current normalisation apply"))
+  #   premessa:::plot_distance_from_beads(exprs(rval$gating_set@data[[input$select_sample_input]]), x.var = input$x_dist_input, y.var = input$y_dist_input)
+  # })
+  
+  
   return(rval)
   
 }
@@ -412,13 +419,13 @@ if (interactive()){
     observe({
       # utils::data("GvHD", package = "flowCore")
       # rval$gating_set <- GatingSet(GvHD)
-      utils::data("Bcells", package = "flowAI")
-      rval$gating_set <- flowWorkspace::GatingSet(Bcells)
+      # utils::data("Bcells", package = "flowAI")
+      # rval$gating_set <- flowWorkspace::GatingSet(Bcells)
 
-      # fs <- read.ncdfFlowSet(files = c("/mnt/NAS7/Workspace/hammamiy/data_premasse/20120222_cells_found.fcs",
-      #                                  "/mnt/NAS7/Workspace/hammamiy/data_premasse/20120229_cells_found.fcs"))
-      # 
-      # gs <- GatingSet(fs)
+      fs <- read.ncdfFlowSet(files = c("/mnt/NAS7/Workspace/hammamiy/data_premasse/20120222_cells_found.fcs",
+                                       "/mnt/NAS7/Workspace/hammamiy/data_premasse/20120229_cells_found.fcs"))
+
+      gs <- GatingSet(fs)
 
       # rg <- flowCore::rectangleGate(filterId = "beads1", list("Bead1(La139)Di" = c(10, 200), "(Ir193)Di" = c(-50, 50)))
       # rg2 <- flowCore::rectangleGate(filterId = "beads2", list("Bead2(Pr141)Di" = c(10, 200), "(Ir193)Di" = c(-50, 50)))
@@ -435,7 +442,7 @@ if (interactive()){
 
 
 
-      # rval$gating_set <- gs
+      rval$gating_set <- gs
 
       # rg <- flowCore::rectangleGate(filterId = "beads1", list("APC-Cy7-A" = c(10, 200), "Pacific Blue-A" = c(-50, 50)))
       # flowWorkspace::gs_pop_add(rval$gating_set, rg)
