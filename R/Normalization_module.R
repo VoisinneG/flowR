@@ -49,7 +49,7 @@ NormalizationUI <- function(id){
                  ),
                  
                  tabPanel("Plot options",
-                          plotGatingSetInput(ns("plot_preview"))
+                          plotCytoUI(ns("plot_preview"))
                  )
                )
                
@@ -91,10 +91,10 @@ Normalization <- function(input, output, session, rval){
 
   
   
-  res <- callModule(plotGatingSet, "plot_preview", 
+  res <- callModule(plotCyto, "plot_preview", 
                     gs_tmp$gs_norm,
                     plot_params = plot_params,
-                    show_gates = F,
+                    show_gates = T,
                     simple_plot = F)
   
 
@@ -348,20 +348,29 @@ Normalization <- function(input, output, session, rval){
   get_stat_for_plot <- reactive({
 
     # get name of parameter normalized
-    beads <- colnames(gs_tmp$gs_norm)[match(m_norm_tmp$beads.cols.names.used, colnames(gs_tmp$gs_norm))]
-    beads_norm <- colnames(gs_tmp$gs_norm)[match(paste0(m_norm_tmp$beads.cols.names.used, " norm"), colnames(gs_tmp$gs_norm))]
+    if(length(grepl("norm", colnames(gs_tmp$gs_norm))) > 0 ){
+      
+      beads <- colnames(gs_tmp$gs_norm)[match(m_norm_tmp$beads.cols.names.used, colnames(gs_tmp$gs_norm))]
+      beads_norm <- colnames(gs_tmp$gs_norm)[match(paste0(m_norm_tmp$beads.cols.names.used, " norm"), colnames(gs_tmp$gs_norm))]
+
+      df <- get_data_gs(gs = gs_tmp$gs_norm, sample = flowR::sampleNames(gs_tmp$gs_norm), subset = input$gates_subset_select)
+      
+    } else{
+      beads <- colnames(rval$gating_set)[match(input$beads_select_input, colnames(rval$gating_set))]
+      beads_norm <- NULL
+      df <- get_data_gs(gs = rval$gating_set, sample = flowR::sampleNames(rval$gating_set), subset = input$gates_subset_select)
+    }
+    
     
     # get one vector before/after norm
     beads_before_after <- c(beads, beads_norm)
     
-    df <- get_data_gs(gs = gs_tmp$gs_norm, sample = sampleNames(gs_tmp$gs_norm), subset = input$gates_subset_select)
-   
-     df_stat <- flowR:::compute_stats(df = df,
+    df_stat <- flowR:::compute_stats(df = df,
                                      y_trans = asinh_trans(scale = 5),
                                      apply_inverse = TRUE,
                                      yvar = beads_before_after,
                                      stat_function = "median"
-                                     )
+    )
     
     return(list
            (df_stat,
@@ -372,24 +381,32 @@ Normalization <- function(input, output, session, rval){
   
   ### Make normalization plot #######################################################################################
   output$norm_plot <- renderPlot({
-    validate(need(!is.null(m_normed$norm), "No current normalisation apply"))
+    # validate(need(!is.null(m_normed$norm), "No current normalisation apply"))
+    validate(
+      need(!is.null(rval$gating_set), "No current gatingSet"),
+      need(input$gates_subset_select != "", "Need gates (subset) to visualize the plot")
+             )
     
+    print(input$gates_subset_select)
     data <- melt(get_stat_for_plot()[[1]],value.name = "Signal median", variable.name = "Parameters")
-    
+
     colnames(data)[colnames(data) == "name"] <- "Sample"
     
     data$norm_aspect <- "Before"
     data$norm_aspect[which(grepl("norm" , data$Parameters))] <- "After"
-
-    ggplot(data = data, mapping = aes(x = Sample, y = `Signal median`)) + geom_point(aes(colour = Parameters)) + facet_grid(norm_aspect ~ .)
-  
+    
+    plotting <- ggplot(data = data, mapping = aes(x = Sample, y = `Signal median`)) 
+    plotting <- plotting + geom_point(aes(colour = Parameters)) 
+    plotting <- plotting + geom_line(data = data, aes(x = Sample, y = `Signal median`, color = Parameters, group = Parameters))
+    plotting <- plotting + facet_grid(norm_aspect ~ .)
+    plotting
     # premessa:::plot_beads_over_time(beads.data = m_norm_tmp$m, beads.normed = m_norm_tmp$norm.res$beads.normed, beads.cols = m_norm_tmp$beads.cols.names.used)
   })
-  # 
-  # output$norm_plot_dist <- renderPlot({
-  #   # validate(need(rval$gating_set@[[]], "No current normalisation apply"))
-  #   premessa:::plot_distance_from_beads(exprs(rval$gating_set@data[[input$select_sample_input]]), x.var = input$x_dist_input, y.var = input$y_dist_input)
-  # })
+  
+  output$norm_plot_dist <- renderPlot({
+    # validate(need(rval$gating_set@[[]], "No current normalisation apply"))
+    premessa:::plot_distance_from_beads(exprs(rval$gating_set@data[[input$select_sample_input]]), x.var = input$x_dist_input, y.var = input$y_dist_input)
+  })
   
   
   return(rval)
