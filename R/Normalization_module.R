@@ -37,6 +37,7 @@ NormalizationUI <- function(id){
            ),
            box(width = 12, title = "Create GatingSet",
                textInput(inputId = ns("gating_set_norm_text"), label = "Entry the names of normalize GatingSet", value = NULL),
+               checkboxInput(inputId = ns("delete_beads"), label = "Remove beads in the new gatingSet", value = F),
                actionButton(inputId = ns("create_gs"), label = "Create GatingSet")
            )
     ),
@@ -59,13 +60,13 @@ NormalizationUI <- function(id){
                tabsetPanel(
                  tabPanel("Before/After normalization",
                           plotOutput(ns("norm_plot"))
-                 ),
-                 tabPanel("beads distance",
-                          plotOutput(ns("norm_plot_dist")),
-                          column(4, selectInput(inputId = ns("select_sample_input"), label = "Select sample", choices = NULL, selected = NULL)),
-                          column(4, selectInput(inputId = ns("x_dist_input"), label = "X axis", choices = NULL, selected = NULL)),
-                          column(4, selectInput(inputId = ns("y_dist_input"), label = "Y axis", choices = NULL, selected = NULL))
                  )
+                 # tabPanel("beads distance",
+                 #          plotOutput(ns("norm_plot_dist")),
+                 #          column(4, selectInput(inputId = ns("select_sample_input"), label = "Select sample", choices = NULL, selected = NULL)),
+                 #          column(4, selectInput(inputId = ns("x_dist_input"), label = "X axis", choices = NULL, selected = NULL)),
+                 #          column(4, selectInput(inputId = ns("y_dist_input"), label = "Y axis", choices = NULL, selected = NULL))
+                 # )
                )
                
                
@@ -387,8 +388,24 @@ Normalization <- function(input, output, session, rval){
     validate(need(length(input$beads_select_input) > 0, "Need to choice beads before to apply normalization"))
     
     gs_norm <- normalize_reactive()
-    # print(names(gs_norm))
-    # print("test")
+    # gs_norm <- gs_tmp$gs_norm
+
+    if(input$delete_beads == T){
+      df <- get_data_gs(gs = gs_norm, sample = sampleNames(gs_norm))
+      print(table(df$subset))
+      
+      vec <- colnames(gs_norm)[which(colnames(gs_norm) %in% input$beads_select_input)]
+      vec1 <- colnames(gs_norm)[which(colnames(gs_norm) %in% paste0(input$beads_select_input, " norm"))]
+      
+      beads_to_remove <- c(vec, vec1)
+      
+      df <- df[, !colnames(gs_norm) %in% input$beads_select_input, drop = T]
+      
+      gs_norm <- build_gatingset_from_df(df = df, gs_origin = gs_norm)
+    }
+
+  
+  
     params <- colnames(gs_norm)[colnames(gs_norm) %in% names(rval$trans_parameters)]
     rval$gating_set_list[[input$gating_set_norm_text]] <- list(gating_set = gs_norm,
                                                                 parent = rval$gating_set_selected,
