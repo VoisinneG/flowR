@@ -37,7 +37,7 @@ NormalizationUI <- function(id){
            ),
            box(width = 12, title = "Create GatingSet",
                textInput(inputId = ns("gating_set_norm_text"), label = "Entry the names of normalize GatingSet", value = NULL),
-               actionButton(inputId = ns("create_gs"), label = "create gates by default")
+               actionButton(inputId = ns("create_gs"), label = "Create GatingSet")
            )
     ),
     
@@ -105,6 +105,7 @@ Normalization <- function(input, output, session, rval){
   gate_reference <- reactive({
     if(!is.null(rval$gating_set)){
       res <- get_gates_from_gs(rval$gating_set)
+
       return(names(res))
     } else {
       return(NULL)
@@ -161,23 +162,81 @@ Normalization <- function(input, output, session, rval){
   # Update the selectinput of subset correponding to gate and create default gate 
   observeEvent(input$apply_default_gates ,{
     
+    # idx_gh <- which(flowWorkspace::gs_get_pop_paths(rval$gating_set) == paste0("/", input$select_beads_gates_default))
+    search_same_subset <- which(flowWorkspace::gs_get_pop_paths(rval$gating_set) %in% paste0("/",input$select_beads_gates_default))
+    # print(flowWorkspace::gs_get_pop_paths(rval$gating_set)[search_same_subset])
+    # print(search_same_subset)
+    # flowWorkspace::gs_get_pop_paths(rval$gating_set)
+    
+    # if subset is existing (remove the subset & add new subset) or keep subset 
+    if(length(search_same_subset) > 0){
+      ns <- session$ns
+      showModal(
+        modalDialog(title = "Gates is existing",
+                    "Would you like to remove the subset currently existing",
+                  footer = tagList(actionButton(ns("remove_subset"), "Remove subset"), 
+                                   modalButton("Keep subset")
+                                   )
+                             )
+      )
+    } else {
+      
+      arbritrary_value <- list(x = c(10, 200))
+      sapply(input$select_beads_gates_default, function(x){
+        
+        names(arbritrary_value) <- x # rename x to the corresponding channel selected
+        rg <- flowCore::rectangleGate(filterId = x, arbritrary_value)
+        flowWorkspace::gs_pop_add(rval$gating_set, rg)
+      })
+      
+      recompute(rval$gating_set)
+      rval$update_gs <- rval$update_gs + 1
+      
+      updateSelectInput(session = session,
+                        inputId = "gates_subset_select",
+                        label = "Choice the gates of references",
+                        choices = gate_reference()
+      )
+    }
+  })
+  
+  ### Remove subset if existing when users apply default gates ############################################################
+  
+  observeEvent(input$remove_subset, {
+    
+    id_to_remove <- which(flowWorkspace::gs_get_pop_paths(rval$gating_set) %in% paste0("/",input$select_beads_gates_default))
+    target_gate <- flowWorkspace::gs_get_pop_paths(rval$gating_set)[id_to_remove]
+    
+    #remove actual target gate
+    sapply(target_gate, function(x){
+      flowWorkspace::gs_pop_remove(gs = rval$gating_set, node = x) # remove all subset present from the target (if we have the same subset here)
+    })
+    #update rval$gating_set after removing all target
+    recompute(rval$gating_set)
+    rval$update_gs <- rval$update_gs + 1
+    
+    # add new subset (gate)
+    target <- gsub(pattern = "^/", replacement = "", x = target_gate) # remove the "/" of the beads name
+    
+    # add the default gate after removing the subset 
     arbritrary_value <- list(x = c(10, 200))
     sapply(input$select_beads_gates_default, function(x){
-      
       names(arbritrary_value) <- x # rename x to the corresponding channel selected
       rg <- flowCore::rectangleGate(filterId = x, arbritrary_value)
       flowWorkspace::gs_pop_add(rval$gating_set, rg)
     })
     
+    # reupdate gs
     recompute(rval$gating_set)
     rval$update_gs <- rval$update_gs + 1
     
+    new_gate_references <- names(get_gates_from_gs(rval$gating_set))
     updateSelectInput(session = session,
                       inputId = "gates_subset_select",
                       label = "Choice the gates of references",
-                      choices = gate_reference()
+                      choices = new_gate_references
     )
-    
+    removeModal()
   })
   
   ## update subset params_plot
@@ -195,7 +254,7 @@ Normalization <- function(input, output, session, rval){
       need(!is.null(rval$gating_set), "")
            )
     
-    print(input$select_beads_gates_default)
+    # print(input$select_beads_gates_default)
     plot_params$yvar <- input$select_beads_gates_default
     
     if(length(grep("FSC", colnames(rval$gating_set))) >= 1){
@@ -387,7 +446,7 @@ Normalization <- function(input, output, session, rval){
       need(input$gates_subset_select != "", "Need gates (subset) to visualize the plot")
              )
     
-    print(input$gates_subset_select)
+    # print(input$gates_subset_select)
     data <- melt(get_stat_for_plot()[[1]],value.name = "Signal median", variable.name = "Parameters")
 
     colnames(data)[colnames(data) == "name"] <- "Sample"
