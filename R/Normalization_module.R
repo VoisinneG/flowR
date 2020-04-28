@@ -78,6 +78,7 @@ NormalizationUI <- function(id){
 }
 
 #'@import premessa
+#'@importFrom flowWorkspace colnames gs_get_pop_paths gs_pop_add gs_pop_remove
 #'@export
 Normalization <- function(input, output, session, rval){
   # Setup temporary gs reactiveValues
@@ -201,6 +202,17 @@ Normalization <- function(input, output, session, rval){
     }
   })
   
+  # observe({
+  #   validate(need(!is.null(rval$gating_set), ""))
+  #   new_gate_references <- names(flowR::get_gates_from_gs(rval$gating_set))
+  #   
+  #   updateSelectInput(session = session,
+  #                     inputId = "gates_subset_select",
+  #                     label = "Choice the gates of references",
+  #                     choices = names(flowR::get_gates_from_gs(rval$gating_set))
+  #   )
+  # })
+  
   ### Remove subset if existing when users apply default gates ############################################################
   
   observeEvent(input$remove_subset, {
@@ -314,6 +326,8 @@ Normalization <- function(input, output, session, rval){
   
   normalize_reactive <- reactive({
       
+    withProgress(message = 'Making normalization', value = 0, {
+      n <- 0
       m_norm_tmp$beads.cols.names.used <- input$beads_select_input
       sample_names <- sampleNames(rval$gating_set)
       
@@ -335,6 +349,7 @@ Normalization <- function(input, output, session, rval){
       baseline.data <- unlist(df_stat[, -1])
       
       for(sample in sampleNames(rval$gating_set)){
+        n <- n + 1
         df <- get_data_gs(rval$gating_set, sample = sample, subset = "root")
         m_norm_tmp$m <- as.matrix(df[-which(names(df) %in% c("name", "subset"))])
         beads.data <- get_data_gs(rval$gating_set, sample = sample, subset = input$gates_subset_select)
@@ -359,6 +374,7 @@ Normalization <- function(input, output, session, rval){
         
         df_list[[sample]] <- cbind(df, as.data.frame(m_normed$norm))
         
+        incProgress(1/n, detail = paste("Normalize sample :", sample))
       }
       
       df <- do.call(rbind, df_list)
@@ -370,7 +386,7 @@ Normalization <- function(input, output, session, rval){
       
       return(gs_norm)
       # rval$gating_set <- gs_norm
-      
+    })
     
   })
   
@@ -389,22 +405,20 @@ Normalization <- function(input, output, session, rval){
     
     gs_norm <- normalize_reactive()
     # gs_norm <- gs_tmp$gs_norm
-
+    
+    # remove beads
     if(input$delete_beads == T){
-      df <- get_data_gs(gs = gs_norm, sample = sampleNames(gs_norm))
-      print(table(df$subset))
+      flowWorkspace::gs_pop_remove(gs_norm, input$gates_subset_select)
+      recompute(gs_norm)
       
-      vec <- colnames(gs_norm)[which(colnames(gs_norm) %in% input$beads_select_input)]
-      vec1 <- colnames(gs_norm)[which(colnames(gs_norm) %in% paste0(input$beads_select_input, " norm"))]
-      
-      beads_to_remove <- c(vec, vec1)
-      
-      df <- df[, !colnames(gs_norm) %in% input$beads_select_input, drop = T]
-      
-      gs_norm <- build_gatingset_from_df(df = df, gs_origin = gs_norm)
+      #update subset names
+      actualised_subset <- names(get_gates_from_gs(gs_norm))
+      updateSelectInput(session = session,
+                        inputId = "gates_subset_select",
+                        label = "Choice the gates of references",
+                        choices = actualised_subset
+      )
     }
-
-  
   
     params <- colnames(gs_norm)[colnames(gs_norm) %in% names(rval$trans_parameters)]
     rval$gating_set_list[[input$gating_set_norm_text]] <- list(gating_set = gs_norm,
