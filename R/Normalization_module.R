@@ -59,7 +59,8 @@ NormalizationUI <- function(id){
            box(width = 12,title = "Normalization graphical representation",
                tabsetPanel(
                  tabPanel("Before/After normalization",
-                          plotOutput(ns("norm_plot"))
+                          # plotOutput(ns("norm_plot")),
+                          simpleDisplayUI(ns("simple_norm_display"))
                  )
                  # tabPanel("beads distance",
                  #          plotOutput(ns("norm_plot_dist")),
@@ -101,7 +102,7 @@ Normalization <- function(input, output, session, rval){
   
 
   callModule(simpleDisplay, "simple_display", res$plot)
-  
+  callModule(simpleDisplay, "simple_norm_display", norm_plot)
   ### Setup gates of references subset ######################################################################
   
   gate_reference <- reactive({
@@ -164,20 +165,24 @@ Normalization <- function(input, output, session, rval){
   # Update the selectinput of subset correponding to gate and create default gate 
   observeEvent(input$apply_default_gates ,{
     
-    # idx_gh <- which(flowWorkspace::gs_get_pop_paths(rval$gating_set) == paste0("/", input$select_beads_gates_default))
     search_same_subset <- which(flowWorkspace::gs_get_pop_paths(rval$gating_set) %in% paste0("/",input$select_beads_gates_default))
-    # print(flowWorkspace::gs_get_pop_paths(rval$gating_set)[search_same_subset])
-    # print(search_same_subset)
-    # flowWorkspace::gs_get_pop_paths(rval$gating_set)
     
+    #get the same subset for the listing message 
+    same_subset <- flowWorkspace::gs_get_pop_paths(rval$gating_set)[search_same_subset]
+    
+    subset_msg_listing <- sapply(same_subset, function(x){
+      c(x, "<br>")
+    })
+  
     # if subset is existing (remove the subset & add new subset) or keep subset 
     if(length(search_same_subset) > 0){
       ns <- session$ns
       showModal(
         modalDialog(title = "Gates is existing",
-                    "Would you like to remove the subset currently existing",
-                  footer = tagList(actionButton(ns("remove_subset"), "Remove subset"), 
-                                   modalButton("Keep subset")
+                    div("List of the current existing gates: ", br() , HTML(subset_msg_listing)),
+                    
+                  footer = tagList(actionButton(ns("remove_subset"), "Overwrite subset"), 
+                                   modalButton("Don't overwrite")
                                    )
                              )
       )
@@ -473,7 +478,8 @@ Normalization <- function(input, output, session, rval){
   })
   
   ### Make normalization plot #######################################################################################
-  output$norm_plot <- renderPlot({
+  
+  norm_plot <- reactive({
     # validate(need(!is.null(m_normed$norm), "No current normalisation apply"))
     validate(
       need(!is.null(rval$gating_set), "No current gatingSet"),
@@ -487,17 +493,16 @@ Normalization <- function(input, output, session, rval){
     
     data$norm_aspect <- "Before"
     data$norm_aspect[which(grepl("norm" , data$Parameters))] <- "After"
-    print(data$Parameters == "After")
-    print(data$Parameters[which(grepl("norm", data$Parameters))])
     
+    # remove pattern norm in parameters for having only the same parameters legend and colors in plot representation 
     data$Parameters <- gsub(" norm", "" ,data$Parameters)
-    print(data)
+   
     
     plotting <- ggplot(data = data, mapping = aes(x = Sample, y = `Signal median`)) 
     plotting <- plotting + geom_point(aes(colour = Parameters)) 
     plotting <- plotting + geom_line(data = data, aes(x = Sample, y = `Signal median`, color = Parameters, group = Parameters))
     plotting <- plotting + facet_grid(norm_aspect ~ subset)
-    plotting
+    return(plotting)
     # premessa:::plot_beads_over_time(beads.data = m_norm_tmp$m, beads.normed = m_norm_tmp$norm.res$beads.normed, beads.cols = m_norm_tmp$beads.cols.names.used)
   })
   
