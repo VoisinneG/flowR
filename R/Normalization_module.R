@@ -25,7 +25,7 @@ NormalizationUI <- function(id){
                # h4(br("Apply modification")),
                
                
-               selectInput(inputId = ns("gates_subset_select"), label = "Choice the gates of references", choices = NULL),
+               selectInput(inputId = ns("gates_subset_select"), label = "Choice the gates of references", choices = NULL, multiple = T),
                hr(),
                selectInput(inputId = ns("beads_select_input"), label = "Choices the channels beads", multiple = T, choices = NULL),
                
@@ -187,8 +187,8 @@ Normalization <- function(input, output, session, rval){
       sapply(input$select_beads_gates_default, function(x){
         
         names(arbritrary_value) <- x # rename x to the corresponding channel selected
-        rg <- flowCore::rectangleGate(filterId = x, arbritrary_value)
-        flowWorkspace::gs_pop_add(rval$gating_set, rg)
+        rg <- flowCore::rectangleGate(filterId = x, .gate = arbritrary_value)
+        flowWorkspace::gs_pop_add(rval$gating_set, rg, parent = "root")
       })
       
       recompute(rval$gating_set)
@@ -361,8 +361,9 @@ Normalization <- function(input, output, session, rval){
                                                                 time.col.name = "Time")
         m_normed$norm <- m_norm_tmp$norm.res$m.normed
         # print(m_normed$norm)
-        beads.events <- gh_pop_get_indices(rval$gating_set[[sample]], input$gates_subset_select)
         
+        beads.events <- gh_pop_get_indices(rval$gating_set[[sample]], input$gates_subset_select)
+        print("failed")
         
         m_normed$norm <- cbind(m_normed$norm,
                                beadDist = premessa:::get_mahalanobis_distance_from_beads(m_normed$norm,
@@ -378,11 +379,13 @@ Normalization <- function(input, output, session, rval){
       }
       
       df <- do.call(rbind, df_list)
+      print(df)
       
       fs_norm <- build_flowset_from_df(df = df)
       
       # #build GatingSet
       gs_norm <- build_gatingset_from_df(df = df, gs_origin = rval$gating_set)
+      # build_gatingset_from_df(df = df, gs_origin = rval$gating_set)
       
       return(gs_norm)
       # rval$gating_set <- gs_norm
@@ -390,7 +393,7 @@ Normalization <- function(input, output, session, rval){
     
   })
   
-  ### make normalisation ##################################################################################################
+  ### Create new gatingset based on the normalization ##################################################################################################
   
   # Apply temporary normalization preview 
   
@@ -484,11 +487,16 @@ Normalization <- function(input, output, session, rval){
     
     data$norm_aspect <- "Before"
     data$norm_aspect[which(grepl("norm" , data$Parameters))] <- "After"
+    print(data$Parameters == "After")
+    print(data$Parameters[which(grepl("norm", data$Parameters))])
+    
+    data$Parameters <- gsub(" norm", "" ,data$Parameters)
+    print(data)
     
     plotting <- ggplot(data = data, mapping = aes(x = Sample, y = `Signal median`)) 
     plotting <- plotting + geom_point(aes(colour = Parameters)) 
     plotting <- plotting + geom_line(data = data, aes(x = Sample, y = `Signal median`, color = Parameters, group = Parameters))
-    plotting <- plotting + facet_grid(norm_aspect ~ .)
+    plotting <- plotting + facet_grid(norm_aspect ~ subset)
     plotting
     # premessa:::plot_beads_over_time(beads.data = m_norm_tmp$m, beads.normed = m_norm_tmp$norm.res$beads.normed, beads.cols = m_norm_tmp$beads.cols.names.used)
   })
