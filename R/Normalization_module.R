@@ -30,6 +30,7 @@ NormalizationUI <- function(id){
                selectInput(inputId = ns("beads_select_input"), label = "Choices the channels beads", multiple = T, choices = NULL),
                
                hr(),
+               checkboxInput(inputId = ns("use_intersect"), label = "Exclude subset", value = T),
                actionButton(inputId = ns("normalize_button"), label = "Apply normalization")
                
                
@@ -367,7 +368,26 @@ Normalization <- function(input, output, session, rval){
         m_normed$norm <- m_norm_tmp$norm.res$m.normed
         # print(m_normed$norm)
         
-        beads.events <- gh_pop_get_indices(rval$gating_set[[sample]], input$gates_subset_select)
+        # get all pop indices
+        indice_list <- sapply(input$gates_subset_select, function(x){
+          list(gh_pop_get_indices(rval$gating_set[[sample]], x))
+        }) 
+        
+        # use intersect 
+        maxlen <- max(sapply(indice_list, length))
+        
+        if(input$use_intersect == TRUE){
+          intersec <- lapply(seq(maxlen),function(i) Reduce(intersect,lapply(indice_list,"[[", i)))
+          beads.events <- unlist(intersec)
+        } else if(input$use_intersect == FALSE) {
+          intersec <- lapply(seq(maxlen),function(i) Reduce(union,lapply(indice_list,"[[", i)))
+          beads.events <- unlist(intersec)
+        }
+        
+        print(beads.events)
+  
+        
+        # beads.events <- gh_pop_get_indices(rval$gating_set[[sample]], input$gates_subset_select)
         print("failed")
         
         m_normed$norm <- cbind(m_normed$norm,
@@ -384,7 +404,7 @@ Normalization <- function(input, output, session, rval){
       }
       
       df <- do.call(rbind, df_list)
-      print(df)
+      
       
       fs_norm <- build_flowset_from_df(df = df)
       
