@@ -383,12 +383,8 @@ Normalization <- function(input, output, session, rval){
           intersec <- unique(lapply(seq(maxlen),function(i) Reduce(union,lapply(indice_list,"[[", i))))
           beads.events <- unlist(intersec)
         }
-        
-        print(beads.events)
-  
-        
+
         # beads.events <- gh_pop_get_indices(rval$gating_set[[sample]], input$gates_subset_select)
-        print("failed")
         
         m_normed$norm <- cbind(m_normed$norm,
                                beadDist = premessa:::get_mahalanobis_distance_from_beads(m_normed$norm,
@@ -544,55 +540,55 @@ Normalization <- function(input, output, session, rval){
 # library(flowWorkspace)
 # library(flowCore)
 # 
-if (interactive()){
-
-  ui <- dashboardPage(
-    dashboardHeader(title = "flowAI"),
-    sidebar = dashboardSidebar(disable = TRUE),
-    body = dashboardBody(
-      NormalizationUI("module")
-    )
-  )
-
-  server <- function(input, output, session) {
-    rval <- reactiveValues()
-    observe({
-      # utils::data("GvHD", package = "flowCore")
-      # rval$gating_set <- GatingSet(GvHD)
-      # utils::data("Bcells", package = "flowAI")
-      # rval$gating_set <- flowWorkspace::GatingSet(Bcells)
-
-      fs <- read.ncdfFlowSet(files = c("/mnt/NAS7/Workspace/hammamiy/data_premasse/20120222_cells_found.fcs",
-                                       "/mnt/NAS7/Workspace/hammamiy/data_premasse/20120229_cells_found.fcs"))
-
-      gs <- GatingSet(fs)
-
-      # rg <- flowCore::rectangleGate(filterId = "beads1", list("Bead1(La139)Di" = c(10, 200), "(Ir193)Di" = c(-50, 50)))
-      # rg2 <- flowCore::rectangleGate(filterId = "beads2", list("Bead2(Pr141)Di" = c(10, 200), "(Ir193)Di" = c(-50, 50)))
-      # rg3 <- flowCore::rectangleGate(filterId = "beads3", list("CD11c(Tb159)Di" = c(10, 200), "(Ir193)Di" = c(-50, 50)))
-      # rg4 <- flowCore::rectangleGate(filterId = "beads4", list("Bead3(Tm169)Di" = c(10, 200), "(Ir193)Di" = c(-50, 50)))
-      # rg5 <- flowCore::rectangleGate(filterId = "beads5", list("Bead4(Lu175)Di" = c(10, 200), "(Ir193)Di" = c(-50, 50)))
-
-      # flowWorkspace::gs_pop_add(gs, rg)
-      # flowWorkspace::gs_pop_add(gs, rg2, parent = "/beads1")
-      # flowWorkspace::gs_pop_add(gs, rg3, parent = "/beads1/beads2")
-      # flowWorkspace::gs_pop_add(gs, rg4, parent = "/beads1/beads2/beads3")
-      # flowWorkspace::gs_pop_add(gs, rg5, parent = "/beads1/beads2/beads3/beads4")
-      # recompute(gs)
-
-
-
-      rval$gating_set <- gs
-
-      # rg <- flowCore::rectangleGate(filterId = "beads1", list("APC-Cy7-A" = c(10, 200), "Pacific Blue-A" = c(-50, 50)))
-      # flowWorkspace::gs_pop_add(rval$gating_set, rg)
-      # recompute(rval$gating_set)
-
-
-    })
-    res <- callModule(Normalization, "module", rval = rval)
-  }
-
-  shinyApp(ui, server)
-
-}
+# if (interactive()){
+# 
+#   ui <- dashboardPage(
+#     dashboardHeader(title = "flowAI"),
+#     sidebar = dashboardSidebar(disable = TRUE),
+#     body = dashboardBody(
+#       NormalizationUI("module")
+#     )
+#   )
+# 
+#   server <- function(input, output, session) {
+#     rval <- reactiveValues()
+#     observe({
+#       # utils::data("GvHD", package = "flowCore")
+#       # rval$gating_set <- GatingSet(GvHD)
+#       # utils::data("Bcells", package = "flowAI")
+#       # rval$gating_set <- flowWorkspace::GatingSet(Bcells)
+# 
+#       fs <- read.ncdfFlowSet(files = c("/mnt/NAS7/Workspace/hammamiy/data_premasse/20120222_cells_found.fcs",
+#                                        "/mnt/NAS7/Workspace/hammamiy/data_premasse/20120229_cells_found.fcs"))
+# 
+#       gs <- GatingSet(fs)
+# 
+#       # rg <- flowCore::rectangleGate(filterId = "beads1", list("Bead1(La139)Di" = c(10, 200), "(Ir193)Di" = c(-50, 50)))
+#       # rg2 <- flowCore::rectangleGate(filterId = "beads2", list("Bead2(Pr141)Di" = c(10, 200), "(Ir193)Di" = c(-50, 50)))
+#       # rg3 <- flowCore::rectangleGate(filterId = "beads3", list("CD11c(Tb159)Di" = c(10, 200), "(Ir193)Di" = c(-50, 50)))
+#       # rg4 <- flowCore::rectangleGate(filterId = "beads4", list("Bead3(Tm169)Di" = c(10, 200), "(Ir193)Di" = c(-50, 50)))
+#       # rg5 <- flowCore::rectangleGate(filterId = "beads5", list("Bead4(Lu175)Di" = c(10, 200), "(Ir193)Di" = c(-50, 50)))
+# 
+#       # flowWorkspace::gs_pop_add(gs, rg)
+#       # flowWorkspace::gs_pop_add(gs, rg2, parent = "/beads1")
+#       # flowWorkspace::gs_pop_add(gs, rg3, parent = "/beads1/beads2")
+#       # flowWorkspace::gs_pop_add(gs, rg4, parent = "/beads1/beads2/beads3")
+#       # flowWorkspace::gs_pop_add(gs, rg5, parent = "/beads1/beads2/beads3/beads4")
+#       # recompute(gs)
+# 
+# 
+# 
+#       rval$gating_set <- gs
+# 
+#       # rg <- flowCore::rectangleGate(filterId = "beads1", list("APC-Cy7-A" = c(10, 200), "Pacific Blue-A" = c(-50, 50)))
+#       # flowWorkspace::gs_pop_add(rval$gating_set, rg)
+#       # recompute(rval$gating_set)
+# 
+# 
+#     })
+#     res <- callModule(Normalization, "module", rval = rval)
+#   }
+# 
+#   shinyApp(ui, server)
+# 
+# }
