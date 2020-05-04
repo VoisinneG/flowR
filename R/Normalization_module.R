@@ -380,7 +380,7 @@ Normalization <- function(input, output, session, rval){
           intersec <- lapply(seq(maxlen),function(i) Reduce(intersect,lapply(indice_list,"[[", i)))
           beads.events <- unlist(intersec)
         } else if(input$use_intersect == FALSE) {
-          intersec <- lapply(seq(maxlen),function(i) Reduce(union,lapply(indice_list,"[[", i)))
+          intersec <- unique(lapply(seq(maxlen),function(i) Reduce(union,lapply(indice_list,"[[", i))))
           beads.events <- unlist(intersec)
         }
         
