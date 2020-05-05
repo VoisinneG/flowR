@@ -129,6 +129,17 @@ Normalization <- function(input, output, session, rval){
     return(names)
   })
   
+  # update select input of the actual subset
+  
+  observe({
+    validate(need(!is.null(rval$gating_set), ""))
+    print(names(get_gates_from_gs(rval$gating_set)))
+    updateSelectInput(session = session,
+                      inputId = "gates_subset_select", 
+                      label = "Choice the gates of references", 
+                      choices = names(get_gates_from_gs(rval$gating_set)))
+  })
+  
   ### update select_beads_gates_default and apply default gates on these chan ########################################################
   
   # update selectinput beads gates 
@@ -141,7 +152,6 @@ Normalization <- function(input, output, session, rval){
   })
   
   # search in the current parameters the desc corresponding to "beads"
-  
   find_chan_desc_beads <- reactive({
     validate(need(!is.null(rval$gating_set), "gs is null"))
     
@@ -297,26 +307,26 @@ Normalization <- function(input, output, session, rval){
   })
   
   # update x & y selectinput for the plot dist
-  observe({
-    updateSelectInput(session, 
-                         "x_dist_input",
-                         label = "X axis",
-                         choices = chan_names(),
-                         selected = chan_names()[1])
-    
-    updateSelectInput(session = session, 
-                      inputId = "y_dist_input",
-                      label = "Y axis",
-                      choices = chan_names(),
-                      selected = chan_names()[2])
-    
-    updateSelectInput(session = session,
-                      inputId = "select_sample_input",
-                      label = "Select sample",
-                      choices = sampleNames(rval$gating_set),
-                      selected = sampleNames(rval$gating_set)[1])
-    
-  })
+  # observe({
+  #   updateSelectInput(session, 
+  #                        "x_dist_input",
+  #                        label = "X axis",
+  #                        choices = chan_names(),
+  #                        selected = chan_names()[1])
+  #   
+  #   updateSelectInput(session = session, 
+  #                     inputId = "y_dist_input",
+  #                     label = "Y axis",
+  #                     choices = chan_names(),
+  #                     selected = chan_names()[2])
+  #   
+  #   updateSelectInput(session = session,
+  #                     inputId = "select_sample_input",
+  #                     label = "Select sample",
+  #                     choices = sampleNames(rval$gating_set),
+  #                     selected = sampleNames(rval$gating_set)[1])
+  #   
+  # })
   
   ## Normalization from subset & specific "beads selected" #######################################################
   
@@ -331,7 +341,7 @@ Normalization <- function(input, output, session, rval){
   })
   
   normalize_reactive <- reactive({
-      
+    validate(need(!is.null(rval$gating_set), ""))
     withProgress(message = 'Making normalization', value = 0, {
       n <- 0
       m_norm_tmp$beads.cols.names.used <- input$beads_select_input
@@ -366,7 +376,6 @@ Normalization <- function(input, output, session, rval){
                                                                 beads.col.names = m_norm_tmp$beads.cols.names.used,
                                                                 time.col.name = "Time")
         m_normed$norm <- m_norm_tmp$norm.res$m.normed
-        # print(m_normed$norm)
         
         # get all pop indices
         indice_list <- sapply(input$gates_subset_select, function(x){
