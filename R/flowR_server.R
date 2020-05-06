@@ -24,7 +24,8 @@ flowR_server <- function(session, input, output, modules = NULL) {
                          gating_set_selected = NULL,
                          tab_elements = list(),
                          menu_elements = list(),
-                         modules = NULL
+                         modules = NULL,
+                         active_menu = NULL
                          )
   
   ### Build UI based on selected modules #######################################################
@@ -170,6 +171,12 @@ flowR_server <- function(session, input, output, modules = NULL) {
     rval$update_gs
     validate(need(class(rval$gating_set) == "GatingSet", "input is not a GatingSet"))
     get_parameters_gs(rval$gating_set)
+  })
+  
+  ### Get the active menuItems #################################################################
+  
+  observe({
+    rval$active_module <- input$menu
   })
   
   ### Main Value boxes #########################################################################
