@@ -516,7 +516,11 @@ Clean <- function(input, output, session, rval) {
   
   ### Analyze samples ###################################################
   
-  res <- eventReactive(input$clean_selected_sample_input, {
+  res <- eventReactive(input$clean_selected_sample_input,{ 
+    run_clean()
+  })
+  
+  run_clean <- reactive({ 
     show_error <- 0
     preview_val_but$input_prev <- 0
     
@@ -649,6 +653,7 @@ Clean <- function(input, output, session, rval) {
         )
       )
     }
+    
     
     return(
       list(
@@ -926,7 +931,7 @@ Clean <- function(input, output, session, rval) {
   ### get gatingSet name ##################################################################################
   
   # for reinitialize the plot
-  name_gs_analysed <- eventReactive(input$clean_selected_sample_input, {
+  name_gs_analysed <- eventReactive(c(input$clean_selected_sample_input, input$pre_cleaning), {
     value_name <- rval$gating_set_selected
     return(value_name)
   })
@@ -1092,6 +1097,36 @@ Clean <- function(input, output, session, rval) {
     datatable(res_table(), options = list(scrollX = T, scrollCollapse=TRUE, lengthMenu = c(100,50,20,10)))
   })
   
+  ### Popup when the data is not clean #####################################################################################
+  
+  observe({
+    validate(need(!is.null(rval$gating_set), ""))
+    validate(need(!is.null(rval$active_module), ""))
+   
+    
+    if(rval$active_module == "Clean_tab"){
+      if(!"badCells" %in% colnames(rval$gating_set)){
+        ns <- session$ns
+        showModal(
+          modalDialog(title = "Would you like to make a first cleaning",
+                      tagList(actionButton(ns("pre_cleaning"), "Run cleaning"),
+                              modalButton("Exit")
+                      ),
+                      footer = NULL
+          )
+        )
+      }
+    }
+    # print(rval$active_module == "Clean_tab")
+   
+    # print(names(shiny_session))
+  })
+  
+  res <- eventReactive(input$pre_cleaning,{
+    removeModal()
+    run_clean()
+    
+  })
   
   return(rval)
 }
