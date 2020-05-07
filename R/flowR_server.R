@@ -176,7 +176,7 @@ flowR_server <- function(session, input, output, modules = NULL) {
   ### Get the active menuItems #################################################################
   
   observe({
-    rval$active_module <- input$menu
+    rval$active_menu <- input$menu
   })
   
   ### Main Value boxes #########################################################################

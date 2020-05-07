@@ -465,7 +465,7 @@ Clean <- function(input, output, session, rval) {
     chNames <- choices()$plot_var
     pattern <- "^FSC|^SSC"
     excludeCh<- grep(pattern, chNames, value = TRUE)
-    print(excludeCh)
+    # print(excludeCh)
     updateSelectInput(session = session, inputId = "options_chExclude", 
                       choices = chNames,
                       select = excludeCh)
@@ -478,10 +478,10 @@ Clean <- function(input, output, session, rval) {
   ### Set time channel ###############################################################
   observe({
     chNames <- choices()$plot_var
-    print(chNames)
+    # print(chNames)
     pattern <- "^Time|^time"
     timeCh<- grep(pattern, chNames, value = TRUE)
-    print(timeCh)
+    # print(timeCh)
     updateSelectInput(session, "choice_channel_input", 
                       label = "Select time channel",
                       choices = chNames,
@@ -1101,10 +1101,10 @@ Clean <- function(input, output, session, rval) {
   
   observe({
     validate(need(!is.null(rval$gating_set), ""))
-    validate(need(!is.null(rval$active_module), ""))
+    validate(need(!is.null(rval$active_menu), ""))
    
     
-    if(rval$active_module == "Clean_tab"){
+    if(rval$active_menu == "Clean_tab"){
       if(!"badCells" %in% colnames(rval$gating_set)){
         ns <- session$ns
         showModal(
@@ -1117,9 +1117,6 @@ Clean <- function(input, output, session, rval) {
         )
       }
     }
-    # print(rval$active_module == "Clean_tab")
-   
-    # print(names(shiny_session))
   })
   
   res <- eventReactive(input$pre_cleaning,{
