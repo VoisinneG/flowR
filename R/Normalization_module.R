@@ -9,10 +9,17 @@ NormalizationUI <- function(id){
     
     column(4,
            box(width = 12, title = "Parameter",
+               selectInput(inputId = ns("time_choice"), 
+                           label = "Choose time parameters",
+                           choices = NULL, 
+                           selected = NULL, 
+                           multiple = F),
+               
                selectInput(inputId = ns("select_beads_gates_default")
                            , label = "Select beads channel to apply default gates"
                            , choices = NULL,
                           multiple = T),
+               
                actionButton(inputId = ns("apply_default_gates"), label = "Apply default gates"),
                
                hr(),
@@ -327,6 +334,18 @@ Normalization <- function(input, output, session, rval){
   #                     selected = sampleNames(rval$gating_set)[1])
   #   
   # })
+  ## Search time parameters ######################################################################################
+  
+  search_time <- reactive ({
+    time <- which(grepl("[Tt]ime", colnames(rval$gating_set)))
+    return(time)
+  })
+  
+  observe({
+    validate(need(!is.null(rval$gating_set), ""))
+    updateSelectInput(session = session, inputId = "time_choice", label = "Choose time parameters", choices = colnames(rval$gating_set),
+                      selected = colnames(rval$gating_set)[search_time()])
+  })
   
   ## Normalization from subset & specific "beads selected" #######################################################
   
@@ -374,7 +393,7 @@ Normalization <- function(input, output, session, rval){
                                                                 beads.data = beads.data,
                                                                 baseline = baseline.data,
                                                                 beads.col.names = m_norm_tmp$beads.cols.names.used,
-                                                                time.col.name = "Time")
+                                                                time.col.name = input$time_choice)
         m_normed$norm <- m_norm_tmp$norm.res$m.normed
         
         # get all pop indices
