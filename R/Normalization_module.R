@@ -69,7 +69,9 @@ NormalizationUI <- function(id){
                  tabPanel("Before/After normalization",
                           # plotOutput(ns("norm_plot")),
                           simpleDisplayUI(ns("simple_norm_display"))
-                 )
+                 ),
+                 tabPanel("Time varation",
+                          simpleDisplayUI(ns("time_variation_plot")))
                  # tabPanel("beads distance",
                  #          plotOutput(ns("norm_plot_dist")),
                  #          column(4, selectInput(inputId = ns("select_sample_input"), label = "Select sample", choices = NULL, selected = NULL)),
@@ -111,6 +113,7 @@ Normalization <- function(input, output, session, rval){
 
   callModule(simpleDisplay, "simple_display", res$plot)
   callModule(simpleDisplay, "simple_norm_display", norm_plot)
+  callModule(simpleDisplay, "time_variation_plot", time_variation_plot)
   ### Setup gates of references subset ######################################################################
   
   gate_reference <- reactive({
@@ -559,6 +562,35 @@ Normalization <- function(input, output, session, rval){
     premessa:::plot_distance_from_beads(exprs(rval$gating_set@data[[input$select_sample_input]]), x.var = input$x_dist_input, y.var = input$y_dist_input)
   })
   
+  ## Make time variation plot #####################################################################
+  
+  # firstly take dataframe from the temporary or the rval$gating_set
+  time_variation_plot <- reactive({
+
+    data <- get_data_gs(gs = gs_tmp$gs_norm, sample = sampleNames(gs_tmp$gs_norm), subset = input$gates_subset_select)
+    # print(data)
+    print(get_stat_for_plot()[[1]])
+    vector_param <- c(colnames(rval$gating_set)[search_time()])
+    # vector_param <- c(vector_param, input$beads_select_input, "subset", "name")
+    vector_param <- c(vector_param, "subset", "name")
+    
+    data_melt <- melt(data = data, id.vars = c(vector_param))
+    # data_melt <- data_melt[, !colnames(data_melt) %in% c("value", "variable")]
+    data_melt$norm_aspect <- "Before"
+    data_melt$norm_aspect[which(grepl("norm", data_melt$variable))] <- "After"
+    
+    data_melt$value <- asinh(data_melt$value)
+    # remove norm at the variable name for the plot parameters
+    data_melt$variable <- gsub(" norm", "", data_melt$variable)
+    
+    print(table(data_melt$norm_aspect))
+    # print(data_melt)
+    plotting <- ggplot(data = data_melt, mapping = aes(x = Time, y = value)) 
+    plotting <- plotting + geom_smooth(data = data_melt, aes(x = Time, y = value, color = variable, group = variable))
+    plotting <- plotting + facet_grid(norm_aspect ~ .)
+    return(plotting)
+  })
+  
   
   return(rval)
   
@@ -572,55 +604,55 @@ Normalization <- function(input, output, session, rval){
 # library(flowWorkspace)
 # library(flowCore)
 # 
-if (interactive()){
-
-  ui <- dashboardPage(
-    dashboardHeader(title = "flowAI"),
-    sidebar = dashboardSidebar(disable = TRUE),
-    body = dashboardBody(
-      NormalizationUI("module")
-    )
-  )
-
-  server <- function(input, output, session) {
-    rval <- reactiveValues()
-    observe({
-      # utils::data("GvHD", package = "flowCore")
-      # rval$gating_set <- GatingSet(GvHD)
-      # utils::data("Bcells", package = "flowAI")
-      # rval$gating_set <- flowWorkspace::GatingSet(Bcells)
-
-      fs <- read.ncdfFlowSet(files = c("/mnt/NAS7/Workspace/hammamiy/data_premasse/20120222_cells_found.fcs",
-                                       "/mnt/NAS7/Workspace/hammamiy/data_premasse/20120229_cells_found.fcs"))
-
-      gs <- GatingSet(fs)
-
-      # rg <- flowCore::rectangleGate(filterId = "beads1", list("Bead1(La139)Di" = c(10, 200), "(Ir193)Di" = c(-50, 50)))
-      # rg2 <- flowCore::rectangleGate(filterId = "beads2", list("Bead2(Pr141)Di" = c(10, 200), "(Ir193)Di" = c(-50, 50)))
-      # rg3 <- flowCore::rectangleGate(filterId = "beads3", list("CD11c(Tb159)Di" = c(10, 200), "(Ir193)Di" = c(-50, 50)))
-      # rg4 <- flowCore::rectangleGate(filterId = "beads4", list("Bead3(Tm169)Di" = c(10, 200), "(Ir193)Di" = c(-50, 50)))
-      # rg5 <- flowCore::rectangleGate(filterId = "beads5", list("Bead4(Lu175)Di" = c(10, 200), "(Ir193)Di" = c(-50, 50)))
-
-      # flowWorkspace::gs_pop_add(gs, rg)
-      # flowWorkspace::gs_pop_add(gs, rg2, parent = "/beads1")
-      # flowWorkspace::gs_pop_add(gs, rg3, parent = "/beads1/beads2")
-      # flowWorkspace::gs_pop_add(gs, rg4, parent = "/beads1/beads2/beads3")
-      # flowWorkspace::gs_pop_add(gs, rg5, parent = "/beads1/beads2/beads3/beads4")
-      # recompute(gs)
-
-
-
-      rval$gating_set <- gs
-
-      # rg <- flowCore::rectangleGate(filterId = "beads1", list("APC-Cy7-A" = c(10, 200), "Pacific Blue-A" = c(-50, 50)))
-      # flowWorkspace::gs_pop_add(rval$gating_set, rg)
-      # recompute(rval$gating_set)
-
-
-    })
-    res <- callModule(Normalization, "module", rval = rval)
-  }
-
-  shinyApp(ui, server)
-
-}
+# if (interactive()){
+# 
+#   ui <- dashboardPage(
+#     dashboardHeader(title = "flowAI"),
+#     sidebar = dashboardSidebar(disable = TRUE),
+#     body = dashboardBody(
+#       NormalizationUI("module")
+#     )
+#   )
+# 
+#   server <- function(input, output, session) {
+#     rval <- reactiveValues()
+#     observe({
+#       # utils::data("GvHD", package = "flowCore")
+#       # rval$gating_set <- GatingSet(GvHD)
+#       # utils::data("Bcells", package = "flowAI")
+#       # rval$gating_set <- flowWorkspace::GatingSet(Bcells)
+# 
+#       fs <- read.ncdfFlowSet(files = c("/mnt/NAS7/Workspace/hammamiy/data_premasse/20120222_cells_found.fcs",
+#                                        "/mnt/NAS7/Workspace/hammamiy/data_premasse/20120229_cells_found.fcs"))
+# # 
+#       gs <- GatingSet(fs)
+# 
+#       # rg <- flowCore::rectangleGate(filterId = "beads1", list("Bead1(La139)Di" = c(10, 200), "(Ir193)Di" = c(-50, 50)))
+#       # rg2 <- flowCore::rectangleGate(filterId = "beads2", list("Bead2(Pr141)Di" = c(10, 200), "(Ir193)Di" = c(-50, 50)))
+#       # rg3 <- flowCore::rectangleGate(filterId = "beads3", list("CD11c(Tb159)Di" = c(10, 200), "(Ir193)Di" = c(-50, 50)))
+#       # rg4 <- flowCore::rectangleGate(filterId = "beads4", list("Bead3(Tm169)Di" = c(10, 200), "(Ir193)Di" = c(-50, 50)))
+#       # rg5 <- flowCore::rectangleGate(filterId = "beads5", list("Bead4(Lu175)Di" = c(10, 200), "(Ir193)Di" = c(-50, 50)))
+# 
+#       # flowWorkspace::gs_pop_add(gs, rg)
+#       # flowWorkspace::gs_pop_add(gs, rg2, parent = "/beads1")
+#       # flowWorkspace::gs_pop_add(gs, rg3, parent = "/beads1/beads2")
+#       # flowWorkspace::gs_pop_add(gs, rg4, parent = "/beads1/beads2/beads3")
+#       # flowWorkspace::gs_pop_add(gs, rg5, parent = "/beads1/beads2/beads3/beads4")
+#       # recompute(gs)
+# 
+# 
+# 
+#       rval$gating_set <- gs
+# 
+#       # rg <- flowCore::rectangleGate(filterId = "beads1", list("APC-Cy7-A" = c(10, 200), "Pacific Blue-A" = c(-50, 50)))
+#       # flowWorkspace::gs_pop_add(rval$gating_set, rg)
+#       # recompute(rval$gating_set)
+# 
+# 
+#     })
+#     res <- callModule(Normalization, "module", rval = rval)
+#   }
+# 
+#   shinyApp(ui, server)
+# 
+# }
