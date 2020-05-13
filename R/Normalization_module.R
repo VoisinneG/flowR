@@ -37,7 +37,7 @@ NormalizationUI <- function(id){
                selectInput(inputId = ns("beads_select_input"), label = "Choices the channels beads", multiple = T, choices = NULL),
                
                hr(),
-               checkboxInput(inputId = ns("use_intersect"), label = "Exclude subset", value = T),
+               checkboxInput(inputId = ns("use_intersect"), label = "Use intersection on all subset", value = T),
                actionButton(inputId = ns("normalize_button"), label = "Apply normalization")
                
                
