@@ -481,7 +481,7 @@ Clean <- function(input, output, session, rval) {
     # print(chNames)
     pattern <- "^Time|^time"
     timeCh<- grep(pattern, chNames, value = TRUE)
-    # print(timeCh)
+    print(timeCh)
     updateSelectInput(session, "choice_channel_input", 
                       label = "Select time channel",
                       choices = chNames,
@@ -516,9 +516,18 @@ Clean <- function(input, output, session, rval) {
   
   ### Analyze samples ###################################################
   
-  res <- eventReactive(input$clean_selected_sample_input,{ 
+  # Give the type of input for create interaction with the pop up clean or the action button analysis
+  pop_up_or_not_button <- eventReactive(list(input$clean_selected_sample_input, input$pre_cleaning),{ 
+
+    clean_select_sample <- input$clean_selected_sample_input
+    pop_up_clean <- input$pre_cleaning 
+   })
+  
+  res <- eventReactive(pop_up_or_not_button(), {
+    removeModal()
     run_clean()
   })
+  
   
   run_clean <- reactive({ 
     show_error <- 0
@@ -1119,11 +1128,11 @@ Clean <- function(input, output, session, rval) {
     }
   })
   
-  res <- eventReactive(input$pre_cleaning,{
-    removeModal()
-    run_clean()
-    
-  })
+  # res <- eventReactive(input$pre_cleaning,{
+  #   removeModal()
+  #   run_clean()
+  #   
+  # })
   
   return(rval)
 }
