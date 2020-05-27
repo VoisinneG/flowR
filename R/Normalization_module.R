@@ -71,7 +71,8 @@ NormalizationUI <- function(id){
                           simpleDisplayUI(ns("simple_norm_display"))
                  ),
                  tabPanel("Time varation",
-                          simpleDisplayUI(ns("time_variation_plot")))
+                          simpleDisplayUI(ns("time_variation_plot"))
+                         )
                  # tabPanel("beads distance",
                  #          plotOutput(ns("norm_plot_dist")),
                  #          column(4, selectInput(inputId = ns("select_sample_input"), label = "Select sample", choices = NULL, selected = NULL)),
@@ -348,6 +349,9 @@ Normalization <- function(input, output, session, rval){
     validate(need(!is.null(rval$gating_set), ""))
     updateSelectInput(session = session, inputId = "time_choice", label = "Choose time parameters", choices = colnames(rval$gating_set),
                       selected = colnames(rval$gating_set)[search_time()])
+    
+    updateSelectInput(session = session, inputId = "time_param_plot", label = "Select time parameter", choices = colnames(rval$gating_set),
+                      selected = colnames(rval$gating_set)[search_time()])
   })
   
   ## Normalization from subset & specific "beads selected" #######################################################
@@ -364,85 +368,96 @@ Normalization <- function(input, output, session, rval){
   
   normalize_reactive <- reactive({
     validate(need(!is.null(rval$gating_set), ""))
-    withProgress(message = 'Making normalization', value = 0, {
-      n <- 0
-      m_norm_tmp$beads.cols.names.used <- input$beads_select_input
-      sample_names <- sampleNames(rval$gating_set)
-      
-      beads.gate <- list()
-      
-      # if users takes specific gates (from specific subset)
-      df_list <- list()
-      
-      # compute baseline
-      df <- get_data_gs(gs = rval$gating_set, sample = sampleNames(rval$gating_set), subset = input$gates_subset_select)
-      # beads.cols.names <- c("Bead1(La139)Di", "Bead2(Pr141)Di", "CD11c(Tb159)Di", "Bead3(Tm169)Di", "Bead4(Lu175)Di")
-      df$id <- 1
-      df_stat <- flowR:::compute_stats(df = df,
-                                       y_trans = asinh_trans(scale = 5),
-                                       apply_inverse = TRUE,
-                                       yvar = m_norm_tmp$beads.cols.names.used,
-                                       stat_function = "median",
-                                       id.vars = c("id"))
-      baseline.data <- unlist(df_stat[, -1])
-      
-      for(sample in sampleNames(rval$gating_set)){
-        n <- n + 1
-        df <- get_data_gs(rval$gating_set, sample = sample, subset = "root")
-        m_norm_tmp$m <- as.matrix(df[-which(names(df) %in% c("name", "subset"))])
-        beads.data <- get_data_gs(rval$gating_set, sample = sample, subset = input$gates_subset_select)
-        beads.data <- as.matrix(beads.data[-which(names(beads.data) %in% c("name", "subset"))])
-        m_norm_tmp$norm.res <- premessa:::correct_data_channels(m = m_norm_tmp$m,
-                                                                beads.data = beads.data,
-                                                                baseline = baseline.data,
-                                                                beads.col.names = m_norm_tmp$beads.cols.names.used,
-                                                                time.col.name = input$time_choice)
-        m_normed$norm <- m_norm_tmp$norm.res$m.normed
-        
-        # get all pop indices
-        indice_list <- sapply(input$gates_subset_select, function(x){
-          list(gh_pop_get_indices(rval$gating_set[[sample]], x))
-        }) 
-        
-        # use intersect 
-        maxlen <- max(sapply(indice_list, length))
-        
-        if(input$use_intersect == TRUE){
-          intersec <- lapply(seq(maxlen),function(i) Reduce(intersect,lapply(indice_list,"[[", i)))
-          beads.events <- unlist(intersec)
-        } else if(input$use_intersect == FALSE) {
-          intersec <- unique(lapply(seq(maxlen),function(i) Reduce(union,lapply(indice_list,"[[", i))))
-          beads.events <- unlist(intersec)
-        }
-
-        # beads.events <- gh_pop_get_indices(rval$gating_set[[sample]], input$gates_subset_select)
-        
-        m_normed$norm <- cbind(m_normed$norm,
-                               beadDist = premessa:::get_mahalanobis_distance_from_beads(m_normed$norm,
-                                                                                         beads.events,
-                                                                                         m_norm_tmp$beads.cols.names.used))
-        
-        colnames(m_normed$norm) <- paste(colnames(m_normed$norm), "norm")
-        colnames(m_normed$norm)[colnames(m_normed$norm)=="beadDist norm"] <- "beadDist"
-        
-        df_list[[sample]] <- cbind(df, as.data.frame(m_normed$norm))
-        
-        incProgress(1/n, detail = paste("Normalize sample :", sample))
-      }
-      
-      df <- do.call(rbind, df_list)
-      
-      
-      fs_norm <- build_flowset_from_df(df = df)
-      
-      # #build GatingSet
-      gs_norm <- build_gatingset_from_df(df = df, gs_origin = rval$gating_set)
-      # build_gatingset_from_df(df = df, gs_origin = rval$gating_set)
-      
-      return(gs_norm)
-      # rval$gating_set <- gs_norm
-    })
     
+    if(is.null(input$gates_subset_select)){
+      showModal(
+        modalDialog(title = "You cannot make normalization without using gates",
+                    "Please choose one or more than one gates",
+                    footer = modalButton("Dismiss"))
+      )  
+    } else {
+      
+      
+      withProgress(message = 'Making normalization', value = 0, {
+        n <- 0
+        m_norm_tmp$beads.cols.names.used <- input$beads_select_input
+        sample_names <- sampleNames(rval$gating_set)
+        
+        beads.gate <- list()
+        
+        # if users takes specific gates (from specific subset)
+        df_list <- list()
+        
+        # compute baseline
+        df <- get_data_gs(gs = rval$gating_set, sample = sampleNames(rval$gating_set), subset = input$gates_subset_select)
+        # beads.cols.names <- c("Bead1(La139)Di", "Bead2(Pr141)Di", "CD11c(Tb159)Di", "Bead3(Tm169)Di", "Bead4(Lu175)Di")
+        df$id <- 1
+        df_stat <- flowR:::compute_stats(df = df,
+                                         y_trans = asinh_trans(scale = 5),
+                                         apply_inverse = TRUE,
+                                         yvar = m_norm_tmp$beads.cols.names.used,
+                                         stat_function = "median",
+                                         id.vars = c("id"))
+        baseline.data <- unlist(df_stat[, -1])
+        
+        for(sample in sampleNames(rval$gating_set)){
+          n <- n + 1
+          df <- get_data_gs(rval$gating_set, sample = sample, subset = "root")
+          m_norm_tmp$m <- as.matrix(df[-which(names(df) %in% c("name", "subset"))])
+          beads.data <- get_data_gs(rval$gating_set, sample = sample, subset = input$gates_subset_select)
+          beads.data <- as.matrix(beads.data[-which(names(beads.data) %in% c("name", "subset"))])
+          m_norm_tmp$norm.res <- premessa:::correct_data_channels(m = m_norm_tmp$m,
+                                                                  beads.data = beads.data,
+                                                                  baseline = baseline.data,
+                                                                  beads.col.names = m_norm_tmp$beads.cols.names.used,
+                                                                  time.col.name = input$time_choice)
+          m_normed$norm <- m_norm_tmp$norm.res$m.normed
+          
+          # get all pop indices
+          indice_list <- sapply(input$gates_subset_select, function(x){
+            list(gh_pop_get_indices(rval$gating_set[[sample]], x))
+          }) 
+          
+          # use intersect 
+          maxlen <- max(sapply(indice_list, length))
+          
+          if(input$use_intersect == TRUE){
+            intersec <- lapply(seq(maxlen),function(i) Reduce(intersect,lapply(indice_list,"[[", i)))
+            beads.events <- unlist(intersec)
+          } else if(input$use_intersect == FALSE) {
+            intersec <- unique(lapply(seq(maxlen),function(i) Reduce(union,lapply(indice_list,"[[", i))))
+            beads.events <- unlist(intersec)
+          }
+          
+          # beads.events <- gh_pop_get_indices(rval$gating_set[[sample]], input$gates_subset_select)
+          
+          m_normed$norm <- cbind(m_normed$norm,
+                                 beadDist = premessa:::get_mahalanobis_distance_from_beads(m_normed$norm,
+                                                                                           beads.events,
+                                                                                           m_norm_tmp$beads.cols.names.used))
+          
+          colnames(m_normed$norm) <- paste(colnames(m_normed$norm), "norm")
+          colnames(m_normed$norm)[colnames(m_normed$norm)=="beadDist norm"] <- "beadDist"
+          
+          df_list[[sample]] <- cbind(df, as.data.frame(m_normed$norm))
+          
+          incProgress(1/n, detail = paste("Normalize sample :", sample))
+        }
+        
+        df <- do.call(rbind, df_list)
+        
+        
+        fs_norm <- build_flowset_from_df(df = df)
+        
+        # #build GatingSet
+        gs_norm <- build_gatingset_from_df(df = df, gs_origin = rval$gating_set)
+        # build_gatingset_from_df(df = df, gs_origin = rval$gating_set)
+        
+        return(gs_norm)
+        
+        # rval$gating_set <- gs_norm
+      })
+    }
   })
   
   ### Create new gatingset based on the normalization ##################################################################################################
@@ -454,11 +469,16 @@ Normalization <- function(input, output, session, rval){
     print("Normalization finished")
   })
   
+  #get the value of normalization
+  res_norm <- eventReactive(input$normalize_button, {
+    gs_tmp$gs_norm
+  })
   # create the new gating set from the normalization
   observeEvent(input$create_gs, {
     validate(need(length(input$beads_select_input) > 0, "Need to choice beads before to apply normalization"))
     
-    gs_norm <- normalize_reactive()
+    gs_norm <- res_norm()
+    print(res_norm())
     # gs_norm <- gs_tmp$gs_norm
     
     # remove beads
@@ -566,7 +586,11 @@ Normalization <- function(input, output, session, rval){
   
   # firstly take dataframe from the temporary or the rval$gating_set
   time_variation_plot <- reactive({
-
+    validate(
+      need(!is.null(rval$gating_set), ""),
+      need(!is.null(gs_tmp$gs_norm), "Need to make normalization")
+      )
+    
     data <- get_data_gs(gs = gs_tmp$gs_norm, sample = sampleNames(gs_tmp$gs_norm), subset = input$gates_subset_select)
     # print(data)
     print(get_stat_for_plot()[[1]])
@@ -624,7 +648,7 @@ Normalization <- function(input, output, session, rval){
 # 
 #       fs <- read.ncdfFlowSet(files = c("/mnt/NAS7/Workspace/hammamiy/data_premasse/20120222_cells_found.fcs",
 #                                        "/mnt/NAS7/Workspace/hammamiy/data_premasse/20120229_cells_found.fcs"))
-# # 
+# #
 #       gs <- GatingSet(fs)
 # 
 #       # rg <- flowCore::rectangleGate(filterId = "beads1", list("Bead1(La139)Di" = c(10, 200), "(Ir193)Di" = c(-50, 50)))
