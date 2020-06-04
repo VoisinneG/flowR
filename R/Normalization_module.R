@@ -70,7 +70,7 @@ NormalizationUI <- function(id){
                           # plotOutput(ns("norm_plot")),
                           simpleDisplayUI(ns("simple_norm_display"))
                  ),
-                 tabPanel("Time varation",
+                 tabPanel("Time variation",
                           simpleDisplayUI(ns("time_variation_plot"))
                          )
                  # tabPanel("beads distance",
@@ -144,7 +144,7 @@ Normalization <- function(input, output, session, rval){
   
   observe({
     validate(need(!is.null(rval$gating_set), ""))
-    print(names(get_gates_from_gs(rval$gating_set)))
+    # print(names(get_gates_from_gs(rval$gating_set)))
     updateSelectInput(session = session,
                       inputId = "gates_subset_select", 
                       label = "Choice the gates of references", 
@@ -567,20 +567,21 @@ Normalization <- function(input, output, session, rval){
     
     # remove pattern norm in parameters for having only the same parameters legend and colors in plot representation 
     data$Parameters <- gsub(" norm", "" ,data$Parameters)
-   
+    
     
     plotting <- ggplot(data = data, mapping = aes(x = Sample, y = `Signal median`)) 
     plotting <- plotting + geom_point(aes(colour = Parameters)) 
     plotting <- plotting + geom_line(data = data, aes(x = Sample, y = `Signal median`, color = Parameters, group = Parameters))
     plotting <- plotting + facet_grid(norm_aspect ~ subset)
+    plotting <- plotting + theme(axis.text.x = element_text(angle = 60, hjust = 1))
     return(plotting)
     # premessa:::plot_beads_over_time(beads.data = m_norm_tmp$m, beads.normed = m_norm_tmp$norm.res$beads.normed, beads.cols = m_norm_tmp$beads.cols.names.used)
   })
   
-  output$norm_plot_dist <- renderPlot({
-    # validate(need(rval$gating_set@[[]], "No current normalisation apply"))
-    premessa:::plot_distance_from_beads(exprs(rval$gating_set@data[[input$select_sample_input]]), x.var = input$x_dist_input, y.var = input$y_dist_input)
-  })
+  # output$norm_plot_dist <- renderPlot({
+  #   # validate(need(rval$gating_set@[[]], "No current normalisation apply"))
+  #   premessa:::plot_distance_from_beads(exprs(rval$gating_set@data[[input$select_sample_input]]), x.var = input$x_dist_input, y.var = input$y_dist_input)
+  # })
   
   ## Make time variation plot #####################################################################
   
@@ -646,10 +647,20 @@ Normalization <- function(input, output, session, rval){
 #       # utils::data("Bcells", package = "flowAI")
 #       # rval$gating_set <- flowWorkspace::GatingSet(Bcells)
 # 
-#       fs <- read.ncdfFlowSet(files = c("/mnt/NAS7/Workspace/hammamiy/data_premasse/20120222_cells_found.fcs",
-#                                        "/mnt/NAS7/Workspace/hammamiy/data_premasse/20120229_cells_found.fcs"))
-# #
+#       # fs <- read.ncdfFlowSet(files = c("/mnt/NAS7/Workspace/hammamiy/data_premasse/20120222_cells_found.fcs",
+#       #                                  "/mnt/NAS7/Workspace/hammamiy/data_premasse/20120229_cells_found.fcs"))
+#       
+#       # fs <- read.ncdfFlowSet(files = c("/mnt/NAS7/Workspace/hammamiy/PFICSCompRun1/LD1_NS+NS_A01_exp.fcs", "/mnt/NAS7/Workspace/hammamiy/PFICSCompRun1/LD1_NS+PI_C01_exp.fcs", "/mnt/NAS7/Workspace/hammamiy/PFICSCompRun1/LD1_PI+NS_B01_exp.fcs", "/mnt/NAS7/Workspace/hammamiy/PFICSCompRun1/LD1_PI+PI_D01_exp.fcs"))
+#       
+#       fs <- read.ncdfFlowSet(files = c("/mnt/NAS7/Workspace/hammamiy/Test_data_cytonorm/Gates_PTLG021_Unstim_Control_1.fcs", 
+#                                        "/mnt/NAS7/Workspace/hammamiy/Test_data_cytonorm/Gates_PTLG021_Unstim_Control_2.fcs",
+#                                        "/mnt/NAS7/Workspace/hammamiy/Test_data_cytonorm/Gates_PTLG028_Unstim_Control_1.fcs",
+#                                        "/mnt/NAS7/Workspace/hammamiy/Test_data_cytonorm/Gates_PTLG028_Unstim_Control_2.fcs", 
+#                                        "/mnt/NAS7/Workspace/hammamiy/Test_data_cytonorm/Gates_PTLG034_Unstim_Control_1.fcs",
+#                                        "/mnt/NAS7/Workspace/hammamiy/Test_data_cytonorm/Gates_PTLG034_Unstim_Control_2.fcs"))
 #       gs <- GatingSet(fs)
+# 
+# 
 # 
 #       # rg <- flowCore::rectangleGate(filterId = "beads1", list("Bead1(La139)Di" = c(10, 200), "(Ir193)Di" = c(-50, 50)))
 #       # rg2 <- flowCore::rectangleGate(filterId = "beads2", list("Bead2(Pr141)Di" = c(10, 200), "(Ir193)Di" = c(-50, 50)))
