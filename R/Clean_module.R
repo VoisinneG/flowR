@@ -514,20 +514,9 @@ Clean <- function(input, output, session, rval) {
     }
   })
   
-  ### Analyze samples ###################################################
+ 
   
-  # Give the type of input for create interaction with the pop up clean or the action button analysis
-  pop_up_or_not_button <- eventReactive(list(input$clean_selected_sample_input, input$pre_cleaning),{ 
-
-    clean_select_sample <- input$clean_selected_sample_input
-    pop_up_clean <- input$pre_cleaning 
-   })
-  
-  res <- eventReactive(pop_up_or_not_button(), {
-    removeModal()
-    run_clean()
-  })
-  
+  #### Process the cleaning ###############################################################
   
   run_clean <- reactive({ 
     show_error <- 0
@@ -675,6 +664,40 @@ Clean <- function(input, output, session, rval) {
     
   })
   
+  
+  ### setup the pop up for precleaning or not ###################################################
+  
+  # update the value in the observeEvent for precleaning & cleaning to 0 or 1 (if cleaning is used update cleaning to 1 and precleaning to 0)
+  status_clean_or_precleaning <- reactiveValues(precleaning = 0, cleaning = 0)
+  
+  # Create a clean result for the precleaning and cleaning button 
+  clean_res <- reactiveValues(res = NULL)
+  
+  # run precleaning when the button is clicked and update value in reactiveValues and the result of cleaning in the reactiveValues
+  observeEvent(input$pre_cleaning,{
+    removeModal()
+    status_clean_or_precleaning$precleaning <- 1
+    status_clean_or_precleaning$cleaning <- 0
+    clean_res$res <- run_clean()
+  })
+  
+  # run cleaning and update the reactiveValues
+  observeEvent(input$clean_selected_sample_input, {
+    status_clean_or_precleaning$precleaning <- 0
+    status_clean_or_precleaning$cleaning <- 1
+    clean_res$res <- run_clean()
+  })
+  
+  #use the reactiveValues to update the res (for the result of cleaning)
+  res <- reactive({
+    
+    if(status_clean_or_precleaning$precleaning == 1 ){
+      clean_res$res
+    } else if(status_clean_or_precleaning$cleaning == 1){
+      clean_res$res
+    }
+  })
+  
   ### setup the gatingSet tagged (badCells) ##############################################################
 
   create_futur_gs <- reactive({
@@ -768,7 +791,7 @@ Clean <- function(input, output, session, rval) {
         if(is.null(res()$dynamic_range[sample]$bad_upperIDs)){
           message("NULL VALUE PRESENT HERE ICI")
         } else{
-          if(is.na(res$dynamic_range[[sample]]$bad_upperIDs) && length(res$dynamic_range[[sample]]$bad_upperIDs) == 0){
+          if(is.na(res()$dynamic_range[[sample]]$bad_upperIDs) && length(res()$dynamic_range[[sample]]$bad_upperIDs) == 0){
             message("badupper ID cells is not present in dynamic range")
             
           } else {
@@ -1119,7 +1142,7 @@ Clean <- function(input, output, session, rval) {
         showModal(
           modalDialog(title = "Would you like to make a first cleaning",
                       tagList(actionButton(ns("pre_cleaning"), "Run cleaning"),
-                              modalButton("Exit")
+                              modalButton("Quit")
                       ),
                       footer = NULL
           )
@@ -1127,12 +1150,7 @@ Clean <- function(input, output, session, rval) {
       }
     }
   })
-  
-  # res <- eventReactive(input$pre_cleaning,{
-  #   removeModal()
-  #   run_clean()
-  #   
-  # })
+
   
   return(rval)
 }
