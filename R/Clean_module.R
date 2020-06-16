@@ -346,6 +346,7 @@ Clean <- function(input, output, session, rval) {
     if(!is.null(input$alpha) && input$alpha>=0 && input$alpha<=1 && is.numeric(input$alpha)){
       input$alpha
       shinyjs::enable(id = "clean_selected_sample_input")
+      shinyjs::enable(id = "pre_cleaning")
     } else {
       showModal(
         modalDialog(title = "Error from anomalies ESD values parameters",
@@ -354,6 +355,7 @@ Clean <- function(input, output, session, rval) {
         )
       )
       shinyjs::disable(id = "clean_selected_sample_input")
+      shinyjs::disable(id = "pre_cleaning")
     }
   })
   
@@ -368,6 +370,7 @@ Clean <- function(input, output, session, rval) {
     if(input$second_fraction>=0 && input$second_fraction<=1){
       input$second_fraction
       shinyjs::enable(id = "clean_selected_sample_input")
+      shinyjs::enable(id = "pre_cleaning")
     } else {
       showModal(
         modalDialog(title = "Error with timestep smoothness entry",
@@ -377,6 +380,7 @@ Clean <- function(input, output, session, rval) {
         )
       )
       shinyjs::disable(id = "clean_selected_sample_input")
+      shinyjs::disable(id = "pre_cleaning")
     }
   })
   
@@ -390,6 +394,7 @@ Clean <- function(input, output, session, rval) {
     if(input$timestep>=0){
       input$timestep
       shinyjs::enable(id = "clean_selected_sample_input")
+      shinyjs::enable(id = "pre_cleaning")
     } else {
       showModal(
         modalDialog(title = "Error with timestep values entry",
@@ -399,6 +404,7 @@ Clean <- function(input, output, session, rval) {
         )
       )
       shinyjs::disable(id = "clean_selected_sample_input")
+      shinyjs::disable(id = "pre_cleaning")
     }
     
   })
@@ -435,8 +441,10 @@ Clean <- function(input, output, session, rval) {
         )
       )
       shinyjs::disable(id = "clean_selected_sample_input")
+      shinyjs::disable(id = "pre_cleaning")
     } else {
       shinyjs::enable(id = "clean_selected_sample_input")
+      shinyjs::enable(id = "pre_cleaning")
     }
     
     
@@ -895,6 +903,7 @@ Clean <- function(input, output, session, rval) {
       sample <- samples[i]
 
       Signal_acquisition <- res()$FlowSignalQCList[[sample]]$Perc_bad_cells$badPerc_cp*100
+      print(Signal_acquisition)
       Number_sig_acq_good_cells <- length(res()$FlowSignalQCList[[sample]]$goodCellIDs)
       
       Flow_rate <- res()$flowRateQCList[[sample]]$res_fr_QC$badPerc*100
@@ -1134,11 +1143,11 @@ Clean <- function(input, output, session, rval) {
   observe({
     validate(need(!is.null(rval$gating_set), ""))
     validate(need(!is.null(rval$active_menu), ""))
-   
-    
+      
     if(rval$active_menu == "Clean_tab"){
       if(!"badCells" %in% colnames(rval$gating_set)){
         ns <- session$ns
+        
         showModal(
           modalDialog(title = "Would you like to make a first cleaning",
                       tagList(actionButton(ns("pre_cleaning"), "Run cleaning"),
