@@ -585,35 +585,54 @@ Normalization <- function(input, output, session, rval){
   
   ## Make time variation plot #####################################################################
   
+  get_data_from_gs_tmp <- reactive({
+    
+    data <- get_data_gs(gs = gs_tmp$gs_norm, sample = sampleNames(gs_tmp$gs_norm), subset = input$gates_subset_select)
+    
+  })
+  
   # firstly take dataframe from the temporary or the rval$gating_set
   time_variation_plot <- reactive({
     validate(
       need(!is.null(rval$gating_set), ""),
-      need(!is.null(gs_tmp$gs_norm), "Need to make normalization")
+      need(!is.null(gs_tmp$gs_norm), "Need to make normalization"),
+      # need(length(input$normalize_button) != 0, "Apply normalization one time"),
+      need(input$time_choice == colnames(rval$gating_set)[search_time()], "Select time before normalization")
       )
-    
-    data <- get_data_gs(gs = gs_tmp$gs_norm, sample = sampleNames(gs_tmp$gs_norm), subset = input$gates_subset_select)
-    # print(data)
-    print(get_stat_for_plot()[[1]])
-    vector_param <- c(colnames(rval$gating_set)[search_time()])
-    # vector_param <- c(vector_param, input$beads_select_input, "subset", "name")
-    vector_param <- c(vector_param, "subset", "name")
-    
-    data_melt <- melt(data = data, id.vars = c(vector_param))
-    # data_melt <- data_melt[, !colnames(data_melt) %in% c("value", "variable")]
-    data_melt$norm_aspect <- "Before"
-    data_melt$norm_aspect[which(grepl("norm", data_melt$variable))] <- "After"
-    
-    data_melt$value <- asinh(data_melt$value)
-    # remove norm at the variable name for the plot parameters
-    data_melt$variable <- gsub(" norm", "", data_melt$variable)
-    
-    print(table(data_melt$norm_aspect))
-    # print(data_melt)
-    plotting <- ggplot(data = data_melt, mapping = aes(x = Time, y = value)) 
-    plotting <- plotting + geom_smooth(data = data_melt, aes(x = Time, y = value, color = variable, group = variable))
-    plotting <- plotting + facet_grid(norm_aspect ~ .)
-    return(plotting)
+      
+      data <- get_data_from_gs_tmp()
+      
+      # get the time parameters
+      vector_param <- c(colnames(rval$gating_set)[search_time()])
+      vector_param <- c(vector_param, "subset", "name")
+      
+      # create new dataset with the time parameters for all parameters
+      data_melt <- melt(data = data, id.vars = c(vector_param))
+      
+      # get the data for the beads selected by the users
+      grep_input_beads_and_norm <- sapply(input$beads_select_input, function(x){
+        grep(x, unique(data_melt$variable), value = T, fixed = T)
+      
+      })
+      
+      data_melt <- data_melt[which(data_melt$variable %in% grep_input_beads_and_norm),]
+      
+      
+      # Identify the data for before and after the normalization
+      data_melt$norm_aspect <- "Before"
+      data_melt$norm_aspect[which(grepl("norm", data_melt$variable))] <- "After"
+      data_melt$value <- asinh(data_melt$value)
+      
+      # remove norm at the variable name for the plot parameters
+      data_melt$variable <- gsub(" norm", "", data_melt$variable)
+      
+      # Make plot for time variation (with geom_smooth because is faster than geom_line)
+      plotting <- ggplot(data = data_melt, mapping = aes(x = Time, y = value)) 
+      plotting <- plotting + stat_smooth(data = data_melt, aes(x = Time, y = value, color = variable, group = variable))
+      plotting <- plotting + facet_grid(norm_aspect ~ subset)
+      return(plotting)
+      
+
   })
   
   
@@ -647,17 +666,17 @@ Normalization <- function(input, output, session, rval){
 #       # utils::data("Bcells", package = "flowAI")
 #       # rval$gating_set <- flowWorkspace::GatingSet(Bcells)
 # 
-#       # fs <- read.ncdfFlowSet(files = c("/mnt/NAS7/Workspace/hammamiy/data_premasse/20120222_cells_found.fcs",
-#       #                                  "/mnt/NAS7/Workspace/hammamiy/data_premasse/20120229_cells_found.fcs"))
-#       
+#       fs <- read.ncdfFlowSet(files = c("/mnt/NAS7/Workspace/hammamiy/data_premasse/20120222_cells_found.fcs",
+#                                        "/mnt/NAS7/Workspace/hammamiy/data_premasse/20120229_cells_found.fcs"))
+# 
 #       # fs <- read.ncdfFlowSet(files = c("/mnt/NAS7/Workspace/hammamiy/PFICSCompRun1/LD1_NS+NS_A01_exp.fcs", "/mnt/NAS7/Workspace/hammamiy/PFICSCompRun1/LD1_NS+PI_C01_exp.fcs", "/mnt/NAS7/Workspace/hammamiy/PFICSCompRun1/LD1_PI+NS_B01_exp.fcs", "/mnt/NAS7/Workspace/hammamiy/PFICSCompRun1/LD1_PI+PI_D01_exp.fcs"))
-#       
-#       fs <- read.ncdfFlowSet(files = c("/mnt/NAS7/Workspace/hammamiy/Test_data_cytonorm/Gates_PTLG021_Unstim_Control_1.fcs", 
-#                                        "/mnt/NAS7/Workspace/hammamiy/Test_data_cytonorm/Gates_PTLG021_Unstim_Control_2.fcs",
-#                                        "/mnt/NAS7/Workspace/hammamiy/Test_data_cytonorm/Gates_PTLG028_Unstim_Control_1.fcs",
-#                                        "/mnt/NAS7/Workspace/hammamiy/Test_data_cytonorm/Gates_PTLG028_Unstim_Control_2.fcs", 
-#                                        "/mnt/NAS7/Workspace/hammamiy/Test_data_cytonorm/Gates_PTLG034_Unstim_Control_1.fcs",
-#                                        "/mnt/NAS7/Workspace/hammamiy/Test_data_cytonorm/Gates_PTLG034_Unstim_Control_2.fcs"))
+# 
+#       # fs <- read.ncdfFlowSet(files = c("/mnt/NAS7/Workspace/hammamiy/Test_data_cytonorm/Gates_PTLG021_Unstim_Control_1.fcs",
+#       #                                  "/mnt/NAS7/Workspace/hammamiy/Test_data_cytonorm/Gates_PTLG021_Unstim_Control_2.fcs",
+#       #                                  "/mnt/NAS7/Workspace/hammamiy/Test_data_cytonorm/Gates_PTLG028_Unstim_Control_1.fcs",
+#       #                                  "/mnt/NAS7/Workspace/hammamiy/Test_data_cytonorm/Gates_PTLG028_Unstim_Control_2.fcs",
+#       #                                  "/mnt/NAS7/Workspace/hammamiy/Test_data_cytonorm/Gates_PTLG034_Unstim_Control_1.fcs",
+#       #                                  "/mnt/NAS7/Workspace/hammamiy/Test_data_cytonorm/Gates_PTLG034_Unstim_Control_2.fcs"))
 #       gs <- GatingSet(fs)
 # 
 # 
