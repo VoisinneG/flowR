@@ -56,6 +56,7 @@ ImportUI <- function(id) {
     column(width = 6,
            box(title = "GatingSet",
                width = NULL, height = NULL,
+               checkboxInput(ns("select_all"), label = "Select all", value = F),
                div(style = 'overflow-x: scroll', DT::DTOutput(ns("files_table"))),
                br(),
                # selectizeInput(ns("groups"), "select groups",
@@ -228,6 +229,17 @@ Import <- function(input, output, session, rval) {
     df$new_name <- basename(rval_mod$df_files$datapath)
     df$dir_name <- dirname(rval_mod$df_files$datapath)
     df
+  })
+  
+  #### Select all element in datatable ####
+  dt_proxy <- DT::dataTableProxy("files_table")
+  observeEvent(input$select_all, {
+    if (isTRUE(input$select_all)) {
+      DT::selectRows(dt_proxy, input$files_table_rows_all)
+    } else {
+      DT::selectRows(dt_proxy, NULL)
+    }
+    
   })
   
   return(rval)
