@@ -335,6 +335,8 @@ Clean <- function(input, output, session, rval) {
   
   })
   ### Check parameter to provide an error ############################################
+  # this is a reactiveVerification for the showModal (precleaning dataset) 
+  reactiveVerification <- reactiveValues(alphaError = 0, secondFractionError = 0, timeStepError = 0, binSizeError = 0)
   
   #ESD parameter error
   observe({ 
@@ -346,8 +348,10 @@ Clean <- function(input, output, session, rval) {
     if(!is.null(input$alpha) && input$alpha>=0 && input$alpha<=1 && is.numeric(input$alpha)){
       input$alpha
       shinyjs::enable(id = "clean_selected_sample_input")
-      shinyjs::enable(id = "pre_cleaning")
+      
+      reactiveVerification$alphaError <- 0
     } else {
+      reactiveVerification$alphaError <- 1
       showModal(
         modalDialog(title = "Error from anomalies ESD values parameters",
                     "Choose an anomalies ESB between 0-1",
@@ -355,7 +359,6 @@ Clean <- function(input, output, session, rval) {
         )
       )
       shinyjs::disable(id = "clean_selected_sample_input")
-      shinyjs::disable(id = "pre_cleaning")
     }
   })
   
@@ -369,9 +372,13 @@ Clean <- function(input, output, session, rval) {
     
     if(input$second_fraction>=0 && input$second_fraction<=1){
       input$second_fraction
+      reactiveVerification$secondFractionError <- 0
+
       shinyjs::enable(id = "clean_selected_sample_input")
-      shinyjs::enable(id = "pre_cleaning")
+
     } else {
+      reactiveVerification$secondFractionError <- 1
+      
       showModal(
         modalDialog(title = "Error with timestep smoothness entry",
                     "Choose an timestep between 0-1",
@@ -380,7 +387,7 @@ Clean <- function(input, output, session, rval) {
         )
       )
       shinyjs::disable(id = "clean_selected_sample_input")
-      shinyjs::disable(id = "pre_cleaning")
+      
     }
   })
   
@@ -393,9 +400,12 @@ Clean <- function(input, output, session, rval) {
     )
     if(input$timestep>=0){
       input$timestep
+      reactiveVerification$timeStepError <- 0
       shinyjs::enable(id = "clean_selected_sample_input")
-      shinyjs::enable(id = "pre_cleaning")
+
     } else {
+      reactiveVerification$timeStepError <- 1
+      
       showModal(
         modalDialog(title = "Error with timestep values entry",
                     "Choose an timestep > 0",
@@ -404,7 +414,7 @@ Clean <- function(input, output, session, rval) {
         )
       )
       shinyjs::disable(id = "clean_selected_sample_input")
-      shinyjs::disable(id = "pre_cleaning")
+      
     }
     
   })
@@ -431,7 +441,7 @@ Clean <- function(input, output, session, rval) {
     
     # disable and show modal dialog or button is usable
     if(input$binSize<= 0 || input$binSize > bin_max){
-      
+      reactiveVerification$binSizeError <- 1
       showModal(
         modalDialog(
           title = "Bin verification to provide possible error in cleaning",
@@ -441,10 +451,11 @@ Clean <- function(input, output, session, rval) {
         )
       )
       shinyjs::disable(id = "clean_selected_sample_input")
-      shinyjs::disable(id = "pre_cleaning")
+      
     } else {
       shinyjs::enable(id = "clean_selected_sample_input")
-      shinyjs::enable(id = "pre_cleaning")
+      reactiveVerification$binSizeError <- 0
+      
     }
     
     
@@ -1146,16 +1157,44 @@ Clean <- function(input, output, session, rval) {
       
     if(rval$active_menu == "Clean_tab"){
       if(!"badCells" %in% colnames(rval$gating_set)){
-        ns <- session$ns
+        print("single cond")
         
-        showModal(
-          modalDialog(title = "Would you like to make a first cleaning",
-                      tagList(actionButton(ns("pre_cleaning"), "Run cleaning"),
-                              modalButton("Quit")
-                      ),
-                      footer = NULL
+        print(reactiveVerification$alphaError == 1)
+        print(reactiveVerification$secondFractionError == 1)
+        print(reactiveVerification$timeStepError == 1)
+        print(reactiveVerification$binSizeError == 1)
+        
+        print("multiple condition")
+        
+        print(reactiveVerification$alphaError == 1 || reactiveVerification$secondFractionError == 1)
+        print(reactiveVerification$alphaError == 1 || reactiveVerification$secondFractionError == 1 || reactiveVerification$timeStepError == 1 || reactiveVerification$binSizeError == 1)
+        if(reactiveVerification$alphaError == 1  || reactiveVerification$secondFractionError == 1 || reactiveVerification$timeStepError == 1 || reactiveVerification$binSizeError == 1){
+          ns <- session$ns
+          
+          showModal(
+            modalDialog(title = "Would you like to make a first cleaning",
+                        "You cannot perform a precleaning because one or multiple parameters provide an error",
+                        footer = tagList(actionButton(ns("pre_cleaning"), "Run cleaning"),
+                                                                 modalButton("Quit")
+                        )
+            )
           )
-        )
+          shinyjs::disable("pre_cleaning")
+        } else { 
+          ns <- session$ns
+          
+          showModal(
+            modalDialog(title = "Would you like to make a first cleaning",
+                        tagList(actionButton(ns("pre_cleaning"), "Run cleaning"),
+                                modalButton("Quit")
+                        ),
+                        footer = NULL
+            )
+          )
+          
+          shinyjs::enable("pre_cleaning")
+        }
+
       }
     }
   })
