@@ -181,11 +181,8 @@ CleanUI<-function(id){
                                     br(),
                                     br(),
                                     simpleDisplayUI(ns("simple_display_module2"))
-                           )
-                           
+                           )           
                )
-               
-               
            ),
            box(title = "Results",
                width = NULL, collapsed = F, collapsible = T,
@@ -203,8 +200,6 @@ CleanUI<-function(id){
                                                                                                                       "Magma" = "A",
                                                                                                                       "Inferno" = "B",
                                                                                                                       "Plasma" = "C"))
-                                        
-                                        
                                     )
                            ),
                            tabPanel("Table",
@@ -219,7 +214,6 @@ CleanUI<-function(id){
                )
            )
     )
-    
   )
   
 }
@@ -236,7 +230,7 @@ CleanUI<-function(id){
 Clean <- function(input, output, session, rval) {
   
   ### Call modules ###################################################################
-  # temp_rval <- reactiveValues(test = NULL)
+  
   temp_gs <- reactiveValues(gating_set = NULL)
   preview_val_but <- reactiveValues(input_prev = NULL)
   
@@ -252,6 +246,8 @@ Clean <- function(input, output, session, rval) {
   plot_params <- reactiveValues()
   
   ### setup preview badCells plottings via callModules ########################################################### 
+  
+  # Use the current parameters selected by the users to update a plot and make a visualization of badcells
   observeEvent(input$update_preview_badCells, {
     preview_val_but$input_prev <- 1
     
@@ -280,6 +276,7 @@ Clean <- function(input, output, session, rval) {
   
   ### Setup sliderInput for flowRate #################################################
   
+  # gets values of the sliders
   sliders <- reactive({
     return(
       c(
@@ -291,6 +288,7 @@ Clean <- function(input, output, session, rval) {
     )
   })
   
+  # create sliderbar from the reactives sliders 
   output$sliderRate <- renderUI({
     if(input$useCutInput == T){
       ns <- session$ns
@@ -311,6 +309,7 @@ Clean <- function(input, output, session, rval) {
     }
   })
   
+  # get the values of the sliders
   rateSlider <- reactive({
     return(
       c(input$rateSliderInput[1], input$rateSliderInput[2])
@@ -344,13 +343,13 @@ Clean <- function(input, output, session, rval) {
       need(input$alpha != "", "choose an ESD between 0-1"),
       need(is.numeric(input$alpha), "Numeric value only")
     )
-
+    
+    # Verification of parameters and lets active the buttons for cleaning sample
     if(!is.null(input$alpha) && input$alpha>=0 && input$alpha<=1 && is.numeric(input$alpha)){
-      input$alpha
       shinyjs::enable(id = "clean_selected_sample_input")
-      
       reactiveVerification$alphaError <- 0
     } else {
+      # disable the buttons and provide a pop up with the best parameters
       reactiveVerification$alphaError <- 1
       showModal(
         modalDialog(title = "Error from anomalies ESD values parameters",
@@ -363,22 +362,20 @@ Clean <- function(input, output, session, rval) {
   })
   
   #show message to provide parameter error on second fraction
-  
   observe({
     validate(
       need(input$second_fraction != "", "choose timestep smoothness between 0-1"),
       need(is.numeric(input$second_fraction), "Numeric values only")
     )
     
+    # verification of the parameters and let active the button
     if(input$second_fraction>=0 && input$second_fraction<=1){
-      input$second_fraction
       reactiveVerification$secondFractionError <- 0
-
       shinyjs::enable(id = "clean_selected_sample_input")
 
-    } else {
+    } else { 
+      # provide error message and inactive the button
       reactiveVerification$secondFractionError <- 1
-      
       showModal(
         modalDialog(title = "Error with timestep smoothness entry",
                     "Choose an timestep between 0-1",
@@ -392,20 +389,17 @@ Clean <- function(input, output, session, rval) {
   })
   
   ## show message to provide timestep error before the cleaning
-  
   observe({
     validate(
       need(input$timestep != "", "Choose a timestep value > 0"),
       need(is.numeric(input$timestep), "Need numeric value only")
     )
     if(input$timestep>=0){
-      input$timestep
       reactiveVerification$timeStepError <- 0
       shinyjs::enable(id = "clean_selected_sample_input")
 
     } else {
       reactiveVerification$timeStepError <- 1
-      
       showModal(
         modalDialog(title = "Error with timestep values entry",
                     "Choose an timestep > 0",
@@ -451,7 +445,6 @@ Clean <- function(input, output, session, rval) {
         )
       )
       shinyjs::disable(id = "clean_selected_sample_input")
-      
     } else {
       shinyjs::enable(id = "clean_selected_sample_input")
       reactiveVerification$binSizeError <- 0
@@ -462,6 +455,7 @@ Clean <- function(input, output, session, rval) {
   })
   ### get parameters from GatingSet ##################################################
   
+  # get the parameters of the gating set
   choices <- reactive({
     rval$update_gs
     validate(need(class(rval$gating_set) == "GatingSet", 
@@ -469,6 +463,7 @@ Clean <- function(input, output, session, rval) {
     get_parameters_gs(rval$gating_set)
   })
   
+  # get the data of gatingset
   set <- reactive({
     rval$update_gs
     validate(need(class(rval$gating_set) == "GatingSet", 
@@ -484,7 +479,7 @@ Clean <- function(input, output, session, rval) {
     chNames <- choices()$plot_var
     pattern <- "^FSC|^SSC"
     excludeCh<- grep(pattern, chNames, value = TRUE)
-    # print(excludeCh)
+    
     updateSelectInput(session = session, inputId = "options_chExclude", 
                       choices = chNames,
                       select = excludeCh)
@@ -497,10 +492,10 @@ Clean <- function(input, output, session, rval) {
   ### Set time channel ###############################################################
   observe({
     chNames <- choices()$plot_var
-    # print(chNames)
+    
     pattern <- "^Time|^time"
     timeCh<- grep(pattern, chNames, value = TRUE)
-    print(timeCh)
+    
     updateSelectInput(session, "choice_channel_input", 
                       label = "Select time channel",
                       choices = chNames,
@@ -538,8 +533,10 @@ Clean <- function(input, output, session, rval) {
   #### Process the cleaning ###############################################################
   
   run_clean <- reactive({ 
+    
+    # set value 
     show_error <- 0
-    preview_val_but$input_prev <- 0
+    preview_val_but$input_prev <- 0 # set to 0 for reinitialization of preview 
     
     if(is.null(input$groupButton)){
       showModal(
@@ -554,7 +551,8 @@ Clean <- function(input, output, session, rval) {
     validate(need(input$choice_sample_input, "No sample selected"))
     validate(need(all(input$choice_sample_input %in% choices()$sample),
                   "Please select samples"))
-  
+    
+    # set parameters for cleaning
     samples <- input$choice_sample_input
     
     timeCh <- input$choice_channel_input
@@ -601,10 +599,9 @@ Clean <- function(input, output, session, rval) {
     withProgress(message = 'The data cleaning is running..', value = 0,{
       for(i in  1:length(samples)){
         sample <- samples[i]
-        
         ordFCS <- flowAI:::ord_fcs_time(set()[[sample]], timeCh = timeCh)
         
-        ### modification ici #### 
+        # if we have a probleme with dynamic range button return a message and stop process
         if(2 %in% input$groupButton){
           dynamic_range[[sample]] <-   tryCatch(expr = {
             flowAI:::flow_margin_check(x = ordFCS,
@@ -616,9 +613,10 @@ Clean <- function(input, output, session, rval) {
             return(NA)
           })
         }
-
+        
+        # selection of flow rate for cleaning and provide a message if the process can crash
         if(1 %in% input$groupButton){
-          # provide a possible error
+          # provide a possible error 
           flowRateQCList[[sample]] <- tryCatch({
             flowRateData[[sample]] <- flowAI:::flow_rate_bin(x = ordFCS, timeCh = timeCh, second_fraction = second_fraction, timestep = timestep)
             flowAI:::flow_rate_check(x= ordFCS, FlowRateData = flowRateData[[sample]], alpha = alpha, use_decomp = T)
@@ -633,6 +631,7 @@ Clean <- function(input, output, session, rval) {
         if(is.na(flowRateQCList[[sample]]) && !is.null(flowRateQCList[[sample]])){break} # break loop if we have an error
         # signal acquisition process
         
+        # If the signal button is selected make the process and provide an eventual crash with a message
         if(3 %in% input$groupButton){
           FlowSignalQCList[[sample]] <-   tryCatch(expr = {
             FlowSignalData <- do.call(flowAI:::flow_signal_bin, c(list(ordFCS), 
@@ -725,6 +724,7 @@ Clean <- function(input, output, session, rval) {
     on.exit(progress$close())
     progress$set(message = "Make the clean gatingSet", value = 0)
     
+    # set value
     df_temp <- NULL
     df_ending <- NULL
     
@@ -762,6 +762,8 @@ Clean <- function(input, output, session, rval) {
       
       ## FlowRate search badCells
       
+      # for each criteria of cleaning select in the groupButton we search the values and positions of badCells in each list from the reactive cleaning res
+      # and when we didn't have in the list "badCells criteria" then we look the good cells and find the ID missing in the list and add a tag for badCells
       if(input$groupButton == 1){
         if(sample %in% names(ok_after_verify$flowRateSelected)){
           # keep cell from flowRate
@@ -775,7 +777,7 @@ Clean <- function(input, output, session, rval) {
           }
           
           if(is.null(res()$flowRateQCList[[sample]]$badCellIDs)){
-            message("NULL VALUE ICI")
+            message("null value find in flowRate")
           } else {
             if(is.na(res()$flowRateQCList[[sample]]$badCellIDs) && length(res()$flowRateQCList[[sample]]$badCellIDs) == 0){
               message("badcells ID is not present in flowRate")
@@ -798,7 +800,7 @@ Clean <- function(input, output, session, rval) {
         
         # search badCells if id is found in bad lower_ids or upper_ids
         if(is.null(res()$dynamic_range[[sample]]$bad_lowerIDs)) {
-          message("NULL VALUE PRESENT HERE")
+          message('null value find in dynamic range (in "bad lower IDs")')
         } else {
           if(is.na(res()$dynamic_range[[sample]]$bad_lowerIDs) || length(res()$dynamic_range[[sample]]$bad_lowerIDs) == 0){
             message("bad lower ids not found in dynamic range")
@@ -808,7 +810,7 @@ Clean <- function(input, output, session, rval) {
         }
         
         if(is.null(res()$dynamic_range[sample]$bad_upperIDs)){
-          message("NULL VALUE PRESENT HERE ICI")
+          message('null value find in dynamic range (in "bad upper IDs")')
         } else{
           if(is.na(res()$dynamic_range[[sample]]$bad_upperIDs) && length(res()$dynamic_range[[sample]]$bad_upperIDs) == 0){
             message("badupper ID cells is not present in dynamic range")
@@ -828,7 +830,7 @@ Clean <- function(input, output, session, rval) {
         }
       }
       
-      # get cleaning gating set
+      # get cleaning dataframe for the new gating set
       df_ending <- rbind(df_ending, df_temp2[[sample]])
       
       subset_df_clean <- subset(df_ending, df_ending[,"badCells"] == 0)
@@ -836,9 +838,12 @@ Clean <- function(input, output, session, rval) {
       progress$inc(1/i, detail = paste("Doing part", sample))
     }
     
+    # modify badCells parameters as integer 
     subset_df_clean[,"badCells"] <- as.integer(subset_df_clean[,"badCells"])
     df_ending[,"badCells"] <- as.integer(df_ending[,"badCells"]) 
-
+    
+    # build gatingSet for the all data with the cleaning tag
+    # or keep only in the gatingSet the goodCells with BadCells parameters as 0 for all sample
     gs_old_tagged <- build_gatingset_from_df(df = df_ending, gs_origin = rval$gating_set)
     gs_good_cells <- build_gatingset_from_df(df = subset_df_clean, gs_origin = rval$gating_set)
 
@@ -857,7 +862,7 @@ Clean <- function(input, output, session, rval) {
     updateTextInput(session, "GatingSet_tagged_name", value = paste0(rval$gating_set_selected, "_clean"))
   })
   
-
+  # build the new gatingSet whe users click on create gating set
   observeEvent(input$action_create_gatingset,{
     preview_val_but$input_prev <- 0
     gs_list <- create_futur_gs() # list of frame for futur gs
@@ -912,9 +917,8 @@ Clean <- function(input, output, session, rval) {
     
     for(i in  1:length(samples)){
       sample <- samples[i]
-
+      # for each sample get the result of the different list and transform value in pourcentage
       Signal_acquisition <- res()$FlowSignalQCList[[sample]]$Perc_bad_cells$badPerc_cp*100
-      print(Signal_acquisition)
       Number_sig_acq_good_cells <- length(res()$FlowSignalQCList[[sample]]$goodCellIDs)
       
       Flow_rate <- res()$flowRateQCList[[sample]]$res_fr_QC$badPerc*100
@@ -966,6 +970,7 @@ Clean <- function(input, output, session, rval) {
       }
     }
     
+    # rename all column in the dataframe 
     colnames(df)[which(names(df) == "Sample")] <- "Samples names"
     colnames(df)[which(names(df) == "Signal_acquisition")] <- "Signal acquisition bad cells(%)"
     colnames(df)[which(names(df) == "Flow_rate")] <- "Flow rate bad cells(%)"
@@ -1067,7 +1072,6 @@ Clean <- function(input, output, session, rval) {
   
   output$flow_rate_plot_output <- renderPlot({
     validate(
-      # need(!is.null(res()), "Need to clean the data with the correct option"),
       need(length(res()$flowRateQCList) != 0, "Need to select flow rate cleaning to visualize plot")
     )
     condition_reini()
@@ -1154,20 +1158,11 @@ Clean <- function(input, output, session, rval) {
   observe({
     validate(need(!is.null(rval$gating_set), ""))
     validate(need(!is.null(rval$active_menu), ""))
-      
+    
+    # if the users come for the first time with his gatingSet and he didn't make clean a pop up will appears and demand to him if the users want make the first cleaning with the default parameters
     if(rval$active_menu == "Clean_tab"){
       if(!"badCells" %in% colnames(rval$gating_set)){
-        print("single cond")
-        
-        print(reactiveVerification$alphaError == 1)
-        print(reactiveVerification$secondFractionError == 1)
-        print(reactiveVerification$timeStepError == 1)
-        print(reactiveVerification$binSizeError == 1)
-        
-        print("multiple condition")
-        
-        print(reactiveVerification$alphaError == 1 || reactiveVerification$secondFractionError == 1)
-        print(reactiveVerification$alphaError == 1 || reactiveVerification$secondFractionError == 1 || reactiveVerification$timeStepError == 1 || reactiveVerification$binSizeError == 1)
+        # need to verify if the parameters is correct for the cleaning (modification of the show Modal if the condition is correct or not)
         if(reactiveVerification$alphaError == 1  || reactiveVerification$secondFractionError == 1 || reactiveVerification$timeStepError == 1 || reactiveVerification$binSizeError == 1){
           ns <- session$ns
           
@@ -1179,7 +1174,7 @@ Clean <- function(input, output, session, rval) {
                         )
             )
           )
-          shinyjs::disable("pre_cleaning")
+          shinyjs::disable("pre_cleaning") # disable the button of precleaning if the parameters is not correct
         } else { 
           ns <- session$ns
           
