@@ -1,3 +1,36 @@
+#' Normalize data from beads
+#' @param id shiny id
+#' @import shiny
+#' @importFrom DT dataTableOutput
+#' @importFrom shinyjs useShinyjs
+#' @export
+#' @examples 
+#' \dontrun{
+#' if (interactive()){
+#' 
+#'   ui <- dashboardPage(
+#'     dashboardHeader(title = "premessa"),
+#'     sidebar = dashboardSidebar(disable = TRUE),
+#'     body = dashboardBody(
+#'       NormalizationUI("module")
+#'     )
+#'   )
+#' 
+#'   server <- function(input, output, session) {
+#'     rval <- reactiveValues()
+#'     observe({
+#'      #files <- path of you're files 
+#'      fs <- read.ncdfFlowSet(files = files)
+#'       rval$gating_set <- flowWorkspace::GatingSet(fs)
+#'     })
+#'     res <- callModule(Normalization, "module", rval = rval)
+#'   }
+#'   
+#'   shinyApp(ui, server)
+#' 
+#' }}
+
+
 
 #'@import shiny
 #'@export
@@ -23,15 +56,7 @@ NormalizationUI <- function(id){
                actionButton(inputId = ns("apply_default_gates"), label = "Apply default gates"),
                
                hr(),
-               # radioButtons(inputId = ns("norm_default"),
-               #              label = "Choose gating normalization option",
-               #              choices = c("Default" = 1,
-               #                          "Personalized" = 2),
-               #              selected = 1,
-               #              inline = F),
-               # h4(br("Apply modification")),
-               
-               
+
                selectInput(inputId = ns("gates_subset_select"), label = "Choice the gates of references", choices = NULL, multiple = T),
                hr(),
                selectInput(inputId = ns("beads_select_input"), label = "Choices the channels beads", multiple = T, choices = NULL),
@@ -67,18 +92,11 @@ NormalizationUI <- function(id){
            box(width = 12,title = "Normalization graphical representation",
                tabsetPanel(
                  tabPanel("Before/After normalization",
-                          # plotOutput(ns("norm_plot")),
                           simpleDisplayUI(ns("simple_norm_display"))
                  ),
                  tabPanel("Time variation",
                           simpleDisplayUI(ns("time_variation_plot"))
                          )
-                 # tabPanel("beads distance",
-                 #          plotOutput(ns("norm_plot_dist")),
-                 #          column(4, selectInput(inputId = ns("select_sample_input"), label = "Select sample", choices = NULL, selected = NULL)),
-                 #          column(4, selectInput(inputId = ns("x_dist_input"), label = "X axis", choices = NULL, selected = NULL)),
-                 #          column(4, selectInput(inputId = ns("y_dist_input"), label = "Y axis", choices = NULL, selected = NULL))
-                 # )
                )
                
                
@@ -97,24 +115,20 @@ Normalization <- function(input, output, session, rval){
   
   gs_tmp <- reactiveValues(gs_norm = rval)
   
-  
-  #### call module ######################################################################################
+  #### call module and create plot ######################################################################################
   
   plot_params <- reactiveValues(plot_type = "dots", subset = c("root", NULL), color_var = "subset", xvar = NULL, yvar = NULL, split_var = "yvar")
-  
-
-  
   
   res <- callModule(plotCyto, "plot_preview", 
                     gs_tmp$gs_norm,
                     plot_params = plot_params,
                     show_gates = T,
                     simple_plot = F)
-  
 
   callModule(simpleDisplay, "simple_display", res$plot)
   callModule(simpleDisplay, "simple_norm_display", norm_plot)
   callModule(simpleDisplay, "time_variation_plot", time_variation_plot)
+  
   ### Setup gates of references subset ######################################################################
   
   gate_reference <- reactive({
@@ -130,18 +144,16 @@ Normalization <- function(input, output, session, rval){
   
   ### Update selectInput #########################################################################
 
-  
   # update multiple select input from channel names
   chan_names <- reactive({
     validate(
       need(!is.null(rval$gating_set), "")
     )
-    names <- flowWorkspace::colnames(rval$gating_set)
+    names <- flowWorkspace::colnames(rval$gating_set) # get channel names
     return(names)
   })
   
   # update select input of the actual subset
-  
   observe({
     validate(need(!is.null(rval$gating_set), ""))
     # print(names(get_gates_from_gs(rval$gating_set)))
@@ -168,10 +180,7 @@ Normalization <- function(input, output, session, rval){
     
     # find the similary beads from different sample
     all_beads_description <- lapply(rval$gating_set@data@frames, function(x){
-
       pattern_result <- flowR::description(x)[which(grepl("[Bb]ead", flowR::description(x)))]
-      # print(grepl("[Bb]ead", flowR::description(x)))
-      
       names <- colnames(rval$gating_set)[which(colnames(rval$gating_set) %in% pattern_result)]
       intersect(colnames(rval$gating_set),names)
     })
@@ -186,12 +195,11 @@ Normalization <- function(input, output, session, rval){
   
   # Update the selectinput of subset correponding to gate and create default gate 
   observeEvent(input$apply_default_gates ,{
-    
     search_same_subset <- which(flowWorkspace::gs_get_pop_paths(rval$gating_set) %in% paste0("/",input$select_beads_gates_default))
     
     #get the same subset for the listing message 
     same_subset <- flowWorkspace::gs_get_pop_paths(rval$gating_set)[search_same_subset]
-    
+  
     subset_msg_listing <- sapply(same_subset, function(x){
       c(x, "<br>")
     })
@@ -210,12 +218,12 @@ Normalization <- function(input, output, session, rval){
       )
     } else {
       
-      arbritrary_value <- list(x = c(10, 200))
+      arbritrary_value <- list(x = c(10, 200)) # position of gates
       sapply(input$select_beads_gates_default, function(x){
         
         names(arbritrary_value) <- x # rename x to the corresponding channel selected
-        rg <- flowCore::rectangleGate(filterId = x, .gate = arbritrary_value)
-        flowWorkspace::gs_pop_add(rval$gating_set, rg, parent = "root")
+        rg <- flowCore::rectangleGate(filterId = x, .gate = arbritrary_value) # create the gates
+        flowWorkspace::gs_pop_add(rval$gating_set, rg, parent = "root") # add the new gate in GatingSet object 
       })
       
       recompute(rval$gating_set)
@@ -229,16 +237,6 @@ Normalization <- function(input, output, session, rval){
     }
   })
   
-  # observe({
-  #   validate(need(!is.null(rval$gating_set), ""))
-  #   new_gate_references <- names(flowR::get_gates_from_gs(rval$gating_set))
-  #   
-  #   updateSelectInput(session = session,
-  #                     inputId = "gates_subset_select",
-  #                     label = "Choice the gates of references",
-  #                     choices = names(flowR::get_gates_from_gs(rval$gating_set))
-  #   )
-  # })
   
   ### Remove subset if existing when users apply default gates ############################################################
   
@@ -287,16 +285,16 @@ Normalization <- function(input, output, session, rval){
   })
   
   # update yvar ("beads selected") & xvar = "FSC" if fsc is not present in chan take the first parameter
-  
   observe({
     validate(
       need(!is.null(input$gates_subset_select), ""),
       need(!is.null(rval$gating_set), "")
            )
     
-    # print(input$select_beads_gates_default)
+    # update plot from the users beads selections
     plot_params$yvar <- input$select_beads_gates_default
     
+    # find FSC parameters and put it in the xvar param for the plot if the FSC is not present we take the first parameters
     if(length(grep("FSC", colnames(rval$gating_set))) >= 1){
       position_grep <- which(grepl("FSC", colnames(rval$gating_set)))
       
@@ -314,43 +312,18 @@ Normalization <- function(input, output, session, rval){
                         label = "Choices the channels beads",
                         choices = chan_names(),
                         selected = input$select_beads_gates_default)
-    # selected = m_norm_tmp$beads.cols.names.used
   })
-  
-  # update x & y selectinput for the plot dist
-  # observe({
-  #   updateSelectInput(session, 
-  #                        "x_dist_input",
-  #                        label = "X axis",
-  #                        choices = chan_names(),
-  #                        selected = chan_names()[1])
-  #   
-  #   updateSelectInput(session = session, 
-  #                     inputId = "y_dist_input",
-  #                     label = "Y axis",
-  #                     choices = chan_names(),
-  #                     selected = chan_names()[2])
-  #   
-  #   updateSelectInput(session = session,
-  #                     inputId = "select_sample_input",
-  #                     label = "Select sample",
-  #                     choices = sampleNames(rval$gating_set),
-  #                     selected = sampleNames(rval$gating_set)[1])
-  #   
-  # })
+
   ## Search time parameters ######################################################################################
-  
   search_time <- reactive ({
     time <- which(grepl("[Tt]ime", colnames(rval$gating_set)))
     return(time)
   })
   
+  # udpate the time choice parameters 
   observe({
     validate(need(!is.null(rval$gating_set), ""))
     updateSelectInput(session = session, inputId = "time_choice", label = "Choose time parameters", choices = colnames(rval$gating_set),
-                      selected = colnames(rval$gating_set)[search_time()])
-    
-    updateSelectInput(session = session, inputId = "time_param_plot", label = "Select time parameter", choices = colnames(rval$gating_set),
                       selected = colnames(rval$gating_set)[search_time()])
   })
   
@@ -366,6 +339,7 @@ Normalization <- function(input, output, session, rval){
     input$beads_select_input
   })
   
+  # make normalization 
   normalize_reactive <- reactive({
     validate(need(!is.null(rval$gating_set), ""))
     
@@ -376,9 +350,9 @@ Normalization <- function(input, output, session, rval){
                     footer = modalButton("Dismiss"))
       )  
     } else {
-      
-      
+    
       withProgress(message = 'Making normalization', value = 0, {
+        # n used in progress bar
         n <- 0
         m_norm_tmp$beads.cols.names.used <- input$beads_select_input
         sample_names <- sampleNames(rval$gating_set)
@@ -418,18 +392,17 @@ Normalization <- function(input, output, session, rval){
             list(gh_pop_get_indices(rval$gating_set[[sample]], x))
           }) 
           
-          # use intersect 
+          # use intersect for the normalization
           maxlen <- max(sapply(indice_list, length))
           
           if(input$use_intersect == TRUE){
             intersec <- lapply(seq(maxlen),function(i) Reduce(intersect,lapply(indice_list,"[[", i)))
             beads.events <- unlist(intersec)
           } else if(input$use_intersect == FALSE) {
+            # Use union for the normalization 
             intersec <- unique(lapply(seq(maxlen),function(i) Reduce(union,lapply(indice_list,"[[", i))))
             beads.events <- unlist(intersec)
           }
-          
-          # beads.events <- gh_pop_get_indices(rval$gating_set[[sample]], input$gates_subset_select)
           
           m_normed$norm <- cbind(m_normed$norm,
                                  beadDist = premessa:::get_mahalanobis_distance_from_beads(m_normed$norm,
@@ -445,17 +418,12 @@ Normalization <- function(input, output, session, rval){
         }
         
         df <- do.call(rbind, df_list)
-        
-        
         fs_norm <- build_flowset_from_df(df = df)
         
         # #build GatingSet
         gs_norm <- build_gatingset_from_df(df = df, gs_origin = rval$gating_set)
-        # build_gatingset_from_df(df = df, gs_origin = rval$gating_set)
         
         return(gs_norm)
-        
-        # rval$gating_set <- gs_norm
       })
     }
   })
@@ -463,7 +431,6 @@ Normalization <- function(input, output, session, rval){
   ### Create new gatingset based on the normalization ##################################################################################################
   
   # Apply temporary normalization preview 
-  
   observeEvent(input$normalize_button, {
     gs_tmp$gs_norm <- normalize_reactive()
     print("Normalization finished")
@@ -473,13 +440,12 @@ Normalization <- function(input, output, session, rval){
   res_norm <- eventReactive(input$normalize_button, {
     gs_tmp$gs_norm
   })
+  
   # create the new gating set from the normalization
   observeEvent(input$create_gs, {
     validate(need(length(input$beads_select_input) > 0, "Need to choice beads before to apply normalization"))
     
     gs_norm <- res_norm()
-    print(res_norm())
-    # gs_norm <- gs_tmp$gs_norm
     
     # remove beads
     if(input$delete_beads == T){
@@ -487,8 +453,6 @@ Normalization <- function(input, output, session, rval){
         flowWorkspace::gs_pop_remove(gs_norm, x)
         recompute(gs_norm)
       })
-      
-      
       
       #update subset names
       actualised_subset <- names(get_gates_from_gs(gs_norm))
@@ -521,12 +485,13 @@ Normalization <- function(input, output, session, rval){
       
       beads <- colnames(gs_tmp$gs_norm)[match(m_norm_tmp$beads.cols.names.used, colnames(gs_tmp$gs_norm))]
       beads_norm <- colnames(gs_tmp$gs_norm)[match(paste0(m_norm_tmp$beads.cols.names.used, " norm"), colnames(gs_tmp$gs_norm))]
-
+      
       df <- get_data_gs(gs = gs_tmp$gs_norm, sample = flowR::sampleNames(gs_tmp$gs_norm), subset = input$gates_subset_select)
       
     } else{
       beads <- colnames(rval$gating_set)[match(input$beads_select_input, colnames(rval$gating_set))]
       beads_norm <- NULL
+      
       df <- get_data_gs(gs = rval$gating_set, sample = flowR::sampleNames(rval$gating_set), subset = input$gates_subset_select)
     }
     
@@ -551,44 +516,38 @@ Normalization <- function(input, output, session, rval){
   ### Make normalization plot #######################################################################################
   
   norm_plot <- reactive({
-    # validate(need(!is.null(m_normed$norm), "No current normalisation apply"))
     validate(
       need(!is.null(rval$gating_set), "No current gatingSet"),
       need(input$gates_subset_select != "", "Need gates (subset) to visualize the plot")
              )
     
-    # print(input$gates_subset_select)
+    # melt the data 
     data <- melt(get_stat_for_plot()[[1]],value.name = "Signal median", variable.name = "Parameters")
 
+    #rename name to Sample
     colnames(data)[colnames(data) == "name"] <- "Sample"
     
+    # Add column Before and modify it when we find norm in the parameters 
     data$norm_aspect <- "Before"
     data$norm_aspect[which(grepl("norm" , data$Parameters))] <- "After"
     
     # remove pattern norm in parameters for having only the same parameters legend and colors in plot representation 
     data$Parameters <- gsub(" norm", "" ,data$Parameters)
     
-    
+    # make plot before / after normalization ( or before only if the users didn't made a normalization)
     plotting <- ggplot(data = data, mapping = aes(x = Sample, y = `Signal median`)) 
     plotting <- plotting + geom_point(aes(colour = Parameters)) 
     plotting <- plotting + geom_line(data = data, aes(x = Sample, y = `Signal median`, color = Parameters, group = Parameters))
     plotting <- plotting + facet_grid(norm_aspect ~ subset)
     plotting <- plotting + theme(axis.text.x = element_text(angle = 60, hjust = 1))
     return(plotting)
-    # premessa:::plot_beads_over_time(beads.data = m_norm_tmp$m, beads.normed = m_norm_tmp$norm.res$beads.normed, beads.cols = m_norm_tmp$beads.cols.names.used)
   })
-  
-  # output$norm_plot_dist <- renderPlot({
-  #   # validate(need(rval$gating_set@[[]], "No current normalisation apply"))
-  #   premessa:::plot_distance_from_beads(exprs(rval$gating_set@data[[input$select_sample_input]]), x.var = input$x_dist_input, y.var = input$y_dist_input)
-  # })
   
   ## Make time variation plot #####################################################################
   
+  # get the data from the reactive values "temporary"
   get_data_from_gs_tmp <- reactive({
-    
     data <- get_data_gs(gs = gs_tmp$gs_norm, sample = sampleNames(gs_tmp$gs_norm), subset = input$gates_subset_select)
-    
   })
   
   # firstly take dataframe from the temporary or the rval$gating_set
@@ -596,7 +555,6 @@ Normalization <- function(input, output, session, rval){
     validate(
       need(!is.null(rval$gating_set), ""),
       need(!is.null(gs_tmp$gs_norm), "Need to make normalization"),
-      # need(length(input$normalize_button) != 0, "Apply normalization one time"),
       need(input$time_choice == colnames(rval$gating_set)[search_time()], "Select time before normalization")
       )
       
@@ -615,8 +573,8 @@ Normalization <- function(input, output, session, rval){
       
       })
       
+      # melt the data and get the data for the beads before and after normalization
       data_melt <- data_melt[which(data_melt$variable %in% grep_input_beads_and_norm),]
-      
       
       # Identify the data for before and after the normalization
       data_melt$norm_aspect <- "Before"
@@ -631,10 +589,8 @@ Normalization <- function(input, output, session, rval){
       plotting <- plotting + stat_smooth(data = data_melt, aes(x = Time, y = value, color = variable, group = variable))
       plotting <- plotting + facet_grid(norm_aspect ~ subset)
       return(plotting)
-      
 
   })
-  
   
   return(rval)
   
