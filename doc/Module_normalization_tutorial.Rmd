@@ -1,0 +1,54 @@
+---
+title: "*flowR* Normalization module tutorial"
+author: "HAMMAMI Yousri"
+data: "01/07/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Français (French part tutorial)
+
+Ce tutoriel permet à l'utilisateur de comprendre comment fonctionne le module **Normalization**. 
+
+### Paramétrages 
+
+Sur le module de normalisation, au niveau des paramétrages. Vous devez choix le paramètre du temps pour pouvoir effectuer la normalisation.
+
+Le choix des paramètres de billes ou des paramètres sur lequel on peut appliquer des gates par défaut avec des cordonnées monodimensionnel (coordonnée fixe pour les paramètres sélectionner) en appuyant sur le bouton **"Apply default gates"**
+
+En sélectionnant la/les gate(s) de références sur laquel on va normaliser son gatingset, la mise à jour de la visualisation de ces sous populations.
+
+en sélectionnant les paramètres sur laquel on va normalisé son jeu de donnée. On pourra visualiser le signal médian avant normalisation ainsi que la variation du signal temporel. 
+
+On peut choisir si on veut utiliser l'intersection entre les sous-ensembles ou l'union de ces sous ensembles.
+
+Pour démarrer la normalisation, cliquer sur **Apply normalization**
+
+### Creation du nouveau gatingSet
+
+Choix du nom du nouveau gatingSet avec le donnée normalisés, soit en conservant les billes ayant servies à la normalisation ou en ne conservant pas ces billes.
+
+## English part (tutorial)
+
+This tutorial allows the user to understand how the **Normalization** module works.
+
+### Settings
+
+On the normalization module, in the settings. You must choose the time parameter to be able to perform normalization.
+
+The choice of beads parameters or parameters on which can apply gates by default with one-dimensional coordinates (fixed coordinate for the selected parameters) by pressing the button **"Apply default gates"**
+
+By selecting the gate(s) of references on which we will normalize its gatingset, updating the visualization of these sub-populations.
+
+by selecting the parameters on which we will normalize its data set. You can view the median signal before normalization as well as the variation of the time signal.
+
+We can choose if we want to use the intersection between the subsets or the union of these subsets.
+
+To start normalization, click on ** Apply normalization **
+
+### Create a new GatingSet
+
+Choose a names for the new gatingSet, whether keep the beads who serve in normalization or without keeping the beads.

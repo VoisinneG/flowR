@@ -1,0 +1,65 @@
+---
+title: "*flowR* Clean module tutorial"
+author: "HAMMAMI Yousri"
+data: "30/06/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Français (French part)
+
+Ce tutoriel permet à l'utilisateur de comprendre comment fonctionne le module **clean**. 
+
+Une fois que vous entrez sur le module de nettoyage et que votre jeu de donnée n'a jamais été nettoyés, une fenêtre apparaît demandant à l'utilisateur de réaliser un premier nettoyage, si les paramètres le permettent, sinon le pré-nettoyage ne sera pas disponible. 
+
+
+### Parametrès 
+
+  Une fois sur le module de nettoyage. On peut sélectionner les échantillons sur lequelles le nettoyage va se faire. Et la configuration de différent paramètre, tel que le choix du paramètre temps, ainsi que les timesteps (etc..) auront une influence sur les différents critères de nettoyages.
+
+### Paramètres avancés
+
+  Pour les utilisateurs avancés il existe d'autres paramètres qui sont réglables, pour plus de détail regarder la documentation sur le package [FlowAI](http://bioconductor.org/packages/release/bioc/manuals/flowAI/man/flowAI.pdf)
+
+### Sélection interactive
+
+  Activer le mode interactive sur le FlowRate, la sélection de manière graphique à partir de **deux slides bar** peut se faire pour l'échantillon actuellement visualisé, une fois que la sélection a été fait à l'aide des deux slidesbars, l'application de la sélection peut se faire en cliquant sur le bouton **"Apply for the current sample"** 
+
+### GatingSet
+
+  En cliquant sur le bouton prévisualisation des mauvaises cellules, on mets à jour une répresentation graphique dans la boîte des résultats à l'onglet **"Preview BadCells Plot"** on peut visualiser les mauvaises cellules.
+
+  La création d'un nouveau gatingSet peut-être fait soit en conservant le paramètre **BadCells** avec pour les mauvaises cellules 1 et les cellules considérés comme bonne 0.
+
+  Sinon on peut crée un gatingSet avec uniquement les bonnes cellules.
+
+
+## English 
+
+This tutorial allows the user to understand how the **clean** module works.
+
+Once you enter the cleaning module and your dataset has never been cleaned, a window appears asking the user to perform a first cleaning, if the parameters allow it, otherwise the pre-cleaning will not be not available.
+
+### Parameters
+
+On the cleaning module. You can select the samples on which the cleaning will be done. And the configuration of different parameters, such as the choice of the time parameter, as well as the timesteps (etc...) will have an influence on the different cleaning criteria.
+
+### Advanced parameters (for advanced users)
+
+For advanced users there are other parameters which are adjustable, for more detail look at the documentation on the package [FlowAI](http://bioconductor.org/packages/release/bioc/manuals/flowAI/man/flowAI.pdf)
+
+### Interactive selection
+
+Activate the interactive mode on the FlowRate, the graphical selection from **two slide bars** can be done for the currently viewed sample, once the selection has been made using the two slidesbars, apply the selection by clicking on the button **"Apply for the current sample"**
+
+### GatingSet 
+
+By clicking on the **bad cells preview** button, you can updates a graphical representation in the results box on the tab **"BadCells Plot Preview"**  and visualize bad cells.
+
+The creation of a new gatingSet can be done by keeping the parameter **BadCells** with 1 for bad cells and cells judged as good 0.
+
+Otherwise we can create a gatingSet with only the right cells.
+
