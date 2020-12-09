@@ -1007,8 +1007,10 @@ get_data_gs <- function(gs,
   if(is.null(sample)){sample <- flowWorkspace::sampleNames(gs)}
   if(is.null(subset)){subset <- gh_get_gate_names(gs[[1]])}
   
-  idx <- which(sample %in% flowWorkspace::sampleNames(gs))
-
+  #idx <- which(sample %in% flowWorkspace::sampleNames(gs))
+  idx <- match(sample, flowWorkspace::sampleNames(gs))
+  idx <- idx[!is.na(idx)]
+  
   if(length(idx) == 0){
     return(NULL)
   }
@@ -1162,17 +1164,17 @@ compute_stats <- function(df = NULL,
     warning("Note that negative values will be discarded when computing the geometric mean")
   }
   
+  if(stat_function == "median"){
+    y_trans = scales::identity_trans()
+    apply_inverse = FALSE
+  }
+  
   if(is.null(var_names)){
     var_names <- yvar
     names(var_names) <- yvar
   }
   
   if(! stat_function %in% c("cell count", "percentage")){
-    
-    if(is.null(df)){
-      stop("no data available")
-    }
-    
     if(!is.null(yvar)){
       
       if(!is.null(y_trans)){
