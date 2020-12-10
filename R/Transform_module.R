@@ -59,7 +59,7 @@ TransformUI <- function(id) {
                            selectInput(ns("trans"), "transformation",
                                        choices = c("identity", 
                                                    "flowjo_biexp_trans",
-                                                   "logicle",
+                                                   #"logicle",
                                                    "asinh",
                                                    "log"), 
                                        selected = "identity"),
@@ -153,15 +153,15 @@ Transform <- function(input, output, session, rval) {
     }else if(input$trans %in% c('asinh')){
       x[[1]] <- numericInput(ns("scale"), label = "scale", 
                              value = rval_mod$trans_parameters[["scale"]])
-    }else if(input$trans == 'logicle'){
-      x[[1]] <- numericInput(ns("w"), label = "w", 
-                             value = rval_mod$trans_parameters[["w"]])
-      x[[2]] <- numericInput(ns("t"), label = "t", 
-                             value = rval_mod$trans_parameters[["t"]])
-      x[[3]] <- numericInput(ns("m"), label = "m", 
-                             value = rval_mod$trans_parameters[["m"]])
-      x[[4]] <- numericInput(ns("a"), label = "a", 
-                             value = rval_mod$trans_parameters[["a"]])
+    # }else if(input$trans == 'logicle'){
+    #   x[[1]] <- numericInput(ns("w"), label = "w", 
+    #                          value = rval_mod$trans_parameters[["w"]])
+    #   x[[2]] <- numericInput(ns("t"), label = "t", 
+    #                          value = rval_mod$trans_parameters[["t"]])
+    #   x[[3]] <- numericInput(ns("m"), label = "m", 
+    #                          value = rval_mod$trans_parameters[["m"]])
+    #   x[[4]] <- numericInput(ns("a"), label = "a", 
+    #                          value = rval_mod$trans_parameters[["a"]])
     }else if(input$trans == 'flowjo_biexp_trans'){
       x[[1]] <- numericInput(ns("channelRange"), label = "channelRange", 
                              value = rval_mod$trans_parameters[["channelRange"]])
@@ -367,10 +367,10 @@ Transform <- function(input, output, session, rval) {
                              "identity" = list(),
                              "asinh" = list(scale = input$scale),
                              "log" = list(base = input$base),
-                             "logicle" = list(w=input$w,
-                                              m=input$m,
-                                              t = input$t,
-                                              a = input$a),
+                             # "logicle" = list(w=input$w,
+                             #                  m=input$m,
+                             #                  t = input$t,
+                             #                  a = input$a),
                              "flowjo_biexp_trans" = list(channelRange = input$channelRange, 
                                                          maxValue = input$maxValue, 
                                                          pos = input$pos, 
@@ -381,10 +381,10 @@ Transform <- function(input, output, session, rval) {
                       "identity" = scales::identity_trans(),
                       "log" = scales::log_trans(base = input$base),
                       "asinh" = asinh_trans(scale = input$scale),
-                      "logicle" = flowWorkspace::logicle_trans(w=input$w,
-                                                m= input$m,
-                                                t = input$t,
-                                                a = input$a),
+                      # "logicle" = flowWorkspace::logicle_trans(w=input$w,
+                      #                           m= input$m,
+                      #                           t = input$t,
+                      #                           a = input$a),
                       "flowjo_biexp_trans" = flowWorkspace::flowjo_biexp_trans(channelRange = input$channelRange, 
                                                                                      maxValue = input$maxValue, 
                                                                                      pos = input$pos, 
