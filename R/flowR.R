@@ -1396,6 +1396,7 @@ call_plot_function <- function(data,
 plot_hexagonal <- function(args = list()){
   
   plot_type <- "hexagonal"
+  max_nrow_to_plot <- Inf
   bins <- 100
   use_log10_count <- TRUE
   option <- "viridis"
@@ -1409,7 +1410,11 @@ plot_hexagonal <- function(args = list()){
   }
   
   if(class(data) %in% c("ncdfFlowSet", "flowSet")){
-    stop("Plot type not supported for flowSet objects")
+    #stop("Plot type not supported for flowSet objects")
+    p <- ggcyto::ggcyto(data,
+                        aes_string(x = as.name( xvar ),
+                                   y = as.name( yvar )),
+                        max_nrow_to_plot = max_nrow_to_plot)
   }else{
     p <- ggplot(data,
                         aes_(x = as.name( xvar ), 
@@ -1698,7 +1703,7 @@ plot_contour <-function(args = list()){
   
   plot_type <- "contour"
 
-  max_nrow_to_plot = Inf
+  max_nrow_to_plot <- Inf
   color_var <- NULL
   group_var <- NULL
   

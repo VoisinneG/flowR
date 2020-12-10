@@ -17,13 +17,14 @@ data("GvHD")
 gs <- GatingSet(GvHD)
 
 # pb with scaling of ggcyto plots
-p <- ggcyto::ggcyto(data = gs@data[[1]], aes(x=`FL1-H`)) + 
-  #geom_hexagonal()
+p <- ggcyto::ggcyto(data = gs@data[[1]], aes(x=`FSC-H`)) + 
+  #geom_point()
+  #geom_hex()
   geom_density()
 
-p + scale_x_logicle(t=1e4)
+p + scale_x_logicle(t=1e4) + scale_y_logicle()
 
-p <- ggcyto::ggcyto(data = gs@data[1:10], aes(x=`FSC-H`, y=`SSC-H`, color = `FSC-A`)) + geom_point()
+p <- ggcyto::ggcyto(data = gs@data[1:10], aes(x=`FSC-H`, y=`SSC-H`, color = `FSC-H`)) + geom_point()
 #p <- format_plot(p=p, options = list(axis_limits=list("FSC-A" = c(0,100000))) )
 #p + scale_x_logicle(limits=c(0,100000))
 #p + scale_x_continuous(limits=c(0,100000))
@@ -31,11 +32,11 @@ p <- ggcyto::ggcyto(data = gs@data[1:10], aes(x=`FSC-H`, y=`SSC-H`, color = `FSC
 p <- ggcyto::ggcyto(data = gs@data[1:3], aes(x=`FSC-A`, y=`SSC-A`))
 p <- p + geom_hex()
 
-p <- call_plot_function(data = gs@data[1:3], plot_type = "hexagonal", plot_args = list(xvar = "FSC-A", yvar = "SSC-A"))
+p <- call_plot_function(data = gs@data[1:3], plot_type = "dots", plot_args = list(xvar = "FSC-H", yvar = "SSC-H"))
 p <- as.ggplot(p)
 p <- p + facet_wrap(NULL)
-p <- format_plot(p=p, options = list(axis_limits=list("FSC-A" = c(0,100000)),
-                                     transformation = list("FSC-A" = logicle_trans())) )
+p <- format_plot(p=p, options = list(axis_limits=list("FSC-H" = c(0,100000)),
+                                     transformation = list("FSC-H" = logicle_trans())) )
 p
 
 p <- p + facet_wrap(~Patient)
@@ -58,28 +59,32 @@ foo <- GvHD[1:3]
 fs <- Subset(foo, rectGate)
 gs <- GatingSet(fs)
 p <- ggcyto::ggcyto(data = gs@data[1:3], aes(x=`FSC-H`, y=`SSC-H`)) + geom_hex()
-p <- ggplot(data = gs@data[1:3], aes(x=`FSC-H`, y=`SSC-H`)) + geom_hex()
+p <- ggplot(data = gs@data[1:3], aes(x=`FSC-H`, y=`SSC-H`)) + 
+  geom_point()
+  #geom_hex()
 
 
 #p <- as.ggplot(p)
 
-p$coordinates$limits$x <- c("min"=0, "max" = 100000)
+#p$coordinates$limits$x <- c("min"=0, "max" = 100000)
 
 p <- p + scale_x_continuous(trans = logicle_trans(), limits = c(0,100000))
 
 p <- p + scale_y_continuous(trans = logicle_trans(), limits = c(0, 100000))
 
-p + coord_trans(limx = c(0,100000), x = "logicle")
+p + coord_trans(xlim = c(0,100000), x = "logicle")
 
-#does not work with plot_type = "hexagonal
+# When using 'logicle_trans()' the code below does not work with plot_type = "hexagonal" or "contour"
+# Use "flowjo_biexp_trans()" instead which appears more robust
+# It might be necessary to completely replace logicle_trans() by flowjo_biexp_trans() ....
 p <- plot_gs_ggcyto(gs, 
-                    plot_type = "dots",
+                    plot_type = "hexagonal",
                     plot_args = list(xvar = "FL1-H", yvar="FL2-H", size = 3),
                     options=list(
                       axis_limits=list("FL1-H" = c(100, 100000),
                                        "FL2-H" = c(100, 100000)),
-                      transformation = list("FL1-H" = asinh_trans(),
-                                            "FL2-H" = asinh_trans())))
+                      transformation = list("FL1-H" = flowjo_biexp_trans(),
+                                            "FL2-H" = flowjo_biexp_trans())))
 
 
 p <- plot_gs_ggcyto(gs, plot_args = list(xvar = "FSC-A", yvar = "SSC-A"))
