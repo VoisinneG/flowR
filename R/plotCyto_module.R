@@ -912,7 +912,8 @@ observe({
     # }
     
     polygon <- data.frame(x = polygon_gate$x,
-                          y = polygon_gate$y)
+                          y = polygon_gate$y
+                          )
     
     #print(polygon)
     
@@ -926,7 +927,9 @@ observe({
                        #if(use_ggcyto){
                         # p <- as.ggplot(p)
                          if(!is.null(polygon$x)){
-                           p <- add_polygon_layer(p, polygon = polygon)
+                           p <- add_polygon_layer(p, 
+                                                  polygon = polygon, 
+                                                  idx_selected = polygon_gate$idx_selected)
                          }
                        #}
                        # if(!is.null(gate)){

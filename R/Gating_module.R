@@ -69,6 +69,12 @@ GatingUI <- function(id) {
                    actionButton(ns("create_gate"), "create gate"),
                    actionButton(ns("reset_gate"), "reset gate")
                ),
+               box(title = "Edit",width = NULL, height = NULL, 
+                   collapsible = TRUE, collapsed = TRUE,
+                   checkboxInput(ns("edit_mode"), label = "Turn on edit mode", value = FALSE),
+                   verbatimTextOutput(ns("selected_node")),
+                   actionButton(ns("delete_nodes"), "Delete selected nodes")
+               ),
                box(title = "Delete",width = NULL, height = NULL, 
                    collapsible = TRUE, collapsed = TRUE,
                    selectInput(ns("gate_to_delete"), 
@@ -194,6 +200,7 @@ GatingUI <- function(id) {
 #' @importFrom DT datatable renderDT
 #' @importFrom dplyr rename
 #' @importFrom utils write.table
+#' @importFrom sp point.in.polygon
 #' @export
 #' @rdname GatingUI
 Gating <- function(input, output, session, rval) {
@@ -201,7 +208,7 @@ Gating <- function(input, output, session, rval) {
   
   plot_params <- reactiveValues() # parameters controlling the main plot
   plot_params_gh <- reactiveValues() # parameters controlling the gating hierarchy plot
-  gate <- reactiveValues(x = NULL, y = NULL) # polygon gate represented on plot
+  gate <- reactiveValues(x = NULL, y = NULL, idx_selected = NULL) # polygon gate represented on plot
   brush_coords <- reactiveValues(x = NULL, y = NULL)
   display_params <- reactiveValues(nrow = 2, width = 200, height = 200)
   rval_mod <- reactiveValues()
@@ -285,6 +292,14 @@ Gating <- function(input, output, session, rval) {
     updateSelectInput(session, "gate_selection", selected = res$params$subset)
   })
   
+  ### Edit mode ########################################################################
+  
+  observeEvent(input$delete_nodes, {
+    gate$x <- gate$x[setdiff(1:length(gate$x), gate$idx_selected)]
+    gate$y <- gate$y[setdiff(1:length(gate$y), gate$idx_selected)]
+    gate$idx_selected <- NULL
+  })
+  
   ### Manage simple click events on main plot ##########################################
   
   observeEvent(res_display$params$plot_click, {
@@ -308,17 +323,33 @@ Gating <- function(input, output, session, rval) {
       if(!is.null(gate$x)){
         d <- sqrt(((gate$x - x_coord)/gate$x)^2 + ((gate$y - y_coord)/gate$y)^2)
         min_d <- min(d)
+        idx_min <- which.min(d)
         print(min_d)
+        print(idx_min)
       }
       
-      
-      gate$x <- c(gate$x, x_coord)
-      gate$y <- c(gate$y, y_coord)
+      if(!input$edit_mode){
+        gate$x <- c(gate$x, x_coord)
+        gate$y <- c(gate$y, y_coord)
+      }else{
+        #in edit mode, nearest point to click-position will be selected or de-selected
+        if(min_d <- 1){
+          if(idx_min %in% gate$idx_selected){
+            gate$idx_selected <- setdiff(gate$idx_selected, idx_min)
+          }else{
+            gate$idx_selected <- union(gate$idx_selected, idx_min)
+          }
+          
+        }
+      }
+
   
       #idx <- grDevices::chull(gate$x, gate$y)
       #gate$x <- gate$x[idx]
       #gate$y <- gate$y[idx]
     }
+    
+    
   })
   
   ### Manage brush events on main plot ###################################################
@@ -343,6 +374,18 @@ Gating <- function(input, output, session, rval) {
       }
       brush_coords$y <- y_coord
       
+      if(input$edit_mode){
+        in_poly <- sp::point.in.polygon(gate$x, 
+                                        gate$y, 
+                                        brush_coords$x,
+                                        brush_coords$y, 
+                                        mode.checked=FALSE)
+        print(in_poly)
+        if(sum(in_poly) > 0){
+          gate$idx_selected <- which(in_poly>0)
+        }
+      }
+      
     }
     
   })
@@ -350,6 +393,7 @@ Gating <- function(input, output, session, rval) {
   observeEvent(input$get_brush_coords, {
     gate$x <- brush_coords$x
     gate$y <- brush_coords$y
+    gate$idx_selected <- NULL
   })
   
   ### Manage double click events on main plot #############################################
@@ -357,12 +401,14 @@ Gating <- function(input, output, session, rval) {
   observeEvent(res_display$params$plot_dblclick, {
     gate$x <- NULL
     gate$y <- NULL
+    gate$idx_selected <- NULL
   })
   
   ### reset polygon using action button ###################################################
   observeEvent(input$reset_gate, {
     gate$x <- NULL
     gate$y <- NULL
+    gate$idx_selected <- NULL
     rval$gate <- NULL
   })
   
@@ -370,12 +416,14 @@ Gating <- function(input, output, session, rval) {
   observeEvent(res$params$xvar, {
     gate$x <- NULL
     gate$y <- NULL
+    gate$idx_selected <- NULL
   })
   
   ### reset polygon when plot y axis is modified #########################################
   observeEvent(res$params$yvar, {
     gate$x <- NULL
     gate$y <- NULL
+    gate$idx_selected <- NULL
   })
   
   ### Create gate from polygon, update rval$gating_set ###################################
@@ -413,6 +461,7 @@ Gating <- function(input, output, session, rval) {
         
         gate$x <- NULL
         gate$y <- NULL
+        gate$idx_selected <- NULL
 
         if(res$params$subset != "root"){
           gate_name <- paste(res$params$subset, "/", input$gate_name, sep = "")
@@ -521,6 +570,7 @@ Gating <- function(input, output, session, rval) {
       
       gate$x <- NULL
       gate$y <- NULL
+      gate$idx_selected <- NULL
 
     }
 

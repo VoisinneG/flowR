@@ -2106,10 +2106,11 @@ plot_pca <-function(args = list()){
 #' @importFrom ggrepel geom_label_repel
 add_polygon_layer <- function(p,
                              polygon = NULL,
+                             idx_selected = NULL,
                              label = NULL){
   
   #if(p$plot_env$plot_type != "histogram" & setequal(names(polygon), c("x", "y"))){
-  if(setequal(names(polygon), c("x", "y"))){
+  if(all(c("x", "y") %in% names(polygon))){
     if(!is.null(polygon$x)){
       if(length(polygon$x)>1){
         polygon <- data.frame(x = polygon$x, y = polygon$y)
@@ -2172,12 +2173,20 @@ add_polygon_layer <- function(p,
         # add polygon layer
 
         p <- p +
-          geom_path(data = polygon, mapping = aes(x=x, y=y), color = "red", inherit.aes = FALSE) +
+          geom_path(data = polygon, mapping = aes(x=x, y=y), 
+                    color = "red", inherit.aes = FALSE) +
           geom_polygon(data=polygon, mapping = aes(x=x, y=y), 
                        inherit.aes = FALSE,
                        fill="red",
                        alpha=0.05) +
-          geom_point(data = polygon, mapping = aes(x=x, y=y), color = "red", inherit.aes = FALSE, alpha = 0.5, size = 2)
+          geom_point(data = polygon, mapping = aes(x=x, y=y), 
+                     color = "red", inherit.aes = FALSE, alpha = 0.5, size = 2)
+        
+        if(!is.null(idx_selected)){
+          p <- p + geom_point(data = polygon[idx_selected, ], mapping = aes(x=x, y=y), shape = 21,
+                              color = "red", fill = "yellow", inherit.aes = FALSE, alpha = 0.5, size = 4)
+        }
+          
         if(!is.null(label)){
           df_label <- data.frame(x=mean(polygon$x), y= mean(polygon$y))
           p <- p +  geom_label_repel(data = df_label, force = 4, inherit.aes = FALSE,
