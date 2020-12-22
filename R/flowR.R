@@ -2112,7 +2112,8 @@ add_polygon_layer <- function(p,
   #if(p$plot_env$plot_type != "histogram" & setequal(names(polygon), c("x", "y"))){
   if(all(c("x", "y") %in% names(polygon))){
     if(!is.null(polygon$x)){
-      if(length(polygon$x)>1){
+      
+      if(length(polygon$x)>0){
         polygon <- data.frame(x = polygon$x, y = polygon$y)
         polygon <- rbind(polygon, polygon[1,])
         
@@ -2180,11 +2181,13 @@ add_polygon_layer <- function(p,
                        fill="red",
                        alpha=0.05) +
           geom_point(data = polygon, mapping = aes(x=x, y=y), 
-                     color = "red", inherit.aes = FALSE, alpha = 0.5, size = 2)
+                     color = "red", inherit.aes = FALSE, alpha = 0.5, size = 2) +
+          geom_point(data = polygon[length(polygon$x)-1, ], mapping = aes(x=x, y=y), 
+                     shape = 21, color = "red", fill = NA, inherit.aes = FALSE, alpha = 0.5, size = 6)
         
         if(!is.null(idx_selected)){
           p <- p + geom_point(data = polygon[idx_selected, ], mapping = aes(x=x, y=y), shape = 21,
-                              color = "red", fill = "yellow", inherit.aes = FALSE, alpha = 0.5, size = 4)
+                              color = "red", fill = "yellow", inherit.aes = FALSE, alpha = 0.5, size = 6)
         }
           
         if(!is.null(label)){

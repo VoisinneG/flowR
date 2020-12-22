@@ -49,31 +49,35 @@ GatingUI <- function(id) {
     column(width = 4,
            box(title = "Gates", width = NULL, height = NULL, 
                collapsible = TRUE, collapsed = FALSE,
-               actionButton(ns("show_gate"), label = "Show defining gate"),
-               br(),
-               br(),
                box(title = "Select",width = NULL, height = NULL, 
                    collapsible = TRUE, collapsed = TRUE,
                    selectInput(ns("gate_selection"), 
-                               label = "Select gate", 
+                               label = "Choose gate", 
                                choices = NULL, 
                                selected = NULL),
-               ),
-               box(title = "Create",width = NULL, height = NULL, 
-                   collapsible = TRUE, collapsed = TRUE,
-                   actionButton(ns("get_brush_coords"), "Get path from brush"),
-                   #checkboxInput(ns("convex_hull"), "Get convex hull from points", value = FALSE),
-                   br(),
-                   br(),
-                   textInput(ns("gate_name"), label = "Enter gate name", value = ""),
-                   actionButton(ns("create_gate"), "create gate"),
-                   actionButton(ns("reset_gate"), "reset gate")
+                   actionButton(ns("select_gate"), label = "Select"),
                ),
                box(title = "Edit",width = NULL, height = NULL, 
                    collapsible = TRUE, collapsed = TRUE,
-                   checkboxInput(ns("edit_mode"), label = "Turn on edit mode", value = FALSE),
+                   #checkboxInput(ns("edit_mode"), label = "Turn on edit mode", value = FALSE),
+                   actionButton(ns("get_brush_coords"), "Get path from brush"),
+                   checkboxInput(ns("convex_hull"), "Make convex hull", FALSE),
+                   selectInput(ns("edit_action"), 
+                               label = "Action", 
+                               choices = c("draw", "select", "move"), 
+                               selected = "draw"),
                    verbatimTextOutput(ns("selected_node")),
-                   actionButton(ns("delete_nodes"), "Delete selected nodes")
+                   actionButton(ns("delete_nodes"), "Delete selected nodes"),
+                   actionButton(ns("apply_changes"), "Apply changes"),
+                   checkboxInput(ns("update_only_selected_samples"), 
+                                 label = "Update gates only for selected samples", value = TRUE),
+                   actionButton(ns("reset_gate"), "reset")
+               ),
+               box(title = "Create",width = NULL, height = NULL, 
+                   collapsible = TRUE, collapsed = TRUE,
+                   textInput(ns("gate_name"), label = "Enter gate name", value = ""),
+                   actionButton(ns("create_gate"), "create gate")
+                   
                ),
                box(title = "Delete",width = NULL, height = NULL, 
                    collapsible = TRUE, collapsed = TRUE,
@@ -275,21 +279,99 @@ Gating <- function(input, output, session, rval) {
     updateSelectInput(session, "gate_to_rename", choices = setdiff(gates, "root"))
     updateSelectInput(session, "gate_to_copy", choices = setdiff(gates, "root"))
     updateSelectInput(session, "new_parent", choices = gates)
-    updateSelectInput(session, "gate_selection", choices = gates)
+    updateSelectInput(session, "gate_selection", choices = setdiff(gates, "root"))
   })
   
   ### Observe environments for gating ###################################################
 
-  observeEvent(input$gate_selection, {
-    #update plot_params
-    for(var in names(plot_params)){
-      plot_params[[var]] <- res$params[[var]]
+  # observeEvent(input$gate_selection, {
+  #   #update plot_params
+  #   for(var in names(plot_params)){
+  #     plot_params[[var]] <- res$params[[var]]
+  #   }
+  #   plot_params$subset <- input$gate_selection
+  # })
+  # 
+  # observe({
+  #   updateSelectInput(session, "gate_selection", selected = res$params$subset)
+  # })
+  
+  ### Update plot parameters to show defining gate ########################################
+  # observeEvent(input$show_gate, {
+  # 
+  #   if(res$params$subset != "root"){
+  # 
+  #     gates <- get_gates_from_gs(gs = rval$gating_set)
+  #     rval$gate <- gates[[res$params$subset]]$gate
+  # 
+  #     #update plot_params
+  #     for(var in names(plot_params)){
+  #       plot_params[[var]] <- res$params[[var]]
+  #     }
+  #     plot_params$subset <- gates[[res$params$subset]]$parent
+  # 
+  #     if(class(rval$gate[[1]]) != "booleanFilter"){
+  #       gate_params <- names(rval$gate[[1]]@parameters)
+  # 
+  #       if(length(gate_params) > 0){
+  #         plot_params$xvar <- gate_params[1]
+  #       }
+  #       if(length(gate_params) > 1){
+  #         plot_params$yvar <- gate_params[2]
+  #       }
+  #     }
+  # 
+  #   }
+  # 
+  # })
+  
+  ### Update plot parameters to show defining gate ########################################
+  observeEvent(input$select_gate, {
+    
+    if(input$gate_selection != "root"){
+      
+      gates <- get_gates_from_gs(gs = rval$gating_set)
+      
+      print(names(gates))
+      print(class(gates[[input$gate_selection]]$gate[[1]]))
+      
+      rval$gate <- gates[[input$gate_selection]]$gate
+      
+      #update plot_params
+      for(var in names(plot_params)){
+        plot_params[[var]] <- res$params[[var]]
+      }
+      plot_params$subset <- gates[[input$gate_selection]]$parent
+      
+      if(class(rval$gate[[1]]) != "booleanFilter"){
+        gate_params <- names(rval$gate[[1]]@parameters)
+        
+        if(length(gate_params) > 0){
+          plot_params$xvar <- gate_params[1]
+        }
+        if(length(gate_params) > 1){
+          plot_params$yvar <- gate_params[2]
+        }
+      }
+      
+       polygon <- get_gate_coordinates(rval$gate[[1]])
+       gate$x <- polygon[[plot_params$xvar]]
+       gate$y <- polygon[[plot_params$yvar]]
+       gate$idx_selected <- NULL
+      
     }
-    plot_params$subset <- input$gate_selection
+    
   })
   
-  observe({
-    updateSelectInput(session, "gate_selection", selected = res$params$subset)
+  ### Convex Hull ######################################################################
+  observeEvent(c(gate$x, input$convex_hull), {
+    if(input$convex_hull){
+      idx <- grDevices::chull(gate$x, gate$y)
+      gate$x <- gate$x[idx]
+      gate$y <- gate$y[idx]
+      gate$idx_selected <- NULL
+    }
+    
   })
   
   ### Edit mode ########################################################################
@@ -298,6 +380,47 @@ Gating <- function(input, output, session, rval) {
     gate$x <- gate$x[setdiff(1:length(gate$x), gate$idx_selected)]
     gate$y <- gate$y[setdiff(1:length(gate$y), gate$idx_selected)]
     gate$idx_selected <- NULL
+  })
+  
+  ### Change gate coordinates ##########################################################
+  observeEvent(input$apply_changes, {
+    
+    if(!is.null(gate$x)){
+      polygon <- data.frame(x = gate$x, y = gate$y)
+      
+      #hpts <- grDevices::chull(polygon)
+      #polygon <- polygon[hpts, ]
+      polygon <- as.matrix(polygon)
+      
+      var_names <- c(res$params$xvar, res$params$yvar)
+      names(var_names) <- NULL
+      colnames(polygon) <- var_names
+      
+      poly_gate <- flowCore::polygonGate(.gate = polygon, 
+                                         filterId=input$gate_name)
+      rval$gate <- poly_gate
+      
+      if(input$update_only_selected_samples){
+        sample_names <- res$params$sample
+      }else{
+        sample_names <- choices()$sample
+      }
+      
+      gate_list <- lapply(sample_names, function(x){poly_gate})
+      names(gate_list) <- sample_names
+      flowWorkspace::gs_pop_set_gate(obj = rval$gating_set[sample_names], 
+                                     y = input$gate_selection,
+                                     value = gate_list
+      )
+      
+      flowWorkspace::recompute(rval$gating_set)
+      rval$update_gs <- rval$update_gs + 1
+      
+      gate$x <- NULL
+      gate$y <- NULL
+      gate$idx_selected <- NULL
+    }
+    
   })
   
   ### Manage simple click events on main plot ##########################################
@@ -319,28 +442,29 @@ Gating <- function(input, output, session, rval) {
         y_coord <- rval$gating_set@transformation[[yvar]]$inverse(y_coord)
       }
       
-      #compute distance with existing vertexes
-      if(!is.null(gate$x)){
-        d <- sqrt(((gate$x - x_coord)/gate$x)^2 + ((gate$y - y_coord)/gate$y)^2)
-        min_d <- min(d)
-        idx_min <- which.min(d)
-        print(min_d)
-        print(idx_min)
-      }
       
-      if(!input$edit_mode){
+      
+      if(input$edit_action == "draw"){
         gate$x <- c(gate$x, x_coord)
         gate$y <- c(gate$y, y_coord)
-      }else{
+      }else if(input$edit_action == "select"){
         #in edit mode, nearest point to click-position will be selected or de-selected
-        if(min_d <- 1){
-          if(idx_min %in% gate$idx_selected){
-            gate$idx_selected <- setdiff(gate$idx_selected, idx_min)
-          }else{
-            gate$idx_selected <- union(gate$idx_selected, idx_min)
+        
+        #compute distance with existing vertexes
+        if(!is.null(gate$x)){
+          d <- sqrt(((gate$x - x_coord)/gate$x)^2 + ((gate$y - y_coord)/gate$y)^2)
+          min_d <- min(d)
+          idx_min <- which.min(d)
+        
+          if(min_d < 0.03){
+            if(idx_min %in% gate$idx_selected){
+              gate$idx_selected <- setdiff(gate$idx_selected, idx_min)
+            }else{
+              gate$idx_selected <- union(gate$idx_selected, idx_min)
+            }
           }
-          
         }
+        
       }
 
   
@@ -362,6 +486,8 @@ Gating <- function(input, output, session, rval) {
       xvar <- res$params$xvar
       yvar <- res$params$yvar
       
+      # get brush coordinates
+      
       x_coord <- c(brush$xmin, brush$xmax, brush$xmax, brush$xmin)
       if(xvar %in% names(rval$gating_set@transformation)){
         x_coord <- rval$gating_set@transformation[[xvar]]$inverse(x_coord)
@@ -374,17 +500,37 @@ Gating <- function(input, output, session, rval) {
       }
       brush_coords$y <- y_coord
       
-      if(input$edit_mode){
-        in_poly <- sp::point.in.polygon(gate$x, 
-                                        gate$y, 
-                                        brush_coords$x,
-                                        brush_coords$y, 
-                                        mode.checked=FALSE)
-        print(in_poly)
-        if(sum(in_poly) > 0){
-          gate$idx_selected <- which(in_poly>0)
-        }
+      #get brush direction
+      
+      click <- res_display$params$plot_click
+      
+      dir_brush_x <- 0
+      dir_brush_y <- 0
+      if(!is.null(click)){
+        df_brush <- data.frame( x=c(brush$xmin, brush$xmax), y=c(brush$ymin, brush$ymax))
+        print(df_brush)
+        dist_brush_x <- (click$x - df_brush$x)^2
+        dist_brush_y <- (click$y - df_brush$y)^2
+        dir_brush_x <- ifelse(which.min(dist_brush_x)==1, 1, -1)
+        dir_brush_y <- ifelse(which.min(dist_brush_y)==1, 1, -1)
       }
+      
+      #update selected nodes or node positions
+      
+        if(input$edit_action == "select"){
+          in_poly <- sp::point.in.polygon(gate$x, 
+                                          gate$y, 
+                                          brush_coords$x,
+                                          brush_coords$y, 
+                                          mode.checked=FALSE)
+          gate$idx_selected <- which(in_poly>0)
+        }else if(input$edit_action == "move"){
+          gate$x[gate$idx_selected] <- gate$x[gate$idx_selected] + 
+            dir_brush_x*diff(brush_coords$x[1:2])
+          gate$y[gate$idx_selected] <- gate$y[gate$idx_selected] + 
+            dir_brush_y*diff(brush_coords$y[2:3])
+        }
+      
       
     }
     
@@ -412,19 +558,19 @@ Gating <- function(input, output, session, rval) {
     rval$gate <- NULL
   })
   
-  ### reset polygon when plot x axis is modified #########################################
-  observeEvent(res$params$xvar, {
+  ### reset polygon when gating set is updated ############################################
+  observeEvent(rval$update_gs, {
     gate$x <- NULL
     gate$y <- NULL
     gate$idx_selected <- NULL
   })
   
   ### reset polygon when plot y axis is modified #########################################
-  observeEvent(res$params$yvar, {
-    gate$x <- NULL
-    gate$y <- NULL
-    gate$idx_selected <- NULL
-  })
+  # observeEvent(res$params$yvar, {
+  #   gate$x <- NULL
+  #   gate$y <- NULL
+  #   gate$idx_selected <- NULL
+  # })
   
   ### Create gate from polygon, update rval$gating_set ###################################
 
@@ -541,42 +687,7 @@ Gating <- function(input, output, session, rval) {
     
 
   })
-  
-  ### Update plot parameters to show defining gate ########################################
-  observeEvent(input$show_gate, {
-    
-    if(res$params$subset != "root"){
-      
-      gates <- get_gates_from_gs(gs = rval$gating_set)
-      rval$gate <- gates[[res$params$subset]]$gate
-      
-      #update plot_params
-      for(var in names(plot_params)){
-        plot_params[[var]] <- res$params[[var]]
-      }
-      plot_params$subset <- gates[[res$params$subset]]$parent
-      
-      if(class(rval$gate[[1]]) != "booleanFilter"){
-        gate_params <- names(rval$gate[[1]]@parameters)
-        
-        if(length(gate_params) > 0){
-          plot_params$xvar <- gate_params[1]
-        }
-        if(length(gate_params) > 1){
-          plot_params$yvar <- gate_params[2]
-        }
-      }
-      
-      
-      gate$x <- NULL
-      gate$y <- NULL
-      gate$idx_selected <- NULL
 
-    }
-
-  })
-  
-  
   ### Output messages ####################################################################
   
   output$message_gate <- renderPrint({

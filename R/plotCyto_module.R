@@ -183,7 +183,7 @@ observe({
     x <- list()
     
     if(use_ggcyto){
-      plot_types <- c("dots", "histogram", "contour")
+      plot_types <- c("dots", "histogram", "contour", "hexagonal")
     }else{
       plot_types <- c("dots", "histogram", "contour", "hexagonal")
     }
