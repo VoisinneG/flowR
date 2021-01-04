@@ -42,7 +42,6 @@ PlottingUI <- function(id) {
 Plotting <- function(input, output, session, rval){
 
   plot_params <- reactiveValues()
-  #rval_mod <- reactiveValues(init = TRUE)
   
   observe({
     

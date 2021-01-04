@@ -1413,11 +1413,11 @@ plot_hexagonal <- function(args = list()){
   }
   
   if(class(data) %in% c("ncdfFlowSet", "flowSet")){
-    #stop("Plot type not supported for flowSet objects")
-    p <- ggcyto::ggcyto(data,
-                        aes_string(x = as.name( xvar ),
-                                   y = as.name( yvar )),
-                        max_nrow_to_plot = max_nrow_to_plot)
+    stop("Plot type not supported for flowSet objects")
+    # p <- ggcyto::ggcyto(data,
+    #                     aes_string(x = as.name( xvar ),
+    #                                y = as.name( yvar )),
+    #                     max_nrow_to_plot = max_nrow_to_plot)
   }else{
     p <- ggplot(data,
                         aes_(x = as.name( xvar ), 
@@ -1665,7 +1665,6 @@ plot_dots <-function(args = list()){
     p <- p + ggpointdensity::geom_pointdensity(alpha = alpha, 
                                                size = size,
                                                adjust = adjust_default * adjust)
-      #scale_color_viridis()
   }else{
     p <- p +  geom_point(alpha = alpha,
                           size = size)
@@ -2299,6 +2298,7 @@ add_gate <- function(p, gate){
 #' @param gate a gate object
 #' @importFrom sp point.in.polygon
 #' @importFrom rlang quo_get_expr
+#' @importFrom ggcyto geom_gate geom_stats
 add_gate_to_plot <- function(p, gate){
   
   if(is.null(gate)){
@@ -2310,7 +2310,6 @@ add_gate_to_plot <- function(p, gate){
   }
     
   polygon <- get_gate_coordinates(gate[[1]])
-  
   
   xvar <- NULL
   yvar <- NULL
@@ -2328,53 +2327,12 @@ add_gate_to_plot <- function(p, gate){
     }
   }
   
-  # if("colour" %in% names(p$mapping)){
-  #   if("quosure" %in% class(p$mapping$colour)){
-  #     color_var <- as.character(rlang::quo_get_expr(p$mapping$colour))
-  #   }
-  # }
-  
   if(all(names(polygon) %in% c(xvar, yvar))){ 
-    #print("OK gate")
-    p <- p + geom_gate(gate) + geom_stats(gate = gate, nudge_y = 0.5,
+    
+    p <- p + ggcyto::geom_gate(gate) + 
+      ggcyto::geom_stats(gate = gate, nudge_y = 0.5,
                                               type = c("gate_name", "percent"), label.padding = unit(0.5, "lines"),
                                               fill = grDevices::rgb(1,1,1,0.75))
-    # if(dim(polygon)[2] >1){
-    #   in_poly <- sp::point.in.polygon(p$data[[xvar]], 
-    #                                   p$data[[yvar]], 
-    #                                   polygon[[xvar]],
-    #                                   polygon[[yvar]], 
-    #                                   mode.checked=FALSE)
-    #   
-    #   perc_in_poly <- sprintf("%.1f", sum(in_poly)/length(in_poly)*100)
-    #   
-    #   idx_match <- match(c(xvar, yvar), names(polygon))
-    #   names(polygon)[idx_match] <- c("x", "y")
-    #   
-    #   label <- paste(gate@filterId, " (", perc_in_poly, "%)", sep="")
-    #   p <- add_polygon_layer(p, polygon = polygon, label = label)
-    # }else{
-    #   p <- p + geom_area(data = data.frame(x = polygon[[xvar]], y = c(1,1)), 
-    #                      mapping = aes(x=x, y = y), 
-    #                      alpha = 0.2, 
-    #                      color = "red", fill = "red")
-    #   perc_in_poly <- sum(p$data[[xvar]] <= max(polygon[[xvar]]) & 
-    #                         p$data[[xvar]] >= min(polygon[[xvar]]))/ 
-    #     le_intngth(p$data[[xvar]])*100
-    #   perc_in_poly <- sprintf("%.1f", perc_in_poly)
-    #   label <- paste(gate@filterId, " (", perc_in_poly, "%)", sep="")
-    #   df_label <- data.frame(x=mean(polygon[[xvar]]), y= 0.5)
-    #   p <- p +  geom_label_repel(data = df_label, force = 4, inherit.aes = FALSE,
-    #                              mapping = aes(x=x, y=y),
-    #                              label = label,
-    #                              fill = grDevices::rgb(1,1,1,0.85),
-    #                              color = "red",
-    #                              nudge_y = 0,
-    #                              nudge_x =0,
-    #                              point.padding = 0)
-    #   
-    # }
-    
   }
   
   return(p)
@@ -2436,7 +2394,12 @@ get_plot_data_range <- function(p){
 #' @importFrom graph addEdge nodes
 #' @importFrom Rgraphviz renderGraph layoutGraph
 #' @importFrom methods new
-plot_tree <- function(gates, fontsize = 40, rankdir = "LR", shape = "ellipse", fixedsize = FALSE){
+plot_tree <- function(gates, 
+                      fontsize = 40, 
+                      rankdir = "LR", 
+                      shape = "ellipse", 
+                      fixedsize = FALSE){
+  
   gR = methods::new("graphNEL", nodes = union("root", names(gates)), edgemode = "directed")
   
   for(i in 1:length(gates)){
@@ -2450,14 +2413,15 @@ plot_tree <- function(gates, fontsize = 40, rankdir = "LR", shape = "ellipse", f
   names(nodeNames) <- graph::nodes(gR)
   nAttrs$label <- nodeNames
   
-  p <- Rgraphviz::renderGraph(Rgraphviz::layoutGraph(gR,
-                                                     nodeAttrs=nAttrs,
-                                                     attrs=list(graph=list(rankdir=rankdir),
-                                                                node=list(fixedsize = fixedsize,
-                                                                          fillcolor = "gray",
-                                                                          fontsize = fontsize,
-                                                                          shape = shape)
-                                                     )
+  p <- Rgraphviz::renderGraph(
+    Rgraphviz::layoutGraph(gR,
+                           nodeAttrs=nAttrs,
+                           attrs=list(graph=list(rankdir=rankdir),
+                                      node=list(fixedsize = fixedsize,
+                                                fillcolor = "gray",
+                                                fontsize = fontsize,
+                                                shape = shape)
+                           )
     )
   )
   return(p)
@@ -2559,7 +2523,7 @@ format_plot <- function(p,
     default_trans <- scales::identity_trans()
   }
   
-  ### transformations ###
+  ### transformations ####
   
   if(!is.null(xvar)){
     if(length(xvar) == 1){
@@ -2646,14 +2610,14 @@ format_plot <- function(p,
             trans_col <- transformation[[color_var]]
           }
           
-          colorlim <- axis_limits[[color_var]]
+          color_lim <- axis_limits[[color_var]]
           
           is_cont <- FALSE
           
           if(color_var %in% names(p$data)){
             is_cont <- is.double(p$data[[color_var]])
           }
-          print("OK color")
+          
           #is_cont <- ifelse(color_var %in% names(p$data), is.double(p$data[[color_var]]), FALSE)
           
           if(is_cont){
@@ -2662,7 +2626,7 @@ format_plot <- function(p,
             p <- p + viridis::scale_colour_viridis(trans = trans_col,
                                                    name = label_color,
                                                    option = option, 
-                                                   limits = colorlim)
+                                                   limits = color_lim)
           }
         }
       }
@@ -2673,7 +2637,7 @@ format_plot <- function(p,
     p <- p + viridis::scale_colour_viridis(option = option)
   }
   
-  ### facet ###
+  ### facet ####
   if(!is.null(options$facet_var) | !is.null(facet_yvar)){
     
     left_formula <- paste(facet_yvar, collapse = " + ")
@@ -2695,7 +2659,7 @@ format_plot <- function(p,
     p <- p + facet_wrap(NULL)
   }
   
-  ### theme ###
+  ### theme ####
   if(!is.null(title)){
     p <- p + ggtitle(title)
   }
@@ -2724,207 +2688,7 @@ format_plot <- function(p,
   
 }
 
-#' Format a ggplot object
-#' @param p a ggplot object
-#' @param options  list of plot format options. Names of options include:
-#' xlim : x-axis range
-#' ylim : y-axis range
-#' transformation : named list of trans objects 
-#' default_trans : default trans object (set to 'identity_trans()' by default). 
-#' Used only if 'transformation' is not an element of 'options'.
-#' axis_labels : named list with axis labels (each element should be named after a plot variable)
-#' color_var_name : name to display for color variable
-#' facet_var : names of the variables used for facetting plots along the x-axis
-#' facet_yvar : names of the variables used for facetting plots along the y-axis
-#' scales : control scaling across facets (passed to 'facet_grid()'), Set to "fixed" by default
-#' option : name of the viridis palette
-#' theme : name of the ggplot theme ("gray" by default)
-#' legend.position : legend position
-#' @import ggplot2
-#' @import viridis
-#' @importFrom stats as.formula
-#' @importFrom rlang quo_get_expr
-#' @importFrom scales identity_trans
-#' @return a ggplot object
-format_ggcyto_plot <- function(p,
-                        options = list()){
-  
-  xvar <- NULL
-  yvar <- NULL
-  
-  if("x" %in% names(p$mapping)){
-    if("quosure" %in% class(p$mapping$x)){
-      xvar <- as.character(rlang::quo_get_expr(p$mapping$x))
-    }
-  }
-  
-  if("y" %in% names(p$mapping)){
-    if("quosure" %in% class(p$mapping$x)){
-      yvar <- as.character(rlang::quo_get_expr(p$mapping$y))
-    }
-  }
-  
-  xlim <- NULL
-  ylim <- NULL
-  
-  transformation <- list()
-  axis_labels <- list()
-  axis_limits <- list()
-  
-  color_var <- as.character(p$plot_env$color_var)
-  
-  facet_yvar <- NULL
-  if(!is.null(p$plot_env$plot_type)){
-    if(p$plot_env$plot_type == "bar"){
-      facet_yvar <- "variable"
-    }
-  }
-  
-  
-  #### default parameters ###
-  
-  var_options <- c("xlim", "ylim", "transformation", "default_trans",
-                   "axis_labels", "axis_limits", "color_var_name", "facet_var", "facet_yvar",
-                   "scales", "option", "theme", "legend.position")
-  
-  for(var in intersect(names(options), var_options)){
-    assign(var, options[[var]])
-  }
-  
-  #facet scales
-  if(is.null(options$scales)){
-    scales <- "fixed"
-  }
-  
-  #default viridis palette
-  if(is.null(options$option)){
-    option <- "viridis"
-  }
-  
-  #default transformation
-  if(is.null(options$default_trans)){
-    default_trans <- scales::identity_trans()
-  }
-  
-  ### transformations ###
-  
-  if(!is.null(xvar)){
-    if(length(xvar) == 1){
-      
-      labx <- ifelse(xvar %in% names(axis_labels), axis_labels[[xvar]], xvar)
-      trans_x <- default_trans
-      if(xvar %in% names(transformation)){
-        trans_x <- transformation[[xvar]]
-      }
-      xlim <- axis_limits[[xvar]]
-      
-      if(is.double(p$data[[xvar]])){
-        p <- p + scale_x_continuous(name = labx, trans = trans_x, limits = xlim ) 
-      }else if(is.integer(p$data[[xvar]])){
-        limits <- NULL
-        if(!is.null(xlim)){limits <- seq(xlim[1], xlim[2])}
-        p <- p + scale_x_discrete(name = labx,  limits = limits) 
-      }else{
-        p <- p + scale_x_discrete(name = labx) 
-      }
-      
-    }
-  }
-  
-  if(!is.null(yvar)){
-    if(length(yvar) == 1){
-      
-      laby <- ifelse(yvar %in% names(options$axis_labels), options$axis_labels[[yvar]], yvar)
-      trans_y <- default_trans
-      if(yvar %in% names(transformation)){
-        trans_y <- transformation[[yvar]]
-      }
-      ylim <- axis_limits[[yvar]]
-      
-      if(is.double(p$data[[yvar]])){
-        p <- p + scale_y_continuous(name = laby, trans = trans_y, limits = ylim) 
-      }else if(is.integer(p$data[[yvar]])){
-        limits <- NULL
-        if(!is.null(ylim)){limits <- seq(ylim[1], ylim[2])}
-        p <- p + scale_y_discrete(name = laby,  limits = limits) 
-      }else{
-        p <- p + scale_y_discrete(name = laby) 
-      }
-      
-    }
-  }
-  
-  if(!is.null(p$plot_env$plot_type)){
-    if(p$plot_env$plot_type == "dots"){
-      
-      if(!is.null(color_var)){
-        if(length(color_var) == 1){
-          
-          label_color <- ifelse(color_var %in% names(options$axis_labels), options$axis_labels[[color_var]], color_var)
-          trans_col <- default_trans
-          if(color_var %in% names(transformation)){
-            trans_col <- transformation[[color_var]]
-          }
-          is_cont <- ifelse(color_var %in% names(p$data), is.double(p$data[[color_var]]), FALSE)
-          
-          if(is_cont){
-            p <- p + viridis::scale_colour_viridis(trans = trans_col,
-                                                   name = label_color,
-                                                   option = option)
-          }
-        }
-      }
-    }
-  }
-  
-  ### facet ###
-  if(!is.null(options$facet_var) | !is.null(facet_yvar)){
-    
-    left_formula <- paste(facet_yvar, collapse = " + ")
-    right_formula <- "."
-    if(!is.null(options$facet_var)){
-      if(options$facet_var != ""){
-        right_formula <- paste(options$facet_var, collapse = " + ")
-      }
-    }
-    
-    #print(paste(left_formula, "~", right_formula))
-    formula_facet <- stats::as.formula(paste(left_formula, "~", right_formula))
-    
-    p <- p + facet_grid(formula_facet,
-                        labeller = label_both, 
-                        #scales = scale_y,
-                        scales = scales)
-  }
-  
-  ### theme ###
-  # if(length(unique(p$data$subset))==1){
-  #   p <- p + ggtitle(unique(p$data$subset))
-  # }
-  
-  if("theme" %in% names(options)){
-    if(!is.null(options$theme)){
-      if(options$theme != ""){
-        theme_name = paste("theme_", options$theme, sep = "")
-        theme_function <- function(...){
-          do.call(theme_name, list(...))
-        }
-        p <- p + theme_function()
-      }
-    }
-    
-  }
-  
-  
-  if(!is.null(options$legend.position)){
-    p <- p + theme(legend.position = options$legend.position)
-  }
-  
-  p <- p + theme(plot.title = element_text(face = "bold"))
-  
-  return(p)
-  
-}
+
 ### Main plot functions #######################################################################
 
 
@@ -3238,9 +3002,7 @@ plot_gh <- function( gs,
         par_nodes <- lapply(nodes_to_plot_parent, function(x){
           
           g <- flowWorkspace::gh_pop_get_gate(gs[[idx[1]]], x)
-          
-          
-          
+
           if(class(g) %in% c("polygonGate")){
             try(colnames(g@boundaries), silent = TRUE)
           }else if(class(g) %in% c("ellipsoidGate")){
@@ -3474,6 +3236,7 @@ plot_comp_as_heatmap <- function(df, name = ""){
                             margins = c(50, 50, 50, 0)
   )
 }
+
 ### Dimensionality Reduction ###################################################################
 
 #' Perform dimensionality reduction

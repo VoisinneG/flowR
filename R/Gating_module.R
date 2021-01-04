@@ -210,7 +210,7 @@ GatingUI <- function(id) {
 Gating <- function(input, output, session, rval) {
   
   
-  plot_params <- reactiveValues() # parameters controlling the main plot
+  plot_params <- reactiveValues(auto_focus = TRUE) # parameters controlling the main plot
   plot_params_gh <- reactiveValues() # parameters controlling the gating hierarchy plot
   gate <- reactiveValues(x = NULL, y = NULL, idx_selected = NULL) # polygon gate represented on plot
   brush_coords <- reactiveValues(x = NULL, y = NULL)
@@ -281,49 +281,6 @@ Gating <- function(input, output, session, rval) {
     updateSelectInput(session, "new_parent", choices = gates)
     updateSelectInput(session, "gate_selection", choices = setdiff(gates, "root"))
   })
-  
-  ### Observe environments for gating ###################################################
-
-  # observeEvent(input$gate_selection, {
-  #   #update plot_params
-  #   for(var in names(plot_params)){
-  #     plot_params[[var]] <- res$params[[var]]
-  #   }
-  #   plot_params$subset <- input$gate_selection
-  # })
-  # 
-  # observe({
-  #   updateSelectInput(session, "gate_selection", selected = res$params$subset)
-  # })
-  
-  ### Update plot parameters to show defining gate ########################################
-  # observeEvent(input$show_gate, {
-  # 
-  #   if(res$params$subset != "root"){
-  # 
-  #     gates <- get_gates_from_gs(gs = rval$gating_set)
-  #     rval$gate <- gates[[res$params$subset]]$gate
-  # 
-  #     #update plot_params
-  #     for(var in names(plot_params)){
-  #       plot_params[[var]] <- res$params[[var]]
-  #     }
-  #     plot_params$subset <- gates[[res$params$subset]]$parent
-  # 
-  #     if(class(rval$gate[[1]]) != "booleanFilter"){
-  #       gate_params <- names(rval$gate[[1]]@parameters)
-  # 
-  #       if(length(gate_params) > 0){
-  #         plot_params$xvar <- gate_params[1]
-  #       }
-  #       if(length(gate_params) > 1){
-  #         plot_params$yvar <- gate_params[2]
-  #       }
-  #     }
-  # 
-  #   }
-  # 
-  # })
   
   ### Update plot parameters to show defining gate ########################################
   observeEvent(input$select_gate, {
@@ -466,11 +423,7 @@ Gating <- function(input, output, session, rval) {
         }
         
       }
-
-  
-      #idx <- grDevices::chull(gate$x, gate$y)
-      #gate$x <- gate$x[idx]
-      #gate$y <- gate$y[idx]
+      
     }
     
     
@@ -565,13 +518,6 @@ Gating <- function(input, output, session, rval) {
     gate$idx_selected <- NULL
   })
   
-  ### reset polygon when plot y axis is modified #########################################
-  # observeEvent(res$params$yvar, {
-  #   gate$x <- NULL
-  #   gate$y <- NULL
-  #   gate$idx_selected <- NULL
-  # })
-  
   ### Create gate from polygon, update rval$gating_set ###################################
 
   observeEvent(input$create_gate, {
@@ -585,12 +531,10 @@ Gating <- function(input, output, session, rval) {
       ))
     }else{
       if(!is.null(gate$x)){
+        
         polygon <- data.frame(x = gate$x, y = gate$y)
         
-        #hpts <- grDevices::chull(polygon)
-        #polygon <- polygon[hpts, ]
         polygon <- as.matrix(polygon)
-
         var_names <- c(res$params$xvar, res$params$yvar)
         names(var_names) <- NULL
         colnames(polygon) <- var_names

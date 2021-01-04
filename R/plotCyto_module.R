@@ -110,10 +110,9 @@ plotCyto <- function(input, output, session,
                               show_outliers = FALSE,
                               option = "viridis")
   
-observe({
-  print(rval_plot$auto_focus)
-})
+
   ### Initialization of plot parameters ############################################################
+  
   observe({
     rval_plot$xvar <- choices()$plot_var[1]
     
@@ -182,7 +181,7 @@ observe({
     x <- list()
     
     if(use_ggcyto){
-      plot_types <- c("dots", "histogram", "contour", "hexagonal")
+      plot_types <- c("dots", "histogram", "contour")
     }else{
       plot_types <- c("dots", "histogram", "contour", "hexagonal")
     }
@@ -673,30 +672,29 @@ observe({
     if(!use_ggcyto){
       return(list())
     }
-      #print("raw ggcyto")
-      
-      plot_list <- list()
-      
-      
-        validate(need(class(rval$gating_set) =="GatingSet", "No GatingSet"))
-        validate(need(rval_input$sample, "Please select samples"))
-        validate(need(all(rval_input$sample %in% choices()$sample),
-                        "All samples not found in GatingSet"))
-        validate(need(rval_input$subset, "Please select subsets"))
-        validate(need(all(rval_input$subset %in% choices()$subset),
-                        "All subsets not found in GatingSet"))
-        validate(need(rval_input$xvar %in% choices()$plot_var, "Please select x variable"))
-        validate(need(rval_input$plot_type, "Please select plot type"))
-        if(!is.null(rval_input$plot_type)){
-          if(rval_input$plot_type != "histogram"){
-            validate(need(rval_input$yvar %in% choices()$plot_var, "Please select y variable"))
-            validate(need(all(!rval_input$yvar %in% rval_input$xvar), "Please select different x and y variables"))
-          }
-        }
+    #print("raw ggcyto")
     
-
+    plot_list <- list()
+    
+    
+    validate(need(class(rval$gating_set) =="GatingSet", "No GatingSet"))
+    validate(need(rval_input$sample, "Please select samples"))
+    validate(need(all(rval_input$sample %in% choices()$sample),
+                  "All samples not found in GatingSet"))
+    validate(need(rval_input$subset, "Please select subsets"))
+    validate(need(all(rval_input$subset %in% choices()$subset),
+                  "All subsets not found in GatingSet"))
+    validate(need(rval_input$xvar %in% choices()$plot_var, "Please select x variable"))
+    validate(need(rval_input$plot_type, "Please select plot type"))
+    if(!is.null(rval_input$plot_type)){
+      if(rval_input$plot_type != "histogram"){
+        validate(need(rval_input$yvar %in% choices()$plot_var, "Please select y variable"))
+        validate(need(all(!rval_input$yvar %in% rval_input$xvar), "Please select different x and y variables"))
+      }
+    }
+    
     spill <- choices()$compensation
-    #print(spill)
+
     if(!is.null(rval$apply_comp)){
       if(!rval$apply_comp){
         spill <- NULL
@@ -706,9 +704,7 @@ observe({
     fs <- gs_get_fs_subset(gs = rval$gating_set[rval_input$sample], 
                            spill =spill,
                            subset = rval_input$subset)
-    
-    
-    
+
     # gate data based on plot limits
     if(!rval_input$auto_focus){
       
@@ -727,18 +723,6 @@ observe({
         rectGate <- flowCore::rectangleGate(filterId="focus", choices()$axis_limits[gate_var])
         fs <- flowCore::Subset(fs, rectGate)
       }
-      # xlim <- choices()$axis_limits[[rval_input$xvar]]
-      # boundray_list[[]]
-      # boundaries <- matrix(xlim, nrow = 1)
-      # rownames(boundaries) <- rval_input$xvar
-      # colnames(boundaries) <- c("min", "max")
-      # if(!is.null(rval_input$yvar)){
-      #   ylim <- choices()$axis_limits[[rval_input$yvar]]
-      #   boundaries <- matrix(c(xlim, ylim), nrow = 2)
-      #   rownames(boundaries) <- c(rval_input$xvar, input$yvar)
-      #   colnames(boundaries) <- c("min", "max")
-      # }
-      # gate_focus <- flowCore::rectangleGate(.gate = boundaries)
       
     }
     
@@ -755,6 +739,7 @@ observe({
       plot_args[[var]] <- rval_input[[var]][1]
     }
     
+    # set the maximum number of cells to include in plot (default to 30000)
     plot_args[["max_nrow_to_plot"]] <- 3e4
     if(!is.null(rval_input$use_all_cells)){
       if(rval_input$use_all_cells){
@@ -762,6 +747,7 @@ observe({
       }
     }
     
+    # set parameter for geom_pointdensity (only for "dots" plot)
     plot_args[["transform_function"]] <- "identity"
     transformation <- choices()$transformation
     if(!is.null(rval$apply_trans)){
@@ -792,7 +778,7 @@ observe({
   plot_format <- eventReactive( c(params_update_plot_format(), 
                                   draw_gates()), {
     
-    print("format")
+    #print("format")
     
     plist <- draw_gates()
       
@@ -815,9 +801,7 @@ observe({
     
     if(use_ggcyto){
       plist <- lapply( plist, function(p){
-        print(class(p))
         p <- as.ggplot(p)
-        print(class(p))
         return(p)} )
     }
    
@@ -837,13 +821,10 @@ observe({
                          data_range <- get_plot_data_range(p)
                          options$axis_limits[names(data_range)] <- data_range
                        }
-                       
-                       #print(options$axis_limits)
-                       print("OK1")
+                       print(options$axis_limits)
                        p <- format_plot(p,
                                    options = options)
-                       print("OK2")
-                       p
+                       return(p)
                      })
    return(plist)
   })
@@ -863,7 +844,7 @@ observe({
     validate(need(all(rval_input$subset %in% choices()$subset), 
                   "All subsets not found in GatingSet"))
     
-    print("gate")
+    #print("gate")
     
     gate <- NULL
 
@@ -885,9 +866,6 @@ observe({
                          for(gate_name in setdiff(gate, "root")){
                            gate_int <- flowWorkspace::gs_pop_get_gate(rval$gating_set,
                                                                       gate_name)
-                           #p <- add_gate(p = p, gate = gate_int)
-                           #print(gate_int)
-                           #print(get_gate_coordinates(gate_int))
                            p <- add_gate_to_plot(p, gate_int)
                          }
                        }
@@ -901,42 +879,19 @@ observe({
 
   draw_polygon <- reactive({
 
-    print("poly")
-
-    # gate <- NULL
-    # if(!is.null(rval_input$show_gates)){
-    #   if(rval_input$show_gates){
-    #     gate <- rval_input$subset
-    #   }
-    # }
-    
+    #print("poly")
+ 
     polygon <- data.frame(x = polygon_gate$x,
                           y = polygon_gate$y
                           )
     
-    #print(polygon)
-    
     plist <- lapply( plot_format(),
                      function(p){
-                    
-                       print("OK")
-                       #print(polygon$x)
-                       #if(use_ggcyto){
-                        # p <- as.ggplot(p)
-
-                         if(!is.null(polygon$x)){
-                           p <- add_polygon_layer(p, 
-                                                  polygon = polygon, 
-                                                  idx_selected = polygon_gate$idx_selected)
-                         }
-                       #}
-                       # if(!is.null(gate)){
-                       #   for(gate_name in setdiff(gate, "root")){
-                       #     g <- choices()$gates[[gate_name]]$gate
-                       #     p <- add_gate(p, g)
-                       #   }
-                       # }
-                       #print("OK")
+                       if(!is.null(polygon$x)){
+                         p <- add_polygon_layer(p, 
+                                                polygon = polygon, 
+                                                idx_selected = polygon_gate$idx_selected)
+                       }
                        if(rval_input$zoom_on_data_points){
                          data_range <- get_plot_data_range(p)
                          xlim <- NULL
@@ -947,7 +902,6 @@ observe({
                          }
                          p <- p + coord_cartesian(xlim = xlim, ylim = ylim, expand = TRUE)
                        }
-                       #print("OK")
                        return(p)
                      })
     

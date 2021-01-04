@@ -1,7 +1,6 @@
 #' Identify and remove anomalies
 #' @param id shiny id
 #' @import shiny
-#' @importFrom DT dataTableOutput
 #' @importFrom shinyjs useShinyjs
 #' @export
 #' @examples 

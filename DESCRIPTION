@@ -52,7 +52,7 @@ Imports:
   flowAI
 LazyData: TRUE
 License: file LICENSE
-RoxygenNote: 7.1.0
+RoxygenNote: 7.1.1
 biocViews:
 Depends:
   R (>= 3.5.0)
