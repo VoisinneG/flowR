@@ -12,6 +12,7 @@ plot_gs(
   spill = NULL,
   metadata = NULL,
   gate_name = NULL,
+  Ncells = NULL,
   plot_type = "hexagonal",
   plot_args = list(),
   options = list()
