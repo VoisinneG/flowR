@@ -46,8 +46,10 @@ Imports:
   htmlwidgets,
   FlowSOM,
   mFilter,
+  plyr,
   changepoint,
-  pryr
+  pryr,
+  flowAI
 LazyData: TRUE
 License: file LICENSE
 RoxygenNote: 7.1.0

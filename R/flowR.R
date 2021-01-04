@@ -595,6 +595,7 @@ get_all_ancestors <- function(named_list, names){
   
 }
 
+#' Get all gate names from a GatingHierarchy
 #' @param gh a GatingHierarchy
 #' @importFrom flowWorkspace gs_pop_get_children
 gh_get_gate_names <- function(gh){
@@ -1044,8 +1045,10 @@ get_data_gs <- function(gs,
   if(is.null(sample)){sample <- flowWorkspace::sampleNames(gs)}
   if(is.null(subset)){subset <- gh_get_gate_names(gs[[1]])}
   
-  idx <- which(sample %in% flowWorkspace::sampleNames(gs))
-
+  #idx <- which(sample %in% flowWorkspace::sampleNames(gs))
+  idx <- match(sample, flowWorkspace::sampleNames(gs))
+  idx <- idx[!is.na(idx)]
+  
   if(length(idx) == 0){
     return(NULL)
   }
@@ -1391,7 +1394,7 @@ call_plot_function <- function(data,
 #' 'use_log10_count' : logical, transform bin counts using log10
 #' 'option' : name of the viridis palette
 #' @import ggplot2
-#' @import ggcyto
+#' @importFrom ggcyto ggcyto
 #' @importFrom viridis scale_fill_viridis
 plot_hexagonal <- function(args = list()){
   
@@ -1447,7 +1450,7 @@ plot_hexagonal <- function(args = list()){
 #' (If 'smooth' is TRUE, the inverse of 'bins' is used as the value for the bandwidth parameter 'bw')
 #' 'alpha' : transparency (between 0 and 1)
 #' @import ggplot2
-#' @import ggcyto
+#' @importFrom ggcyto ggcyto
 #' @importFrom ggridges geom_density_ridges
 plot_histogram <- function(args = list()){
   
@@ -1573,7 +1576,7 @@ plot_histogram <- function(args = list()){
 #' 'id.vars' : variable defining groups for which a label should be displayed 
 #' (superseded by 'color_var' and 'group_var')
 #' @import ggplot2
-#' @import ggcyto
+#' @importFrom ggcyto ggcyto
 #' @importFrom ggrepel geom_label_repel
 #' @importFrom ggpointdensity geom_pointdensity
 plot_dots <-function(args = list()){
@@ -1699,6 +1702,7 @@ plot_dots <-function(args = list()){
 #' 'alpha' : contour line transparency (between 0 and 1). If 'show_outliers' is TRUE, used to set outliers dot transparency.
 #' 'size' : contour line size. If 'show_outliers' is TRUE, used to set outliers dot size.
 #' @import ggplot2
+#' @importFrom ggcyto ggcyto
 plot_contour <-function(args = list()){
   
   plot_type <- "contour"
@@ -3007,7 +3011,9 @@ plot_gs <- function(gs,
 #' @param options  list of plot format options passed to \code{format_plot()}
 #' @param gate_name Names of the gates to add to the plot (if it is compatible with plot parameters).
 #' Ignored if NULL.
-#' @importFrom flowWorkspace gs_get_pop_paths gs_pop_get_gate sampleNames
+#' @importFrom flowWorkspace gs_get_pop_paths gh_pop_get_gate sampleNames
+#' @importFrom ggcyto as.ggplot
+
 #' @return a plot
 plot_gs_ggcyto <- function(gs,
                     sample = NULL,
@@ -3049,7 +3055,7 @@ plot_gs_ggcyto <- function(gs,
     }
   }
   
-  p <- as.ggplot(p)
+  p <- ggcyto::as.ggplot(p)
   
   p <- format_plot(p, options = options)
   

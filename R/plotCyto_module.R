@@ -70,7 +70,6 @@ plotCytoUI <- function(id) {
 #' @importFrom flowWorkspace gs_pop_get_children gs_pop_get_data sampleNames
 #' @importFrom flowCore parameters compensate rectangleGate Subset
 #' @import shiny
-#' @import ggcyto
 #' @export
 #' @rdname plotCytoUI
 plotCyto <- function(input, output, session,
@@ -674,7 +673,7 @@ observe({
     if(!use_ggcyto){
       return(list())
     }
-      print("raw ggcyto")
+      #print("raw ggcyto")
       
       plot_list <- list()
       
@@ -919,13 +918,12 @@ observe({
     
     plist <- lapply( plot_format(),
                      function(p){
-                       
-                       
-                       
+                    
                        print("OK")
                        #print(polygon$x)
                        #if(use_ggcyto){
                         # p <- as.ggplot(p)
+
                          if(!is.null(polygon$x)){
                            p <- add_polygon_layer(p, 
                                                   polygon = polygon, 
@@ -938,7 +936,7 @@ observe({
                        #     p <- add_gate(p, g)
                        #   }
                        # }
-                       print("OK")
+                       #print("OK")
                        if(rval_input$zoom_on_data_points){
                          data_range <- get_plot_data_range(p)
                          xlim <- NULL
@@ -949,7 +947,7 @@ observe({
                          }
                          p <- p + coord_cartesian(xlim = xlim, ylim = ylim, expand = TRUE)
                        }
-                       print("OK")
+                       #print("OK")
                        return(p)
                      })
     
