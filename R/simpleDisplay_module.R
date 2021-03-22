@@ -288,7 +288,10 @@ simpleDisplay <- function(input, output, session,
   
   output$ui_save <- renderUI({
     ns <- session$ns
-    downloadButton(ns("download_plot"), "Save plot")
+    x <- list()
+    x[[1]] <- downloadButton(ns("download_plot"), "Save plot")
+    x[[2]] <- downloadButton(ns("download_plot_data"), "Save plot data")
+    fluidRow(tagList(x))
   })
   
   output$ui_options_all <- renderUI({
@@ -383,7 +386,15 @@ simpleDisplay <- function(input, output, session,
       dev.off()
     }
   )
-
+  
+  output$download_plot_data <- downloadHandler(
+    filename = "plot_data.rda",
+    content = function(file) {
+      plot_data <- plot_list()
+      save(plot_data, file = file)
+    }
+  )
+  
   return( list( plot = plot_display, params = input) )
 }
 
@@ -411,17 +422,17 @@ simpleDisplay <- function(input, output, session,
 # 
 #   server <- function(input, output, session) {
 # 
-#     params <- reactiveValues(use_plotly = FALSE, 
-#                              width = 300, 
-#                              height = 300, 
-#                              max_height = 500, 
+#     params <- reactiveValues(use_plotly = FALSE,
+#                              width = 300,
+#                              height = 300,
+#                              max_height = 500,
 #                              min_size = 200,
 #                              nrow = 2,
 #                              title = "samples")
 # 
 #     plot_list <- reactive({
 # 
-#       load("../flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
+#       load("~/ownCloud/FlowR_project/flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
 #       fs <- build_flowset_from_df(df = res$cluster$data)
 #       gs <- GatingSet(fs)
 #       #add_gates_flowCore(gs, res$cluster$gates)
@@ -433,22 +444,22 @@ simpleDisplay <- function(input, output, session,
 #         # p
 # 
 # 
-#       # plist <- list()
-#       # plist[[1]] <- ggplot(iris, aes(x=Sepal.Length, y = Sepal.Width, color = Species)) +
-#       #   geom_point(alpha = 0.5)+
-#       #   facet_wrap(~Species)
-#       # 
-#       #  plist[[2]] <- ggplot(iris, aes(x=Species, y = Sepal.Length, fill = Species)) +
-#       #    geom_col(alpha = 0.5)
-#       # 
-#       # return(plist)
+#       plist <- list()
+#       plist[[1]] <- ggplot(iris, aes(x=Sepal.Length, y = Sepal.Width, color = Species)) +
+#         geom_point(alpha = 0.5)+
+#         facet_wrap(~Species)
 # 
-#       df <- get_data_gs(gs)
-#       df_cluster <- get_cluster(df, yvar = names(df)[4:7], y_trans = logicle_trans() )
-#       fSOM <- df_cluster$fSOM
-#       graphics::plot.new()
-#       print("plot")
-#       PlotPies(fSOM, cellTypes=as.factor(df$name))
+#        plist[[2]] <- ggplot(iris, aes(x=Species, y = Sepal.Length, fill = Species)) +
+#          geom_col(alpha = 0.5)
+# 
+#       return(plist)
+# 
+#       # df <- get_data_gs(gs)
+#       # df_cluster <- get_cluster(df, yvar = names(df)[4:7], y_trans = logicle_trans() )
+#       # fSOM <- df_cluster$fSOM
+#       # graphics::plot.new()
+#       # print("plot")
+#       # PlotPies(fSOM, cellTypes=as.factor(df$name))
 # 
 #       #heatmaply(matrix(runif(100), 50, 2))
 # 
@@ -462,11 +473,11 @@ simpleDisplay <- function(input, output, session,
 #     res <- callModule(simpleDisplay, "simple_display_module",
 #                plot_list = plot_list,
 #                params = params,
-#                save = FALSE,
+#                save = TRUE,
 #                multirow = FALSE)
 # 
 #   }
 # 
 #   shinyApp(ui, server)
 # 
-#}
+# }
