@@ -5,7 +5,7 @@ library("flowCore")
 data("GvHD")
 gs <- GatingSet(GvHD)
 
-fs <- read.ncdfFlowSet(files = "../flowR_utils/demo-data/JL04BMVLG-Valentin/Tumor_T_001_012.fcs")
+fs <- read.ncdfFlowSet(files = "~/ownCloud/FlowR_project/flowR_utils/demo-data/JL04BMVLG-Valentin/Tumor_T_001_012.fcs")
 #fs <- read.ncdfFlowSet(files = "../flowR_utils/demo-data/OC17BMGV/s1-Tube_001-006.fcs")
 
 gs <- GatingSet(fs)
