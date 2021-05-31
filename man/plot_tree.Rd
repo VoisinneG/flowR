@@ -6,15 +6,15 @@
 \usage{
 plot_tree(
   gates,
-  fontsize = 40,
-  rankdir = "LR",
-  shape = "ellipse",
-  fixedsize = FALSE
+  attrs = list(graph = list(rankdir = "LR"), node = list(fixedsize = FALSE, fillcolor =
+    "gray", fontsize = 40, shape = "ellipse"))
 )
 }
 \arguments{
 \item{gates}{a named list. Each list element should contain a item 'parent' with 
 the name of its parent list element}
+
+\item{attrs}{parameter passed to Rgraphviz::layoutGraph()}
 }
 \description{
 Build a tree graph from a named list

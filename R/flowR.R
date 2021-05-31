@@ -640,7 +640,7 @@ get_gates_from_gs <- function(gs){
 #' @importFrom flowWorkspace gs_get_pop_paths gs_pop_add recompute colnames
 add_gates_flowCore <- function(gs, gates){
   
-  print(sampleNames(gs))
+  #print(sampleNames(gs))
   
   #gates are expected to share the same hierarchy and dimensions across samples
   # so focus only on the first sample
@@ -965,11 +965,11 @@ get_parameters_gs <- function(gs){
 #' @param gs a GatingSet
 #' @param spill spillover matrix. If NULL, uncompensated data is used for gating
 #' @param subset Name of the subset
-#' @importFrom flowWorkspace GatingSet gs_pop_get_data
+#' @importFrom flowWorkspace GatingSet gs_pop_get_data sampleNames
 #' @importFrom flowCore compensate
 gs_get_fs_subset <- function(gs, spill = NULL, subset){
   
-  fs <- gs@data[sampleNames(gs)]
+  fs <- gs@data[flowWorkspace::sampleNames(gs)]
   gates <- get_gates_from_gs(gs) 
   
   if(!is.null(spill)){
@@ -1025,7 +1025,7 @@ getPopStatsPlus <- function(gs, spill = NULL, filter = NULL){
 #' (as returned by \code{pData(gs)$name})
 #' @param subset Names of subsets from the GatingSet 
 #' (as returned by \code{gh_get_gate_names(gs[[1]])})
-#' @param Ncells number of cells to sample from the GatingSet
+#' @param Ncells Maximum number of cells per sample and subset sampled from the GatingSet
 #' @param spill spillover matrix. If NULL, uncompensated data is used for gating. 
 #' Uncompensated data is returned if parameter 'return_comp_data' is TRUE.
 #' @param return_comp_data logical. Should compensated data be returned ?
@@ -1356,7 +1356,7 @@ get_plot_data <- function(gs,
 ### Plotting ##################################################################################
 
 #' Generates a plot from data
-#' @param df data.frame with plot data (as returned by \code{get_plot_data})
+#' @param data data.frame with plot data (as returned by \code{get_plot_data})
 #' @param plot_type Name of the type of plot to generate. 
 #' Available types are 'hexagonal', 'histogram', 'dots', 'contour' (for single cell data) and 
 #' 'heatmap', 'bar', 'tile', 'pca' (for aggregated data). 
@@ -1593,6 +1593,7 @@ plot_dots <-function(args = list()){
   group_var <- NULL
   alpha <- 0.1
   size <- 0.1
+  pch <- 16
   
   if(length(unlist(args[c("xvar", "yvar")])) != 2 ){
     warning("Incorrect dimensions")
@@ -1667,7 +1668,7 @@ plot_dots <-function(args = list()){
                                                adjust = adjust_default * adjust)
   }else{
     p <- p +  geom_point(alpha = alpha,
-                          size = size)
+                          size = size, pch=pch)
   }
   
 
@@ -1710,10 +1711,12 @@ plot_contour <-function(args = list()){
   color_var <- NULL
   group_var <- NULL
   
-  bins <- 30
+  bins <- 50
+  breaks <- 10^(seq(from = -1.5, to = 0, length.out = 30))
   alpha <- 0.75
   size <- 0.2
   show_outliers <- FALSE
+  pch <- 16
   
   if(length(unlist(args[c("xvar", "yvar")])) != 2 ){
     warning("Incorrect dimensions")
@@ -1770,7 +1773,7 @@ plot_contour <-function(args = list()){
   }
   
   if(show_outliers){
-    p <- p + geom_point(size = size, alpha = alpha)
+    p <- p + geom_point(size = size, alpha = alpha, pch = pch)
     size <- 0.1
     alpha <- 1
   }
@@ -1778,20 +1781,24 @@ plot_contour <-function(args = list()){
   
   
    if(!is.null(color_var)){
-    
+     
      if(show_outliers){
        p <- p + stat_density2d(aes_string(colour = color_var, group = group_var),
                                fill = "white",
                                size=0,
                                geom="polygon",
-                               n=bins
+                               n=bins,
+                               contour_var = "ndensity",
+                               breaks = breaks
        )
      }
      
     p <- p + geom_density2d(aes_string(colour = color_var, group = group_var),
                             size=size,
                             alpha= alpha,
-                            n=bins
+                            n=bins,
+                            contour_var = "ndensity",
+                            breaks = breaks
     )
       
    }else{
@@ -1800,7 +1807,9 @@ plot_contour <-function(args = list()){
                                fill = "white",
                                size=0,
                                geom="polygon",
-                               n=bins
+                               n=bins,
+                               contour_var = "ndensity",
+                               breaks = breaks
        )
      }
      
@@ -1808,7 +1817,9 @@ plot_contour <-function(args = list()){
                              color = "black",
                              size=size,
                              alpha= alpha,
-                             n=bins
+                             n=bins,
+                             contour_var = "ndensity",
+                             breaks = breaks
      )
     
   }
@@ -1918,7 +1929,8 @@ plot_bar <-function(args = list()){
   group_var <- NULL
   color_var <- NULL
   show.legend <- TRUE
-  
+  pch <- 16
+    
   if(is.null(args["df"])){
     return(NULL)
   }
@@ -1959,6 +1971,7 @@ plot_bar <-function(args = list()){
                 position = position_jitter(width = 0.25, height = 0),
                 alpha = 0.5,
                 size = 3,
+                pch = pch,
                 show.legend = show.legend)
 
   
@@ -2043,6 +2056,7 @@ plot_pca <-function(args = list()){
   color_var <- NULL
   label_var <- "name"
   scale <- FALSE
+  pch <- 16
   
   if(is.null(args["df"])){
     return(NULL)
@@ -2094,7 +2108,7 @@ plot_pca <-function(args = list()){
                                  y=as.name(PCy),
                                  color = color_var, 
                                  label = label_var)) +
-    geom_point() +
+    geom_point(pch=pch) +
     geom_text_repel(show.legend = FALSE)
   
   return(p)
@@ -2184,13 +2198,13 @@ add_polygon_layer <- function(p,
                        fill="red",
                        alpha=0.05) +
           geom_point(data = polygon, mapping = aes(x=x, y=y), 
-                     color = "red", inherit.aes = FALSE, alpha = 0.5, size = 2) +
+                     color = "red", inherit.aes = FALSE, alpha = 0.5, size = 2, pch=16) +
           geom_point(data = polygon[length(polygon$x)-1, ], mapping = aes(x=x, y=y), 
-                     shape = 21, color = "red", fill = NA, inherit.aes = FALSE, alpha = 0.5, size = 6)
+                     shape = 21, color = "red", fill = NA, inherit.aes = FALSE, alpha = 0.5, size = 6, pch=16)
         
         if(!is.null(idx_selected)){
           p <- p + geom_point(data = polygon[idx_selected, ], mapping = aes(x=x, y=y), shape = 21,
-                              color = "red", fill = "yellow", inherit.aes = FALSE, alpha = 0.5, size = 6)
+                              color = "red", fill = "yellow", inherit.aes = FALSE, alpha = 0.5, size = 6, pch=16)
         }
           
         if(!is.null(label)){
@@ -2391,14 +2405,17 @@ get_plot_data_range <- function(p){
 #' Build a tree graph from a named list
 #' @param gates a named list. Each list element should contain a item 'parent' with 
 #' the name of its parent list element
+#' @param attrs parameter passed to Rgraphviz::layoutGraph()
 #' @importFrom graph addEdge nodes
 #' @importFrom Rgraphviz renderGraph layoutGraph
 #' @importFrom methods new
 plot_tree <- function(gates, 
-                      fontsize = 40, 
-                      rankdir = "LR", 
-                      shape = "ellipse", 
-                      fixedsize = FALSE){
+                      attrs = list(graph=list(rankdir="LR"),
+                                   node=list(fixedsize = FALSE,
+                                             fillcolor = "gray",
+                                             fontsize = 40,
+                                             shape = "ellipse"))
+                      ){
   
   gR = methods::new("graphNEL", nodes = union("root", names(gates)), edgemode = "directed")
   
@@ -2416,12 +2433,7 @@ plot_tree <- function(gates,
   p <- Rgraphviz::renderGraph(
     Rgraphviz::layoutGraph(gR,
                            nodeAttrs=nAttrs,
-                           attrs=list(graph=list(rankdir=rankdir),
-                                      node=list(fixedsize = fixedsize,
-                                                fillcolor = "gray",
-                                                fontsize = fontsize,
-                                                shape = shape)
-                           )
+                           attrs=attrs
     )
   )
   return(p)
@@ -2709,6 +2721,7 @@ format_plot <- function(p,
 #' @param options  list of plot format options passed to \code{format_plot()}
 #' @param gate_name Names of the gates to add to the plot (if it is compatible with plot parameters).
 #' Ignored if NULL.
+#' @param Ncells Maximum number of cells per sample and subset. If NULL, all cells are used.
 #' @importFrom flowWorkspace gs_get_pop_paths gh_pop_get_gate sampleNames
 #' @return a plot
 plot_gs <- function(gs,
@@ -2759,8 +2772,6 @@ plot_gs <- function(gs,
 }
 
 #' Plot a GatingSet
-#' @param df a data.frame with plot data resulting from a call of \code{get_plot_data}. 
-#' Supersedes parameters 'gs', 'sample', 'spill', 'metadata'
 #' @param gs a GatingSet
 #' @param sample Names of samples from the GatingSet 
 #' (as returned by \code{pData(gs)$name})
@@ -2911,7 +2922,7 @@ plot_stat <- function(df = NULL,
   
   plot_args$annotation_vars <- unique(c("name", "subset", names(metadata)))
   
-  p <- call_plot_function(df = df_stat,
+  p <- call_plot_function(data = df_stat,
                           plot_type = plot_type,
                           plot_args = plot_args)
   
@@ -2939,7 +2950,7 @@ plot_stat <- function(df = NULL,
 #' @param options  list of plot format options passed to \code{format_plot()}
 #' @return a list of ggplot objects
 #' @importFrom flowWorkspace gs_get_pop_paths gs_pop_get_parent gs_pop_get_children sampleNames
-plot_gh <- function( gs, 
+  plot_gh <- function( gs, 
                       df = NULL,
                       sample = NULL,
                       Ncells = NULL,
@@ -3448,7 +3459,8 @@ get_cluster <- function(df,
 #' \dontrun{
 #' utils::data("GvHD", package = "flowCore")
 #' gs <- GatingSet(GvHD)
-#' df <- get_data_gs(gs = gs, sample = flowWorkspace::sampleNames(gs)[1:3], subset = "root", Ncells = 1000)
+#' samples <- flowWorkspace::sampleNames(gs)[1:3]
+#' df <- get_data_gs(gs = gs, sample = samples, subset = "root", Ncells = 1000)
 #' fs <- build_flowset_from_df(df = df, origin = gs@data)
 #' pData(fs)}
 build_flowset_from_df <- function(df,
@@ -3484,7 +3496,7 @@ build_flowset_from_df <- function(df,
           par@data$name <- as.character(par@data$name)
           par@data$desc <- as.character(par@data$desc)
           
-          desc <- description(origin[[idx]])
+          desc <- flowCore::description(origin[[idx]])
           #desc <- origin$desc[[idx]]
           new_par <- setdiff(chanel_col, par@data$name)
           npar <- length(par@data$name)

@@ -23,7 +23,7 @@ get_data_gs(
 \item{subset}{Names of subsets from the GatingSet 
 (as returned by \code{gh_get_gate_names(gs[[1]])})}
 
-\item{Ncells}{number of cells to sample from the GatingSet}
+\item{Ncells}{Maximum number of cells per sample and subset sampled from the GatingSet}
 
 \item{spill}{spillover matrix. If NULL, uncompensated data is used for gating. 
 Uncompensated data is returned if parameter 'return_comp_data' is TRUE.}

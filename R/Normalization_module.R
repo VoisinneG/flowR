@@ -2,36 +2,6 @@
 #' @param id shiny id
 #' @import shiny
 #' @importFrom shinyjs useShinyjs
-#' @export
-#' @examples 
-#' \dontrun{
-#' if (interactive()){
-#' 
-#'   ui <- dashboardPage(
-#'     dashboardHeader(title = "premessa"),
-#'     sidebar = dashboardSidebar(disable = TRUE),
-#'     body = dashboardBody(
-#'       NormalizationUI("module")
-#'     )
-#'   )
-#' 
-#'   server <- function(input, output, session) {
-#'     rval <- reactiveValues()
-#'     observe({
-#'      #files <- path of you're files 
-#'      fs <- read.ncdfFlowSet(files = files)
-#'       rval$gating_set <- flowWorkspace::GatingSet(fs)
-#'     })
-#'     res <- callModule(Normalization, "module", rval = rval)
-#'   }
-#'   
-#'   shinyApp(ui, server)
-#' 
-#' }}
-
-
-
-#'@import shiny
 #'@export
 NormalizationUI <- function(id){
   
@@ -106,9 +76,15 @@ NormalizationUI <- function(id){
   )
 }
 
-#'@import premessa
-#'@importFrom flowWorkspace colnames gs_get_pop_paths gs_pop_add gs_pop_remove
-#'@export
+#' Normalization module server function
+#' @param input shiny input
+#' @param output shiny output
+#' @param session shiny session
+#' @param rval A reactive values object
+#' @import premessa
+#' @importFrom flowWorkspace colnames gs_get_pop_paths gs_pop_add gs_pop_remove
+#' @export
+#' @rdname NormalizationUI
 Normalization <- function(input, output, session, rval){
   # Setup temporary gs reactiveValues
   

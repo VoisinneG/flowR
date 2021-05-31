@@ -78,8 +78,8 @@ simpleDisplayUI <- function(id){
 #'   \item{use_plotly}{: use plotly library to render an interactive plot}
 #'   \item{top}{: main title}
 #'  }
-#' @param nrow Initial number of rows in the layout
-#' @param size Initial size of a single plot (in pixels)
+#' @param save logical. Add buttons to save plot and plot data?
+#' @param multirow logical. Allow plots to be displayed on multiple rows?
 #' @return a reactivevalues object with:
 #' \describe{
 #'   \item{plot}{: the plots displayed}

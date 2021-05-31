@@ -2,15 +2,28 @@
 % Please edit documentation in R/Clean_module.R
 \name{CleanUI}
 \alias{CleanUI}
+\alias{Clean}
 \title{Identify and remove anomalies}
 \usage{
 CleanUI(id)
+
+Clean(input, output, session, rval)
 }
 \arguments{
 \item{id}{shiny id}
+
+\item{input}{shiny input}
+
+\item{output}{shiny output}
+
+\item{session}{shiny session}
+
+\item{rval}{A reactive values object}
 }
 \description{
 Identify and remove anomalies
+
+Clean module server function
 }
 \examples{
 \dontrun{

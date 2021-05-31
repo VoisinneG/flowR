@@ -674,12 +674,15 @@ Gating <- function(input, output, session, rval) {
     }
 
     fontsize <- ifelse(is.null(input$fontsize), 10, input$fontsize)
+    shape <- ifelse(is.null(input$shape), "ellipse", input$shape)
+    fixedsize <- ifelse(is.null(input$fixedsize), FALSE, input$fixedsize)
     
     p <- plot_tree(gates,
-                   fontsize = fontsize,
-                   rankdir = rankdir,
-                   shape = ifelse(is.null(input$shape), "ellipse", input$shape),
-                   fixedsize = ifelse(is.null(input$fixedsize), FALSE, input$fixedsize))
+                   attrs = list(graph=list(rankdir=rankdir),
+                                node=list(fixedsize = fixedsize,
+                                          fillcolor = "gray",
+                                          fontsize = fontsize,
+                                          shape = shape)))
 
     return(p)
   })

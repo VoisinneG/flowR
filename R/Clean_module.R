@@ -223,6 +223,11 @@ CleanUI<-function(id){
   
 }
 
+#' Clean module server function
+#' @param input shiny input
+#' @param output shiny output
+#' @param session shiny session
+#' @param rval A reactive values object
 #' @importFrom flowCore exprs keyword
 #' @importFrom flowWorkspace pData gslist_to_gs GatingSetList
 #' @importFrom scales pretty_breaks
@@ -232,6 +237,7 @@ CleanUI<-function(id){
 #' @importFrom shinyjs enable disable
 #' @import flowAI
 #' @export
+#' @rdname CleanUI
 Clean <- function(input, output, session, rval) {
   
   ### Call modules ###################################################################
@@ -1015,9 +1021,9 @@ Clean <- function(input, output, session, rval) {
     condition_reini()
     
     plot_rate <- flowAI:::flow_rate_plot(res()$flowRateQCList[[input$select_one_sample]])
-    plot_rate <- plot_rate + ggplot2:::geom_hline(yintercept = c(rateSlider()[1], rateSlider()[2]), color="blue",
+    plot_rate <- plot_rate + ggplot2::geom_hline(yintercept = c(rateSlider()[1], rateSlider()[2]), color="blue",
                                                   linetype = "longdash", size = 1.2, show_guide = TRUE)
-    plot_rate <- plot_rate + ggplot2:::geom_vline(xintercept = c(timeSlider()[1], timeSlider()[2]), color="blue",
+    plot_rate <- plot_rate + ggplot2::geom_vline(xintercept = c(timeSlider()[1], timeSlider()[2]), color="blue",
                                                   linetype = "longdash", size = 1.2, show_guide = TRUE)
     plot_rate
   })

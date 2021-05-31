@@ -38,6 +38,8 @@ Must have a column \code{name} used for mapping.}
 \item{gate_name}{Names of the gates to add to the plot (if it is compatible with plot parameters).
 Ignored if NULL.}
 
+\item{Ncells}{Maximum number of cells per sample and subset. If NULL, all cells are used.}
+
 \item{plot_type}{name of the plot type}
 
 \item{plot_args}{list of plot parameters passed to the plot function. 

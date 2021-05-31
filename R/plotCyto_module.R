@@ -62,6 +62,7 @@ plotCytoUI <- function(id) {
 #'   \item{x}{vector of x coordinates}
 #'   \item{y}{vector of y coordinates}
 #' }
+#' @param use_ggcyto logical, use the ggcyto package to generate plots
 #' @return A reactivevalues object with the following elements :
 #' \describe{
 #'   \item{plot}{a plot or a list of plots}

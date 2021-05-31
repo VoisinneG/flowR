@@ -117,6 +117,8 @@ ZenithUI <- function(id) {
 #' @rdname ZenithUI
 Zenith <- function(input, output, session, rval) {
   
+  rval_mod <- reactiveValues( gs = NULL )
+  
   observe({
     if(is.null(rval$update_gs)){
       rval$update_gs <- 0
@@ -345,7 +347,7 @@ Zenith <- function(input, output, session, rval) {
     df[["mean_score_gluc_dep"]] <- df_metabo[["mean_score_gluc_dep"]][idx_match]
     df[["mean_score_mito_dep"]] <- df_metabo[["mean_score_mito_dep"]][idx_match]
     
-    gs <- build_gatingset_from_df(df = df, gs_origin = rval$gating_set)
+    rval_mod$gs <- build_gatingset_from_df(df = df, gs_origin = rval$gating_set)
     
     # fs <- build_flowset_from_df(df, 
     #                             origin = rval$gating_set@data)

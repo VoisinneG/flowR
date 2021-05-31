@@ -2,39 +2,26 @@
 % Please edit documentation in R/Normalization_module.R
 \name{NormalizationUI}
 \alias{NormalizationUI}
+\alias{Normalization}
 \title{Normalize data from beads}
 \usage{
 NormalizationUI(id)
+
+Normalization(input, output, session, rval)
 }
 \arguments{
 \item{id}{shiny id}
+
+\item{input}{shiny input}
+
+\item{output}{shiny output}
+
+\item{session}{shiny session}
+
+\item{rval}{A reactive values object}
 }
 \description{
 Normalize data from beads
-}
-\examples{
-\dontrun{
-if (interactive()){
 
-  ui <- dashboardPage(
-    dashboardHeader(title = "premessa"),
-    sidebar = dashboardSidebar(disable = TRUE),
-    body = dashboardBody(
-      NormalizationUI("module")
-    )
-  )
-
-  server <- function(input, output, session) {
-    rval <- reactiveValues()
-    observe({
-     #files <- path of you're files 
-     fs <- read.ncdfFlowSet(files = files)
-      rval$gating_set <- flowWorkspace::GatingSet(fs)
-    })
-    res <- callModule(Normalization, "module", rval = rval)
-  }
-  
-  shinyApp(ui, server)
-
-}}
+Normalization module server function
 }
