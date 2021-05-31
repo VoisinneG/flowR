@@ -3153,9 +3153,12 @@ matrix_equal <- function(x, y){
 }
 #' @importFrom htmlwidgets JS
 #' @importFrom DT datatable formatRound formatStyle styleInterval
+#' @importFrom magrittr %>%
 #' @importFrom RColorBrewer brewer.pal
 format_style_comp_matrix <- function(df, editable = 'none', rownames = TRUE){
   
+  `%>%` <- DT::`%>%`() 
+    
   df <- as.matrix(df)
   do_formatting <- is.numeric(df[1])
   
