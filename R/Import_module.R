@@ -1,4 +1,4 @@
-utils::globalVariables("GvHD")
+utils::globalVariables(c("GvHD", "Bcells"))
 
 #' Import data and build a GatingSet
 #' @param id shiny id

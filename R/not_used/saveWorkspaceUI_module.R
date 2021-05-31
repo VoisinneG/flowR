@@ -1,9 +1,8 @@
 #' @title saveWorkspaceUI and saveWorkspoce
 #' @description  A shiny Module that deals with metadata
 #' @param id shiny id
-#' @importFrom shinydashboard box tabBox
+#' @importFrom shinydashboard tabBox
 #' @import shiny
-#' @import DT
 saveWorkspaceUI <- function(id) {
   # Create a namespace function using the provided id
   ns <- NS(id)
@@ -31,15 +30,14 @@ saveWorkspaceUI <- function(id) {
 #' @param output shiny output
 #' @param session shiny session
 #' @return a reactivevalues object with values "df_files", "flow_set_imported" and "gates_flowCore"
-#' @import flowWorkspace
-#' @import flowCore
+#' @importFrom flowWorkspace GatingSet colnames gs_pop_get_gate
+#' @importFrom flowCore asinhtGml2_trans transformList transform compensate
+#' @importFrom CytoML GatingSet2flowJo GatingSet2cytobank
+#' @importFrom scales trans_new
 #' @import shiny
-#' @import DT
 #' @export
 #' @rdname saveWorkspaceUI
 saveWorkspace <- function(input, output, session, rval) {
-  
-  `%then%` <- shiny:::`%OR%`
   
   output$export_gating_set <- downloadHandler(
     
@@ -56,11 +54,11 @@ saveWorkspace <- function(input, output, session, rval) {
       ####################################################
       #transform
       if(input$export_format == "FlowJo"){
-        trans.def <- trans_new("flowJo_linear", 
+        trans.def <- scales::trans_new("flowJo_linear", 
                                transform = function(x){x}, 
                                inverse = function(x){x})
       }else if(input$export_format == "Cytobank"){
-        trans.def <- asinhtGml2_trans()
+        trans.def <- flowCore::asinhtGml2_trans()
       }
       
       
@@ -70,9 +68,9 @@ saveWorkspace <- function(input, output, session, rval) {
         trans_list[[i]] <- trans.def
       }
       
-      trans <- transformerList(colnames(gs), trans_list)
+      trans <- flowCore::transformList(flowWorkspace::colnames(gs), trans_list)
       
-      gs <- transform(gs, trans)
+      gs <- flowCore::transform(gs, trans)
       print(gs@transformation)
       
       ####################################################
@@ -81,12 +79,12 @@ saveWorkspace <- function(input, output, session, rval) {
       if(input$apply_comp & !is.null(rval$df_spill)){
         comp <- rval$df_spill
       }else{
-        comp <- diag( length(colnames(rval$flow_set)))
-        colnames(comp) <- colnames(rval$flow_set)
+        comp <- diag( length(flowWorkspace::colnames(rval$flow_set)))
+        colnames(comp) <- flowWorkspace::colnames(rval$flow_set)
         row.names(comp) <- colnames(comp)
       }
       comp <- compensation(comp)
-      gs <- compensate(gs, comp)
+      gs <- flowCore::compensate(gs, comp)
       print(gs@compensation)
       
       
@@ -103,7 +101,7 @@ saveWorkspace <- function(input, output, session, rval) {
       
       gs <- add_gates_flowCore(gs, gates)
       
-      g <- getGate(gs, "/live")
+      g <- flowWorkspace::gs_pop_get_gate(gs, "/live")
       print(g[[1]]@boundaries)
       
       #gs <- rval$gating_set

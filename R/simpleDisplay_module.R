@@ -78,8 +78,8 @@ simpleDisplayUI <- function(id){
 #'   \item{use_plotly}{: use plotly library to render an interactive plot}
 #'   \item{top}{: main title}
 #'  }
-#' @param nrow Initial number of rows in the layout
-#' @param size Initial size of a single plot (in pixels)
+#' @param save logical. Add buttons to save plot and plot data?
+#' @param multirow logical. Allow plots to be displayed on multiple rows?
 #' @return a reactivevalues object with:
 #' \describe{
 #'   \item{plot}{: the plots displayed}
@@ -288,7 +288,10 @@ simpleDisplay <- function(input, output, session,
   
   output$ui_save <- renderUI({
     ns <- session$ns
-    downloadButton(ns("download_plot"), "Save plot")
+    x <- list()
+    x[[1]] <- downloadButton(ns("download_plot"), "Save plot")
+    x[[2]] <- downloadButton(ns("download_plot_data"), "Save plot data")
+    fluidRow(tagList(x))
   })
   
   output$ui_options_all <- renderUI({
@@ -383,7 +386,15 @@ simpleDisplay <- function(input, output, session,
       dev.off()
     }
   )
-
+  
+  output$download_plot_data <- downloadHandler(
+    filename = "plot_data.rda",
+    content = function(file) {
+      plot_data <- plot_list()
+      save(plot_data, file = file)
+    }
+  )
+  
   return( list( plot = plot_display, params = input) )
 }
 
@@ -411,24 +422,24 @@ simpleDisplay <- function(input, output, session,
 # 
 #   server <- function(input, output, session) {
 # 
-#     params <- reactiveValues(use_plotly = FALSE, 
-#                              width = 300, 
-#                              height = 300, 
-#                              max_height = 500, 
+#     params <- reactiveValues(use_plotly = FALSE,
+#                              width = 300,
+#                              height = 300,
+#                              max_height = 500,
 #                              min_size = 200,
 #                              nrow = 2,
 #                              title = "samples")
 # 
 #     plot_list <- reactive({
 # 
-#       load("../flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
+#       load("~/ownCloud/FlowR_project/flowR_utils/demo-data/Rafa2Gui/analysis/cluster.rda")
 #       fs <- build_flowset_from_df(df = res$cluster$data)
 #       gs <- GatingSet(fs)
-#       #add_gates_flowCore(gs, res$cluster$gates)
-#       #plot_gh(gs)
+#       add_gates_flowCore(gs, res$cluster$gates)
+#       plot_gh(gs, plot_type = "dots")
 # 
 #         # gates <- get_gates_from_ws(
-#         #      "../flowR_utils/demo-data/2019-Exp-Tumor-042 (Lung Carcinoma)/Classical analysis 06012020.wsp")
+#         #      "~/ownCloud/FlowR_project/flowR_utils/demo-data/2019-Exp-Tumor-042 (Lung Carcinoma)/Classical analysis 06012020.wsp")
 #         # p <- plot_tree(gates, fontsize = 40, rankdir = NULL, shape = "ellipse", fixedsize = TRUE)
 #         # p
 # 
@@ -443,12 +454,12 @@ simpleDisplay <- function(input, output, session,
 #       # 
 #       # return(plist)
 # 
-#       df <- get_data_gs(gs)
-#       df_cluster <- get_cluster(df, yvar = names(df)[4:7], y_trans = logicle_trans() )
-#       fSOM <- df_cluster$fSOM
-#       graphics::plot.new()
-#       print("plot")
-#       PlotPies(fSOM, cellTypes=as.factor(df$name))
+#       # df <- get_data_gs(gs)
+#       # df_cluster <- get_cluster(df, yvar = names(df)[4:7], y_trans = logicle_trans() )
+#       # fSOM <- df_cluster$fSOM
+#       # graphics::plot.new()
+#       # print("plot")
+#       # PlotPies(fSOM, cellTypes=as.factor(df$name))
 # 
 #       #heatmaply(matrix(runif(100), 50, 2))
 # 
@@ -462,11 +473,11 @@ simpleDisplay <- function(input, output, session,
 #     res <- callModule(simpleDisplay, "simple_display_module",
 #                plot_list = plot_list,
 #                params = params,
-#                save = FALSE,
+#                save = TRUE,
 #                multirow = FALSE)
 # 
 #   }
 # 
 #   shinyApp(ui, server)
 # 
-#}
+# }

@@ -12,6 +12,7 @@ plot_gs(
   spill = NULL,
   metadata = NULL,
   gate_name = NULL,
+  Ncells = NULL,
   plot_type = "hexagonal",
   plot_args = list(),
   options = list()
@@ -36,6 +37,8 @@ Must have a column \code{name} used for mapping.}
 
 \item{gate_name}{Names of the gates to add to the plot (if it is compatible with plot parameters).
 Ignored if NULL.}
+
+\item{Ncells}{Maximum number of cells per sample and subset. If NULL, all cells are used.}
 
 \item{plot_type}{name of the plot type}
 

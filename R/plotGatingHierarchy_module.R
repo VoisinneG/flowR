@@ -153,9 +153,6 @@ plotGatingHierarchy <- function(input, output, session,
     options$transformation <- transformation
     options$axis_labels <- axis_labels
     options$axis_limits <- axis_limits
-
-    print("spill")
-    print(spill)
     
     p <- plot_gh( gs = rval$gating_set,
                   sample = rval_plot$sample,

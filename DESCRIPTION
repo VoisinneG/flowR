@@ -13,6 +13,9 @@ Imports:
   openCyto,
   flowWorkspace (>= 3.34.1),
   flowCore,
+  ggcyto,
+  ggpointdensity,
+  premessa,
   ncdfFlow,
   DT,
   plotly,
@@ -46,11 +49,13 @@ Imports:
   htmlwidgets,
   FlowSOM,
   mFilter,
+  plyr,
   changepoint,
-  pryr
+  pryr,
+  flowAI
 LazyData: TRUE
 License: file LICENSE
-RoxygenNote: 7.0.2
+RoxygenNote: 7.1.1
 biocViews:
 Depends:
   R (>= 3.5.0)

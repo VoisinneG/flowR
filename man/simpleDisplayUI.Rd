@@ -35,9 +35,9 @@ with the following elements (not mandatory):
   \item{top}{: main title}
  }}
 
-\item{nrow}{Initial number of rows in the layout}
+\item{save}{logical. Add buttons to save plot and plot data?}
 
-\item{size}{Initial size of a single plot (in pixels)}
+\item{multirow}{logical. Allow plots to be displayed on multiple rows?}
 }
 \value{
 a reactivevalues object with:

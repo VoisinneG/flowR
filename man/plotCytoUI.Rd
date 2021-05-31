@@ -65,6 +65,8 @@ Must contain elements :
   \item{x}{vector of x coordinates}
   \item{y}{vector of y coordinates}
 }}
+
+\item{use_ggcyto}{logical, use the ggcyto package to generate plots}
 }
 \value{
 A reactivevalues object with the following elements :

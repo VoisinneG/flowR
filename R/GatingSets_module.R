@@ -89,6 +89,7 @@ GatingSetsUI <- function(id) {
 #' @importFrom graph addEdge
 #' @importFrom Rgraphviz renderGraph layoutGraph
 #' @importFrom methods new
+#' @importFrom ncdfFlow as.flowSet
 #' @export
 #' @rdname GatingSetsUI
 GatingSets <- function(input, output, session, rval) {
@@ -163,7 +164,7 @@ GatingSets <- function(input, output, session, rval) {
                         return_comp_data = FALSE)
       
       res[[input$gating_set]] <- list(data = df,
-                                      flow_set = gs@data,
+                                      flow_set = ncdfFlow::as.flowSet(gs@data),
                                       metadata = pData(gs),
                                       compensation = gs@compensation,
                                       transformation = gs@transformation,
@@ -199,7 +200,7 @@ GatingSets <- function(input, output, session, rval) {
         name <- names(rval$gating_set_list)[i]
         
         res[[name]] <- list(data = df,
-                            flow_set = gs@data,
+                            flow_set = ncdfFlow::as.flowSet(gs@data),
                             metadata = pData(gs),
                             compensation = gs@compensation,
                             transformation = gs@transformation,

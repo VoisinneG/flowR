@@ -58,7 +58,8 @@ TransformUI <- function(id) {
                            textInput(ns("param_desc"), label = "Description (first parameter only)", value = ""),
                            selectInput(ns("trans"), "transformation",
                                        choices = c("identity", 
-                                                   "logicle", 
+                                                   "flowjo_biexp_trans",
+                                                   #"logicle",
                                                    "asinh",
                                                    "log"), 
                                        selected = "identity"),
@@ -104,7 +105,7 @@ TransformUI <- function(id) {
 #' @param rval A reactive values object
 #' @return The updated reactiveValues object \code{rval}
 #' @import shiny
-#' @importFrom flowWorkspace logicle_trans flowjo_fasinh_trans
+#' @importFrom flowWorkspace logicle_trans flowjo_biexp_trans
 #' @importFrom scales log_trans identity_trans
 #' @importFrom flowCore parameters description
 #' @importFrom DT renderDT dataTableProxy editData replaceData
@@ -121,7 +122,12 @@ Transform <- function(input, output, session, rval) {
                                       "w" = 0.5,
                                       "t" = 262144,
                                       "m" = 4.5,
-                                      "a" = 0
+                                      "a" = 0,
+                                      "channelRange" = 4096, 
+                                      "maxValue" = 262144, 
+                                      "pos" = 4.5, 
+                                      "neg" = 0, 
+                                      "widthBasis" = -10
                                       )
   })
   
@@ -147,15 +153,26 @@ Transform <- function(input, output, session, rval) {
     }else if(input$trans %in% c('asinh')){
       x[[1]] <- numericInput(ns("scale"), label = "scale", 
                              value = rval_mod$trans_parameters[["scale"]])
-    }else if(input$trans == 'logicle'){
-      x[[1]] <- numericInput(ns("w"), label = "w", 
-                             value = rval_mod$trans_parameters[["w"]])
-      x[[2]] <- numericInput(ns("t"), label = "t", 
-                             value = rval_mod$trans_parameters[["t"]])
-      x[[3]] <- numericInput(ns("m"), label = "m", 
-                             value = rval_mod$trans_parameters[["m"]])
-      x[[4]] <- numericInput(ns("a"), label = "a", 
-                             value = rval_mod$trans_parameters[["a"]])
+    # }else if(input$trans == 'logicle'){
+    #   x[[1]] <- numericInput(ns("w"), label = "w", 
+    #                          value = rval_mod$trans_parameters[["w"]])
+    #   x[[2]] <- numericInput(ns("t"), label = "t", 
+    #                          value = rval_mod$trans_parameters[["t"]])
+    #   x[[3]] <- numericInput(ns("m"), label = "m", 
+    #                          value = rval_mod$trans_parameters[["m"]])
+    #   x[[4]] <- numericInput(ns("a"), label = "a", 
+    #                          value = rval_mod$trans_parameters[["a"]])
+    }else if(input$trans == 'flowjo_biexp_trans'){
+      x[[1]] <- numericInput(ns("channelRange"), label = "channelRange", 
+                             value = rval_mod$trans_parameters[["channelRange"]])
+      x[[2]] <- numericInput(ns("maxValue"), label = "maxValue", 
+                             value = rval_mod$trans_parameters[["maxValue"]])
+      x[[3]] <- numericInput(ns("pos"), label = "pos", 
+                             value = rval_mod$trans_parameters[["pos"]])
+      x[[4]] <- numericInput(ns("neg"), label = "neg", 
+                             value = rval_mod$trans_parameters[["neg"]])
+      x[[5]] <- numericInput(ns("widthBasis"), label = "widthBasis", 
+                             value = rval_mod$trans_parameters[["widthBasis"]])
     }
     
     box(title = "Transform parameters", width = NULL, collapsible = TRUE, collapsed = FALSE,
@@ -269,17 +286,19 @@ Transform <- function(input, output, session, rval) {
       for(i in 1:length(new_par)){
         
         transformation[[new_par[i]]] <- switch(rval_mod$parameters$display[idx_new[i]],
-                                                    "LOG" = flowWorkspace::logicle_trans(w=0.5, 
-                                                                          m=4.5, 
-                                                                          t = 262144, 
-                                                                          a = 0),
+                                                    "LOG" = flowWorkspace::flowjo_biexp_trans(channelRange = 4096, 
+                                                                                                    maxValue = 262144, 
+                                                                                                    pos = 4.5, 
+                                                                                                    neg = 0, 
+                                                                                                    widthBasis = -10),
                                                     scales::identity_trans())
         
         trans_parameters[[new_par[i]]] <- switch(rval_mod$parameters$display[idx_new[i]],
-                                                      "LOG" = list(w=0.5, 
-                                                                   m=4.5, 
-                                                                   t = 262144, 
-                                                                   a = 0),
+                                                      "LOG" = list(channelRange = 4096,
+                                                                   maxValue = 262144, 
+                                                                   pos = 4.5, 
+                                                                   neg = 0, 
+                                                                   widthBasis = -10),
                                                       list())
       }
       
@@ -348,19 +367,29 @@ Transform <- function(input, output, session, rval) {
                              "identity" = list(),
                              "asinh" = list(scale = input$scale),
                              "log" = list(base = input$base),
-                             "logicle" = list(w=input$w,
-                                              m=input$m,
-                                              t = input$t,
-                                              a = input$a))
+                             # "logicle" = list(w=input$w,
+                             #                  m=input$m,
+                             #                  t = input$t,
+                             #                  a = input$a),
+                             "flowjo_biexp_trans" = list(channelRange = input$channelRange, 
+                                                         maxValue = input$maxValue, 
+                                                         pos = input$pos, 
+                                                         neg = input$neg, 
+                                                         widthBasis = input$widthBasis))
       
       trans <- switch(input$trans,
                       "identity" = scales::identity_trans(),
                       "log" = scales::log_trans(base = input$base),
                       "asinh" = asinh_trans(scale = input$scale),
-                      "logicle" = flowWorkspace::logicle_trans(w=input$w,
-                                                m= input$m,
-                                                t = input$t,
-                                                a = input$a))
+                      # "logicle" = flowWorkspace::logicle_trans(w=input$w,
+                      #                           m= input$m,
+                      #                           t = input$t,
+                      #                           a = input$a),
+                      "flowjo_biexp_trans" = flowWorkspace::flowjo_biexp_trans(channelRange = input$channelRange, 
+                                                                                     maxValue = input$maxValue, 
+                                                                                     pos = input$pos, 
+                                                                                     neg = input$neg, 
+                                                                                     widthBasis = input$widthBasis))
       
       for(i in 1:length(var_name)){
         transformation[[var_name[i]]] <- trans

@@ -42,7 +42,6 @@ PlottingUI <- function(id) {
 Plotting <- function(input, output, session, rval){
 
   plot_params <- reactiveValues()
-  #rval_mod <- reactiveValues(init = TRUE)
   
   observe({
     
@@ -54,7 +53,7 @@ Plotting <- function(input, output, session, rval){
 
   })
   
-  res <- callModule(plotGatingSet, "plot_module", rval, plot_params,
+  res <- callModule(plotCyto, "plot_module", rval, plot_params,
                     simple_plot = FALSE, 
                     auto_update = FALSE
                     )

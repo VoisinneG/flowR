@@ -39,9 +39,6 @@ Ignored if NULL.}
 Plot parameters depend on the plot type selected.}
 
 \item{options}{list of plot format options passed to \code{format_plot()}}
-
-\item{df}{a data.frame with plot data resulting from a call of \code{get_plot_data}. 
-Supersedes parameters 'gs', 'sample', 'spill', 'metadata'}
 }
 \value{
 a plot
