@@ -701,31 +701,32 @@ plotCyto <- function(input, output, session,
         spill <- NULL
       }
     }
-      
-    fs <- gs_get_fs_subset(gs = rval$gating_set[rval_input$sample], 
+    
+    gs <- rval$gating_set[rval_input$sample]
+    fs <- gs_get_fs_subset(gs = gs, 
                            spill =spill,
                            subset = rval_input$subset)
 
     # gate data based on plot limits
-    if(!rval_input$auto_focus){
-      
-      gate_var <- NULL
-      if(!is.null(choices()$axis_limits[[rval_input$xvar]])){
-        gate_var <- rval_input$xvar
-      }
-      
-      if(!is.null(rval_input$yvar)){
-        if(!is.null(choices()$axis_limits[[rval_input$yvar]])){
-          gate_var <- c(gate_var, rval_input$yvar)
-        }
-      }
-      
-      if(length(gate_var) > 0 ){
-        rectGate <- flowCore::rectangleGate(filterId="focus", choices()$axis_limits[gate_var])
-        fs <- flowCore::Subset(fs, rectGate)
-      }
-      
-    }
+    # if(!rval_input$auto_focus){
+    #   
+    #   gate_var <- NULL
+    #   if(!is.null(choices()$axis_limits[[rval_input$xvar]])){
+    #     gate_var <- rval_input$xvar
+    #   }
+    #   
+    #   if(!is.null(rval_input$yvar)){
+    #     if(!is.null(choices()$axis_limits[[rval_input$yvar]])){
+    #       gate_var <- c(gate_var, rval_input$yvar)
+    #     }
+    #   }
+    #   
+    #   if(length(gate_var) > 0 ){
+    #     rectGate <- flowCore::rectangleGate(filterId="focus", choices()$axis_limits[gate_var])
+    #     fs <- flowCore::Subset(fs, rectGate)
+    #   }
+    #   
+    # }
     
     plot_args <- reactiveValuesToList(rval_input)
     
@@ -849,10 +850,12 @@ plotCyto <- function(input, output, session,
     
     gate <- NULL
 
+    gs <- rval$gating_set[rval_input$sample]
+    
     if(show_gates){
       if(!is.null(rval_input$subset)){
         if(rval_input$subset %in% choices()$subset){
-          child_gates <- flowWorkspace::gs_pop_get_children(rval$gating_set[[1]],
+          child_gates <- flowWorkspace::gs_pop_get_children(gs[[1]],
                                                             rval_input$subset)
           if(length(child_gates) > 0){
             gate <- child_gates
@@ -865,7 +868,7 @@ plotCyto <- function(input, output, session,
                      function(p){
                        if(!is.null(gate)){
                          for(gate_name in setdiff(gate, "root")){
-                           gate_int <- flowWorkspace::gs_pop_get_gate(rval$gating_set,
+                           gate_int <- flowWorkspace::gs_pop_get_gate(gs,
                                                                       gate_name)
                            p <- add_gate_to_plot(p, gate_int)
                          }
@@ -970,7 +973,7 @@ plotCyto <- function(input, output, session,
 #                       plot_params = plot_params,
 #                       simple_plot = FALSE,
 #                       show_gates = TRUE,
-#                       use_ggcyto = FALSE
+#                       use_ggcyto = TRUE
 #                       )
 # 
 #     callModule(simpleDisplay, "simple_display_module", res$plot)

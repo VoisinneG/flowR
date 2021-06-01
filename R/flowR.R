@@ -2812,7 +2812,9 @@ plot_gs_ggcyto <- function(gs,
   if(is.null(sample)) sample <-  flowWorkspace::sampleNames(gs)[1]
   if(is.null(subset)) subset <- gh_get_gate_names(gs[[1]])[1]
   
-  fs <- gs_get_fs_subset(gs[sample], spill = spill, subset = subset)
+  gs <- gs[sample]
+  #gs <- recompute(gs) 
+  fs <- gs_get_fs_subset(gs, spill = spill, subset = subset)
   options[["title"]] <- subset
   
   # if(!is.null(spill)){
